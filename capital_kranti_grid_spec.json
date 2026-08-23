@@ -1,0 +1,35 @@
+{
+  "target_pdf": "(172) PDF.pdf",
+  "page_size_pt": {
+    "width": 1119.7,
+    "height": 1584.55
+  },
+  "live_area_pt": {
+    "x0": 15.51,
+    "y0": 12.064,
+    "x1": 1104.182,
+    "y1": 1575.412
+  },
+  "base_module_grid": {
+    "columns": 8,
+    "pitch_pt": 136.084,
+    "origin_x_pt": 15.51,
+    "single_column_text_width_pt": 124.2,
+    "gutter_pt": 11.884,
+    "module_bounds_x_pt": [
+      15.51,
+      151.594,
+      287.678,
+      423.762,
+      559.846,
+      695.93,
+      832.014,
+      968.098,
+      1104.182
+    ],
+    "derivation": "re-derived from the blank master's own live-area width (confirmed target page), not carried over unchanged from the issue PDF measurement -- the two agreed to within 0.5pt across the full width, this is the reconciled, canonical value."
+  },
+  "typography_leading_rule": {
+    "rule": "leading_pt = 1.200 x font_size_pt"
+  }
+}
