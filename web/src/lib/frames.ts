@@ -1,7 +1,20 @@
-import raw from "./frames.json";
+import template from "./template.json";
 import { pt, type Pt } from "./gridSpec";
 
-export type FrameType = "chrome" | "masthead" | "photo" | "body" | "headline";
+// Every structural type the extraction pipeline found across all 4 pages.
+// See capital_kranti_zone_map.json / the roadmap artifact for how these were classified.
+export type FrameType =
+  | "chrome"
+  | "masthead"
+  | "running_header"
+  | "footer"
+  | "photo"
+  | "body_or_caption"
+  | "fine_print"
+  | "headline_L1"
+  | "headline_L2"
+  | "subhead_kicker"
+  | "ad_or_box";
 
 export interface Frame {
   id: string;
@@ -10,20 +23,37 @@ export interface Frame {
   y0: Pt;
   x1: Pt;
   y1: Pt;
-  label: string;
+  w: Pt;
+  h: Pt;
   fontSizePt?: Pt;
   gridSnapped: boolean;
-  moduleStart?: number;
-  moduleEnd?: number;
+  moduleStart: number;
+  moduleEnd: number;
+  labelHint: string | null;
 }
 
-// Single source of truth for both the React preview and the pdf-lib export script.
-// The .json file is read directly by the Node export script too -- do not fork this data.
-export const page1Frames: Frame[] = (raw.frames as Array<Record<string, unknown>>).map((f) => ({
-  ...(f as object),
-  x0: pt(f.x0 as number),
-  y0: pt(f.y0 as number),
-  x1: pt(f.x1 as number),
-  y1: pt(f.y1 as number),
-  fontSizePt: f.fontSizePt !== undefined ? pt(f.fontSizePt as number) : undefined,
-})) as Frame[];
+type RawFrame = {
+  id: string;
+  type: string;
+  x0: number; y0: number; x1: number; y1: number; w: number; h: number;
+  moduleStart: number; moduleEnd: number; gridSnapped: boolean;
+  fontSizePt: number | null; labelHint: string | null;
+};
+
+export type PageNumber = "1" | "2" | "3" | "4";
+
+const pages = template.pages as Record<PageNumber, { frames: RawFrame[] }>;
+
+/** All frames for one page, re-anchored onto the blank master's exact coordinate
+ * system (see canonical_template.json for the full transform + provenance). */
+export function getPageFrames(page: PageNumber): Frame[] {
+  return pages[page].frames.map((f) => ({
+    ...f,
+    type: f.type as FrameType,
+    x0: pt(f.x0), y0: pt(f.y0), x1: pt(f.x1), y1: pt(f.y1),
+    w: pt(f.w), h: pt(f.h),
+    fontSizePt: f.fontSizePt != null ? pt(f.fontSizePt) : undefined,
+  }));
+}
+
+export const PAGE_NUMBERS: PageNumber[] = ["1", "2", "3", "4"];
