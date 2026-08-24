@@ -8,6 +8,7 @@
 export const CHROME = {
   tagline: "સમાજનો વિવેકપૂર્ણ દ્રષ્ટિકોણ",
   wordmark: "કેપિટલ ક્રાંતિ",
+  subtitleEn: "(CAPITAL KRANTI - DAILY - GANDHINAGAR)",
   subtitle: "દૈનિક (ગાંધીનગર)",
   contactBar: "M. : 98256 08744    •    E-mail : capitalkranti@gmail.com    •    web : capitalkranti.co.in",
   rni: "RNI No. 54922/93",
@@ -16,6 +17,13 @@ export const CHROME = {
     "PLOT NO. 704/B/2, G.I.D.C., SECTOR-28, GANDHINAGAR. PUBLISHED FROM : BLOCK NO. 32/4, GH TYPE, " +
     "SECTOR-28, GANDHINAGAR [GUJARAT]-382 028.",
 };
+
+// The source page sets all numerals in the edition bar as Gujarati digits (૦-૯),
+// not Latin -- these are the ones that actually appear in the original render.
+const GUJARATI_DIGITS = ["૦", "૧", "૨", "૩", "૪", "૫", "૬", "૭", "૮", "૯"];
+function toGujaratiDigits(n: number | string): string {
+  return String(n).replace(/[0-9]/g, (d) => GUJARATI_DIGITS[Number(d)]);
+}
 
 /** Dynamic per-issue fields -- these are the ones an automated build should regenerate daily,
  * everything in CHROME above stays fixed across issues. */
@@ -26,8 +34,9 @@ export function editionBar(date: Date, issueNo: number): string {
   const yyyy = date.getFullYear();
   const dow = days[date.getDay()];
   return (
-    `વર્ષ : 34    •    અંક : ${issueNo}    •    તારીખ : ${dd}-${mm}-${yyyy}, ${dow}` +
-    `    •    કિંમત : 50 પૈસા    •    તંત્રી : પાર્થ એમ. ઠક્કર` +
+    `વર્ષ : ${toGujaratiDigits(34)}    •    અંક : ${toGujaratiDigits(issueNo)}    •    ` +
+    `તારીખ : ${toGujaratiDigits(`${dd}-${mm}-${yyyy}`)}, ${dow}` +
+    `    •    કિંમત : ${toGujaratiDigits(50)} પૈસા    •    તંત્રી : પાર્થ એમ. ઠક્કર` +
     `    •    બ્યુરો ચીફ : બિજેન કાપડિયા (અમદાવાદ)    •    મેનેજિંગ તંત્રી : સુરેશ ચંડી`
   );
 }
@@ -121,7 +130,7 @@ const today = new Date();
 /** Frame-id -> text, for the frames on page 1 we have real content for. */
 export const PAGE1_CONTENT: Record<string, string> = {
   "p1-2": CHROME.tagline,
-  "p1-4": `${CHROME.contactBar}    ${CHROME.rni}`,
+  "p1-4": CHROME.contactBar,
   "p1-7": CHROME.wordmark,
   "p1-8": CHROME.subtitle,
   "p1-10": editionBar(today, 212),

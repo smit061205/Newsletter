@@ -3,6 +3,7 @@ import { PAGE, LIVE_AREA, LEADING_RATIO } from "@/lib/gridSpec";
 import { getPageFrames, PAGE_NUMBERS, type PageNumber, type Frame } from "@/lib/frames";
 import { PAGE1_CONTENT, AD_PLACEHOLDER_IDS, OPEN_STORY_SLOT_IDS, CHROME, FONT_SIZE_OVERRIDES_PT } from "@/lib/content";
 import { resolveFont } from "@/lib/fonts";
+import headerSpec from "@/lib/header_spec.json";
 
 // The reader-facing render: what an editor proofs and what Playwright screenshots
 // for production. No debug numbers, no per-type colour coding -- see ./debug for
@@ -13,6 +14,13 @@ export function generateStaticParams() {
 
 const GUJARATI_FONT = "'Noto Sans Gujarati', 'Noto Sans', Arial, sans-serif";
 const RULE = "#111";
+
+// Frame ids handled by <Masthead/> instead of the generic loop -- every text span
+// and background field in the header was individually re-measured from the source
+// PDF (see header_spec.json), not approximated from the block-level extraction.
+const MASTHEAD_FRAME_IDS = new Set([
+  "p1-1", "p1-2", "p1-3", "p1-4", "p1-5", "p1-6", "p1-7", "p1-8", "p1-9", "p1-10",
+]);
 
 export default async function PrintPage({
   params,
@@ -43,18 +51,183 @@ export default async function PrintPage({
           boxShadow: "0 0 0 0.5pt #ccc",
         }}
       >
-        {/* structural rules -- top masthead band + edition-bar bottom, matching the
-            measured header-band positions from the source PDF */}
-        <Rule y={LIVE_AREA.y0 + 30.5} />
-        {page === "1" && <Rule y={266} weight={0.75} />}
+        {page === "1" && <Masthead />}
+        {page !== "1" && <Rule y={LIVE_AREA.y0 + 30.5} />}
 
         {frames.map((f) => {
+          if (page === "1" && MASTHEAD_FRAME_IDS.has(f.id)) return null;
           if (adIds.includes(f.id)) return <AdBox key={f.id} f={f} />;
           if (pendingIds.includes(f.id)) return <PendingBox key={f.id} f={f} />;
           return <FrameBox key={f.id} f={f} text={content[f.id]} />;
         })}
 
         {page === "4" && <FooterLegal />}
+      </div>
+    </>
+  );
+}
+
+// Every box/text position below is `header_spec.json`'s canonical-coordinate
+// re-measurement of the source PDF's actual header spans and filled rects --
+// not estimated. See the extraction that produced it: every span's own bbox,
+// font, size, and RGB color, and every filled rect's own bbox/fill/stroke.
+type Box = { x0: number; y0: number; x1: number; y1: number };
+const H = headerSpec.header_boxes_canonical_pt as Record<string, Box | number>;
+const C = headerSpec.colors as Record<string, string>;
+const b = (name: string) => H[name] as Box;
+const w = (bx: Box) => bx.x1 - bx.x0;
+const h = (bx: Box) => bx.y1 - bx.y0;
+
+function Masthead() {
+  const tagBar = b("navy_box_tagline");
+  const contactBar = b("navy_box_contact");
+  const rniBar = b("navy_box_rni");
+  const tagText = b("tagline_text");
+  const rniText = b("rni_text");
+  const wordmark = b("wordmark");
+  const pOpen = b("subtitle_paren_open");
+  const enBold1 = b("subtitle_en_bold1");
+  const enBold2 = b("subtitle_en_bold2");
+  const pClose = b("subtitle_paren_close");
+  const guSub = b("subtitle_gu");
+  const editionBg = b("edition_bar_bg");
+  const tabL = b("edition_tab_left");
+  const tabR = b("edition_tab_right");
+  const contactStart = H["contact_text_start"] as number;
+  const contactEnd = H["contact_text_end"] as number;
+
+  return (
+    <>
+      {/* three navy fields -- tagline / contact / RNI -- separate boxes with a
+          small gap between them, each with the same fill + purple stroke */}
+      {[tagBar, contactBar, rniBar].map((bx, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute", left: `${bx.x0}pt`, top: `${bx.y0}pt`,
+            width: `${w(bx)}pt`, height: `${h(bx)}pt`,
+            background: C.navy_fill, border: `0.96pt solid ${C.navy_stroke}`,
+            boxSizing: "border-box",
+          }}
+        />
+      ))}
+
+      {/* tagline text, white, on the first navy field */}
+      <div style={{
+        position: "absolute", left: `${tagText.x0}pt`, top: `${tagText.y0}pt`,
+        width: `${w(tagText)}pt`, height: `${h(tagText)}pt`,
+        display: "flex", alignItems: "center",
+        fontFamily: "'Hind Vadodara', 'Noto Sans Gujarati', sans-serif", fontWeight: 700,
+        fontSize: "13.5pt", color: "#fff", whiteSpace: "nowrap",
+      }}>
+        {CHROME.tagline}
+      </div>
+
+      {/* contact info, white, on the second navy field -- bullets rendered gold
+          to match the source's Wingdings separator colour */}
+      <div style={{
+        position: "absolute", left: `${contactStart}pt`, top: `${contactBar.y0}pt`,
+        width: `${contactEnd - contactStart}pt`, height: `${h(contactBar)}pt`,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        fontFamily: "Arial, Helvetica, sans-serif", fontWeight: 700,
+        fontSize: "9.5pt", color: "#fff", whiteSpace: "nowrap",
+      }}>
+        {CHROME.contactBar.split("    •    ").map((part, i) => (
+          <span key={i} style={{ display: "flex", alignItems: "center", gap: "6pt" }}>
+            {i > 0 && <span style={{ color: C.bullet_gold }}>◆</span>}
+            {part}
+          </span>
+        ))}
+      </div>
+
+      {/* RNI number, white, on the third navy field */}
+      <div style={{
+        position: "absolute", left: `${rniText.x0}pt`, top: `${rniText.y0}pt`,
+        width: `${w(rniText)}pt`, height: `${h(rniText)}pt`,
+        display: "flex", alignItems: "center",
+        fontFamily: "Arial, Helvetica, sans-serif", fontWeight: 700,
+        fontSize: "11.5pt", color: "#fff", whiteSpace: "nowrap",
+      }}>
+        {CHROME.rni}
+      </div>
+
+      {/* masthead brand mark -- real image extracted from the source PDF */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/photos/masthead-logo.jpg"
+        alt=""
+        style={{
+          position: "absolute", left: "14.35pt", top: "52.73pt",
+          width: "141.45pt", height: "172.95pt", objectFit: "cover",
+        }}
+      />
+
+      {/* wordmark -- exact source colour, not an approximation */}
+      <div style={{
+        position: "absolute", left: `${wordmark.x0}pt`, top: `${wordmark.y0}pt`,
+        width: `${w(wordmark)}pt`, height: `${h(wordmark)}pt`,
+        display: "flex", alignItems: "center",
+        fontFamily: "'Baloo Bhai 2', 'Noto Sans Gujarati', sans-serif", fontWeight: 700,
+        fontSize: "68pt", color: C.wordmark_purple, whiteSpace: "nowrap", overflow: "hidden",
+      }}>
+        {CHROME.wordmark}
+      </div>
+
+      {/* "(CAPITAL KRANTI - DAILY - " -- larger, then "GANDHINAGAR)" set smaller
+          to fit, exactly like the source (its own auto-condense, replicated) */}
+      <div style={{
+        position: "absolute", left: `${pOpen.x0}pt`, top: `${enBold1.y0}pt`,
+        height: `${h(enBold1)}pt`, display: "flex", alignItems: "baseline",
+        fontFamily: "Arial, Helvetica, sans-serif", color: C.ink_near_black, whiteSpace: "nowrap",
+      }}>
+        <span style={{ fontSize: "18pt", fontWeight: 400 }}>(</span>
+        <span style={{ fontSize: "18pt", fontWeight: 900, letterSpacing: "-0.01em" }}>
+          CAPITAL KRANTI - DAILY -{" "}
+        </span>
+        <span style={{ fontSize: "14.5pt", fontWeight: 900, letterSpacing: "-0.01em" }}>
+          GANDHINAGAR
+        </span>
+        <span style={{ fontSize: "18pt", fontWeight: 400 }}>)</span>
+      </div>
+
+      {/* Gujarati subtitle -- no border in the source; a plain text run */}
+      <div style={{
+        position: "absolute", left: `${guSub.x0}pt`, top: `${guSub.y0}pt`,
+        width: `${w(guSub)}pt`, height: `${h(guSub)}pt`,
+        display: "flex", alignItems: "center",
+        fontFamily: "'Baloo Bhai 2', 'Noto Sans Gujarati', sans-serif", fontWeight: 700,
+        fontSize: "20pt", color: C.ink_near_black, whiteSpace: "nowrap",
+      }}>
+        {CHROME.subtitle}
+      </div>
+
+      {/* edition-info bar -- cream field with cyan accent tabs at each end */}
+      <div style={{
+        position: "absolute", left: `${editionBg.x0}pt`, top: `${editionBg.y0}pt`,
+        width: `${w(editionBg)}pt`, height: `${h(editionBg)}pt`,
+        background: C.edition_bg_cream, boxSizing: "border-box",
+      }} />
+      <div style={{
+        position: "absolute", left: `${tabL.x0}pt`, top: `${tabL.y0}pt`,
+        width: `${w(tabL)}pt`, height: `${h(tabL)}pt`, background: C.edition_tab_cyan,
+      }} />
+      <div style={{
+        position: "absolute", left: `${tabR.x0}pt`, top: `${tabR.y0}pt`,
+        width: `${w(tabR)}pt`, height: `${h(tabR)}pt`, background: C.edition_tab_cyan,
+      }} />
+      <div style={{
+        position: "absolute", left: `${editionBg.x0 + 10}pt`, top: `${editionBg.y0}pt`,
+        width: `${w(editionBg) - 20}pt`, height: `${h(editionBg)}pt`,
+        display: "flex", alignItems: "center",
+        fontFamily: "'Hind Vadodara', 'Noto Sans Gujarati', sans-serif", fontWeight: 700,
+        fontSize: "9.5pt", color: C.ink_near_black, whiteSpace: "nowrap",
+      }}>
+        {PAGE1_CONTENT["p1-10"]?.split("    •    ").map((part, i) => (
+          <span key={i} style={{ display: "flex", alignItems: "center", gap: "5pt" }}>
+            {i > 0 && <span style={{ color: C.bullet_gold, fontSize: "8pt" }}>◆</span>}
+            {part}
+          </span>
+        ))}
       </div>
     </>
   );
@@ -112,10 +285,19 @@ function FrameBox({ f, text }: { f: Frame; text?: string }) {
   const size = FONT_SIZE_OVERRIDES_PT[f.id] ?? f.fontSizePt ?? 9;
   const font = resolveFont(f.sourceFont, f.type);
   const isPhoto = f.type === "photo";
-  // chrome bars get the real masthead/edition-bar treatment instead of a generic box
-  const bar = CHROME_BAR[f.id];
+  const photoSrc = PHOTO_SRC[f.id];
+  // real newspaper body copy is set justified, not ragged-right; headlines/mast stay left/centre
+  const justify = f.type === "body_or_caption" || f.type === "fine_print";
 
   if (isPhoto) {
+    if (photoSrc) {
+      return (
+        <div style={{ ...box(f), border: "0.5pt solid #c7ccd4" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        </div>
+      );
+    }
     return (
       <div
         style={{
@@ -132,12 +314,11 @@ function FrameBox({ f, text }: { f: Frame; text?: string }) {
     <div
       style={{
         ...box(f),
-        background: bar?.background ?? "#fff",
+        background: "transparent",
         padding: "1pt 3pt",
         display: "flex",
-        alignItems: bar ? "center" : "flex-start",
-        justifyContent: bar?.center ? "center" : "flex-start",
-        border: f.type === "chrome" ? "0.5pt solid #444" : undefined,
+        alignItems: "flex-start",
+        justifyContent: "flex-start",
       }}
     >
       {text && (
@@ -147,9 +328,10 @@ function FrameBox({ f, text }: { f: Frame; text?: string }) {
             fontWeight: font.weight,
             fontSize: `${size}pt`,
             lineHeight: LEADING_RATIO,
-            color: bar?.color ?? "#000",
+            color: "#000",
             display: "block",
-            textAlign: bar?.center ? "center" : "left",
+            textAlign: justify ? "justify" : "left",
+            textAlignLast: justify ? "left" : undefined,
           }}
         >
           {text}
@@ -159,14 +341,11 @@ function FrameBox({ f, text }: { f: Frame; text?: string }) {
   );
 }
 
-// Real bar treatment for the masthead-area chrome frames, matched loosely to the
-// original's colour scheme (navy contact bar, pale edition-info bar) rather than
-// left as bare debug boxes.
-const CHROME_BAR: Record<string, { background: string; color: string; center?: boolean }> = {
-  "p1-1": { background: "#132a52", color: "#fff" },
-  "p1-3": { background: "#132a52", color: "#fff" },
-  "p1-5": { background: "#132a52", color: "#fff" },
-  "p1-9": { background: "#eef1f8", color: "#111" },
+// Real PIB press photos, sourced per-story (see content.ts for provenance). Only
+// wired where a genuine photo exists for that specific story -- unfilled photo
+// frames stay as neutral placeholders rather than borrowing an unrelated image.
+const PHOTO_SRC: Record<string, string> = {
+  "p1-15": "/photos/prag1.jpg",
 };
 
 function AdBox({ f }: { f: Frame }) {
