@@ -77,12 +77,48 @@ export const STORY_PRAG: Story = {
   source: "PIB Ahmedabad, 12 Aug 2026 (PRID 2298380)",
 };
 
+// Source: PIB Ahmedabad, "NIFT Gandhinagar Launches 24-Hour Uniform Design Hackathon",
+// 29 May 2026. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2266804
+export const STORY_NIFT: Story = {
+  subhead: "ITI તાલીમાર્થીઓ માટે નવો યુનિફોર્મ, વિજેતા ટીમને ₹1 લાખનું ઇનામ",
+  headline: "NIFT ગાંધીનગર ખાતે 24 કલાકની યુનિફોર્મ ડિઝાઇન હેકાથોન",
+  bodyColumns: [
+    "ગાંધીનગર: NIFT ગાંધીનગર અને ગુજરાત સરકારના રોજગાર અને તાલીમ નિયામકની કચેરીના સંયુક્ત " +
+      "ઉપક્રમે 'યુનિફોર્મ ડિઝાઇન હેકાથોન 2026'નો પ્રારંભ NIFT કેમ્પસ ખાતે થયો હતો.",
+    "NIFT ગાંધીનગર અને ગુજરાત યુનિવર્સિટીની કુલ ચાર વિદ્યાર્થી ટીમો રાજ્યની સરકારી ITI " +
+      "સંસ્થાઓ માટે કાર્યક્ષમ અને પોસાય તેવા યુનિફોર્મ ડિઝાઇન કરવા 24 કલાક સતત કામ કરી રહી છે.",
+    "વિજેતા ડિઝાઇનનો ખર્ચ પ્રતિ યુનિફોર્મ ₹1,000થી વધુ ન હોવો જોઈએ. પ્રથમ ટીમને ₹50,000, " +
+      "બીજીને ₹30,000 અને ત્રીજીને ₹20,000નું ઇનામ અપાશે.",
+  ],
+  source: "PIB Ahmedabad, 29 May 2026 (PRID 2266804)",
+};
+
+// Source: PIB Delhi, "PM to Visit Gujarat on 25-26 August", 24 Aug 2025. Dated a year
+// before this demo's "today" -- included anyway as a realistic example of a longer
+// policy/visit backgrounder a paper runs ahead of the event, date kept accurate rather
+// than implied to be this week's news. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2160280
+export const STORY_PM_VISIT: Story = {
+  kicker: "25-26 ઓગસ્ટે અમદાવાદમાં ₹5,400 કરોડના વિકાસ પ્રોજેક્ટ્સનું લોકાર્પણ",
+  headline: "વડાપ્રધાન મોદી 25-26 ઓગસ્ટે ગુજરાતની મુલાકાતે",
+  bodyColumns: [
+    "અમદાવાદ: વડાપ્રધાન નરેન્દ્ર મોદી 25-26 ઓગસ્ટના રોજ ગુજરાતની મુલાકાતે આવશે. તેઓ 25 " +
+      "ઓગસ્ટે સાંજે ખોડલધામ મેદાન, અમદાવાદ ખાતે ₹5,400 કરોડથી વધુના વિવિધ વિકાસ પ્રોજેક્ટ્સનું " +
+      "લોકાર્પણ અને શિલાન્યાસ કરશે.",
+    "26 ઓગસ્ટે તેઓ હાંસલપુર ખાતે સુઝુકીની પ્રથમ ગ્લોબલ બેટરી ઇલેક્ટ્રિક વ્હીકલ 'e VITARA'ને " +
+      "100થી વધુ દેશોમાં નિકાસ માટે લીલી ઝંડી આપશે તેમજ હાઇબ્રિડ બેટરી ઇલેક્ટ્રોડના સ્થાનિક " +
+      "ઉત્પાદનનું ઉદ્ઘાટન કરશે.",
+    "કાર્યક્રમમાં ₹1,400 કરોડથી વધુના રેલવે પ્રોજેક્ટ્સ પણ રાષ્ટ્રને અર્પણ કરાશે, જેમાં " +
+      "મહેસાણા-પાલનપુર રેલ લાઇનનું બમણું કરણ અને કલોલ-કડી-કટોસણ તથા બેચરાજી-રાણુજ લાઇનનું " +
+      "ગેજ પરિવર્તન સામેલ છે.",
+    "વિરમગામ-ખુડદ-રામપુરા રોડના પહોળાઈકરણનું ઉદ્ઘાટન તેમજ અમદાવાદ નજીક છ-લેન અંડરપાસના " +
+      "નિર્માણનું ખાતમુહૂર્ત પણ કરાશે.",
+  ],
+  source: "PIB Delhi, 24 Aug 2025 (PRID 2160280)",
+};
+
 const today = new Date();
 
-/** Frame-id -> text, for the frames on page 1 we have real content for.
- * Anything not listed here (photo frames, ad/box backgrounds, and the third
- * headline slot the original page has room for) renders as a clearly-marked
- * placeholder in the print route -- not fabricated as if it were real news. */
+/** Frame-id -> text, for the frames on page 1 we have real content for. */
 export const PAGE1_CONTENT: Record<string, string> = {
   "p1-2": CHROME.tagline,
   "p1-4": `${CHROME.contactBar}    ${CHROME.rni}`,
@@ -103,11 +139,27 @@ export const PAGE1_CONTENT: Record<string, string> = {
   "p1-22": STORY_PRAG.bodyColumns[1],
   "p1-23": STORY_PRAG.bodyColumns[2],
   "p1-24": STORY_PRAG.bodyColumns[3],
+
+  "p1-25": STORY_NIFT.headline,
+  "p1-28": STORY_NIFT.subhead ?? "",
+  "p1-35": STORY_NIFT.bodyColumns[0],
+  "p1-36": STORY_NIFT.bodyColumns[1],
+  "p1-37": STORY_NIFT.bodyColumns[2],
+
+  "p1-26": STORY_PM_VISIT.kicker ?? "",
+  "p1-27": STORY_PM_VISIT.headline,
+  "p1-29": STORY_PM_VISIT.bodyColumns[0],
+  "p1-31": STORY_PM_VISIT.bodyColumns[1],
+  "p1-32": STORY_PM_VISIT.bodyColumns[2],
+  "p1-33": STORY_PM_VISIT.bodyColumns[3],
 };
 
-// Explicitly a placeholder, not a third real story -- see the roadmap's stance on
-// never auto-filling editorial space with fabricated content.
-export const OPEN_STORY_SLOT_IDS = ["p1-25", "p1-26", "p1-27", "p1-28", "p1-29"];
+// Structurally ad space in the original (bordered boxes with no editorial text
+// nearby) -- labelled as what they are rather than left blank or faked as news.
+export const AD_PLACEHOLDER_IDS = ["p1-39", "p1-40"];
+
+// The two small bottom-of-page brief slots with no sourced content behind them yet.
+export const OPEN_STORY_SLOT_IDS = ["p1-42", "p1-43"];
 
 export const PAGE4_FOOTER_ID = "p4-footer-legal";
 
