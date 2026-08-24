@@ -21,13 +21,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <head>
-        {/* Dev-only preview font. Production export needs a self-hosted, licensed
-            Gujarati OpenType face weight-matched to the original Bharati look --
-            this is the still-open "font spike" from the roadmap, not that answer. */}
+        {/* Dev-only preview fonts, one per role the source PDF actually used
+            (see src/lib/fonts.ts): Baloo Bhai 2 for the BBharatiTitleTwo masthead
+            face, Hind Vadodara for BBharatiGopikaTwo body/headlines, Mukta Vaani
+            for the secondary BBharatiMaruti headline face, Noto Sans Gujarati as
+            a shared fallback. Production still needs a self-hosted, licensed face
+            weight-matched to the originals -- the "font spike" stays open. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Sans+Gujarati:wght@400;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Baloo+Bhai+2:wght@700;800&family=Hind+Vadodara:wght@400;500;700&family=Mukta+Vaani:wght@600;700&family=Noto+Sans+Gujarati:wght@400;600;700&display=swap"
           rel="stylesheet"
         />
       </head>

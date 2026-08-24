@@ -30,6 +30,10 @@ export interface Frame {
   moduleStart: number;
   moduleEnd: number;
   labelHint: string | null;
+  /** The exact font span this frame was set in, in the source PDF (e.g.
+   * "BBharatiGopikaTwo,Bold"). Null for frames with no matched text span
+   * (photos, ad boxes). Resolve via resolveFont() in fonts.ts. */
+  sourceFont: string | null;
 }
 
 type RawFrame = {
@@ -37,7 +41,7 @@ type RawFrame = {
   type: string;
   x0: number; y0: number; x1: number; y1: number; w: number; h: number;
   moduleStart: number; moduleEnd: number; gridSnapped: boolean;
-  fontSizePt: number | null; labelHint: string | null;
+  fontSizePt: number | null; labelHint: string | null; sourceFont?: string | null;
 };
 
 export type PageNumber = "1" | "2" | "3" | "4";
@@ -53,6 +57,7 @@ export function getPageFrames(page: PageNumber): Frame[] {
     x0: pt(f.x0), y0: pt(f.y0), x1: pt(f.x1), y1: pt(f.y1),
     w: pt(f.w), h: pt(f.h),
     fontSizePt: f.fontSizePt != null ? pt(f.fontSizePt) : undefined,
+    sourceFont: f.sourceFont ?? null,
   }));
 }
 

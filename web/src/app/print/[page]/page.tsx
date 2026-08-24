@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { PAGE, LIVE_AREA, LEADING_RATIO } from "@/lib/gridSpec";
 import { getPageFrames, PAGE_NUMBERS, type PageNumber, type Frame } from "@/lib/frames";
 import { PAGE1_CONTENT, OPEN_STORY_SLOT_IDS, CHROME, FONT_SIZE_OVERRIDES_PT } from "@/lib/content";
+import { resolveFont } from "@/lib/fonts";
 
 // Bare export surface, one per newspaper page: no nav, no chrome. This is what
 // Playwright screenshots for editor preview and what pdf-lib's export script
@@ -70,6 +71,7 @@ function FrameBox({ f, index, text }: { f: Frame; index: number; text?: string }
   const color = frameColor(f.type);
   const isPhoto = f.type === "photo";
   const size = FONT_SIZE_OVERRIDES_PT[f.id] ?? f.fontSizePt ?? 9;
+  const font = resolveFont(f.sourceFont, f.type);
 
   return (
     <div
@@ -89,12 +91,13 @@ function FrameBox({ f, index, text }: { f: Frame; index: number; text?: string }
     >
       {text ? (
         <span
+          title={f.sourceFont ?? undefined}
           style={{
-            fontFamily: GUJARATI_FONT,
+            fontFamily: font.family,
+            fontWeight: font.weight,
             fontSize: `${size}pt`,
             lineHeight: LEADING_RATIO, // measured exact from the source PDF: leading = 1.2 x size
             color: "#111",
-            fontWeight: f.type.startsWith("headline") ? 700 : 400,
             display: "block",
           }}
         >
