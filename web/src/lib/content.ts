@@ -125,6 +125,30 @@ export const STORY_PM_VISIT: Story = {
   source: "PIB Delhi, 24 Aug 2025 (PRID 2160280)",
 };
 
+// Source: PIB Ahmedabad, "CBI Court Ahmedabad Sentences Income Tax Officer to Three
+// Years' Rigorous Imprisonment in Bribery Case", 21 Aug 2026. Fetched live this
+// session (Phase 8, docs/PRECISION_ROADMAP.md) via the direct iframe content URL
+// (PressReleasePage.aspx?PRID=..., no reg/lang params) after the listing page's
+// date filter was set via a JS-dispatched change event on its <select> -- the
+// two techniques that made repeatable automated PIB fetching actually work,
+// after an earlier attempt at manual UI interaction proved unreliable.
+// https://www.pib.gov.in/PressReleasePage.aspx?PRID=2302022
+export const STORY_CBI_BRIBERY: Story = {
+  kicker: "CBI કોર્ટ, અમદાવાદનો ચુકાદો; 2013ના ટ્રેપ કેસમાં 13 વર્ષે સજા",
+  headline: "લાંચ કેસમાં આવકવેરા અધિકારીને ત્રણ વર્ષની જેલ",
+  bodyColumns: [
+    "અમદાવાદ: CBI કોર્ટ, અમદાવાદે 21 ઓગસ્ટના રોજ આવકવેરા અધિકારી જરનૈલ બી. સિંઘને લાંચ કેસમાં " +
+      "દોષિત ઠેરવી ત્રણ વર્ષની સખત કેદ અને ₹20,000ના દંડની સજા ફટકારી હતી.",
+    "પ્રત્યક્ષકર ભવન, અમદાવાદ ખાતે ફરજ બજાવતા સિંઘ સામે 'શ્રીલેખા વિવિધલક્ષ્મી ચેરિટેબલ ટ્રસ્ટ'ને " +
+      "આવકવેરા કાયદાની કલમ 11 અને 80G હેઠળ મુક્તિ આપવા બદલ ₹10,000ની લાંચ માંગ્યાનો આરોપ હતો.",
+    "CBIએ 22 ફેબ્રુઆરી, 2013ના રોજ છટકું ગોઠવી આરોપીને લાંચ સ્વીકારતા રંગેહાથ ઝડપી પાડ્યો હતો અને " +
+      "એ જ દિવસે ધરપકડ કરી હતી. તપાસ બાદ 31 ઓક્ટોબર, 2013ના રોજ ચાર્જશીટ દાખલ કરાઈ હતી.",
+    "લગભગ 13 વર્ષની ટ્રાયલ બાદ કોર્ટે આરોપીને દોષિત ઠેરવ્યો, જે કેન્દ્ર સરકારના ભ્રષ્ટાચાર વિરોધી " +
+      "અભિયાનનું વધુ એક ઉદાહરણ ગણાવાઈ રહ્યું છે.",
+  ],
+  source: "PIB Ahmedabad, 21 Aug 2026 (PRID 2302022)",
+};
+
 const today = new Date();
 
 /** Frame-id -> text, for the frames on page 1 we have real content for. */

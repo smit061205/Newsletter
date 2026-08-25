@@ -1,0 +1,290 @@
+{
+  "tagline": {
+    "text": "સમાજનો વિવેકપૂર્ણ દ્રષ્ટિકોણ",
+    "font": "BBharatiTitleTwo",
+    "size": 19,
+    "bbox": [
+      28.49,
+      20.79,
+      198.66,
+      39.79
+    ],
+    "width_pt": 170.17,
+    "height_pt": 19,
+    "substituteFont": "'Baloo Bhai 2'",
+    "measuredWidthAtRef100": 1095.41,
+    "calibratedSizePt": 15.53
+  },
+  "rni": {
+    "text": "RNI No. 54922/93",
+    "font": "Helvetica-Bold",
+    "size": 15,
+    "bbox": [
+      961.73,
+      16.69,
+      1083.06,
+      37.35
+    ],
+    "width_pt": 121.33,
+    "height_pt": 20.66,
+    "substituteFont": "Arial, Helvetica",
+    "measuredWidthAtRef100": 805.97,
+    "calibratedSizePt": 15.05
+  },
+  "contact_m": {
+    "text": "M. : 98256 08744",
+    "font": "Helvetica-Bold",
+    "size": 12,
+    "bbox": [
+      304.01,
+      20.74,
+      401.42,
+      37.27
+    ],
+    "width_pt": 97.41,
+    "height_pt": 16.53,
+    "substituteFont": "Arial, Helvetica",
+    "measuredWidthAtRef100": 783.89,
+    "calibratedSizePt": 12.43
+  },
+  "contact_email": {
+    "text": "E-mail : capitalkranti@gmail.com",
+    "font": "Helvetica-Bold",
+    "size": 12,
+    "bbox": [
+      469.13,
+      20.74,
+      671.76,
+      37.27
+    ],
+    "width_pt": 202.63,
+    "height_pt": 16.53,
+    "substituteFont": "Arial, Helvetica",
+    "measuredWidthAtRef100": 1570.17,
+    "calibratedSizePt": 12.9
+  },
+  "contact_web": {
+    "text": "web : capitalkranti.co.in",
+    "font": "Helvetica-Bold",
+    "size": 12,
+    "bbox": [
+      727.25,
+      20.74,
+      866.93,
+      37.27
+    ],
+    "width_pt": 139.68,
+    "height_pt": 16.53,
+    "substituteFont": "Arial, Helvetica",
+    "measuredWidthAtRef100": 1133.59,
+    "calibratedSizePt": 12.32
+  },
+  "wordmark": {
+    "text": "કેપિટલ ક્રાંતિ",
+    "font": "BBharatiTitleTwo",
+    "size": 190,
+    "bbox": [
+      168.29,
+      59,
+      885.18,
+      249
+    ],
+    "width_pt": 716.89,
+    "height_pt": 190,
+    "substituteFont": "'Baloo Bhai 2'",
+    "measuredWidthAtRef100": 481.91,
+    "calibratedSizePt": 148.76
+  },
+  "subtitle_gu": {
+    "text": "દૈનિક (ગાંધીનગર)",
+    "font": "BBharatiTitleTwo",
+    "size": 31,
+    "bbox": [
+      689.81,
+      208.26,
+      879.78,
+      239.26
+    ],
+    "width_pt": 189.97,
+    "height_pt": 31,
+    "substituteFont": "'Baloo Bhai 2'",
+    "measuredWidthAtRef100": 683.11,
+    "calibratedSizePt": 27.81
+  },
+  "en_sub_open": {
+    "text": "(",
+    "font": "Helvetica",
+    "size": 22.36,
+    "bbox": [
+      180.89,
+      208.91,
+      187.55,
+      243.26
+    ],
+    "width_pt": 6.66,
+    "height_pt": 34.35,
+    "substituteFont": "Arial, Helvetica",
+    "measuredWidthAtRef100": 33.31,
+    "calibratedSizePt": 19.99
+  },
+  "en_sub_bold1": {
+    "text": "CAPITAL KRANTI - DAILY - ",
+    "font": "ArialBlack",
+    "size": 22.36,
+    "bbox": [
+      187.49,
+      213.78,
+      482.54,
+      236.14
+    ],
+    "width_pt": 295.05,
+    "height_pt": 22.36,
+    "substituteFont": "'Arial Black', Arial",
+    "measuredWidthAtRef100": 1436.88,
+    "calibratedSizePt": 20.53
+  },
+  "en_sub_bold2": {
+    "text": "GANDHINAGAR",
+    "font": "ArialBlack",
+    "size": 17.89,
+    "bbox": [
+      482.81,
+      218.18,
+      616.74,
+      236.07
+    ],
+    "width_pt": 133.93,
+    "height_pt": 17.89,
+    "substituteFont": "'Arial Black', Arial",
+    "measuredWidthAtRef100": 841.56,
+    "calibratedSizePt": 15.91
+  },
+  "en_sub_close": {
+    "text": ")",
+    "font": "Helvetica",
+    "size": 22.36,
+    "bbox": [
+      616.73,
+      208.91,
+      623.39,
+      243.26
+    ],
+    "width_pt": 6.66,
+    "height_pt": 34.35,
+    "substituteFont": "Arial, Helvetica",
+    "measuredWidthAtRef100": 33.31,
+    "calibratedSizePt": 19.99
+  },
+  "ed_vs": {
+    "text": "વર્ષ : 34",
+    "font": "BBharatiGopikaTwo,Bold",
+    "size": 14,
+    "bbox": [
+      116.69,
+      250.8,
+      160.8,
+      266.11
+    ],
+    "width_pt": 44.11,
+    "height_pt": 15.31,
+    "substituteFont": "'Hind Vadodara'",
+    "measuredWidthAtRef100": 309.31,
+    "calibratedSizePt": 14.26
+  },
+  "ed_ank": {
+    "text": "અંક : 196",
+    "font": "BBharatiGopikaTwo,Bold",
+    "size": 14,
+    "bbox": [
+      189.65,
+      250.8,
+      240.17,
+      266.11
+    ],
+    "width_pt": 50.52,
+    "height_pt": 15.31,
+    "substituteFont": "'Hind Vadodara'",
+    "measuredWidthAtRef100": 387.2,
+    "calibratedSizePt": 13.05
+  },
+  "ed_date": {
+    "text": "તારીખ : 08-08-2026, શનિવાર",
+    "font": "BBharatiGopikaTwo,Bold",
+    "size": 14,
+    "bbox": [
+      270.29,
+      250.8,
+      418.5,
+      266.11
+    ],
+    "width_pt": 148.21,
+    "height_pt": 15.31,
+    "substituteFont": "'Hind Vadodara'",
+    "measuredWidthAtRef100": 1164.91,
+    "calibratedSizePt": 12.72
+  },
+  "ed_price": {
+    "text": "કિંમત : 50 પૈસા",
+    "font": "BBharatiGopikaTwo,Bold",
+    "size": 14,
+    "bbox": [
+      448.61,
+      250.8,
+      526.09,
+      266.11
+    ],
+    "width_pt": 77.48,
+    "height_pt": 15.31,
+    "substituteFont": "'Hind Vadodara'",
+    "measuredWidthAtRef100": 593.31,
+    "calibratedSizePt": 13.06
+  },
+  "ed_editor": {
+    "text": "તંત્રી : પાર્થ એમ. ઠક્કર",
+    "font": "BBharatiGopikaTwo,Bold",
+    "size": 14,
+    "bbox": [
+      556.25,
+      250.8,
+      652.86,
+      266.11
+    ],
+    "width_pt": 96.61,
+    "height_pt": 15.31,
+    "substituteFont": "'Hind Vadodara'",
+    "measuredWidthAtRef100": 860.52,
+    "calibratedSizePt": 11.23
+  },
+  "ed_bureau": {
+    "text": "બ્યુરો ચીફ : બિજેન કાપડિયા (અમદાવાદ)",
+    "font": "BBharatiGopikaTwo,Bold",
+    "size": 14,
+    "bbox": [
+      685.61,
+      250.8,
+      869.41,
+      266.11
+    ],
+    "width_pt": 183.8,
+    "height_pt": 15.31,
+    "substituteFont": "'Hind Vadodara'",
+    "measuredWidthAtRef100": 1541.91,
+    "calibratedSizePt": 11.92
+  },
+  "ed_managing": {
+    "text": "મેનેજિંગ તંત્રી : સુરેશ ચંડી",
+    "font": "BBharatiGopikaTwo,Bold",
+    "size": 14,
+    "bbox": [
+      899.57,
+      250.8,
+      1006.38,
+      266.11
+    ],
+    "width_pt": 106.81,
+    "height_pt": 15.31,
+    "substituteFont": "'Hind Vadodara'",
+    "measuredWidthAtRef100": 951.52,
+    "calibratedSizePt": 11.23
+  }
+}

@@ -1,0 +1,1007 @@
+{
+  "Helvetica-Bold": {
+    "substituteFamily": "Arial, Helvetica",
+    "substituteWeight": 700,
+    "sampleCount": 4,
+    "ratio_median": 1.0307,
+    "ratio_mean": 1.0348,
+    "ratio_min": 1.0031,
+    "ratio_max": 1.0749,
+    "ratio_stdev": 0.0259,
+    "samples": [
+      {
+        "text": "M. : 98256 08744 ",
+        "origSize": 12,
+        "origWidth": 97.36,
+        "calibratedSize": 12.42,
+        "ratio": 1.035
+      },
+      {
+        "text": "E-mail : capitalkranti@gmail.com  ",
+        "origSize": 12,
+        "origWidth": 202.53,
+        "calibratedSize": 12.9,
+        "ratio": 1.0749
+      },
+      {
+        "text": "web : capitalkranti.co.in",
+        "origSize": 12,
+        "origWidth": 139.61,
+        "calibratedSize": 12.32,
+        "ratio": 1.0263
+      },
+      {
+        "text": "RNI No. 54922/93",
+        "origSize": 15,
+        "origWidth": 121.27,
+        "calibratedSize": 15.05,
+        "ratio": 1.0031
+      }
+    ],
+    "confidence": "low (len>=4 chars only, n=4 -- font is inherently used for short fragments in this document)"
+  },
+  "BBharatiTitleTwo": {
+    "substituteFamily": "'Baloo Bhai 2'",
+    "substituteWeight": 700,
+    "sampleCount": 7,
+    "ratio_median": 0.6423,
+    "ratio_mean": 0.6486,
+    "ratio_min": 0.5734,
+    "ratio_max": 0.7229,
+    "ratio_stdev": 0.047,
+    "samples": [
+      {
+        "text": "Mk{ksLkku rððufÃkqýo ÿrüfkuý",
+        "origSize": 19,
+        "origWidth": 170.09,
+        "calibratedSize": 11.9,
+        "ratio": 0.6266
+      },
+      {
+        "text": "ËirLkf (økktÄeLkøkh ykð]r¥k)",
+        "origSize": 19,
+        "origWidth": 164.09,
+        "calibratedSize": 12.2,
+        "ratio": 0.6423
+      },
+      {
+        "text": "furÃkx÷ ¢ktrík - ",
+        "origSize": 23,
+        "origWidth": 115.31,
+        "calibratedSize": 16.1,
+        "ratio": 0.7002
+      },
+      {
+        "text": "ÔÞðMkkrÞf Mk{k[kh",
+        "origSize": 27,
+        "origWidth": 168.41,
+        "calibratedSize": 17.77,
+        "ratio": 0.6581
+      },
+      {
+        "text": "íktºke MÚkkLkuÚke.....",
+        "origSize": 27.44,
+        "origWidth": 173.96,
+        "calibratedSize": 16.93,
+        "ratio": 0.6169
+      },
+      {
+        "text": "ËirLkf („tkÄe™„h)",
+        "origSize": 31,
+        "origWidth": 189.87,
+        "calibratedSize": 22.41,
+        "ratio": 0.7229
+      },
+      {
+        "text": "furÃkx÷ ¢ktrík",
+        "origSize": 190,
+        "origWidth": 716.55,
+        "calibratedSize": 108.94,
+        "ratio": 0.5734
+      }
+    ],
+    "confidence": "high (len>=10 chars, n=7)"
+  },
+  "BBharatiGopikaTwo,Bold": {
+    "substituteFamily": "'Hind Vadodara'",
+    "substituteWeight": 700,
+    "sampleCount": 40,
+    "ratio_median": 0.6716,
+    "ratio_mean": 0.6674,
+    "ratio_min": 0.5039,
+    "ratio_max": 0.8402,
+    "ratio_stdev": 0.0698,
+    "samples": [
+      {
+        "text": "ËwƒE, ‚tÞwõŒ ykhƒ y{ehkŒ",
+        "origSize": 11,
+        "origWidth": 99.8,
+        "calibratedSize": 7.91,
+        "ratio": 0.719
+      },
+      {
+        "text": "{wÏÞ ykf»koýku",
+        "origSize": 13,
+        "origWidth": 57.34,
+        "calibratedSize": 8.28,
+        "ratio": 0.637
+      },
+      {
+        "text": "{níð…qýo …„÷wt",
+        "origSize": 13,
+        "origWidth": 62.37,
+        "calibratedSize": 8.17,
+        "ratio": 0.6281
+      },
+      {
+        "text": "®f{ík : 50 …iMkk ",
+        "origSize": 14,
+        "origWidth": 77.44,
+        "calibratedSize": 10.02,
+        "ratio": 0.716
+      },
+      {
+        "text": "çÞwhku [eV : rçksuLk fkÃkzeÞk (y{ËkðkË) ",
+        "origSize": 14,
+        "origWidth": 183.7,
+        "calibratedSize": 9.75,
+        "ratio": 0.6961
+      },
+      {
+        "text": "íkkhe¾ : 08-08-2026, þrLkðkh",
+        "origSize": 16,
+        "origWidth": 169.25,
+        "calibratedSize": 13.04,
+        "ratio": 0.8153
+      },
+      {
+        "text": "hkßÞ¼h{kt {æÞMÚkefhý zÙkRð™ku «kht¼. fkuxo fu‚ku{ktÚke",
+        "origSize": 16,
+        "origWidth": 259.33,
+        "calibratedSize": 9.37,
+        "ratio": 0.5854
+      },
+      {
+        "text": "yr¼Þk™™ku ÷k¼ ÷uðk fk™q™e ‚uðk ‚¥kk {tz¤™ku y™whkuÄ",
+        "origSize": 16,
+        "origWidth": 259.33,
+        "calibratedSize": 9.29,
+        "ratio": 0.5806
+      },
+      {
+        "text": "• yhurƒÞ™ xÙkðu÷ {kfuox™k ‚¥kkðkh ‚tþkuÄ™",
+        "origSize": 18,
+        "origWidth": 246.01,
+        "calibratedSize": 11.63,
+        "ratio": 0.6459
+      },
+      {
+        "text": "‚q[ðu Au fu ßÞkhu ¼qhksfeÞ ½x™kykuyu {æÞ",
+        "origSize": 18,
+        "origWidth": 260.16,
+        "calibratedSize": 12.93,
+        "ratio": 0.7182
+      },
+      {
+        "text": "…w™:«kró™e Œfku W¼he hne Au.",
+        "origSize": 18,
+        "origWidth": 167.44,
+        "calibratedSize": 10.66,
+        "ratio": 0.5923
+      },
+      {
+        "text": " MÚk¤ku {kxu {wÏÞ",
+        "origSize": 18,
+        "origWidth": 89.72,
+        "calibratedSize": 10.61,
+        "ratio": 0.5894
+      },
+      {
+        "text": "«ðk‚eyku™u «fkrþŒ fhðk{kt ykÔÞk Au fkhý fu",
+        "origSize": 18,
+        "origWidth": 260.16,
+        "calibratedSize": 12.58,
+        "ratio": 0.699
+      },
+      {
+        "text": "• 14-17 ‚ÃxuBƒh Ëhr{Þk™ ËwƒE ðÕzo xÙuz",
+        "origSize": 18,
+        "origWidth": 246.01,
+        "calibratedSize": 12.78,
+        "ratio": 0.7101
+      },
+      {
+        "text": "rðrþü ƒòh yktŒhárü™wt y™kðhý fhðk{kt",
+        "origSize": 18,
+        "origWidth": 260.16,
+        "calibratedSize": 14.14,
+        "ratio": 0.7856
+      },
+      {
+        "text": "ð÷ýkuÚke ÓËÞhku„{kt ð]rØ™wt fkhý",
+        "origSize": 18,
+        "origWidth": 183.16,
+        "calibratedSize": 10.97,
+        "ratio": 0.6095
+      },
+      {
+        "text": "hk¾ðk™ku fkÞo¢{ ykƒw ¾kŒu ÞkuòÞku",
+        "origSize": 18,
+        "origWidth": 194.32,
+        "calibratedSize": 10.79,
+        "ratio": 0.5994
+      },
+      {
+        "text": "- 6 rËð‚eÞ Úkúeze nuÕÚkfuh þY, …nkutåÞk ‚Ufzku ÷k¼kÚkeoyku",
+        "origSize": 18,
+        "origWidth": 309.7,
+        "calibratedSize": 10.71,
+        "ratio": 0.5952
+      },
+      {
+        "text": "yku„uo™kRÍ‚o y™u rx{kÕVe …h rðrþü ykìV‚o.",
+        "origSize": 19,
+        "origWidth": 267,
+        "calibratedSize": 12.77,
+        "ratio": 0.6718
+      },
+      {
+        "text": "fhðk™e MðŒtºkŒk™e Wsðýe fhu Au.",
+        "origSize": 19,
+        "origWidth": 201.03,
+        "calibratedSize": 11.98,
+        "ratio": 0.6303
+      },
+      {
+        "text": "f-6 ‚fo÷Úke yûkhÄk{ [kh hMŒk hkuz ™t.6",
+        "origSize": 20,
+        "origWidth": 246.02,
+        "calibratedSize": 13.2,
+        "ratio": 0.6599
+      },
+      {
+        "text": "Íku™:R{hsL‚e ‚uðkyku y™u ‚hfkhe",
+        "origSize": 20,
+        "origWidth": 260.16,
+        "calibratedSize": 16.8,
+        "ratio": 0.8402
+      },
+      {
+        "text": "hkuxhe rzÂMxÙõx 3055 ™e ð»ko 2025 -26 ™e yuðkuzo yuðkuzo ‚uhu{™e ¾kŒu",
+        "origSize": 21.69,
+        "origWidth": 381.44,
+        "calibratedSize": 10.93,
+        "ratio": 0.5039
+      },
+      {
+        "text": "7 yku„Mx ™uþ™÷ nuLz÷w{ zu yð‚hu {wÏÞ{tºke©eyu",
+        "origSize": 22,
+        "origWidth": 376.03,
+        "calibratedSize": 16.37,
+        "ratio": 0.7441
+      },
+      {
+        "text": "ðkŠ»kf ykìrzx ƒkË nðu VhrsÞkŒ Úkþu ‘yuÂøÍx fkìLVhL‚’,",
+        "origSize": 23.03,
+        "origWidth": 395.23,
+        "calibratedSize": 15.46,
+        "ratio": 0.6713
+      },
+      {
+        "text": "…ku÷e‚u {kurnŒfw{kh hksuþfw{kh",
+        "origSize": 24,
+        "origWidth": 260.89,
+        "calibratedSize": 16.58,
+        "ratio": 0.6907
+      },
+      {
+        "text": "93,280™ku {wÆk{k÷ fƒsu fÞkuo Au",
+        "origSize": 24,
+        "origWidth": 260.89,
+        "calibratedSize": 16.73,
+        "ratio": 0.6972
+      },
+      {
+        "text": "…uLþ™, …„kh, hò ‚rnŒ 8 ‚uðkyku nðu yku™÷kE™,",
+        "origSize": 25,
+        "origWidth": 396.07,
+        "calibratedSize": 16.97,
+        "ratio": 0.6789
+      },
+      {
+        "text": "…ku÷e‚u rƒÂÕzt„™u fkuzo™ fhe zÙku™ y™u {kEf",
+        "origSize": 25.05,
+        "origWidth": 395.71,
+        "calibratedSize": 17.37,
+        "ratio": 0.6935
+      },
+      {
+        "text": "„ktÄe™„h rsÕ÷k fk™q™e ‚uðk ‚¥kk {tz¤ îkhk {erzyuþ™ Vkuh Ä ™uþ™",
+        "origSize": 26,
+        "origWidth": 530.4,
+        "calibratedSize": 16.7,
+        "ratio": 0.6421
+      },
+      {
+        "text": "ònuh™k{w ƒnkh …zkÞwt: Œk.10/08/2026 hkrºk ‚wÄe hkuz ™t.",
+        "origSize": 31.35,
+        "origWidth": 532.92,
+        "calibratedSize": 19.39,
+        "ratio": 0.6186
+      },
+      {
+        "text": "31 yku„Mx ‚wÄe yhSyku Mðefkhkþu",
+        "origSize": 34,
+        "origWidth": 386.47,
+        "calibratedSize": 24.15,
+        "ratio": 0.7103
+      },
+      {
+        "text": "{rn÷k f{oÞku„e rËð‚™e Wsðýe fhkE",
+        "origSize": 34,
+        "origWidth": 394.38,
+        "calibratedSize": 25.11,
+        "ratio": 0.7384
+      },
+      {
+        "text": "÷kuf÷™k {tºk™u ðu„ yk…e™u ™k™k-„heƒ nkÚkþk¤",
+        "origSize": 36,
+        "origWidth": 530.4,
+        "calibratedSize": 22.49,
+        "ratio": 0.6248
+      },
+      {
+        "text": "¼khŒ {kxu {wÏÞ{tºke ©e ¼q…uLÿ …xu÷™e «rŒƒØŒk",
+        "origSize": 36,
+        "origWidth": 530.4,
+        "calibratedSize": 21.57,
+        "ratio": 0.5992
+      },
+      {
+        "text": "£ez{. y…„úuz ÷kRV' Íwtƒuþ™wt y™kðhý fÞwO",
+        "origSize": 36.88,
+        "origWidth": 532.92,
+        "calibratedSize": 25.62,
+        "ratio": 0.6948
+      },
+      {
+        "text": "fkÞ{e R÷ks Au - zkì. „wók",
+        "origSize": 37,
+        "origWidth": 296.51,
+        "calibratedSize": 26.55,
+        "ratio": 0.7176
+      },
+      {
+        "text": "…kuŒk™e ðirðæÞ‚¼h …Þox™ ûk{Œk™wt fhþu «Ëþo™",
+        "origSize": 38,
+        "origWidth": 531.48,
+        "calibratedSize": 21.25,
+        "ratio": 0.5592
+      },
+      {
+        "text": "ø÷kuƒ÷ ÷ezhþe… R™ …Âç÷f nuÕÚk",
+        "origSize": 38.46,
+        "origWidth": 395.22,
+        "calibratedSize": 24.49,
+        "ratio": 0.6366
+      },
+      {
+        "text": "«ðk‚™ Wãku„ [e™™k ƒòh™k",
+        "origSize": 60,
+        "origWidth": 594.33,
+        "calibratedSize": 45.1,
+        "ratio": 0.7516
+      }
+    ],
+    "confidence": "high (len>=10 chars, n=40)"
+  },
+  "BBharatiMaruti": {
+    "substituteFamily": "'Mukta Vaani'",
+    "substituteWeight": 700,
+    "sampleCount": 10,
+    "ratio_median": 0.6071,
+    "ratio_mean": 0.6081,
+    "ratio_min": 0.3745,
+    "ratio_max": 0.7714,
+    "ratio_stdev": 0.1256,
+    "samples": [
+      {
+        "text": "‚hËkh ‚hkuðh ™{oËk zu{ 80.32%",
+        "origSize": 33.94,
+        "origWidth": 251.05,
+        "calibratedSize": 17.33,
+        "ratio": 0.5106
+      },
+      {
+        "text": "¼hkÞku, yu÷xo …h {qfkÞku",
+        "origSize": 33.94,
+        "origWidth": 251.05,
+        "calibratedSize": 20.4,
+        "ratio": 0.6009
+      },
+      {
+        "text": "ðzkuËhk™e ‚ÞkS nkuÂM…x÷{ktÚke Ëw»f{o fu‚™ku",
+        "origSize": 37.5,
+        "origWidth": 395.7,
+        "calibratedSize": 17.07,
+        "ratio": 0.4553
+      },
+      {
+        "text": "ykhku…e …ku÷e‚™u [f{ku yk…e Vhkh",
+        "origSize": 37.5,
+        "origWidth": 395.7,
+        "calibratedSize": 22.99,
+        "ratio": 0.6132
+      },
+      {
+        "text": "¼Y[ yu‚ykuS™ku ytf÷uïh",
+        "origSize": 37.86,
+        "origWidth": 241.46,
+        "calibratedSize": 21.79,
+        "ratio": 0.5756
+      },
+      {
+        "text": "{kt Ëhkuzku Ãkzâku",
+        "origSize": 37.86,
+        "origWidth": 127.75,
+        "calibratedSize": 14.18,
+        "ratio": 0.3745
+      },
+      {
+        "text": "…t[kÞŒku{kt ™kýkfeÞ „uhherŒ",
+        "origSize": 49.7,
+        "origWidth": 532.56,
+        "calibratedSize": 36.02,
+        "ratio": 0.7248
+      },
+      {
+        "text": "hkufðk ‚hfkh™ku {kuxku r™ýoÞ",
+        "origSize": 49.7,
+        "origWidth": 532.56,
+        "calibratedSize": 36.91,
+        "ratio": 0.7427
+      },
+      {
+        "text": "„wshkŒ™k rþûkfku {kxu ‚uðk",
+        "origSize": 55,
+        "origWidth": 530.4,
+        "calibratedSize": 39.18,
+        "ratio": 0.7123
+      },
+      {
+        "text": "‚{kÄk™ …kuxo÷™e þYykŒ",
+        "origSize": 55,
+        "origWidth": 530.4,
+        "calibratedSize": 42.43,
+        "ratio": 0.7714
+      }
+    ],
+    "confidence": "high (len>=10 chars, n=10) -- WARNING: ratio correlates with size, not a flat multiplier (small sizes ~34-38pt cluster ~0.37-0.61, large sizes ~50-55pt cluster ~0.71-0.77) -- confirmed as isolated to this font, not a general issue (BBharatiGopikaTwo,Bold and BBharatiTitleTwo span similarly wide size ranges with no such trend). Use size_band_ratios below instead of the flat median for any new BBharatiMaruti text outside the sampled range.",
+    "size_band_ratios": [
+      {
+        "size_range": [
+          30,
+          40
+        ],
+        "ratio": 0.52
+      },
+      {
+        "size_range": [
+          45,
+          60
+        ],
+        "ratio": 0.74
+      }
+    ]
+  },
+  "BBharatiGopikaTwo": {
+    "substituteFamily": "'Hind Vadodara'",
+    "substituteWeight": 400,
+    "sampleCount": 40,
+    "ratio_median": 0.7444,
+    "ratio_mean": 0.7746,
+    "ratio_min": 0.5529,
+    "ratio_max": 1.0505,
+    "ratio_stdev": 0.1177,
+    "samples": [
+      {
+        "text": "„wshkŒ ‚hfkh™k rþûký",
+        "origSize": 13,
+        "origWidth": 109.99,
+        "calibratedSize": 11.08,
+        "ratio": 0.8526
+      },
+      {
+        "text": "{kæÞr{f rþûký ƒkuzo™k",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 12.28,
+        "ratio": 0.9449
+      },
+      {
+        "text": "…ý fhðk{kt ykðþu. yk",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 13.66,
+        "ratio": 1.0505
+      },
+      {
+        "text": "r™Þr{Œ ‚uðk{kt ‚{kðuþ,",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 12.14,
+        "ratio": 0.9339
+      },
+      {
+        "text": "©e{Œe ykÿk y„úðk÷ …ý yk",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 10.79,
+        "ratio": 0.8297
+      },
+      {
+        "text": "ƒkƒŒku™e ‚eÄe hsqykŒ fhðk{kt",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 8.95,
+        "ratio": 0.6882
+      },
+      {
+        "text": "ykðŒe nŒe, …htŒw ykìrzx rh…kuxo",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 7.91,
+        "ratio": 0.6085
+      },
+      {
+        "text": "Þkus™kyku, ™kýkfeÞ ‚kûkhŒk",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 9.4,
+        "ratio": 0.7229
+      },
+      {
+        "text": "{rn÷kyku™u Œu{™k fkÞËkfeÞ",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 9.53,
+        "ratio": 0.7333
+      },
+      {
+        "text": "y™u ƒnku¤e ‚tÏÞk{kt rðãkÚkeoyku",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 8.64,
+        "ratio": 0.6644
+      },
+      {
+        "text": "zÙu„™ xÙuR÷ RLxh™uþ™÷™k ™ðk",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 7.75,
+        "ratio": 0.596
+      },
+      {
+        "text": "{rn™k{kt …kA÷k ð»ko™e",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 11.04,
+        "ratio": 0.8492
+      },
+      {
+        "text": "ðneðxeŒtºk™k ‚¥kkðkh zuxk{kt",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 9.28,
+        "ratio": 0.7138
+      },
+      {
+        "text": "…rhÂMÚkrŒyu yk «Ëuþ{kt",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 10.56,
+        "ratio": 0.8122
+      },
+      {
+        "text": "ƒw®f„ ðŒo™ ŒhV …ý r™Ëuoþ",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 9.1,
+        "ratio": 0.6998
+      },
+      {
+        "text": "fkZâwt, ßÞkhu ‚kWËe yhurƒÞk",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 9.8,
+        "ratio": 0.754
+      },
+      {
+        "text": "MCPC îkhk ‘{erzyuþ™ Vkuh Ä",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 9.55,
+        "ratio": 0.7347
+      },
+      {
+        "text": "‚uðk ‚¥kk {tz¤ - f÷ku÷,",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 13.23,
+        "ratio": 1.0179
+      },
+      {
+        "text": "¼Y[ rsÕ÷k yu‚ykuS",
+        "origSize": 13,
+        "origWidth": 109.99,
+        "calibratedSize": 13.43,
+        "ratio": 1.0334
+      },
+      {
+        "text": "„ðoÚke ‚L{kr™Œ fÞko. ‚L{kr™Œ",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 8.71,
+        "ratio": 0.6701
+      },
+      {
+        "text": "yu‚ykuS …ku÷e‚u ƒt™u Vhkh",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 9.99,
+        "ratio": 0.7684
+      },
+      {
+        "text": "y‚tŒw÷™ ŒÚkk ¾wË «íÞu",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 10.77,
+        "ratio": 0.8283
+      },
+      {
+        "text": "‚wrðÄk, {k™ðŒkðkËe ‚uðk y™u",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 8.98,
+        "ratio": 0.6907
+      },
+      {
+        "text": "Au. …Ae Œu™kÚke ykí{k{kt",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 9.98,
+        "ratio": 0.7677
+      },
+      {
+        "text": "Œu{™e ËkÞfkyku™e ‚{Š…Œ ‚uðk,",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 8.38,
+        "ratio": 0.6449
+      },
+      {
+        "text": "Ëu¾hu¾ hk¾ðk{kt ykðe hne",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 10.56,
+        "ratio": 0.8123
+      },
+      {
+        "text": "‚k{u÷ Au. nðu sYrhÞkŒ Au fu",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 10,
+        "ratio": 0.769
+      },
+      {
+        "text": "…Ae, ykÞkusfkuyu ònuhkŒ fhe",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 9.47,
+        "ratio": 0.7284
+      },
+      {
+        "text": "Au.{¤Œe {krnŒe {wsƒ, ËknkuË",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 9.37,
+        "ratio": 0.7211
+      },
+      {
+        "text": "MðŒtºkŒk rËð‚™k yr¼Þk™,",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 10.03,
+        "ratio": 0.7713
+      },
+      {
+        "text": "{æÞ«Ëuþ xwrhÍ{ …rù{",
+        "origSize": 13,
+        "origWidth": 109.99,
+        "calibratedSize": 11.58,
+        "ratio": 0.8911
+      },
+      {
+        "text": "ðkh‚k, ðLÞSð™, ykæÞkÂí{f,",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 10.5,
+        "ratio": 0.8077
+      },
+      {
+        "text": "¾swhknku, ‚kt[e y™u",
+        "origSize": 13,
+        "origWidth": 110,
+        "calibratedSize": 12.25,
+        "ratio": 0.9424
+      },
+      {
+        "text": "¼khŒ™k «ðk‚™ Wãku„ ‚kÚku",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 9.51,
+        "ratio": 0.7317
+      },
+      {
+        "text": "y™w¼ð ðÄkhðk{kt {ËË fhu Au.",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 9.28,
+        "ratio": 0.7135
+      },
+      {
+        "text": "òuzŒe xuf™ku÷kuS™e þkuÄ{kt ðÄw™u",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 7.19,
+        "ratio": 0.5529
+      },
+      {
+        "text": "rh‚kuxo ykƒwhkuz ¾kŒu ÞkuòE.",
+        "origSize": 13,
+        "origWidth": 113.35,
+        "calibratedSize": 8.31,
+        "ratio": 0.6393
+      },
+      {
+        "text": "ðLÞSð™, ‚ktMf]rŒf y™u",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 11.65,
+        "ratio": 0.8963
+      },
+      {
+        "text": "Aeyu, ‚kÚku ‚kÚku Œu{™u yuðk",
+        "origSize": 13,
+        "origWidth": 124.14,
+        "calibratedSize": 8.95,
+        "ratio": 0.6882
+      },
+      {
+        "text": "…uÚkk…wh y™u r[÷kuzk ŒhV",
+        "origSize": 13,
+        "origWidth": 124.15,
+        "calibratedSize": 9.23,
+        "ratio": 0.7103
+      }
+    ],
+    "confidence": "high (len>=10 chars, n=40)"
+  },
+  "Calibri": {
+    "substituteFamily": "Arial, Helvetica",
+    "substituteWeight": 400,
+    "sampleCount": 3,
+    "ratio_median": 0.8745,
+    "ratio_mean": 0.8642,
+    "ratio_min": 0.7937,
+    "ratio_max": 0.9243,
+    "ratio_stdev": 0.0538,
+    "samples": [
+      {
+        "text": "GIDC ",
+        "origSize": 13,
+        "origWidth": 30.04,
+        "calibratedSize": 12.02,
+        "ratio": 0.9243
+      },
+      {
+        "text": "NDPS",
+        "origSize": 13,
+        "origWidth": 28.67,
+        "calibratedSize": 10.32,
+        "ratio": 0.7937
+      },
+      {
+        "text": "GIDC",
+        "origSize": 13,
+        "origWidth": 28.42,
+        "calibratedSize": 11.37,
+        "ratio": 0.8745
+      }
+    ],
+    "confidence": "low (len>=4 chars only, n=3 -- font is inherently used for short fragments in this document)"
+  },
+  "Times-Bold": {
+    "substituteFamily": "Georgia, 'Times New Roman'",
+    "substituteWeight": 700,
+    "sampleCount": 6,
+    "ratio_median": 0.9283,
+    "ratio_mean": 0.9268,
+    "ratio_min": 0.8392,
+    "ratio_max": 1.0081,
+    "ratio_stdev": 0.062,
+    "samples": [
+      {
+        "text": "MENA",
+        "origSize": 18,
+        "origWidth": 54.82,
+        "calibratedSize": 16.4,
+        "ratio": 0.9112
+      },
+      {
+        "text": " ATM 2026",
+        "origSize": 18,
+        "origWidth": 90.56,
+        "calibratedSize": 17.02,
+        "ratio": 0.9454
+      },
+      {
+        "text": " XECH,",
+        "origSize": 19,
+        "origWidth": 65.74,
+        "calibratedSize": 18.86,
+        "ratio": 0.9924
+      },
+      {
+        "text": "XECH",
+        "origSize": 36.88,
+        "origWidth": 97.75,
+        "calibratedSize": 30.95,
+        "ratio": 0.8392
+      },
+      {
+        "text": "MENA ",
+        "origSize": 60,
+        "origWidth": 202.17,
+        "calibratedSize": 60.49,
+        "ratio": 1.0081
+      },
+      {
+        "text": "ATM 2026",
+        "origSize": 60,
+        "origWidth": 276.11,
+        "calibratedSize": 51.88,
+        "ratio": 0.8647
+      }
+    ],
+    "confidence": "low (len>=4 chars only, n=6 -- font is inherently used for short fragments in this document)"
+  },
+  "Times-Roman": {
+    "substituteFamily": "Georgia, 'Times New Roman'",
+    "substituteWeight": 400,
+    "sampleCount": 13,
+    "ratio_median": 1.0269,
+    "ratio_mean": 1.0547,
+    "ratio_min": 0.9391,
+    "ratio_max": 1.2842,
+    "ratio_stdev": 0.091,
+    "samples": [
+      {
+        "text": "MENA",
+        "origSize": 13,
+        "origWidth": 40.18,
+        "calibratedSize": 13.31,
+        "ratio": 1.0239
+      },
+      {
+        "text": " MENA",
+        "origSize": 13,
+        "origWidth": 44.02,
+        "calibratedSize": 14.58,
+        "ratio": 1.1218
+      },
+      {
+        "text": " - UAE,",
+        "origSize": 13,
+        "origWidth": 44.62,
+        "calibratedSize": 15.05,
+        "ratio": 1.1574
+      },
+      {
+        "text": "ATM 2026",
+        "origSize": 13,
+        "origWidth": 58.05,
+        "calibratedSize": 12.21,
+        "ratio": 0.9391
+      },
+      {
+        "text": "MENA ",
+        "origSize": 13,
+        "origWidth": 41.7,
+        "calibratedSize": 13.81,
+        "ratio": 1.0626
+      },
+      {
+        "text": "AchieversAwards",
+        "origSize": 13,
+        "origWidth": 98.96,
+        "calibratedSize": 12.96,
+        "ratio": 0.9972
+      },
+      {
+        "text": " NRI Achievers",
+        "origSize": 13,
+        "origWidth": 79.77,
+        "calibratedSize": 12.45,
+        "ratio": 0.958
+      },
+      {
+        "text": "NRI Achievers",
+        "origSize": 13,
+        "origWidth": 80.84,
+        "calibratedSize": 12.62,
+        "ratio": 0.9709
+      },
+      {
+        "text": "Awards ",
+        "origSize": 13,
+        "origWidth": 43.52,
+        "calibratedSize": 13.08,
+        "ratio": 1.0059
+      },
+      {
+        "text": "Achievers",
+        "origSize": 13,
+        "origWidth": 59.04,
+        "calibratedSize": 13.71,
+        "ratio": 1.0549
+      },
+      {
+        "text": "XECH",
+        "origSize": 13,
+        "origWidth": 37.66,
+        "calibratedSize": 13.35,
+        "ratio": 1.0269
+      },
+      {
+        "text": "XECH ",
+        "origSize": 13,
+        "origWidth": 40.62,
+        "calibratedSize": 14.4,
+        "ratio": 1.1077
+      },
+      {
+        "text": " (TTF)",
+        "origSize": 13,
+        "origWidth": 43.18,
+        "calibratedSize": 16.69,
+        "ratio": 1.2842
+      }
+    ],
+    "confidence": "low (len>=4 chars only, n=13 -- font is inherently used for short fragments in this document)"
+  },
+  "ArialBlack": {
+    "substituteFamily": "'Arial Black', Arial",
+    "substituteWeight": 900,
+    "sampleCount": 2,
+    "ratio_median": 0.9036,
+    "ratio_mean": 0.9036,
+    "ratio_min": 0.8892,
+    "ratio_max": 0.9179,
+    "ratio_stdev": 0.0144,
+    "samples": [],
+    "confidence": "very low (n=2, only 2 occurrences in the entire document, no sibling to borrow from)"
+  },
+  "Calibri,Bold": {
+    "substituteFamily": "Arial, Helvetica",
+    "substituteWeight": 700,
+    "sampleCount": 0,
+    "ratio_median": 1.0307,
+    "ratio_mean": 1.0348,
+    "ratio_min": 1.0031,
+    "ratio_max": 1.0749,
+    "ratio_stdev": 0.0259,
+    "samples": [],
+    "confidence": "borrowed from Helvetica-Bold (n=1 in this document, identical substitute mapping: Arial/Helvetica weight 700)"
+  }
+}

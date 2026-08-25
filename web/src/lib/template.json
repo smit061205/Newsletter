@@ -31,7 +31,9 @@
           "labelHint": null,
           "w": 204.4958,
           "h": 27.34,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "navy_box_tagline (masthead chrome, vector-copied)"
         },
         {
           "id": "p1-2",
@@ -48,7 +50,9 @@
           "labelHint": "Mk{ksLkku rððufÃkqýo ÿrüfkuý",
           "w": 170.0917,
           "h": 19.0,
-          "sourceFont": "BBharatiTitleTwo"
+          "sourceFont": "BBharatiTitleTwo",
+          "classification": "static",
+          "classificationNote": "masthead branding, vector-copied verbatim"
         },
         {
           "id": "p1-3",
@@ -65,7 +69,9 @@
           "labelHint": null,
           "w": 665.4334,
           "h": 27.34,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "navy_box_contact (masthead chrome, vector-copied)"
         },
         {
           "id": "p1-4",
@@ -82,7 +88,9 @@
           "labelHint": "RNI No. 54922/93",
           "w": 797.3427,
           "h": 20.66,
-          "sourceFont": "Helvetica-Bold"
+          "sourceFont": "Helvetica-Bold",
+          "classification": "static",
+          "classificationNote": "masthead branding, vector-copied verbatim"
         },
         {
           "id": "p1-5",
@@ -99,7 +107,9 @@
           "labelHint": null,
           "w": 151.2204,
           "h": 27.34,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "navy_box_rni (masthead chrome, vector-copied)"
         },
         {
           "id": "p1-6",
@@ -116,7 +126,9 @@
           "labelHint": null,
           "w": 141.3849,
           "h": 172.95,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "masthead illustration photo (mountain-climber artwork), already inside the static vector-copy clip region -- not an editorial photo"
         },
         {
           "id": "p1-7",
@@ -133,7 +145,9 @@
           "labelHint": "furÃkx÷ ¢ktrík",
           "w": 716.5599,
           "h": 190.0,
-          "sourceFont": "BBharatiTitleTwo"
+          "sourceFont": "BBharatiTitleTwo",
+          "classification": "static",
+          "classificationNote": "masthead branding, vector-copied verbatim"
         },
         {
           "id": "p1-8",
@@ -150,7 +164,9 @@
           "labelHint": "ËirLkf („tkÄe™„h)",
           "w": 698.5682,
           "h": 35.0,
-          "sourceFont": "BBharatiTitleTwo"
+          "sourceFont": "BBharatiTitleTwo",
+          "classification": "static",
+          "classificationNote": "masthead branding, vector-copied verbatim"
         },
         {
           "id": "p1-9",
@@ -167,7 +183,9 @@
           "labelHint": null,
           "w": 1075.7444,
           "h": 22.24,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "mixed",
+          "classificationNote": "edition_bar_bg -- static cream/cyan box + dynamic date/issue/day text, already decomposed and built (build_header_v2.py)"
         },
         {
           "id": "p1-10",
@@ -184,7 +202,9 @@
           "labelHint": "l",
           "w": 905.063,
           "h": 17.12,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "static",
+          "classificationNote": "masthead branding, vector-copied verbatim"
         },
         {
           "id": "p1-11",
@@ -201,7 +221,9 @@
           "labelHint": "31 yku„Mx ‚wÄe yhSyku Mðefkhkþ",
           "w": 386.472,
           "h": 37.19,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p1-12",
@@ -218,7 +240,9 @@
           "labelHint": "ðzk«Äk™ ©e ™huLÿ¼kE {kuËeyu yk",
           "w": 530.4056,
           "h": 168.98,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p1-13",
@@ -235,7 +259,9 @@
           "labelHint": "„wshkŒ™k rþûkfku {kxu ‚uðk",
           "w": 531.4851,
           "h": 159.43,
-          "sourceFont": "BBharatiMaruti"
+          "sourceFont": "BBharatiMaruti",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p1-14",
@@ -252,7 +278,9 @@
           "labelHint": "„wshkŒ ‚hfkh™k rþûký",
           "w": 124.1528,
           "h": 358.68,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-15",
@@ -269,7 +297,9 @@
           "labelHint": null,
           "w": 275.9229,
           "h": 184.0,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p1-16",
@@ -286,7 +316,9 @@
           "labelHint": null,
           "w": 279.0714,
           "h": 186.1,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p1-17",
@@ -303,7 +335,9 @@
           "labelHint": "¼rð»Þ r™rÄ  ‚tƒtrÄŒ «§ku,",
           "w": 124.1528,
           "h": 288.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-18",
@@ -320,7 +354,9 @@
           "labelHint": "y‚tŒku»k y™w¼ðu Œku …w™: ‚{eûk",
           "w": 124.1528,
           "h": 286.56,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-19",
@@ -337,7 +373,9 @@
           "labelHint": "Wjkx™ fhðk{kt ykÔÞwt nŒwt.",
           "w": 124.1528,
           "h": 265.2,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-20",
@@ -354,7 +392,9 @@
           "labelHint": "„ktÄe™„h",
           "w": 124.1528,
           "h": 124.8,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-21",
@@ -371,7 +411,9 @@
           "labelHint": "7 yku„Mx ™uþ™÷ nuLz÷w{ zu yð‚h",
           "w": 390.1902,
           "h": 50.47,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p1-22",
@@ -388,7 +430,9 @@
           "labelHint": "ðzk«Äk™©eyu yk ð»kuo",
           "w": 124.1528,
           "h": 62.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-23",
@@ -405,7 +449,9 @@
           "labelHint": "ð]rØ{kt ‚n¼k„e ƒ™ðk ‚kÚku",
           "w": 124.1528,
           "h": 62.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-24",
@@ -422,7 +468,9 @@
           "labelHint": "ðzk«Äk™©e™e yk y…e÷ rÍ÷e",
           "w": 124.1528,
           "h": 483.6,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-25",
@@ -439,7 +487,9 @@
           "labelHint": "ykxoT‚ yuLz fku{‚o fku÷us {ký‚",
           "w": 394.3883,
           "h": 77.99,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p1-26",
@@ -456,7 +506,9 @@
           "labelHint": "„úk{, Œk÷wfk y™u rsÕ÷k …t[kÞŒk",
           "w": 510.7347,
           "h": 31.72,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p1-27",
@@ -473,7 +525,9 @@
           "labelHint": "…t[kÞŒku{kt ™kýkfeÞ „uhherŒ",
           "w": 532.5647,
           "h": 131.06,
-          "sourceFont": "BBharatiMaruti"
+          "sourceFont": "BBharatiMaruti",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p1-28",
@@ -490,7 +544,9 @@
           "labelHint": "fk{fks™k MÚk¤u òŒeÞ ‚Œk{ýe yxf",
           "w": 395.2379,
           "h": 19.69,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial subhead/kicker text"
         },
         {
           "id": "p1-29",
@@ -507,7 +563,9 @@
           "labelHint": "„wshkŒ™e …t[kÞŒe hks",
           "w": 124.1528,
           "h": 302.28,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-30",
@@ -524,7 +582,9 @@
           "labelHint": null,
           "w": 394.4183,
           "h": 126.2,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p1-31",
@@ -541,7 +601,9 @@
           "labelHint": "(",
           "w": 124.1528,
           "h": 250.19,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-32",
@@ -558,7 +620,9 @@
           "labelHint": "÷uðk{kt {w~fu÷e …zŒe nŒe.",
           "w": 124.1528,
           "h": 249.48,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-33",
@@ -575,7 +639,9 @@
           "labelHint": "f{o[kheyku™e sðkƒËkhe ðÄw",
           "w": 124.1528,
           "h": 249.6,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-34",
@@ -592,7 +658,9 @@
           "labelHint": null,
           "w": 397.217,
           "h": 184.9,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p1-35",
@@ -609,7 +677,9 @@
           "labelHint": "„ktÄe™„h",
           "w": 124.1528,
           "h": 280.8,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-36",
@@ -626,7 +696,9 @@
           "labelHint": "nuÕÚk [ufy… fhkðe ŒtËwhMŒe™u",
           "w": 124.1528,
           "h": 280.8,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-37",
@@ -643,7 +715,9 @@
           "labelHint": "{rn÷kyku {kxu™e rðrðÄ ƒu<uƒ÷",
           "w": 124.1528,
           "h": 280.8,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-38",
@@ -660,7 +734,9 @@
           "labelHint": null,
           "w": 317.1538,
           "h": 211.05,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p1-39",
@@ -677,7 +753,9 @@
           "labelHint": null,
           "w": 666.6029,
           "h": 295.61,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "mixed",
+          "classificationNote": "photo-caption box -- static border + dynamic caption text"
         },
         {
           "id": "p1-40",
@@ -694,7 +772,9 @@
           "labelHint": null,
           "w": 666.6029,
           "h": 210.56,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "inner box border only, no text of its own -- pure decoration"
         },
         {
           "id": "p1-41",
@@ -711,7 +791,9 @@
           "labelHint": null,
           "w": 352.8374,
           "h": 210.75,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p1-42",
@@ -728,7 +810,9 @@
           "labelHint": "„ktÄe™„h þnuh{kt Ëuþ™k 80 {kt ",
           "w": 315.3547,
           "h": 78.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p1-43",
@@ -745,7 +829,9 @@
           "labelHint": "ƒ™kððk yt„u rðMŒ]Œ [[ko fhðk{k",
           "w": 308.8777,
           "h": 78.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         }
       ]
     },
@@ -772,7 +858,9 @@
           "labelHint": null,
           "w": 35.9835,
           "h": 28.3,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "page folio number"
         },
         {
           "id": "p2-2",
@@ -789,7 +877,9 @@
           "labelHint": "furÃkx÷ ¢ktrík -",
           "w": 1015.702,
           "h": 23.24,
-          "sourceFont": "BBharatiTitleTwo"
+          "sourceFont": "BBharatiTitleTwo",
+          "classification": "mixed",
+          "classificationNote": "running_header -- needs decomposition into: page# (dynamic), brand wordmark x2 (static), date/day (dynamic) -- same pattern as edition bar, not yet built"
         },
         {
           "id": "p2-3",
@@ -806,7 +896,9 @@
           "labelHint": null,
           "w": 687.0835,
           "h": 28.3,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "date/day span (duplicate capture of running_header's own dynamic date span)"
         },
         {
           "id": "p2-4",
@@ -823,7 +915,9 @@
           "labelHint": null,
           "w": 294.1145,
           "h": 28.3,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "brand wordmark subtitle span (duplicate capture of running_header's own static span)"
         },
         {
           "id": "p2-5",
@@ -840,7 +934,9 @@
           "labelHint": null,
           "w": 35.9835,
           "h": 28.3,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "small decorative diamond/icon cluster, no text"
         },
         {
           "id": "p2-6",
@@ -857,7 +953,9 @@
           "labelHint": null,
           "w": 260.1402,
           "h": 770.11,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "mixed",
+          "classificationNote": "editorial column (\"તંત્રી સ્થાનેથી\" / From the Editor's Desk) -- static bordered-box design + dynamic editorial body text"
         },
         {
           "id": "p2-7",
@@ -874,7 +972,9 @@
           "labelHint": "MENA",
           "w": 805.0791,
           "h": 220.92,
-          "sourceFont": "Times-Bold"
+          "sourceFont": "Times-Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p2-8",
@@ -891,7 +991,9 @@
           "labelHint": "íktºke MÚkkLkuÚke.....",
           "w": 173.9598,
           "h": 27.44,
-          "sourceFont": "BBharatiTitleTwo"
+          "sourceFont": "BBharatiTitleTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p2-9",
@@ -908,7 +1010,9 @@
           "labelHint": "‚hËkh ‚hkuðh ™{oËk zu{ 80.32%",
           "w": 251.0544,
           "h": 98.76,
-          "sourceFont": "BBharatiMaruti"
+          "sourceFont": "BBharatiMaruti",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p2-10",
@@ -925,7 +1029,9 @@
           "labelHint": "„wshkŒ {kxu hknŒ™k ‚{k[kh ‚k{u",
           "w": 244.1076,
           "h": 624.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-11",
@@ -942,7 +1048,9 @@
           "labelHint": "ËwƒE, ‚tÞwõŒ ykhƒ y{ehkŒ",
           "w": 260.1701,
           "h": 1216.29,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-12",
@@ -959,7 +1067,9 @@
           "labelHint": "• yhurƒÞ™ xÙkðu÷ {kfuox™k ‚¥kk",
           "w": 260.1701,
           "h": 300.49,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial subhead/kicker text"
         },
         {
           "id": "p2-13",
@@ -976,7 +1086,9 @@
           "labelHint": null,
           "w": 397.5168,
           "h": 303.0,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p2-14",
@@ -993,7 +1105,9 @@
           "labelHint": null,
           "w": 395.0679,
           "h": 236.9,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p2-15",
@@ -1010,7 +1124,9 @@
           "labelHint": "…zfkhku",
           "w": 124.6326,
           "h": 234.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-16",
@@ -1027,7 +1143,9 @@
           "labelHint": "Ëhr{Þk™ rðrþü ™ðk ‚tþkuÄ™",
           "w": 124.6326,
           "h": 234.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-17",
@@ -1044,7 +1162,9 @@
           "labelHint": "‚u„{uLx Œhefu yku¤¾ðk{kt ykðu",
           "w": 124.1528,
           "h": 374.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-18",
@@ -1061,7 +1181,9 @@
           "labelHint": null,
           "w": 399.5159,
           "h": 261.35,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p2-19",
@@ -1078,7 +1200,9 @@
           "labelHint": null,
           "w": 396.6673,
           "h": 647.75,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p2-20",
@@ -1095,7 +1219,9 @@
           "labelHint": "òuðk{kt ykðu Au, ¾k‚ fhe™u",
           "w": 124.6326,
           "h": 109.2,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-21",
@@ -1112,7 +1238,9 @@
           "labelHint": "heŒu ‚{sðk{kt {ËË fhðk {kxu",
           "w": 124.1528,
           "h": 109.33,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-22",
@@ -1129,7 +1257,9 @@
           "labelHint": "ðu÷f®{„ ƒuf Ä [kR™eÍ",
           "w": 124.1528,
           "h": 109.2,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-23",
@@ -1146,7 +1276,9 @@
           "labelHint": "„ktÄe™„h rsÕ÷k fk™q™e ‚uðk ‚¥k",
           "w": 530.4056,
           "h": 59.65,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p2-24",
@@ -1163,7 +1295,9 @@
           "labelHint": "„ktÄe™„h",
           "w": 124.1528,
           "h": 234.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-25",
@@ -1180,7 +1314,9 @@
           "labelHint": "{erzyuþ™{kt rhVh fhðk™k",
           "w": 124.1528,
           "h": 234.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-26",
@@ -1197,7 +1333,9 @@
           "labelHint": "yËk÷Œe rððkËku™ku ‚w¾Ë ytŒ ÷kð",
           "w": 259.3305,
           "h": 75.11,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial subhead/kicker text"
         },
         {
           "id": "p2-27",
@@ -1214,7 +1352,9 @@
           "labelHint": "{qfðk™k «ÞJku fhðk{kt ykðþu.",
           "w": 124.1528,
           "h": 140.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p2-28",
@@ -1231,7 +1371,9 @@
           "labelHint": "yk…ðk y…e÷ fhðk{kt ykðe Au.",
           "w": 124.1528,
           "h": 140.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         }
       ]
     },
@@ -1258,7 +1400,9 @@
           "labelHint": null,
           "w": 35.9834,
           "h": 28.3,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "page folio number"
         },
         {
           "id": "p3-2",
@@ -1275,7 +1419,9 @@
           "labelHint": "furÃkx÷ ¢ktrík -",
           "w": 1015.7021,
           "h": 23.24,
-          "sourceFont": "BBharatiTitleTwo"
+          "sourceFont": "BBharatiTitleTwo",
+          "classification": "mixed",
+          "classificationNote": "running_header -- needs decomposition into: page# (dynamic), brand wordmark x2 (static), date/day (dynamic) -- same pattern as edition bar, not yet built"
         },
         {
           "id": "p3-3",
@@ -1292,7 +1438,9 @@
           "labelHint": null,
           "w": 687.0834,
           "h": 28.3,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "date/day span (duplicate capture of running_header's own dynamic date span)"
         },
         {
           "id": "p3-4",
@@ -1309,7 +1457,9 @@
           "labelHint": null,
           "w": 294.1145,
           "h": 28.3,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "brand wordmark subtitle span (duplicate capture of running_header's own static span)"
         },
         {
           "id": "p3-5",
@@ -1326,7 +1476,9 @@
           "labelHint": null,
           "w": 35.9834,
           "h": 28.3,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "small decorative diamond/icon cluster, no text"
         },
         {
           "id": "p3-6",
@@ -1343,7 +1495,9 @@
           "labelHint": "zkì. Œw»kkh ƒe. …xu÷ (Þw™kExuz",
           "w": 395.2279,
           "h": 140.89,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p3-7",
@@ -1360,7 +1514,9 @@
           "labelHint": "®sË„e «íÞu ò„YfŒk s ÓËÞhku„™ku",
           "w": 396.7872,
           "h": 84.88,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p3-8",
@@ -1377,7 +1533,9 @@
           "labelHint": "¼Y[ yu‚ykuS™ku ytf÷uïh",
           "w": 260.8898,
           "h": 184.68,
-          "sourceFont": "Calibri,Bold"
+          "sourceFont": "Calibri,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p3-9",
@@ -1394,7 +1552,9 @@
           "labelHint": null,
           "w": 395.5177,
           "h": 189.95,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p3-10",
@@ -1411,7 +1571,9 @@
           "labelHint": "®‚„k…kuh™k «rŒrcŒ Ä ‚uLx",
           "w": 124.1528,
           "h": 811.08,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-11",
@@ -1428,7 +1590,9 @@
           "labelHint": null,
           "w": 258.6308,
           "h": 146.0,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p3-12",
@@ -1445,7 +1609,9 @@
           "labelHint": "¼Y[ rsÕ÷k yu‚ykuS",
           "w": 124.1528,
           "h": 327.61,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-13",
@@ -1462,7 +1628,9 @@
           "labelHint": "{wÆk{k÷ fƒsu fhðk{kt ykÔÞku Au",
           "w": 124.1528,
           "h": 327.6,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-14",
@@ -1479,7 +1647,9 @@
           "labelHint": "ûkuºkku{kt Œu{™e y‚kÄkhý",
           "w": 124.1528,
           "h": 670.93,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-15",
@@ -1496,7 +1666,9 @@
           "labelHint": "AchieversAwards",
           "w": 124.1528,
           "h": 672.41,
-          "sourceFont": "Times-Roman"
+          "sourceFont": "Times-Roman",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-16",
@@ -1513,7 +1685,9 @@
           "labelHint": "- …kuŒk™k Sð™ «íÞu ÷k…hðkne þk",
           "w": 395.3578,
           "h": 127.7,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial subhead/kicker text"
         },
         {
           "id": "p3-17",
@@ -1530,7 +1704,9 @@
           "labelHint": "ykƒw hkuz",
           "w": 124.1528,
           "h": 109.2,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-18",
@@ -1547,7 +1723,9 @@
           "labelHint": "yuðe ykËŒku Au su™k fkhýu Ëuþ{",
           "w": 124.1528,
           "h": 452.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-19",
@@ -1564,7 +1742,9 @@
           "labelHint": "Ÿ½ðwt,",
           "w": 124.1528,
           "h": 452.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-20",
@@ -1581,7 +1761,9 @@
           "labelHint": "ðzkuËhk™e ‚ÞkS nkuÂM…x÷{ktÚke ",
           "w": 396.3074,
           "h": 516.21,
-          "sourceFont": "BBharatiMaruti"
+          "sourceFont": "BBharatiMaruti",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p3-21",
@@ -1598,7 +1780,9 @@
           "labelHint": "nkÚkfze ¾ku÷ðk{kt ykðe nŒe.",
           "w": 124.1528,
           "h": 374.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-22",
@@ -1615,7 +1799,9 @@
           "labelHint": "rƒÂÕzt„™k Ëhuf {k¤ y™u",
           "w": 124.1528,
           "h": 187.2,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p3-23",
@@ -1632,7 +1818,9 @@
           "labelHint": null,
           "w": 395.2179,
           "h": 554.9,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p3-24",
@@ -1649,7 +1837,9 @@
           "labelHint": null,
           "w": 393.019,
           "h": 463.45,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p3-25",
@@ -1666,7 +1856,9 @@
           "labelHint": null,
           "w": 262.0793,
           "h": 370.85,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         }
       ]
     },
@@ -1693,7 +1885,9 @@
           "labelHint": null,
           "w": 35.0238,
           "h": 27.34,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "page folio number"
         },
         {
           "id": "p4-2",
@@ -1710,7 +1904,9 @@
           "labelHint": "furÃkx÷ ¢ktrík -",
           "w": 1015.702,
           "h": 23.24,
-          "sourceFont": "BBharatiTitleTwo"
+          "sourceFont": "BBharatiTitleTwo",
+          "classification": "mixed",
+          "classificationNote": "running_header -- needs decomposition into: page# (dynamic), brand wordmark x2 (static), date/day (dynamic) -- same pattern as edition bar, not yet built"
         },
         {
           "id": "p4-3",
@@ -1727,7 +1923,9 @@
           "labelHint": null,
           "w": 686.1239,
           "h": 27.34,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "date/day span (duplicate capture of running_header's own dynamic date span)"
         },
         {
           "id": "p4-4",
@@ -1744,7 +1942,9 @@
           "labelHint": null,
           "w": 293.1549,
           "h": 27.34,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "brand wordmark subtitle span (duplicate capture of running_header's own static span)"
         },
         {
           "id": "p4-5",
@@ -1761,7 +1961,9 @@
           "labelHint": null,
           "w": 35.0238,
           "h": 27.34,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "small decorative diamond/icon cluster, no text"
         },
         {
           "id": "p4-6",
@@ -1778,7 +1980,9 @@
           "labelHint": "XECH",
           "w": 532.9244,
           "h": 99.28,
-          "sourceFont": "Times-Bold"
+          "sourceFont": "Times-Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p4-7",
@@ -1795,7 +1999,9 @@
           "labelHint": null,
           "w": 529.7459,
           "h": 24.59,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "section flag label (\"વ્યવસાયિક સમાચાર\" / Business News) -- fixed section-header design"
         },
         {
           "id": "p4-8",
@@ -1812,7 +2018,9 @@
           "labelHint": "ÔÞðMkkrÞf Mk{k[kh",
           "w": 168.4124,
           "h": 27.0,
-          "sourceFont": "BBharatiTitleTwo"
+          "sourceFont": "BBharatiTitleTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p4-9",
@@ -1829,7 +2037,9 @@
           "labelHint": null,
           "w": 27.2874,
           "h": 31.25,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-10",
@@ -1846,7 +2056,9 @@
           "labelHint": null,
           "w": 48.1778,
           "h": 18.3,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-11",
@@ -1863,7 +2075,9 @@
           "labelHint": null,
           "w": 18.9913,
           "h": 12.6,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-12",
@@ -1880,7 +2094,9 @@
           "labelHint": null,
           "w": 15.243,
           "h": 16.45,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-13",
@@ -1897,7 +2113,9 @@
           "labelHint": null,
           "w": 28.6368,
           "h": 22.75,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-14",
@@ -1914,7 +2132,9 @@
           "labelHint": null,
           "w": 24.0889,
           "h": 22.75,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-15",
@@ -1931,7 +2151,9 @@
           "labelHint": null,
           "w": 21.1903,
           "h": 10.5,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-16",
@@ -1948,7 +2170,9 @@
           "labelHint": null,
           "w": 20.5905,
           "h": 16.4,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-17",
@@ -1965,7 +2189,9 @@
           "labelHint": null,
           "w": 17.6919,
           "h": 17.7,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-18",
@@ -1982,7 +2208,9 @@
           "labelHint": null,
           "w": 10.945,
           "h": 11.0,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-19",
@@ -1999,7 +2227,9 @@
           "labelHint": null,
           "w": 21.2902,
           "h": 12.95,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-20",
@@ -2016,7 +2246,9 @@
           "labelHint": null,
           "w": 14.7932,
           "h": 11.85,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-21",
@@ -2033,7 +2265,9 @@
           "labelHint": null,
           "w": 10.845,
           "h": 11.15,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         },
         {
           "id": "p4-22",
@@ -2050,7 +2284,9 @@
           "labelHint": "{æÞ«Ëuþ xwrhÍ{ xexeyuV y{ËkðkË",
           "w": 531.4851,
           "h": 87.18,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p4-23",
@@ -2067,7 +2303,9 @@
           "labelHint": "• 7 yku„Mx, 2026 Úke þY ÚkŒk y",
           "w": 531.4951,
           "h": 92.75,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial subhead/kicker text"
         },
         {
           "id": "p4-24",
@@ -2084,7 +2322,9 @@
           "labelHint": null,
           "w": 259.9302,
           "h": 195.05,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p4-25",
@@ -2101,7 +2341,9 @@
           "labelHint": null,
           "w": 260.7299,
           "h": 173.85,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p4-26",
@@ -2118,7 +2360,9 @@
           "labelHint": null,
           "w": 262.629,
           "h": 175.15,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p4-27",
@@ -2135,7 +2379,9 @@
           "labelHint": "{wtƒE",
           "w": 124.1528,
           "h": 920.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-28",
@@ -2152,7 +2398,9 @@
           "labelHint": "æÞk™{kt hk¾e™u rzÍkR™ fhðk{kt",
           "w": 124.1528,
           "h": 421.2,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-29",
@@ -2169,7 +2417,9 @@
           "labelHint": "{æÞ«Ëuþ xwrhÍ{ ƒkuzo 6Úke 8",
           "w": 124.1528,
           "h": 546.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-30",
@@ -2186,7 +2436,9 @@
           "labelHint": "y„úýe „tŒÔÞ Œhefu ðÄw {sƒqŒ",
           "w": 124.1528,
           "h": 546.0,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-31",
@@ -2203,7 +2455,9 @@
           "labelHint": "…rù{ ¼khŒ™k xÙkðu÷ xÙuz ‚kÚku ",
           "w": 260.1701,
           "h": 43.58,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial subhead/kicker text"
         },
         {
           "id": "p4-32",
@@ -2220,7 +2474,9 @@
           "labelHint": "{erzÞk™k ðzk, ™Š„‚ £wxðk÷kyu",
           "w": 124.1528,
           "h": 265.2,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-33",
@@ -2237,7 +2493,9 @@
           "labelHint": "yr™rùŒŒk™u Ëqh fhðk{kt,",
           "w": 124.1528,
           "h": 265.2,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-34",
@@ -2254,7 +2512,9 @@
           "labelHint": "{w÷kfkŒ ÷uðk «urhŒ fhþu.",
           "w": 124.1528,
           "h": 514.8,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-35",
@@ -2271,7 +2531,9 @@
           "labelHint": "«ðk‚™ ûkuºk{kt «kó ÚkÞu÷k",
           "w": 124.1528,
           "h": 514.8,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-36",
@@ -2288,7 +2550,9 @@
           "labelHint": null,
           "w": 395.128,
           "h": 493.16,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "mixed",
+          "classificationNote": "boxed story (Rotary District 3055 awards) -- static border + dynamic body text"
         },
         {
           "id": "p4-37",
@@ -2305,7 +2569,9 @@
           "labelHint": "hkuxhe rzÂMxÙõx 3055 ™e ð»ko 2",
           "w": 381.4443,
           "h": 30.63,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p4-38",
@@ -2322,7 +2588,9 @@
           "labelHint": "hkuxhe õ÷ƒ ykuV hkÄ™…wh ™u ‚uð",
           "w": 381.4443,
           "h": 30.63,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p4-39",
@@ -2339,7 +2607,9 @@
           "labelHint": "hkÄ™…wh",
           "w": 113.3578,
           "h": 187.2,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-40",
@@ -2356,7 +2626,9 @@
           "labelHint": null,
           "w": 255.5323,
           "h": 187.1,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p4-41",
@@ -2373,7 +2645,9 @@
           "labelHint": null,
           "w": 252.8834,
           "h": 171.95,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p4-42",
@@ -2390,7 +2664,9 @@
           "labelHint": "[kxoh",
           "w": 117.316,
           "h": 124.8,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-43",
@@ -2407,7 +2683,9 @@
           "labelHint": "„ktÄe™„h{kt ‘rŒht„k Þkºkk’ ytŒ",
           "w": 532.9245,
           "h": 118.79,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p4-44",
@@ -2424,7 +2702,9 @@
           "labelHint": null,
           "w": 119.6449,
           "h": 111.4,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p4-45",
@@ -2441,7 +2721,9 @@
           "labelHint": "„ktÄe™„h",
           "w": 124.1528,
           "h": 265.21,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-46",
@@ -2458,7 +2740,9 @@
           "labelHint": "«fkh™k ðkn™ku™ku «ðuþ",
           "w": 124.1528,
           "h": 421.21,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-47",
@@ -2475,7 +2759,9 @@
           "labelHint": "f-6 ‚fo÷Úke yûkhÄk{ [kh hMŒk h",
           "w": 260.1701,
           "h": 93.88,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
         },
         {
           "id": "p4-48",
@@ -2492,7 +2778,9 @@
           "labelHint": "rh‚kuxo ¾kŒu  þkƒrþÞk yuðkuzo",
           "w": 114.5572,
           "h": 62.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-49",
@@ -2509,7 +2797,9 @@
           "labelHint": "sÞhks®‚n ™kzkuËk, zkì.",
           "w": 124.1528,
           "h": 62.4,
-          "sourceFont": "BBharatiGopikaTwo"
+          "sourceFont": "BBharatiGopikaTwo",
+          "classification": "dynamic",
+          "classificationNote": "editorial body copy or photo caption text"
         },
         {
           "id": "p4-50",
@@ -2526,7 +2816,9 @@
           "labelHint": null,
           "w": 259.3305,
           "h": 320.5,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p4-51",
@@ -2543,7 +2835,9 @@
           "labelHint": null,
           "w": 533.754,
           "h": 294.5,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "dynamic",
+          "classificationNote": "editorial news photo"
         },
         {
           "id": "p4-52",
@@ -2560,7 +2854,9 @@
           "labelHint": null,
           "w": 124.2527,
           "h": 148.21,
-          "sourceFont": null
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "recurring PSA-style slogan ad (blood/eye donation) -- plain border, no image, inferred as reused stock ad content"
         },
         {
           "id": "p4-53",
@@ -2577,7 +2873,99 @@
           "labelHint": "hõíkËkLk",
           "w": 76.7747,
           "h": 145.52,
-          "sourceFont": "BBharatiGopikaTwo,Bold"
+          "sourceFont": "BBharatiGopikaTwo,Bold",
+          "classification": "dynamic",
+          "classificationNote": "editorial headline text"
+        },
+        {
+          "id": "p4-56",
+          "type": "photo",
+          "x0": 828.68,
+          "y0": 61.58,
+          "x1": 849.97,
+          "y1": 70.08,
+          "w": 21.29,
+          "h": 8.5,
+          "moduleStart": null,
+          "moduleEnd": null,
+          "gridSnapped": false,
+          "fontSizePt": null,
+          "labelHint": "sponsor_logo_strip_secondary",
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
+        },
+        {
+          "id": "p4-57",
+          "type": "photo",
+          "x0": 711.58,
+          "y0": 61.99,
+          "x1": 733.22,
+          "y1": 69.79,
+          "w": 21.64,
+          "h": 7.8,
+          "moduleStart": null,
+          "moduleEnd": null,
+          "gridSnapped": false,
+          "fontSizePt": null,
+          "labelHint": "sponsor_logo_strip_secondary",
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
+        },
+        {
+          "id": "p4-58",
+          "type": "photo",
+          "x0": 797.64,
+          "y0": 63.39,
+          "x1": 820.68,
+          "y1": 71.29,
+          "w": 23.04,
+          "h": 7.9,
+          "moduleStart": null,
+          "moduleEnd": null,
+          "gridSnapped": false,
+          "fontSizePt": null,
+          "labelHint": "sponsor_logo_strip_secondary",
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
+        },
+        {
+          "id": "p4-59",
+          "type": "photo",
+          "x0": 622.32,
+          "y0": 63.44,
+          "x1": 643.26,
+          "y1": 72.49,
+          "w": 20.94,
+          "h": 9.05,
+          "moduleStart": null,
+          "moduleEnd": null,
+          "gridSnapped": false,
+          "fontSizePt": null,
+          "labelHint": "sponsor_logo_strip_secondary",
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
+        },
+        {
+          "id": "p4-60",
+          "type": "photo",
+          "x0": 771.05,
+          "y0": 65.08,
+          "x1": 789.89,
+          "y1": 72.18,
+          "w": 18.84,
+          "h": 7.1,
+          "moduleStart": null,
+          "moduleEnd": null,
+          "gridSnapped": false,
+          "fontSizePt": null,
+          "labelHint": "sponsor_logo_strip_secondary",
+          "sourceFont": null,
+          "classification": "static",
+          "classificationNote": "sponsor/advertiser logo -- static-per-run booked ad creative, may change issue to issue"
         }
       ]
     }

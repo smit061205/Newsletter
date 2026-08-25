@@ -2,3 +2,7 @@ node_modules/
 .next/
 out/
 *.log
+__pycache__/
+*.pyc
+web/public/review/*/
+web/public/review/index.json

@@ -112,29 +112,39 @@ function Masthead() {
         />
       ))}
 
-      {/* tagline text, white, on the first navy field */}
+      {/* tagline text, white, on the first navy field. Source font is
+          BBharatiTitleTwo (the display face, not the body face) at 19pt;
+          15.53pt here is that size recalibrated so Baloo Bhai 2 -- measurably
+          wider per point than the original -- renders at the SAME width
+          (170.17pt) rather than an eyeballed guess. */}
       <div style={{
         position: "absolute", left: `${tagText.x0}pt`, top: `${tagText.y0}pt`,
         width: `${w(tagText)}pt`, height: `${h(tagText)}pt`,
         display: "flex", alignItems: "center",
-        fontFamily: "'Hind Vadodara', 'Noto Sans Gujarati', sans-serif", fontWeight: 700,
-        fontSize: "13.5pt", color: "#fff", whiteSpace: "nowrap",
+        fontFamily: "'Baloo Bhai 2', 'Noto Sans Gujarati', sans-serif", fontWeight: 700,
+        fontSize: "15.53pt", color: "#fff", whiteSpace: "nowrap",
       }}>
         {CHROME.tagline}
       </div>
 
-      {/* contact info, white, on the second navy field -- bullets rendered gold
-          to match the source's Wingdings separator colour */}
+      {/* white decorative diamonds overlaid at the two gaps -- the source's
+          "arrow" look is these, not notches cut into the boxes themselves */}
+      {["diamond_gap1_a", "diamond_gap1_b", "diamond_gap2_a", "diamond_gap2_b"].map((name) => (
+        <Diamond key={name} points={(headerSpec.decorative_diamonds_canonical_pt as unknown as Record<string, [number, number][]>)[name]} />
+      ))}
+
+      {/* contact info, white, on the second navy field -- bullets are small
+          round dots (Wingdings "l"), light grey/white, not diamonds */}
       <div style={{
         position: "absolute", left: `${contactStart}pt`, top: `${contactBar.y0}pt`,
         width: `${contactEnd - contactStart}pt`, height: `${h(contactBar)}pt`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         fontFamily: "Arial, Helvetica, sans-serif", fontWeight: 700,
-        fontSize: "9.5pt", color: "#fff", whiteSpace: "nowrap",
+        fontSize: "12.55pt", color: "#fff", whiteSpace: "nowrap",
       }}>
         {CHROME.contactBar.split("    •    ").map((part, i) => (
-          <span key={i} style={{ display: "flex", alignItems: "center", gap: "6pt" }}>
-            {i > 0 && <span style={{ color: C.bullet_gold }}>◆</span>}
+          <span key={i} style={{ display: "flex", alignItems: "center", gap: "7pt" }}>
+            {i > 0 && <span style={{ color: C.bullet_light, fontSize: "7pt" }}>●</span>}
             {part}
           </span>
         ))}
@@ -146,7 +156,7 @@ function Masthead() {
         width: `${w(rniText)}pt`, height: `${h(rniText)}pt`,
         display: "flex", alignItems: "center",
         fontFamily: "Arial, Helvetica, sans-serif", fontWeight: 700,
-        fontSize: "11.5pt", color: "#fff", whiteSpace: "nowrap",
+        fontSize: "15.05pt", color: "#fff", whiteSpace: "nowrap",
       }}>
         {CHROME.rni}
       </div>
@@ -162,13 +172,17 @@ function Masthead() {
         }}
       />
 
-      {/* wordmark -- exact source colour, not an approximation */}
+      {/* wordmark -- exact source colour. Source is BBharatiTitleTwo at 190pt;
+          148.76pt is that recalibrated for Baloo Bhai 2 to fill the same
+          716.89pt width the original occupied, measured via Chromium's own
+          text metrics, not eyeballed (an earlier guess of 68pt left most of
+          the box empty). */}
       <div style={{
         position: "absolute", left: `${wordmark.x0}pt`, top: `${wordmark.y0}pt`,
         width: `${w(wordmark)}pt`, height: `${h(wordmark)}pt`,
         display: "flex", alignItems: "center",
         fontFamily: "'Baloo Bhai 2', 'Noto Sans Gujarati', sans-serif", fontWeight: 700,
-        fontSize: "68pt", color: C.wordmark_purple, whiteSpace: "nowrap", overflow: "hidden",
+        fontSize: "148.76pt", color: C.wordmark_purple, whiteSpace: "nowrap", overflow: "hidden",
       }}>
         {CHROME.wordmark}
       </div>
@@ -180,14 +194,14 @@ function Masthead() {
         height: `${h(enBold1)}pt`, display: "flex", alignItems: "baseline",
         fontFamily: "Arial, Helvetica, sans-serif", color: C.ink_near_black, whiteSpace: "nowrap",
       }}>
-        <span style={{ fontSize: "18pt", fontWeight: 400 }}>(</span>
-        <span style={{ fontSize: "18pt", fontWeight: 900, letterSpacing: "-0.01em" }}>
+        <span style={{ fontSize: "20.17pt", fontWeight: 400 }}>(</span>
+        <span style={{ fontSize: "20.17pt", fontWeight: 900, letterSpacing: "-0.01em" }}>
           CAPITAL KRANTI - DAILY -{" "}
         </span>
-        <span style={{ fontSize: "14.5pt", fontWeight: 900, letterSpacing: "-0.01em" }}>
+        <span style={{ fontSize: "15.91pt", fontWeight: 900, letterSpacing: "-0.01em" }}>
           GANDHINAGAR
         </span>
-        <span style={{ fontSize: "18pt", fontWeight: 400 }}>)</span>
+        <span style={{ fontSize: "20.17pt", fontWeight: 400 }}>)</span>
       </div>
 
       {/* Gujarati subtitle -- no border in the source; a plain text run */}
@@ -196,7 +210,7 @@ function Masthead() {
         width: `${w(guSub)}pt`, height: `${h(guSub)}pt`,
         display: "flex", alignItems: "center",
         fontFamily: "'Baloo Bhai 2', 'Noto Sans Gujarati', sans-serif", fontWeight: 700,
-        fontSize: "20pt", color: C.ink_near_black, whiteSpace: "nowrap",
+        fontSize: "27.81pt", color: C.ink_near_black, whiteSpace: "nowrap",
       }}>
         {CHROME.subtitle}
       </div>
@@ -220,16 +234,35 @@ function Masthead() {
         width: `${w(editionBg) - 20}pt`, height: `${h(editionBg)}pt`,
         display: "flex", alignItems: "center",
         fontFamily: "'Hind Vadodara', 'Noto Sans Gujarati', sans-serif", fontWeight: 700,
-        fontSize: "9.5pt", color: C.ink_near_black, whiteSpace: "nowrap",
+        fontSize: "12.5pt", color: C.ink_near_black, whiteSpace: "nowrap",
       }}>
         {PAGE1_CONTENT["p1-10"]?.split("    •    ").map((part, i) => (
           <span key={i} style={{ display: "flex", alignItems: "center", gap: "5pt" }}>
-            {i > 0 && <span style={{ color: C.bullet_gold, fontSize: "8pt" }}>◆</span>}
+            {i > 0 && <span style={{ color: C.bullet_gold, fontSize: "6pt" }}>●</span>}
             {part}
           </span>
         ))}
       </div>
     </>
+  );
+}
+
+// One decorative diamond, drawn from its 4 exact source points (already in
+// canonical pt coordinates). Positioned as an inline SVG sized to the points'
+// own bounding box, not approximated with a rotated square.
+function Diamond({ points }: { points: [number, number][] }) {
+  const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const poly = points.map(([x, y]) => `${x - x0},${y - y0}`).join(" ");
+  return (
+    <svg
+      style={{ position: "absolute", left: `${x0}pt`, top: `${y0}pt` }}
+      width={`${x1 - x0}pt`} height={`${y1 - y0}pt`}
+      viewBox={`0 0 ${x1 - x0} ${y1 - y0}`}
+    >
+      <polygon points={poly} fill="#fff" />
+    </svg>
   );
 }
 
