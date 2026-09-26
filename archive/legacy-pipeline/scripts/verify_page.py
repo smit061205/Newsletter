@@ -36,9 +36,10 @@ SIZE_TOL = 0.05   # pt
 
 
 def assign_spans_to_frames(tdict, candidate_frames, pad=2.0):
-    """Assigns each text span on the page to exactly ONE frame -- the
-    SMALLEST-area candidate frame whose bbox contains the span's center
-    point -- rather than every frame whose bbox happens to overlap it.
+    """Assigns each text span on the page to exactly ONE frame, in two tiers:
+    (1) prefer a frame that FULLY contains the span's bbox (no pad); (2) if
+    none does, fall back to the smallest-area frame whose bbox contains the
+    span's center point (with pad).
 
     Some frames in template.json (e.g. a headline_L1 box sized generously
     for a multi-line display headline) geometrically overlap other frames
@@ -49,22 +50,51 @@ def assign_spans_to_frames(tdict, candidate_frames, pad=2.0):
     (p3-20) reported a false FAIL with size 9.68 mixed into an expected
     19.50, which turned out to be p3-21/p3-22's body text bleeding in, not
     an actual defect (confirmed by rendering the page and looking at it
-    before concluding the check itself was wrong)."""
+    before concluding the check itself was wrong). Smallest-area alone isn't
+    enough, though: two adjacent (not nested) frames can share an ~8pt
+    boundary overlap at their touching edges, and the frame that's simply
+    WIDER (not the correct container) can have the smaller total area and
+    win the tiebreak -- found on page 2 (p2-7's headline box vs. p2-11's
+    very tall column, sharing a sliver of vertical overlap at their
+    boundary). Preferring full containment first resolves that correctly:
+    a span fully inside its real frame is never just grazing another
+    frame's edge."""
     by_frame = {f["id"]: [] for f in candidate_frames}
     for block in tdict["blocks"]:
         if block.get("type") != 0:
             continue
         for line in block.get("lines", []):
             for sp in line.get("spans", []):
-                cx = (sp["bbox"][0] + sp["bbox"][2]) / 2
-                cy = (sp["bbox"][1] + sp["bbox"][3]) / 2
-                best_frame, best_area = None, None
+                sx0, sy0, sx1, sy1 = sp["bbox"]
+                cx = (sx0 + sx1) / 2
+                cy = (sy0 + sy1) / 2
+
+                # A tiny pad here too (not literally 0): composite_snippet's
+                # top_offset_pt shift aligns a span's rendered top with its
+                # frame's y0 to within a small residual (sub-point, not
+                # exactly zero -- see TOP_LEADING_OFFSET_RATIOS), so a
+                # zero-tolerance containment check can reject a span that's
+                # genuinely inside its own frame by a hair. Found directly:
+                # p2-11's y0=245.834 vs. its own span's actual top ~245.8,
+                # 0.03pt outside a strict check.
+                strict_pad = 0.5
+                full_containers = []
                 for f in candidate_frames:
                     fx0, fy0, fx1, fy1 = f["x0"], f["y0"], f["x1"], f["y1"]
-                    if fx0 - pad <= cx <= fx1 + pad and fy0 - pad <= cy <= fy1 + pad:
-                        area = (fx1 - fx0) * (fy1 - fy0)
-                        if best_area is None or area < best_area:
-                            best_frame, best_area = f["id"], area
+                    if (fx0 - strict_pad <= sx0 and sx1 <= fx1 + strict_pad and
+                            fy0 - strict_pad <= sy0 and sy1 <= fy1 + strict_pad):
+                        full_containers.append(f)
+                if full_containers:
+                    best = min(full_containers, key=lambda f: (f["x1"] - f["x0"]) * (f["y1"] - f["y0"]))
+                    best_frame = best["id"]
+                else:
+                    best_frame, best_area = None, None
+                    for f in candidate_frames:
+                        fx0, fy0, fx1, fy1 = f["x0"], f["y0"], f["x1"], f["y1"]
+                        if fx0 - pad <= cx <= fx1 + pad and fy0 - pad <= cy <= fy1 + pad:
+                            area = (fx1 - fx0) * (fy1 - fy0)
+                            if best_area is None or area < best_area:
+                                best_frame, best_area = f["id"], area
                 if best_frame is not None:
                     by_frame[best_frame].append(sp)
     return by_frame
@@ -150,14 +180,33 @@ def check_photo_frame(frame, images):
     return results
 
 
-def verify(built_pdf, page_num, pdf_page_idx=None, only_frame_ids=None):
+def verify(built_pdf, page_num, pdf_page_idx=None, only_frame_ids=None, geometry_overrides=None):
     """Reusable entry point (Phase 9 orchestrator imports this directly rather
     than shelling out to the CLI). Returns (all_results, counts) -- same data
-    the CLI prints, structured for a caller to act on."""
+    the CLI prints, structured for a caller to act on.
+
+    geometry_overrides: optional {frame_id: {"x0":.., "y0":.., "x1":.., "y1":..}}
+    -- when the orchestrator deliberately composites a frame's content into a
+    DIFFERENT rectangle than template.json declares (a clipped overlap fix,
+    or a merged-and-widened frame reclaiming unused sibling space -- see
+    daily_build.py's _merge_trailing_unused_frames), checking that frame
+    against template.json's stale original bounds isn't a real QA check
+    anymore, it's a guaranteed false mismatch: the actual rendered text's
+    bbox no longer falls inside the frame's declared box, so span assignment
+    misattributes it (or drops it as NOT_BUILT) and every geometric check
+    compares against the wrong rectangle. Applying the override here keeps
+    real QA coverage for that frame at its ACTUAL runtime geometry instead
+    of silently excluding it from the harness altogether -- confirmed
+    necessary by hitting exactly this false failure on a real merged frame
+    (p1-29) before this existed."""
     pdf_page_idx = pdf_page_idx if pdf_page_idx is not None else page_num - 1
+    geometry_overrides = geometry_overrides or {}
 
     tmpl = json.load(open(f"{ROOT}/web/src/lib/template.json"))
-    all_frames = tmpl["pages"][str(page_num)]["frames"]
+    all_frames = [dict(f) for f in tmpl["pages"][str(page_num)]["frames"]]
+    for f in all_frames:
+        if f["id"] in geometry_overrides:
+            f.update(geometry_overrides[f["id"]])
     # span assignment (see assign_spans_to_frames) needs every candidate
     # frame on the page, even ones not being reported this call -- an
     # overlapping body frame must still "claim" its own spans away from a

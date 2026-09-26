@@ -29,13 +29,16 @@ def to_guj_digits(s):
 
 
 # Measured directly off the source PDF this session, all 3 pages in one
-# consolidated extraction pass (out/_running_header_geometry.json) -- an
-# earlier hand-copied version of this dict cross-contaminated values between
-# pages (page 3's erase_x ended up under page 2's key) by pasting from
-# separate script runs; loading the single verified JSON instead of
-# hand-transcribing avoids that class of mistake recurring.
+# consolidated extraction pass (scripts/data/running_header_geometry.json,
+# moved out of out/ during the frontend-pivot cleanup -- out/ is disposable
+# build output, this is a real measured-data dependency the engine needs at
+# import time) -- an earlier hand-copied version of this dict
+# cross-contaminated values between pages (page 3's erase_x ended up under
+# page 2's key) by pasting from separate script runs; loading the single
+# verified JSON instead of hand-transcribing avoids that class of mistake
+# recurring.
 import json as _json
-_GEO_RAW = _json.load(open(f"{ROOT}/out/_running_header_geometry.json"))
+_GEO_RAW = _json.load(open(f"{ROOT}/scripts/data/running_header_geometry.json"))
 PAGE_GEOMETRY = {
     int(k): {
         "raw_clip": tuple(v["raw_clip"]),

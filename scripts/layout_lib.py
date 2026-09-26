@@ -58,6 +58,14 @@ FONT_ROLES = {
         "family": "MuktaVaani", "weight": 700,
         "file": f"{FONTS_DIR}/MuktaVaani-Bold.ttf",
     },
+    # Times-Bold (LATIN_MAP in fonts.ts -> Georgia/Times New Roman): the
+    # source PDF uses it only for short English/acronym fragments inside
+    # otherwise-Gujarati frames ("MENA", "ATM 2026", "XECH") -- Tinos is a
+    # metrically-compatible open substitute for Times New Roman.
+    "Times-Bold": {
+        "family": "Tinos", "weight": 700,
+        "file": f"{FONTS_DIR}/Tinos-Bold.ttf",
+    },
 }
 
 INK_NEAR_BLACK = "rgb(35,31,32)"
@@ -106,6 +114,13 @@ TOP_LEADING_OFFSET_RATIOS = {
     "BBharatiGopikaTwo,Bold": 0.1490,
     "BBharatiTitleTwo": 0.2110,
     "BBharatiMaruti": 0.2310,
+    # Tinos (Latin serif, Times-Bold's substitute) is the first measured
+    # NEGATIVE offset -- its glyph-ink top sits BELOW the nominal line-box
+    # top, not above like every Gujarati font tested so far, consistent
+    # with a Latin serif's more compact ascent metrics not needing the
+    # extra headroom Gujarati matras/diacritics require. Confirmed exactly
+    # proportional across sizes 20-55pt before trusting it.
+    "Times-Bold": -0.0464,
 }
 DEFAULT_TOP_LEADING_OFFSET_RATIO = 0.1490  # fallback for any future font role, flagged not measured
 
@@ -207,6 +222,51 @@ def flow_gujarati_text(text, frame, source_font, declared_size_pt, *,
     return out_path, size_pt, top_offset_pt, fit_status
 
 
+def flow_story_across_frames(paragraphs, frames, source_font, declared_size_pt, *, align="justify"):
+    """Threads a list of paragraphs across an ORDERED list of frames -- the
+    same "pour into frame 1, spill overflow into frame 2" pattern real DTP
+    tools call text threading, instead of requiring the caller to have
+    pre-decided exactly how many paragraphs belong in each specific frame
+    (see docs/PRECISION_ROADMAP.md's Phase 1 capacity-aware-assignment
+    entry -- this replaces the earlier one-paragraph-per-frame zip that
+    silently assumed every story's length happened to match its assigned
+    frame count).
+
+    Greedily adds one more paragraph to the current frame, re-measuring via
+    flow_gujarati_text's own WeasyPrint fit check each time (not a length
+    heuristic -- Gujarati glyph widths are too irregular for one to be
+    trustworthy), until the next paragraph would push it below
+    MIN_FIT_RATIO; then moves on to the next frame carrying that paragraph.
+
+    Returns (pieces, leftover_paragraphs): pieces is a list of
+    (frame, snippet_path, size_pt, top_offset_pt, fit_status) ready for
+    composite_snippet(); leftover_paragraphs is whatever didn't fit in ANY
+    of the given frames (frames exhausted before the story was) -- the
+    caller must treat a non-empty leftover the same as a single frame that
+    didn't fit: a real content-overflow event, not something to drop
+    silently."""
+    remaining = list(paragraphs)
+    pieces = []
+    for frame in frames:
+        if not remaining:
+            break
+        accepted_result = None
+        consumed = 0
+        for i in range(1, len(remaining) + 1):
+            candidate = " ".join(remaining[:i])
+            path, size, top_off, fit = flow_gujarati_text(
+                candidate, frame, source_font, declared_size_pt, align=align)
+            if fit["fits"]:
+                accepted_result = (path, size, top_off, fit)
+                consumed = i
+            else:
+                break
+        if consumed:
+            pieces.append((frame, *accepted_result))
+            remaining = remaining[consumed:]
+    return pieces, remaining
+
+
 def composite_snippet(target_page, frame, snippet_path, top_offset_pt=0.0, fit_status=None):
     """Composites a WeasyPrint-rendered snippet onto target_page at frame's
     exact rect, via the same show_pdf_page() mechanism used for the static
@@ -240,37 +300,75 @@ def composite_snippet(target_page, frame, snippet_path, top_offset_pt=0.0, fit_s
     return snippet_doc  # caller must keep a reference alive until page.save()
 
 
+MAX_CROP_FRACTION = 0.35  # never discard more than this fraction of the
+# source's own width/height to force-fit a frame's aspect ratio. Found
+# necessary, not theoretical: a full-width "banner" article box produced a
+# photo sub-frame at ~6.8:1 (box_width / (box_height * 0.38)), and an
+# uncapped center-crop of a 2.5:1 data chart into that shape discarded the
+# chart's single tallest, most-recent, most-important bar entirely --
+# invisible in the crop, not just visually tight. A crop that aggressive on
+# an ordinary editorial photo (people, buildings) rarely destroys its
+# meaning; a crop that aggressive on a chart/infographic can delete the one
+# data point the article is about. Confirmed the deletion directly (cropped
+# the real chart and re-viewed the output) before deciding the fix -- not
+# assumed from the math alone.
+
+
 def crop_to_aspect(image_path, target_aspect, out_path=None):
-    """Center-crops image_path to target_aspect (width/height) -- never
-    stretches. Returns the cropped image path."""
+    """Center-crops image_path TOWARD target_aspect (width/height), capped
+    at MAX_CROP_FRACTION of either source dimension -- never stretches, and
+    now never discards more than that fraction either. When the frame's
+    aspect is too extreme for the source image to reach within that budget,
+    returns the most-cropped image still within budget; its own aspect will
+    then differ from target_aspect, which place_photo_cropped uses as the
+    signal to letterbox (center within the frame at the image's own aspect)
+    rather than stretch it to fill. Returns (cropped_path, actual_aspect)."""
     im = Image.open(image_path)
     w, h = im.size
     src_aspect = w / h
     if src_aspect > target_aspect:
-        # source is wider than target -- crop left/right
-        new_w = round(h * target_aspect)
+        # source is wider than target -- crop left/right, but not more than
+        # MAX_CROP_FRACTION of the source's own width
+        new_w = round(max(h * target_aspect, w * (1 - MAX_CROP_FRACTION)))
+        new_w = min(new_w, w)
         x0 = (w - new_w) // 2
         box = (x0, 0, x0 + new_w, h)
     else:
-        # source is taller than target -- crop top/bottom
-        new_h = round(w / target_aspect)
+        # source is taller than target -- crop top/bottom, but not more than
+        # MAX_CROP_FRACTION of the source's own height
+        new_h = round(max(w / target_aspect, h * (1 - MAX_CROP_FRACTION)))
+        new_h = min(new_h, h)
         y0 = (h - new_h) // 2
         box = (0, y0, w, y0 + new_h)
     cropped = im.crop(box)
     if out_path is None:
         out_path = tempfile.mktemp(suffix=".jpg")
     cropped.convert("RGB").save(out_path, "JPEG", quality=92)
-    return out_path
+    return out_path, cropped.size[0] / cropped.size[1]
 
 
 def place_photo_cropped(target_page, frame, image_path):
-    """Crops image_path to frame's exact aspect ratio (never stretch) and
-    embeds it filling the frame rect exactly."""
+    """Crops image_path toward frame's aspect ratio (capped, see
+    crop_to_aspect) and embeds it. When the crop cap was hit, the frame
+    isn't fully filled -- the image is centered within it at its own
+    (slightly different) aspect instead, so it never stretches AND never
+    loses more than MAX_CROP_FRACTION of its own content, at the cost of a
+    visible margin inside the frame for that one image. That tradeoff (a
+    margin, not missing data) is the point -- see MAX_CROP_FRACTION."""
     width_pt = frame["x1"] - frame["x0"]
     height_pt = frame["y1"] - frame["y0"]
     target_aspect = width_pt / height_pt
-    cropped_path = crop_to_aspect(image_path, target_aspect)
-    rect = fitz.Rect(frame["x0"], frame["y0"], frame["x1"], frame["y1"])
+    cropped_path, actual_aspect = crop_to_aspect(image_path, target_aspect)
+    if abs(actual_aspect - target_aspect) < 1e-6:
+        rect = fitz.Rect(frame["x0"], frame["y0"], frame["x1"], frame["y1"])
+    elif actual_aspect > target_aspect:
+        fit_h = width_pt / actual_aspect
+        y_pad = (height_pt - fit_h) / 2
+        rect = fitz.Rect(frame["x0"], frame["y0"] + y_pad, frame["x1"], frame["y0"] + y_pad + fit_h)
+    else:
+        fit_w = height_pt * actual_aspect
+        x_pad = (width_pt - fit_w) / 2
+        rect = fitz.Rect(frame["x0"] + x_pad, frame["y0"], frame["x0"] + x_pad + fit_w, frame["y1"])
     target_page.insert_image(rect, filename=cropped_path)
     return cropped_path
 

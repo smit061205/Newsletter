@@ -11,6 +11,7 @@ client-side.
 """
 import os
 import json
+import shutil
 import subprocess
 import datetime
 
@@ -41,6 +42,14 @@ def write_manifest(run_name, status, pdf_path, touched_pages, all_qa_results, ru
     run_dir = f"{REVIEW_PUBLIC_DIR}/{run_name}"
     os.makedirs(run_dir, exist_ok=True)
 
+    # Copy the actual built PDF alongside the manifest so the review UI can
+    # serve it as a plain static file (same "static asset, nothing to go
+    # wrong client-side" reasoning as the page PNGs above) -- pdf_path
+    # itself points at out/final or out/staging, outside web/public, so
+    # Next.js can't serve it directly from there.
+    pdf_filename = f"{run_name}.pdf"
+    shutil.copyfile(pdf_path, f"{run_dir}/{pdf_filename}")
+
     qa_by_page = {p: (results, counts) for p, results, counts in all_qa_results}
 
     pages_out = []
@@ -68,6 +77,7 @@ def write_manifest(run_name, status, pdf_path, touched_pages, all_qa_results, ru
         "status": status,
         "builtAt": datetime.datetime.now().isoformat(timespec="seconds"),
         "pdfPath": pdf_path,
+        "pdfUrl": f"/review/{run_name}/{pdf_filename}",
         "runLog": log_out,
         "pages": pages_out,
     }

@@ -187,5 +187,94 @@
       "width": 2.04,
       "color": "rgb(0,174,239)"
     }
-  }
+  },
+  "header_boxes_raw196_pt": {
+    "navy_box_tagline": {
+      "x0": 14.8499,
+      "y0": 15.228,
+      "x1": 219.4401,
+      "y1": 42.568
+    },
+    "navy_box_contact": {
+      "x0": 245.35,
+      "y0": 15.228,
+      "x1": 911.0896,
+      "y1": 42.568
+    },
+    "navy_box_rni": {
+      "x0": 939.7999,
+      "y0": 15.228,
+      "x1": 1091.0895,
+      "y1": 42.568
+    },
+    "edition_bar_bg": {
+      "x0": 15.7003,
+      "y0": 246.978,
+      "x1": 1091.9399,
+      "y1": 269.218
+    },
+    "edition_tab_left": {
+      "x0": 14.5998,
+      "y0": 246.828,
+      "x1": 26.4402,
+      "y1": 270.218
+    },
+    "edition_tab_right": {
+      "x0": 1080.2596,
+      "y0": 246.828,
+      "x1": 1092.1,
+      "y1": 270.218
+    },
+    "tagline_text": {
+      "x0": 28.4902,
+      "y0": 20.788,
+      "x1": 198.6595,
+      "y1": 39.788
+    },
+    "contact_text_start": 304.0101,
+    "contact_text_end": 866.9303,
+    "rni_text": {
+      "x0": 961.73,
+      "y0": 16.688,
+      "x1": 1083.0598,
+      "y1": 37.348
+    },
+    "wordmark": {
+      "x0": 168.2896,
+      "y0": 58.998,
+      "x1": 885.1797,
+      "y1": 248.998
+    },
+    "subtitle_paren_open": {
+      "x0": 180.8904,
+      "y0": 208.908,
+      "x1": 187.5504,
+      "y1": 243.258
+    },
+    "subtitle_en_bold1": {
+      "x0": 187.4904,
+      "y0": 213.778,
+      "x1": 482.5403,
+      "y1": 236.138
+    },
+    "subtitle_en_bold2": {
+      "x0": 482.8104,
+      "y0": 218.178,
+      "x1": 616.7401,
+      "y1": 236.068
+    },
+    "subtitle_paren_close": {
+      "x0": 616.7301,
+      "y0": 208.908,
+      "x1": 623.3901,
+      "y1": 243.258
+    },
+    "subtitle_gu": {
+      "x0": 689.8097,
+      "y0": 208.258,
+      "x1": 879.7802,
+      "y1": 239.258
+    }
+  },
+  "_coordinate_space_note": "header_boxes_canonical_pt = positions on the OLD (172) PDF.pdf canonical target (post tx()/ty() reconciliation). header_boxes_raw196_pt = the SAME boxes inverse-transformed back to raw coordinates on (196) Capital Kranti_08 august.pdf itself -- the correct space for the new backend-driven system, whose target page IS (196), not a separately-reconciled canonical page. Inverse computed exactly from scripts/geometry.py's own tx()/ty() constants, not re-measured."
 }

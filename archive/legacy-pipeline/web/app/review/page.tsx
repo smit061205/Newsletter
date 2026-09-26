@@ -40,6 +40,7 @@ interface RunManifest {
   status: "READY" | "NEEDS_REVIEW";
   builtAt: string;
   pdfPath: string;
+  pdfUrl: string;
   runLog: RunLogEntry[];
   pages: PageManifest[];
 }
@@ -154,6 +155,17 @@ export default async function ReviewPage({
             <span className={`badge ${isReady ? "badge-ready" : "badge-review"}`}>
               {isReady ? "● READY TO PRINT" : "◆ NEEDS REVIEW"}
             </span>
+            <a
+              href={manifest.pdfUrl}
+              download={`${manifest.runName}.pdf`}
+              style={{
+                marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: "#111827", color: "#fff", textDecoration: "none",
+              }}
+            >
+              ↓ Download PDF
+            </a>
           </div>
           <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 24 }}>
             Built {new Date(manifest.builtAt).toLocaleString()} · <code>{manifest.pdfPath}</code>
