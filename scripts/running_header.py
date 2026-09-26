@@ -20,7 +20,7 @@ sys.path.insert(0, "/Users/smitthakkar/NewsPaper_Project/scripts")
 from geometry import tx, ty
 
 ROOT = "/Users/smitthakkar/NewsPaper_Project"
-HIND_FONT_BOLD = f"{ROOT}/web/fonts/HindVadodara-Bold.ttf"
+HIND_FONT_BOLD = f"{ROOT}/web/public/fonts/HindVadodara-Bold.ttf"
 GUJ_DIGITS = "૦૧૨૩૪૫૬૭૮૯"
 
 

@@ -21,7 +21,7 @@ from geometry import tx, ty  # noqa: E402 -- shared transform, see geometry.py
 ROOT = "/Users/smitthakkar/NewsPaper_Project"
 SRC_PDF = f"{ROOT}/(196) Capital Kranti_08 august.pdf"
 TARGET_PDF = f"{ROOT}/(172) PDF.pdf"
-HIND_FONT = f"{ROOT}/web/fonts/HindVadodara-Bold.ttf"
+HIND_FONT = f"{ROOT}/web/public/fonts/HindVadodara-Bold.ttf"
 OUT_PDF = f"{ROOT}/out/page-1-header-v2.pdf"
 DYNAMIC_SNIPPET = f"{ROOT}/out/_edition_bar_snippet.pdf"
 

@@ -25,7 +25,7 @@ from weasyprint import HTML
 from PIL import Image
 
 ROOT = "/Users/smitthakkar/NewsPaper_Project"
-FONTS_DIR = f"{ROOT}/web/fonts"
+FONTS_DIR = f"{ROOT}/web/public/fonts"
 
 CALIBRATION = json.load(open(f"{ROOT}/web/src/lib/calibration_ratios.json"))
 

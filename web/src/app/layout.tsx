@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ALL_FONT_VARIABLES } from "@/lib/fonts";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,10 +19,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // Real self-hosted calibrated fonts (src/lib/fonts.ts, next/font/local),
-    // not a Google Fonts CDN stand-in -- see fonts.ts for why that matters
-    // (the website preview must use the SAME font files the PDF prints with).
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${ALL_FONT_VARIABLES}`}>
+    // Newspaper pages bring their own @font-face (the engine's page HTML,
+    // served by /api/render) -- the same font files the PDF prints with.
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>{children}</body>
     </html>
   );
