@@ -199,64 +199,52 @@ he's already agreed to. Its TypeScript shape is also the Zod schema's shape
 4. ✅ **Write the Zod schema** matching Part D exactly, and the typed API client
    that validates every response through it before returning data to any
    component.
-5. ✅ **Mock the backend with MSW**, implementing the agreed contract with
-   *today's real stories* (SAMARTH/PRAG/NIFT/PM_VISIT/UPI/RBI/etc.) as fixture
-   data — proves the frontend against realistic content before his backend
-   exists, and swapping to the real backend later is a config change, not a
-   rewrite. Include more than one fixture `IssueResponse` — at minimum a
-   1-page day, today's real 2-page day, and a synthetic 4+ page day — so
-   "page count is backend-driven" (Part A) is actually exercised, not just
-   asserted. *(`ONE_PAGE_ISSUE`/`TWO_PAGE_ISSUE`/`FOUR_PAGE_ISSUE` in
-   `fixtures.ts`, switchable via `MOCK_FIXTURE`.)*
-6. ✅ **Build the coordinate/typography layer**: given a box (px) and article
-   text, produce correctly-fit, correctly-calibrated Gujarati typography —
-   port `layout_lib.py`'s fitting logic (proven, don't rebuild from scratch)
-   to work from a `(width, height)` box instead of a `template.json` frame ID.
-   *(Website side: `fonts.ts`'s `ARTICLE_FONT_ROLES`/`calibratedFontSize()`.
-   PDF side: `build_issue_pdf.py`'s `article_frame()`/`render_article()`,
-   reusing `layout_lib.py`'s `flow_gujarati_text()` directly rather than a
-   re-port — one real engine, not two.)*
-7. ✅ **Build the website render path**: a Next.js page that fetches
-   `IssueResponse` and renders **one page component, invoked once per entry
-   in `pages`** (grouping `articles` by their own `page` field) — not one
-   file per page number. Positions each article via its px coordinates,
-   renders masthead/chrome from `chrome.ts` + `gridSpec.ts` + `header_spec.json`
-   on every page the loop produces. *(`NewspaperPage.tsx` + `Masthead.tsx` +
-   `ArticleCard.tsx`, looped from `page.tsx`. Verified in-browser: real
-   Gujarati content, photos, ad placeholder, correct 2-page grouping. Found
-   and fixed a real bug in the process — `fonts.ts` was building an invalid
-   `var(...)` reference from `next/font/local`'s class-name `.variable`
-   instead of the CSS property name it registers, so every article/masthead
-   text was silently falling back to inherited Arial with no console error.)*
-8. ✅ **Build the PDF-generation path**: same data, same fitting logic, same
-   per-page loop (not per-page scripts), output via WeasyPrint (reusing
-   `layout_lib.py` directly). Runs as a Python service inside this
-   (frontend-side) codebase's own future hosting, called with the same
-   already-fetched-and-validated data — not the backend's responsibility
-   (Part B). *(`scripts/build_issue_pdf.py`, invoked via the new
-   `GET /api/issue` route — this app calling its own `fetchIssue()` over
-   HTTP so the Python side never has to know about MSW/mock-vs-live — and
-   wired to the website's "Download print-ready PDF" button via
-   `GET /api/pdf`, which shells out to the script and streams the result.
-   The masthead is a real vector copy straight out of the source PDF
-   (`show_pdf_page` with a clip rect at native (196) coordinates, the same
-   technique the archived `build_header_v2.py` used against the old
-   canonical page) rather than a redrawn approximation — more faithful than
-   the website's CSS masthead, and simpler now that source and target share
-   one coordinate space. Verified end to end against the 2-page mock fixture
-   producing a real print-quality PDF; a handful of mock-data boxes are too
-   small for their real content and get flagged in a `warnings` report
-   rather than silently clipped or crashing the whole build — expected,
-   since fixture box sizes are illustrative, not hand-measured.)*
-9. **Build the QA + approval gate**: pairwise overlap check + "does this
-   article's text actually fit its given box" check, generalized rather than
-   tied to frame IDs (the same techniques already proven this session, direct
-   PDF measurement, not guesswork) — surfaced in a review UI (successor to
-   the old `/review`) where a human confirms the result before it's marked
-   final. See Part G for where approval state lives. *(Not started —
-   `build_issue_pdf.py`'s per-piece `warnings` list is a first-draft version
-   of the "does it fit" half of this; no overlap check or approval-state
-   storage yet.)*
+5. ✅ **Mock the backend with MSW** — with the *real* 8 August issue. The
+   default fixture (`replica`) is `(196) Capital Kranti_08 august.pdf` itself,
+   all 4 pages, expressed in the unchanged contract: 32 rectangles snapped to
+   each real article's exact extent, the real photos and ad creatives as
+   printed, and the real text decoded from the paper's legacy Bharati font.
+   Stories that bend around another in print are sent as a main box plus
+   title-less continuation boxes — rectangles only, exactly as a real backend
+   would have to. Also `one`/`two` (subsets) and `stress` (odd box sizes,
+   far too much/little text, a photo in a one-column box, 6 pages), switched
+   with `MOCK_FIXTURE`. *(`web/src/mocks/fixtures.ts`; regenerate the replica
+   with `python3 scripts/replica/extract_source.py`, never by hand — it refuses
+   to write overlapping boxes and reports any text line no article claimed.
+   Decoder: `scripts/replica/bharati_decode.py`, a code-by-code table built by
+   reading every glyph off the page, validated on all 1,319 legacy spans.)*
+6. ✅ **Build the layout engine** — one engine for both outputs:
+   `scripts/layout/engine.py`. Given only an article's box it decides
+   everything inside: the column grid (8-column, 136.08pt pitch, 124.2pt
+   columns), kicker size (about half the headline), headline size and line
+   count (no widowed last line), photo width and height, and body text
+   threaded through justified columns at the measured 13pt / 15.6pt pitch.
+   Text length is absorbed fluidly: short text grows the headline and the
+   photo, long text shrinks them, then tightens leading and steps the body
+   size down; what still doesn't fit is reported (`overflow`, with the
+   leftover text) and what can't be filled is reported (`underflow`) — never
+   silently dropped or clipped. Line breaks come from WeasyPrint itself, and
+   each line is emitted as its own element, so every renderer draws the same
+   lines. Sizes are always declared-size × `calibration_ratios.json`; glyphs
+   are also scaled to the source's measured letter height (1.077 body,
+   1.159 bold) with a matching horizontal squeeze so widths are unchanged.
+7. ✅ **Website render path** — `page.tsx` shows one scaled iframe per entry
+   in `pages`, each serving the engine's own page HTML
+   (`GET /api/render/[page]`), so what's on screen is exactly what prints.
+8. ✅ **PDF path** — `scripts/build_issue_pdf.py` (and the "Download
+   print-ready PDF" button, `GET /api/pdf`) prints the same page HTML with
+   WeasyPrint on top of vector copies of the real masthead (page 1), running
+   header (pages 2+, folio and date repainted), and legal footer (last page).
+   Article boxes that reach into the header/footer are clamped and flagged.
+9. **QA + approval gate** — QA half done: `scripts/replica/compare.py`
+   compares the output against the source page by page (side-by-side and
+   overlay images in `out/compare/`, blank area per page and per article, ink
+   ratio, the engine's fill per article, box overlaps). Current result: every
+   article's text fits and fills 83–100% of its columns, no overlaps, no lost
+   text; pages carry 7–10 points more blank area than the source, almost all
+   of it from font weight (Hind Vadodara Regular is lighter than Bharati) and
+   the source's heavier display faces. *(Approval UI and approval-state
+   storage not started.)*
 10. **Swap MSW for the real backend** once available; the build plan's whole
     point is that step 10 should be uneventful.
 
@@ -295,11 +283,11 @@ directly: a real `ENOTFOUND mock-backend.local` error, not assumed). Restart
 
 | Concern | Choice | Why |
 |---|---|---|
-| Website rendering | Next.js (App Router) + React + TypeScript | Already this project's frontend; Server Components can fetch+validate server-side before render. |
+| Website rendering | Next.js (App Router) + TypeScript, showing the layout engine's page HTML | One engine for screen and print — they can't disagree. |
 | API mocking | MSW (Mock Service Worker) | Intercepts the same fetch calls the real client will make — swapping to the real backend later changes config, not code. |
 | Contract validation | Zod | One schema definition doubles as the TypeScript type and the runtime validator — a contract mismatch fails loudly, immediately, with a clear message. |
-| Typography + layout fitting | `scripts/layout_lib.py` (kept from this session), ported/reused for box-based fitting instead of frame-ID lookups | Already proven this session for calibrated Gujarati text; no reason to rebuild it. |
+| Typography + layout fitting | `scripts/layout/engine.py` (uses `layout_lib.py`'s calibration), WeasyPrint as the line-breaking engine | Fluid in-box layout from the backend's box alone; WeasyPrint shapes Gujarati correctly. |
 | PDF generation | WeasyPrint, driven by `layout_lib.py`, run as a Python service this codebase owns | Confirmed frontend's responsibility (Part B); reuses the exact pipeline already proven to produce correct Gujarati typography. |
-| Chrome/masthead rendering | `chrome.ts`, `gridSpec.ts`, `header_spec.json`, `calibration_ratios.json` (kept from this session) | Already measured directly off the real newspaper; frontend-owned per Part B. |
+| Chrome/masthead rendering | Vector copies from the source PDF (masthead, running headers, footer) + `header_spec.json` for the dynamic edition bar | Exact, and frontend-owned per Part B. |
 | Approval-gate state | A small local store (JSON file or SQLite) tracking which issue/run has been human-approved | Lightweight and appropriate while everything is local/mocked; revisit once real hosting (Part B) is set up — this is intentionally the one piece of this stack likely to change shape later, flagged rather than over-built now. |
 | Env config | `.env.local`-style config for API base URL + future auth token, mock/real switch | Backend and frontend will each be hosted separately later with a direct connector (Part B) — the base URL must never be hardcoded, even now. |

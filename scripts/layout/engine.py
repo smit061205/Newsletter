@@ -67,10 +67,16 @@ INK = "rgb(35,31,32)"
 
 # One CSS family per font FILE (not per weight) so matching can never fall
 # through to a different face in either the browser or WeasyPrint.
+# `vscale`: the substitute fonts are calibrated to the source's glyph
+# WIDTHS, but Bharati letters are taller for the same width -- measured as the
+# median ink-height ratio source/substitute over every 13pt body span (1.077)
+# and every bold span (1.159) on the source pages. Lines are set that much
+# larger and compressed horizontally by the same factor, so both width (and
+# therefore every line break) and letter height match the printed paper.
 ROLES = {
-    "body": {"src": "BBharatiGopikaTwo", "family": "CKBody", "file": "fonts/HindVadodara-Regular.ttf"},
-    "bold": {"src": "BBharatiGopikaTwo,Bold", "family": "CKBold", "file": "fonts/HindVadodara-Bold.ttf"},
-    "head": {"src": "BBharatiMaruti", "family": "CKHead", "file": "fonts/MuktaVaani-Bold.ttf"},
+    "body": {"src": "BBharatiGopikaTwo", "family": "CKBody", "file": "fonts/HindVadodara-Regular.ttf", "vscale": 1.077},
+    "bold": {"src": "BBharatiGopikaTwo,Bold", "family": "CKBold", "file": "fonts/HindVadodara-Bold.ttf", "vscale": 1.159},
+    "head": {"src": "BBharatiMaruti", "family": "CKHead", "file": "fonts/MuktaVaani-Bold.ttf", "vscale": 1.0},
 }
 FONT_FACES = "".join(
     f"@font-face{{font-family:{r['family']};src:url({r['file']})}}" for r in ROLES.values()
@@ -202,7 +208,9 @@ def text_lines(lines, x, y, w, role, declared, pitch, justify=False):
 
 
 def headline_cap(cols):
-    return {1: 24, 2: 30, 3: 38, 4: 46}.get(cols, 60)
+    """Largest declared headline size per box width. Measured on the source:
+    4-column leads run 50-55pt, 2-3-column heads 34-38pt, full-width 60pt."""
+    return {1: 26, 2: 36, 3: 42, 4: 52}.get(cols, 62)
 
 
 def split_paragraphs(text):
@@ -269,79 +277,149 @@ def balanced_caps(frames, pitch, n):
     return caps_at(hi)
 
 
+def widowed(lines):
+    """A headline whose last line is a stray word or two (under a quarter of
+    its longest line) -- stepping the size down rebalances it."""
+    if len(lines) < 2:
+        return False
+    longest = max(len(t) for (_, t, _) in lines)
+    return len(lines[-1][1]) < 0.25 * longest
+
+
+def story_header(a, x, y, w, cols, variant):
+    """Kicker and headline across the full box width. `variant` is
+    (extra_points, extra_lines): negative points shrink the headline when the
+    body needs room, positive ones grow it (bigger, more lines) when the text
+    is too short to fill the box -- what an editor does with a short lead.
+    The kicker is sized from the headline (about half of it), as on the
+    source pages (34pt over a 55pt head, 24 over 50, 17 over 34)."""
+    out, cursor = [], y
+    title = (a.get("title") or "").strip()
+    hd, tl = None, ()
+    if title:
+        extra_pt, extra_lines = variant
+        max_lines = (3 if cols == 1 else 2) + extra_lines
+        hd = min(64, headline_cap(cols) + extra_pt)
+        tl = set_lines((title,), w, "bold", hd)
+        while hd > 16 and (len(tl) > max_lines or widowed(tl)):
+            hd -= 1
+            tl = set_lines((title,), w, "bold", hd)
+    kicker = (a.get("kicker") or "").strip()
+    if kicker:
+        kd = max(15.0, round((hd or 30) * 0.5))
+        klines = set_lines((kicker,), w, "bold", kd)
+        while len(klines) > 2 and kd > 13:
+            kd -= 1
+            klines = set_lines((kicker,), w, "bold", kd)
+        kp = kd * 1.2
+        out += text_lines(klines, x, cursor, w, "bold", kd, kp)
+        cursor += len(klines) * kp + 2
+    if title:
+        hp = hd * 1.2  # measured: Gopika Bold headlines sit on 1.2 x declared, like body
+        out += text_lines(tl, x, cursor, w, "bold", hd, hp)
+        cursor += len(tl) * hp + 6
+    return out, cursor
+
+
+def photo_options(cols, has_title, has_body):
+    """Photo sizes to try, most preferred first: (columns spanned, max share
+    of the space under the headline). The photo is the fluid variable that
+    lets the same text fill boxes of any size -- it grows (wider, then
+    taller) when the text is short, and shrinks when the text is long."""
+    if not has_body:
+        return [(cols, 1.0)]
+    base = cols if cols <= 1 else (cols - 1 if cols <= 3 else math.ceil(cols / 2))
+    widths = [base] + list(range(base + 1, cols + 1)) + list(range(base - 1, 0, -1))
+    opts = [(base, 0.45)]
+    for frac in (0.55, 0.65, 0.75, 0.35, 0.28, 0.22):
+        opts.append((base, frac))
+    for k in widths[1:]:
+        for frac in (0.45, 0.55, 0.65, 0.75, 0.35, 0.28, 0.22):
+            opts.append((k, frac))
+    return opts
+
+
+STATS = {}  # per-article fit results, written to layout.json for QA
+
+
 def layout_story(a, x, y, w, h, warnings):
     cols = max(1, round((w + GUTTER) / GRID_PITCH))
     colw = (w - (cols - 1) * GUTTER) / cols
     paras = split_paragraphs(a.get("bodyText", ""))
+    title = (a.get("title") or "").strip()
+    caption = (a.get("photoCaption") or "").strip()
     local, src = resolve_image(a.get("photoUrl", ""))
     if a.get("photoUrl") and not local:
         warnings.append({"id": a["id"], "kind": "missing-image", "detail": a["photoUrl"]})
+    n_lines = lambda d: len(set_lines(paras, colw, "body", d))  # noqa: E731
 
-    result = None
-    for step in range(4):  # each step gives the body a little more room
-        out, cursor = [], y
-
-        kicker = (a.get("kicker") or "").strip()
-        if kicker:
-            kd = 18.0 if cols > 1 else 15.0
-            klines = set_lines((kicker,), w, "bold", kd)
-            while len(klines) > 2 and kd > 13:
-                kd -= 1
-                klines = set_lines((kicker,), w, "bold", kd)
-            kp = kd * 1.2
-            out += text_lines(klines, x, cursor, w, "bold", kd, kp)
-            cursor += len(klines) * kp + 2
-
-        title = (a.get("title") or "").strip()
-        if title:
-            max_lines = 3 if cols == 1 else 2
-            hd = headline_cap(cols) - 4 * step
-            tl = set_lines((title,), w, "bold", hd)
-            while len(tl) > max_lines and hd > 16:
-                hd -= 1
-                tl = set_lines((title,), w, "bold", hd)
-            hp = hd * 1.2  # measured: Gopika Bold headlines sit on 1.2 x declared, like body
-            out += text_lines(tl, x, cursor, w, "bold", hd, hp)
-            cursor += len(tl) * hp + 6
-
-        k = 0
-        photo_bottom = cursor
-        if local and (y + h - cursor) > 60:
-            k = cols if cols <= 1 else (cols - 1 if cols <= 3 else math.ceil(cols / 2))
-            if not paras:
-                k = cols
+    def attempt(header, cursor, opt):
+        """One candidate layout: photo boxes + body frames + fitted body."""
+        out = list(header)
+        k, photo_bottom = 0, cursor
+        room = y + h - cursor
+        if local and opt and room > 60:
+            k, frac = opt
             pw = k * colw + (k - 1) * GUTTER
-            ph = pw / image_aspect(local)
-            cap = (y + h - cursor) * ((0.45, 0.40, 0.34, 0.28)[step] if paras else 1.0)
-            ph = min(ph, cap)
+            natural = pw / image_aspect(local)
+            cap = room * frac
+            ph = min(natural, cap)
+            if ph < natural * (1 - 0.35) and paras:
+                return None  # would crop away over a third of the picture
             px = x + w - pw
             out.append(Box("img", px, cursor, pw, ph, src=src, local=local, fit="cover"))
             photo_bottom = cursor + ph + 3
-            caption = (a.get("photoCaption") or "").strip()
             if caption:
-                cd = 11.0
-                cl = set_lines((caption,), pw, "bold", cd)
-                cp = cd * 1.2
-                out += text_lines(cl, px, photo_bottom, pw, "bold", cd, cp)
-                photo_bottom += len(cl) * cp
+                cl = set_lines((caption,), pw, "bold", 11.0)
+                out += text_lines(cl, px, photo_bottom, pw, "bold", 11.0, 13.2)
+                photo_bottom += len(cl) * 13.2
             photo_bottom += 5
-
         frames = []
         for i in range(cols):
             fx = x + i * (colw + GUTTER)
             fy = photo_bottom if (k and i >= cols - k) else cursor
             frames.append((fx, fy, colw, max(0.0, y + h - fy)))
-
         if not paras:
-            result = (out, None)
-            break
+            return out, None, 1.0, True
+        declared, pitch, fits = body_fit(n_lines, frames)
+        capacity = sum(f[3] for f in frames)
+        fill = min(1.0, n_lines(declared) * pitch / capacity) if capacity else 1.0
+        return out, (declared, pitch, frames, fits), fill, fits
 
-        declared, pitch, fits = body_fit(lambda d: len(set_lines(paras, colw, "body", d)), frames)
-        if fits or step == 3:
-            result = (out, (declared, pitch, frames, fits))
+    # Candidate layouts in editorial preference order: the default headline
+    # with a modest photo; then a bigger headline; then bigger photos; and
+    # only then a smaller headline (for text that's too long). The first one
+    # that fits and fills >= 92% of its columns wins; otherwise the fullest
+    # one that fits; otherwise the least-bad overflow.
+    grow, shrink = [(10, 1), (16, 2)], [(-4, 0), (-8, 0), (-12, 0)]
+    opts = photo_options(cols, bool(title), bool(paras)) if local else [None]
+    modest = [o for o in opts if o is None or o[1] in (0.45, 0.55)][:2]
+    order = [((0, 0), o) for o in modest]
+    order += [(v, o) for v in grow for o in modest]
+    order += [(v, o) for v in [(0, 0)] + grow for o in opts]
+    order += [(v, o) for v in shrink for o in opts]
+    headers, seen, fitting, best = {}, set(), [], None
+    for variant, opt in order:
+        if (variant, opt) in seen:
+            continue
+        seen.add((variant, opt))
+        if variant not in headers:
+            headers[variant] = story_header(a, x, y, w, cols, variant)
+        r = attempt(*headers[variant], opt)
+        if r is None:
+            continue
+        if r[3] and r[2] >= 0.92:
+            best = r
             break
+        if r[3]:
+            fitting.append(r)
+        elif best is None or r[2] > best[2]:
+            best = r
+    else:
+        if fitting:
+            best = max(fitting, key=lambda r: r[2])
 
-    out, body = result
+    out, body, fill, fits = best
     if body is None:
         return out
     declared, pitch, frames, fits = body
@@ -356,10 +434,10 @@ def layout_story(a, x, y, w, h, warnings):
         warnings.append({"id": a["id"], "kind": "overflow",
                          "detail": f"{len(lines) - i} line(s) did not fit",
                          "leftover": " ".join(t for (_, t, _) in lines[i:])})
-    capacity = sum(f[3] for f in frames)
-    fill = (min(i, len(lines)) * pitch) / capacity if capacity else 1.0
     if fill < 0.92 and fits:
         warnings.append({"id": a["id"], "kind": "underflow", "detail": f"body fills {fill:.0%} of its columns"})
+    STATS[a["id"]] = {"cols": cols, "fill": round(fill, 3), "fits": fits and i >= len(lines),
+                      "body_pt": declared, "pitch_pt": round(pitch, 2)}
     return out
 
 
@@ -371,7 +449,7 @@ def layout_article(a, warnings, safe=(0.0, PAGE_H)):
     x, y = a["x"] * PT_PER_PX, a["y"] * PT_PER_PX
     w, h = a["width"] * PT_PER_PX, a["height"] * PT_PER_PX
     top, bottom = max(y, safe[0]), min(y + h, safe[1])
-    if (top, bottom) != (y, y + h):
+    if (top, bottom) != (y, y + h) and (top - y) + (y + h - bottom) >= 2.0:
         warnings.append({"id": a["id"], "kind": "chrome-overlap",
                          "detail": f"box trimmed by {top - y + (y + h - bottom):.1f}pt to clear the page header/footer"})
         y, h = top, max(0.0, bottom - top)
@@ -450,8 +528,13 @@ def box_html(b, mode):
     pos = f"left:{b.x:.2f}pt;top:{b.y:.2f}pt;width:{b.w:.2f}pt;height:{b.h:.2f}pt"
     if b.kind == "line":
         cls = "ln j" if b.justify else "ln"
+        v = ROLES[b.role]["vscale"]
+        # set at v x the size across v x the width, then squeeze back by 1/v:
+        # same footprint and line breaks, taller letters (see ROLES)
+        pos = f"left:{b.x:.2f}pt;top:{b.y:.2f}pt;width:{b.w * v:.2f}pt;height:{b.h:.2f}pt"
+        squeeze = f";transform:scaleX({1 / v:.4f});transform-origin:0 0" if v != 1.0 else ""
         return (f'<div class="{cls}" style="{pos};font-family:{ROLES[b.role]["family"]};'
-                f'font-size:{b.size}pt;line-height:{b.pitch:.3f}pt">{esc(b.text)}</div>')
+                f'font-size:{b.size * v:.3f}pt;line-height:{b.pitch:.3f}pt{squeeze}">{esc(b.text)}</div>')
     if b.kind == "label":
         return (f'<div class="lb" style="{pos};font-family:{ROLES[b.role]["family"]};font-size:{b.size}pt;'
                 f'line-height:{b.pitch:.3f}pt;color:{b.color};text-align:{b.align or "left"}">{esc(b.text)}</div>')
@@ -546,7 +629,9 @@ def resolve_issue(issue, out_root):
     # layout.json is the cache-hit marker, so it's written last: a concurrent
     # reader that sees it can rely on every other file already being there
     tmp = os.path.join(out_dir, "layout.json.tmp")
-    json.dump({"issue": {k: issue[k] for k in ("issueDate", "issueNumber", "pages")}, "pages": pages},
+    json.dump({"issue": {k: issue[k] for k in ("issueDate", "issueNumber", "pages")}, "pages": pages,
+               "articles": {aid: st for aid, st in STATS.items()
+                            if aid in {a["id"] for a in issue["articles"]}}},
               open(tmp, "w"), ensure_ascii=False)
     os.replace(tmp, os.path.join(out_dir, "layout.json"))
     return out_dir
