@@ -1,5 +1,5 @@
 // Typed client for the backend contract (contract.ts). Every response is
-// parsed through IssueResponseSchema before it's returned -- a mismatch
+// parsed through IssueRenderSchema before it's returned -- a mismatch
 // between this codebase's assumptions and the real backend fails here, with
 // a clear Zod error, not as a silently broken render three components away
 // (docs/FRONTEND_ROADMAP.md Part B, "runtime schema validation: yes, strict").
@@ -11,12 +11,12 @@
 // change here.
 
 import { env } from "./env";
-import { IssueResponseSchema, type IssueResponse } from "./contract";
+import { IssueRenderSchema, type IssueRender } from "./contract";
 
 // TBD with your brother (docs/FRONTEND_ROADMAP.md Part F) -- placeholder path.
 const ISSUE_ENDPOINT_PATH = "/api/issue";
 
-export async function fetchIssue(): Promise<IssueResponse> {
+export async function fetchIssue(): Promise<IssueRender> {
   const url =
     env.backendMode === "live"
       ? `${env.backendApiUrl}${ISSUE_ENDPOINT_PATH}`
@@ -32,7 +32,7 @@ export async function fetchIssue(): Promise<IssueResponse> {
   }
 
   const json = await res.json();
-  const parsed = IssueResponseSchema.safeParse(json);
+  const parsed = IssueRenderSchema.safeParse(json);
   if (!parsed.success) {
     throw new Error(
       `Backend response at ${url} did not match the expected contract (contract.ts):\n` +

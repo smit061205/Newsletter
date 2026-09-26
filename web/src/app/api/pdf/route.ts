@@ -1,52 +1,29 @@
-// Download-PDF route (the user's original ask: "i want a download pdf
-// button also which gives out print ready perfect newspaper pdf"), now
-// wired to the backend-driven pipeline (docs/FRONTEND_ROADMAP.md Part E
-// step 8) instead of the archived one-off page scripts. Shells out to
-// scripts/build_issue_pdf.py, which fetches this SAME app's /api/issue
-// route and composites the print PDF with layout_lib.py + WeasyPrint --
-// the one Python/WeasyPrint dependency this frontend still has, matching
-// Part G's stack decision ("frontend generates the PDF").
-import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-
-const ROOT = "/Users/smitthakkar/NewsPaper_Project";
-const SCRIPT = path.join(ROOT, "scripts", "build_issue_pdf.py");
+// "Download print-ready PDF": the current issue, every page plotted exactly
+// as the backend positioned it and printed by Chromium at the backend's page
+// size (lib/pdf.ts). Any warnings (text overflowing its box, failed images or
+// fonts, elements off the page) ride along in the X-Plot-Warnings header;
+// `?warnings=1` returns them as JSON instead of the PDF.
+import { fetchIssue } from "@/lib/apiClient";
+import { printIssue } from "@/lib/pdf";
 
 export async function GET(request: Request) {
-  const outPath = path.join(os.tmpdir(), `capital-kranti-${randomUUID()}.pdf`);
-  const issueUrl = new URL("/api/issue", request.url).toString();
-
   try {
-    await new Promise<void>((resolve, reject) => {
-      const proc = spawn("python3", [SCRIPT, "--url", issueUrl, "--out", outPath]);
-      let stderr = "";
-      proc.stderr.on("data", (d) => {
-        stderr += d.toString();
-      });
-      proc.on("error", reject);
-      proc.on("close", (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`build_issue_pdf.py exited ${code}\n${stderr}`));
-      });
-    });
-
-    const pdfBytes = await fs.readFile(outPath);
-    return new Response(new Uint8Array(pdfBytes), {
+    const issue = await fetchIssue();
+    const { pdf, warnings } = await printIssue(issue, new URL(request.url).origin);
+    if (new URL(request.url).searchParams.has("warnings")) {
+      return Response.json({ pages: issue.pages.length, warnings });
+    }
+    return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": 'attachment; filename="capital-kranti-issue.pdf"',
+        "Content-Disposition": `attachment; filename="capital-kranti-${issue.issueDate}.pdf"`,
+        "X-Plot-Warnings": String(warnings.length),
       },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return new Response(`PDF generation failed:\n${message}`, {
-      status: 500,
-      headers: { "Content-Type": "text/plain" },
+      status: 500, headers: { "Content-Type": "text/plain" },
     });
-  } finally {
-    await fs.unlink(outPath).catch(() => {});
   }
 }

@@ -1,6 +1,23 @@
 # Capital Kranti — Frontend Roadmap (Backend-Driven Architecture)
 
-**Status: planning document, cleanup done, no new frontend code written yet.**
+> **Current architecture (supersedes Parts D, E.5–E.9 and G below):** the
+> backend sends the *whole* layout — page size, every element's position,
+> text, fonts by URL, images and page chrome — as one JSON document
+> (**`docs/RENDER_CONTRACT.md`**, schema in `web/src/lib/contract.ts`). The
+> frontend is a pure plotter: it validates the JSON, draws each element where
+> it was placed (`web/src/lib/plot.ts`), shows that on the website
+> (`/api/render/[page]`), and prints the same HTML with Chromium for the PDF
+> (`/api/pdf`, `web/src/lib/pdf.ts`), reporting text overflow, off-page
+> elements and failed images/fonts as warnings but never changing the page.
+> The frontend layout engine described in Part E (grid, headline sizing,
+> photo fitting) moved to `archive/frontend-layout-engine/` — that work is now
+> the backend's job. The mock backend (`scripts/mock_backend/from_source.py`)
+> serves the real 8 August issue with every element at its printed position;
+> `scripts/replica/compare.py` checks the plotted PDF against the source.
+> Remaining: the human approval step (Part E.9) and connecting the real
+> backend (E.10).
+
+**Status (historical): planning document, cleanup done, no new frontend code written yet.**
 Supersedes the content-authoring parts of `docs/PRECISION_ROADMAP.md`, which
 stays in place as the historical record of how the masthead/typography/grid
 were measured — that measurement work is exactly what this new system reuses.

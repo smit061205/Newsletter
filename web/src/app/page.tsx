@@ -1,20 +1,16 @@
-// The newspaper website view. The page count comes from the backend
-// (IssueResponse.pages), and every page is the exact HTML the layout engine
-// produced for the print PDF (/api/render/[page], scripts/layout/engine.py) --
-// one engine for both, so what's on screen is what prints.
+// The newspaper website view: every page of the backend's issue, plotted
+// exactly as positioned (/api/render/[page], lib/plot.ts) -- the same HTML the
+// PDF prints. Page count and each page's size come from the backend.
 
 import { fetchIssue } from "@/lib/apiClient";
+import { staticWarnings } from "@/lib/plot";
+import { PlotWarnings } from "./PlotWarnings";
 
-// The engine lays pages out at the real (196) page size: 1105.5 x 1488.2pt,
-// which is 1474 x 1984.3 CSS px. Shown scaled down to DISPLAY_WIDTH.
-const PAGE_W_PX = (1105.5 * 4) / 3;
-const PAGE_H_PX = (1488.2 * 4) / 3;
 const DISPLAY_WIDTH = 900;
-const SCALE = DISPLAY_WIDTH / PAGE_W_PX;
 
 export default async function Home() {
   const issue = await fetchIssue();
-  const pageNumbers = Array.from({ length: issue.pages }, (_, i) => i + 1);
+  const cssPx = (v: number) => (v * 96) / issue.dpi;
 
   return (
     <main
@@ -25,7 +21,8 @@ export default async function Home() {
     >
       <header style={{ textAlign: "center", fontFamily: "system-ui, sans-serif", color: "#1f1f24" }}>
         <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-          {issue.issueDate} · Issue #{issue.issueNumber} · {issue.pages} page{issue.pages === 1 ? "" : "s"}
+          {issue.issueDate} · Issue #{issue.issueNumber} · {issue.pages.length} page
+          {issue.pages.length === 1 ? "" : "s"}
         </h1>
         <a
           href="/api/pdf"
@@ -38,25 +35,24 @@ export default async function Home() {
           Download print-ready PDF
         </a>
       </header>
-      {pageNumbers.map((n) => (
-        <div
-          key={n}
-          style={{
-            width: DISPLAY_WIDTH, height: PAGE_H_PX * SCALE, overflow: "hidden",
-            boxShadow: "0 0 0 1px #ddd", background: "#fff",
-          }}
-        >
-          <iframe
-            src={`/api/render/${n}`}
-            title={`Page ${n}`}
-            loading={n === 1 ? "eager" : "lazy"}
-            style={{
-              width: PAGE_W_PX, height: PAGE_H_PX, border: 0,
-              transform: `scale(${SCALE})`, transformOrigin: "top left",
-            }}
-          />
-        </div>
-      ))}
+      <PlotWarnings initial={staticWarnings(issue)} />
+      {issue.pages.map((page) => {
+        const w = cssPx(page.width);
+        const h = cssPx(page.height);
+        const scale = DISPLAY_WIDTH / w;
+        return (
+          <div
+            key={page.number}
+            style={{ width: DISPLAY_WIDTH, height: h * scale, overflow: "hidden", boxShadow: "0 0 0 1px #ddd", background: "#fff" }}
+          >
+            <iframe
+              src={`/api/render/${page.number}`}
+              title={`Page ${page.number}`}
+              style={{ width: w, height: h, border: 0, transform: `scale(${scale})`, transformOrigin: "top left" }}
+            />
+          </div>
+        );
+      })}
     </main>
   );
 }
