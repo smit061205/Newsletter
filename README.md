@@ -428,7 +428,7 @@ Printed at the end of every build and stored in the report (`GET /api/issues/<da
 4. **The lead is on page 1;** every story placed, or listed as left out.
 5. **The AI page reviewer** reports nothing it is at least 0.8 confident about.
 6. **Fact checks:** every number in a rewritten or fitted story is in its release.
-7. **Determinism:** the same inputs give an identical issue JSON. The gate compares with the previous version, so it legitimately "fails" once after a code or input change.
+7. **Determinism:** the same inputs give an identical issue JSON. Each build records a fingerprint of what it's made from (`fingerprint.ts`: the day's stories, edits, ads and releases, the publication folder, and the engine's code under `backend/src` and `shared/src`); the gate compares only with a previous build of the same fingerprint. After a change to the inputs or the code there's nothing to compare, and the gate says so and passes.
 
 Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper's standard:
 - **S1 body spacing:** extra word space (word + letter spacing) p95 ≤ 0.5 em, and at most 3% of lines past 0.6 em. The loosest lines are listed in the report (`style.looseLines`) for the editor.
@@ -640,7 +640,7 @@ Add this as gate 8.
 - **Restart rules:** `next dev` must be restarted after mock or shared changes (MSW); the backend server must be restarted after backend code changes (no hot reload).
 - **Playwright** is pinned at 1.62.1. Newer versions want a different Chromium build.
 - **The OpenRouter key** is in `backend/.env`. The account had a $5 limit when it was set up; check it at `https://openrouter.ai/api/v1/key`.
-- **`gate 7`** compares against the previous stored version, so it fails once after any code or input change. Rebuild to confirm.
+- **`gate 7`** compares only builds with the same fingerprint (same inputs, same engine code), so a code or input change doesn't fail it.
 - **The 8 August stand-in ads** are used whenever a day has no `ads` rows (`referenceAds`). There is no ad-booking UI yet.
 - **A release with a Punjabi letter** ("ਲિમિટેડના", release 55037) can't be set in Gopika. It's logged, not fixed: it's a typo in the source.
 - **Fonts with `restricted: true`** are never served publicly. Don't move them to `web/public`.
