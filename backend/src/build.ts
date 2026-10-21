@@ -143,11 +143,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       const n = plan.page;
       const pageAds = ads.filter((a) => a.page === n);
       const fit = await closeGaps(plan, { band: { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, ads: pageAds,
-                                         store, releases, m, leftOut: pool, fillers });
+                                         store, releases, m, leftOut: pool, fillers, say: (l) => log(`  p${n}${l}`) });
       spent += fit.cost;
       factChecks.push(...fit.factChecks);
       pool = pool.filter((s) => !fit.used.includes(s));
-      for (const l of fit.log) log(`  p${n}${l}`);
       pagesOut.set(n, [
         ...pageAds.map((ad) => ({ id: `ad-${ad.id}`, kind: "image" as const, articleId: `ad-${ad.id}`, x: ad.x, y: ad.y,
                                   width: ad.width, height: ad.height, url: ad.url, fit: "fill" as const })),
