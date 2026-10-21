@@ -1,8 +1,8 @@
 {
  "issueDate": "2026-10-21",
  "issueNumber": 270,
- "version": 45,
- "publishedAt": "2026-10-21T22:24:44.168Z",
+ "version": 46,
+ "publishedAt": "2026-10-21T22:32:38.459Z",
  "ready": true,
  "dpi": 300,
  "pdf": "/issues/2026-10-21/issue.pdf",
@@ -106,7 +106,7 @@
   {
    "gate": "7 same inputs, same issue",
    "pass": true,
-   "detail": "inputs or engine changed since v44: nothing to compare (the next build of the same inputs will be)"
+   "detail": "inputs or engine changed since v45: nothing to compare (the next build of the same inputs will be)"
   }
  ],
  "warnings": []
