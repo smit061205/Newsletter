@@ -205,7 +205,15 @@ export class Packer {
             // story can grow into: avoided where another width works
             const straddle = Math.max(...limits) - limit > minBody;
             for (const mode of modes) for (const variant of VARIANTS) {
-              const mod = await this.module(story, rank, k, variant, mode);
+              let mod = await this.module(story, rank, k, variant, mode);
+              // two headlines side by side, level and the same size, read as
+              // one line ("tombstoned"): the desk sets this one a size smaller
+              const level = (m2: Module) => st.placed.some((q) => tombstoned(q, { module: m2, col: c0, x: colX(c0), y })
+                                                                 || tombstoned({ module: m2, col: c0, x: colX(c0), y }, q));
+              if (!isLead && rank < 5 && level(mod)) {
+                const smaller = await this.module(story, rank + 1, k, variant, mode);
+                if (smaller.height <= limit && !level(smaller)) mod = smaller;
+              }
               if (y + mod.height > limit) continue; // too tall here: try shorter text
               const free = [...st.free];
               for (let i = 0; i < k; i++) free[c0 + i] = settle(c0 + i, y + mod.height + gap);
