@@ -353,7 +353,7 @@ The profile is `publications/<id>/profile.json`, validated by `shared/src/profil
 
 ### 8.2 Story module (`layout/module.ts`), a story at its natural size
 For a story with a given **rank** (1 = lead … 5 = brief), **column span k**, **variant** (`long|medium|short`) and **photo mode** (0 = beside the text, 1 = across the whole story, 2 = two photos side by side):
-- **Headline, kicker, deck:** set by `display.ts` (8.7): every line fitted to the story's full width, at the largest size the rank allows (`capByColumns[k] × rankScale[rank]`; a short headline may go one rank up to fill). Kicker 0.6× and deck 0.45× the headline size; kickers centred over leads (ranks 1-2), flush left otherwise.
+- **Headline, kicker, deck:** set by `display.ts` (8.7): every line fitted to the story's full width, at the largest size the rank allows (`capByColumns[k] × rankScale[rank]`; a short headline may go one rank up to fill). Kicker 0.6× and deck 0.45× the headline size; every kicker centred over its story.
 - **Text** is normalised first (`text.ts`): numbers in the paper's digits (English ones like "ATM 2026" stay Latin), clean spacing.
 - **Photo:**
   - natural aspect ratio, nothing cropped in mode 0;

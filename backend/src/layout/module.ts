@@ -170,7 +170,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   if (kicker) {
     const ks = Math.max(KICKER.min, hd * KICKER.ratio);
     const got = await display(kicker, "k", { font: KICKER.font, max: ks, min: KICKER.min, maxLines: 1, leading: KICKER.leading,
-                                             align: rank <= 2 ? "center" : "left" }, 2);
+                                             align: "center" }, 2);
     els.push(...got.elements);
     cursor = got.bottom + GAP.afterKicker;
   }
