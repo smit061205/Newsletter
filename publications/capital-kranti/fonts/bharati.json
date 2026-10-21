@@ -1,0 +1,3053 @@
+{
+"table": {
+"f": [
+"cons",
+"ક"
+],
+"¾": [
+"cons",
+"ખ"
+],
+"„": [
+"cons",
+"ગ"
+],
+"½": [
+"cons",
+"ઘ"
+],
+"[": [
+"cons",
+"ચ"
+],
+"A": [
+"cons",
+"છ"
+],
+"s": [
+"cons",
+"જ"
+],
+"Í": [
+"cons",
+"ઝ"
+],
+"C": [
+"cons",
+"ઝ"
+],
+"x": [
+"cons",
+"ટ"
+],
+"X": [
+"cons",
+"ઠ"
+],
+"z": [
+"cons",
+"ડ"
+],
+"Z": [
+"cons",
+"ઢ"
+],
+"ý": [
+"cons",
+"ણ"
+],
+"Œ": [
+"cons",
+"ત"
+],
+"Ë": [
+"cons",
+"દ"
+],
+"Ä": [
+"cons",
+"ધ"
+],
+"™": [
+"cons",
+"ન"
+],
+"…": [
+"cons",
+"પ"
+],
+"V": [
+"cons",
+"ફ"
+],
+"ƒ": [
+"cons",
+"બ"
+],
+"¼": [
+"cons",
+"ભ"
+],
+"{": [
+"cons",
+"મ"
+],
+"Þ": [
+"cons",
+"ય"
+],
+"h": [
+"cons",
+"ર"
+],
+"÷": [
+"cons",
+"લ"
+],
+"ð": [
+"cons",
+"વ"
+],
+"þ": [
+"cons",
+"શ"
+],
+"‚": [
+"cons",
+"સ"
+],
+"n": [
+"cons",
+"હ"
+],
+"¤": [
+"cons",
+"ળ"
+],
+"¢": [
+"cons",
+"ક્ર"
+],
+"«": [
+"cons",
+"પ્ર"
+],
+"©": [
+"cons",
+"શ્ર"
+],
+"§": [
+"cons",
+"શ્ન"
+],
+"ÿ": [
+"cons",
+"દ્ર"
+],
+"ü": [
+"cons",
+"ષ્ટ"
+],
+"c": [
+"cons",
+"ષ્ઠ"
+],
+"ï": [
+"cons",
+"શ્વ"
+],
+"ù": [
+"cons",
+"શ્ચ"
+],
+"ä": [
+"cons",
+"જ્જ"
+],
+"Ø": [
+"cons",
+"દ્ધ"
+],
+"Æ": [
+"cons",
+"દ્દ"
+],
+"j": [
+"cons",
+"દ્ઘ"
+],
+"ã": [
+"cons",
+"દ્ય"
+],
+"î": [
+"cons",
+"દ્વ"
+],
+"£": [
+"cons",
+"ફ્ર"
+],
+"J": [
+"cons",
+"ત્ન"
+],
+"ö": [
+"cons",
+"હ્ન"
+],
+"ñ": [
+"cons",
+"હ્મ"
+],
+"ó": [
+"cons",
+"પ્ત"
+],
+"¬": [
+"cons",
+"ક્ક"
+],
+"ë": [
+"cons",
+"ઢ્ઢ"
+],
+"ò": [
+"cons",
+[
+"જ",
+"ા"
+]
+],
+"S": [
+"cons",
+[
+"જ",
+"ી"
+]
+],
+"Á": [
+"cons",
+[
+"ર",
+"ુ"
+]
+],
+"Y": [
+"cons",
+[
+"ર",
+"ૂ"
+]
+],
+"Ó": [
+"cons",
+[
+"હ",
+"ૃ"
+]
+],
+"á": [
+"cons",
+[
+"દ",
+"ૃ"
+]
+],
+"õ": [
+"half",
+"ક્"
+],
+"ø": [
+"half",
+"ગ્"
+],
+"å": [
+"half",
+"ચ્"
+],
+"ß": [
+"half",
+"જ્"
+],
+"Û": [
+"half",
+"ણ્"
+],
+"í": [
+"half",
+"ત્"
+],
+"Ú": [
+"half",
+"થ્"
+],
+"æ": [
+"half",
+"ધ્"
+],
+"L": [
+"half",
+"ન્"
+],
+"Ã": [
+"half",
+"પ્"
+],
+"^": [
+"half",
+"ફ્"
+],
+"ç": [
+"half",
+"બ્"
+],
+"B": [
+"half",
+"મ્"
+],
+"Õ": [
+"half",
+"લ્"
+],
+"é": [
+"half",
+"ળ્"
+],
+"~": [
+"half",
+"શ્"
+],
+"»": [
+"half",
+"ષ્"
+],
+"M": [
+"half",
+"સ્"
+],
+"û": [
+"half",
+"ક્ષ્"
+],
+"Ì": [
+"half",
+"હ્ય્"
+],
+"Ï": [
+"half",
+"ખ્"
+],
+"Ô": [
+"half",
+"વ્"
+],
+"Ç": [
+"half",
+"ભ્"
+],
+"¥": [
+"half",
+"ત્ત્"
+],
+"º": [
+"half",
+"ત્ર્"
+],
+"¿": [
+"half",
+"જ્ઞ્"
+],
+"k": [
+"stem",
+"ા"
+],
+"Ù": [
+"mod",
+"્ર"
+],
+"ú": [
+"mod",
+"્ર"
+],
+"T": [
+"mod",
+"્"
+],
+"â": [
+"ya",
+"્ય"
+],
+"e": [
+"sign",
+"ી"
+],
+"w": [
+"sign",
+"ુ"
+],
+"q": [
+"sign",
+"ૂ"
+],
+"u": [
+"sign",
+"ે"
+],
+"i": [
+"sign",
+"ૈ"
+],
+"ì": [
+"sign",
+"ૉ"
+],
+"]": [
+"sign",
+"ૃ"
+],
+"ª": [
+"sign",
+"ીં"
+],
+"U": [
+"sign",
+"ેં"
+],
+"t": [
+"nas",
+"ં"
+],
+"P": [
+"nas",
+"ઁ"
+],
+"O": [
+"reph",
+"ર્ં"
+],
+"y": [
+"vowel",
+"અ"
+],
+"R": [
+"vowel",
+"ઇ"
+],
+"E": [
+"vowel",
+"ઈ"
+],
+"W": [
+"vowel",
+"ઉ"
+],
+"Q": [
+"vowel",
+"ઊ"
+],
+"É": [
+"vowel",
+"ઋ"
+],
+"ô": [
+"vowel",
+"ઉં"
+],
+"Ÿ": [
+"vowel",
+"ઊં"
+],
+"o": [
+"reph",
+"ર્"
+],
+"r": [
+"pre",
+[
+"િ",
+"",
+false
+]
+],
+"Â": [
+"pre",
+[
+"િ",
+"",
+false
+]
+],
+"®": [
+"pre",
+[
+"િ",
+"ં",
+false
+]
+],
+"Š": [
+"pre",
+[
+"િ",
+"",
+true
+]
+],
+"‹": [
+"pre",
+[
+"િ",
+"ં",
+true
+]
+]
+},
+"syllables": {
+"અ": {
+"codes": "y",
+"count": 334
+},
+"અં": {
+"codes": "yt",
+"count": 15
+},
+"આ": {
+"codes": "yk",
+"count": 281
+},
+"આં": {
+"codes": "ykt",
+"count": 10
+},
+"ઇ": {
+"codes": "R",
+"count": 63
+},
+"ઈ": {
+"codes": "E",
+"count": 59
+},
+"ઉ": {
+"codes": "W",
+"count": 120
+},
+"ઉં": {
+"codes": "ô",
+"count": 2
+},
+"ઊ": {
+"codes": "Q",
+"count": 3
+},
+"ઊં": {
+"codes": "Ÿ",
+"count": 4
+},
+"ઋ": {
+"codes": "É",
+"count": 2
+},
+"એ": {
+"codes": "yu",
+"count": 158
+},
+"ઐ": {
+"codes": "yi",
+"count": 1
+},
+"ઑ": {
+"codes": "ykì",
+"count": 13
+},
+"ઓ": {
+"codes": "yku",
+"count": 170
+},
+"ક": {
+"codes": "f",
+"count": 443
+},
+"કં": {
+"codes": "ft",
+"count": 3
+},
+"કા": {
+"codes": "fk",
+"count": 180
+},
+"કાં": {
+"codes": "fkt",
+"count": 2
+},
+"કિ": {
+"codes": "rf",
+"count": 2
+},
+"કિં": {
+"codes": "®f",
+"count": 5
+},
+"કી": {
+"codes": "fe",
+"count": 23
+},
+"કુ": {
+"codes": "fw",
+"count": 20
+},
+"કૂ": {
+"codes": "fq",
+"count": 5
+},
+"કૃ": {
+"codes": "f]",
+"count": 1
+},
+"કે": {
+"codes": "fu",
+"count": 92
+},
+"કૉ": {
+"codes": "fkì",
+"count": 4
+},
+"કો": {
+"codes": "fku",
+"count": 70
+},
+"કૌ": {
+"codes": "fki",
+"count": 1
+},
+"ક્ક": {
+"codes": "¬",
+"count": 3
+},
+"ક્કા": {
+"codes": "¬k",
+"count": 3
+},
+"ક્કી": {
+"codes": "¬e",
+"count": 1
+},
+"ક્કો": {
+"codes": "¬ku",
+"count": 2
+},
+"ક્ઝ": {
+"codes": "õÍ",
+"count": 1
+},
+"ક્ટ": {
+"codes": "õx",
+"count": 16
+},
+"ક્ટિ": {
+"codes": "Âõx",
+"count": 1
+},
+"ક્ટો": {
+"codes": "õxku",
+"count": 2
+},
+"ક્ટ્રો": {
+"codes": "õxÙku",
+"count": 2
+},
+"ક્ત": {
+"codes": "õŒ",
+"count": 7,
+"alternatives": {
+"õík": 1
+}
+},
+"ક્તા": {
+"codes": "õŒk",
+"count": 1
+},
+"ક્તિ": {
+"codes": "ÂõŒ",
+"count": 10
+},
+"ક્નો": {
+"codes": "õ™ku",
+"count": 4
+},
+"ક્ય": {
+"codes": "õâ",
+"count": 1
+},
+"ક્યા": {
+"codes": "õâk",
+"count": 1
+},
+"ક્યાં": {
+"codes": "õâkt",
+"count": 2
+},
+"ક્યુ": {
+"codes": "õâw",
+"count": 4
+},
+"ક્ર": {
+"codes": "¢",
+"count": 10
+},
+"ક્રાં": {
+"codes": "¢kt",
+"count": 4
+},
+"ક્રિ": {
+"codes": "r¢",
+"count": 9
+},
+"ક્રે": {
+"codes": "¢u",
+"count": 1
+},
+"ક્રો": {
+"codes": "¢ku",
+"count": 1
+},
+"ક્લ": {
+"codes": "õ÷",
+"count": 5
+},
+"ક્શ": {
+"codes": "õþ",
+"count": 4
+},
+"ક્ષ": {
+"codes": "ûk",
+"count": 43
+},
+"ક્ષા": {
+"codes": "ûkk",
+"count": 10
+},
+"ક્ષિ": {
+"codes": "rûk",
+"count": 3
+},
+"ક્ષુ": {
+"codes": "ûkw",
+"count": 1
+},
+"ક્ષે": {
+"codes": "ûku",
+"count": 5
+},
+"ક્સ": {
+"codes": "õ‚",
+"count": 4
+},
+"ખ": {
+"codes": "¾",
+"count": 40
+},
+"ખા": {
+"codes": "¾k",
+"count": 18
+},
+"ખી": {
+"codes": "¾e",
+"count": 10
+},
+"ખુ": {
+"codes": "¾w",
+"count": 5
+},
+"ખૂ": {
+"codes": "¾q",
+"count": 3
+},
+"ખે": {
+"codes": "¾u",
+"count": 4
+},
+"ખો": {
+"codes": "¾ku",
+"count": 4
+},
+"ખ્ય": {
+"codes": "ÏÞ",
+"count": 18
+},
+"ખ્યા": {
+"codes": "ÏÞk",
+"count": 3
+},
+"ગ": {
+"codes": "„",
+"count": 182,
+"alternatives": {
+"øk": 4
+}
+},
+"ગં": {
+"codes": "„t",
+"count": 4
+},
+"ગા": {
+"codes": "„k",
+"count": 34
+},
+"ગાં": {
+"codes": "„kt",
+"count": 25,
+"alternatives": {
+"økkt": 3,
+"„tk": 1
+}
+},
+"ગિ": {
+"codes": "r„",
+"count": 1
+},
+"ગી": {
+"codes": "„e",
+"count": 24
+},
+"ગુ": {
+"codes": "„w",
+"count": 24
+},
+"ગૃ": {
+"codes": "„]",
+"count": 5
+},
+"ગે": {
+"codes": "„u",
+"count": 24
+},
+"ગો": {
+"codes": "„ku",
+"count": 4
+},
+"ગ્ઝિ": {
+"codes": "ÂøÍ",
+"count": 4
+},
+"ગ્ન": {
+"codes": "ø™",
+"count": 1
+},
+"ગ્ય": {
+"codes": "øÞ",
+"count": 6
+},
+"ગ્ર": {
+"codes": "„ú",
+"count": 16
+},
+"ગ્રા": {
+"codes": "„úk",
+"count": 19
+},
+"ગ્રી": {
+"codes": "„úe",
+"count": 2
+},
+"ગ્રુ": {
+"codes": "„úw",
+"count": 1
+},
+"ગ્રે": {
+"codes": "„úu",
+"count": 17
+},
+"ગ્લો": {
+"codes": "ø÷ku",
+"count": 7
+},
+"ગ્સ": {
+"codes": "ø‚",
+"count": 6
+},
+"ઘ": {
+"codes": "½",
+"count": 14
+},
+"ઘા": {
+"codes": "½k",
+"count": 1
+},
+"ઘૂ": {
+"codes": "½q",
+"count": 1
+},
+"ચ": {
+"codes": "[",
+"count": 27
+},
+"ચં": {
+"codes": "[t",
+"count": 2
+},
+"ચા": {
+"codes": "[k",
+"count": 46
+},
+"ચિ": {
+"codes": "r[",
+"count": 9
+},
+"ચિં": {
+"codes": "®[",
+"count": 1
+},
+"ચી": {
+"codes": "[e",
+"count": 19
+},
+"ચે": {
+"codes": "[u",
+"count": 9
+},
+"ચૌ": {
+"codes": "[ki",
+"count": 1
+},
+"ચ્ચ": {
+"codes": "å[",
+"count": 10
+},
+"ચ્ચે": {
+"codes": "å[u",
+"count": 1
+},
+"ચ્છ": {
+"codes": "åA",
+"count": 3
+},
+"ચ્યા": {
+"codes": "åÞk",
+"count": 1
+},
+"છ": {
+"codes": "A",
+"count": 5
+},
+"છા": {
+"codes": "Ak",
+"count": 3
+},
+"છી": {
+"codes": "Ae",
+"count": 13
+},
+"છુ": {
+"codes": "Aw",
+"count": 1
+},
+"છું": {
+"codes": "Awt",
+"count": 3
+},
+"છૂ": {
+"codes": "Aq",
+"count": 1
+},
+"છે": {
+"codes": "Au",
+"count": 150
+},
+"છો": {
+"codes": "Aku",
+"count": 5
+},
+"જ": {
+"codes": "s",
+"count": 179
+},
+"જા": {
+"codes": "ò",
+"count": 50
+},
+"જિ": {
+"codes": "rs",
+"count": 29
+},
+"જિં": {
+"codes": "®s",
+"count": 11
+},
+"જી": {
+"codes": "S",
+"count": 57
+},
+"જીં": {
+"codes": "St",
+"count": 1
+},
+"જુ": {
+"codes": "sw",
+"count": 6
+},
+"જું": {
+"codes": "swt",
+"count": 1
+},
+"જૂ": {
+"codes": "sq",
+"count": 12
+},
+"જે": {
+"codes": "su",
+"count": 59
+},
+"જો": {
+"codes": "òu",
+"count": 20
+},
+"જ્જ": {
+"codes": "ä",
+"count": 2
+},
+"જ્જૈ": {
+"codes": "äi",
+"count": 2
+},
+"જ્ઞા": {
+"codes": "¿kk",
+"count": 1
+},
+"જ્ય": {
+"codes": "ßÞ",
+"count": 19
+},
+"જ્યા": {
+"codes": "ßÞk",
+"count": 12
+},
+"ઝ": {
+"codes": "Í",
+"count": 41,
+"alternatives": {
+"C": 1
+}
+},
+"ઝા": {
+"codes": "Ík",
+"count": 10
+},
+"ઝિ": {
+"codes": "rÍ",
+"count": 1
+},
+"ઝી": {
+"codes": "Íe",
+"count": 1
+},
+"ઝીં": {
+"codes": "Íª",
+"count": 1
+},
+"ઝું": {
+"codes": "Íwt",
+"count": 13
+},
+"ઝો": {
+"codes": "Íku",
+"count": 8
+},
+"ઝ્ડ": {
+"codes": "ÍTz",
+"count": 1
+},
+"ટ": {
+"codes": "x",
+"count": 133
+},
+"ટા": {
+"codes": "xk",
+"count": 7
+},
+"ટિ": {
+"codes": "rx",
+"count": 9
+},
+"ટિં": {
+"codes": "®x",
+"count": 3
+},
+"ટી": {
+"codes": "xe",
+"count": 28
+},
+"ટુ": {
+"codes": "xw",
+"count": 10
+},
+"ટૂ": {
+"codes": "xq",
+"count": 3
+},
+"ટૂં": {
+"codes": "xqt",
+"count": 1
+},
+"ટે": {
+"codes": "xu",
+"count": 93
+},
+"ટો": {
+"codes": "xku",
+"count": 3
+},
+"ટ્યો": {
+"codes": "xâku",
+"count": 1
+},
+"ટ્ર": {
+"codes": "xÙ",
+"count": 2
+},
+"ટ્રા": {
+"codes": "xÙk",
+"count": 21
+},
+"ટ્રી": {
+"codes": "xÙe",
+"count": 1
+},
+"ટ્રે": {
+"codes": "xÙu",
+"count": 11
+},
+"ટ્રો": {
+"codes": "xÙku",
+"count": 2
+},
+"ટ્સ": {
+"codes": "xT‚",
+"count": 7
+},
+"ઠ": {
+"codes": "X",
+"count": 20
+},
+"ઠો": {
+"codes": "Xku",
+"count": 1
+},
+"ડ": {
+"codes": "z",
+"count": 97
+},
+"ડા": {
+"codes": "zk",
+"count": 24
+},
+"ડિ": {
+"codes": "rz",
+"count": 45
+},
+"ડી": {
+"codes": "ze",
+"count": 14
+},
+"ડુ": {
+"codes": "zw",
+"count": 2
+},
+"ડે": {
+"codes": "zu",
+"count": 47
+},
+"ડૉ": {
+"codes": "zkì",
+"count": 12
+},
+"ડો": {
+"codes": "zku",
+"count": 12
+},
+"ડ્યો": {
+"codes": "zâku",
+"count": 3
+},
+"ડ્ર": {
+"codes": "zÙ",
+"count": 6
+},
+"ડ્રા": {
+"codes": "zÙk",
+"count": 2
+},
+"ડ્રે": {
+"codes": "zÙu",
+"count": 4
+},
+"ડ્રો": {
+"codes": "zÙku",
+"count": 3
+},
+"ઢ": {
+"codes": "Z",
+"count": 3
+},
+"ઢી": {
+"codes": "Ze",
+"count": 3
+},
+"ઢ્ઢા": {
+"codes": "ëk",
+"count": 1
+},
+"ઢ્યું": {
+"codes": "Zâwt",
+"count": 1
+},
+"ણ": {
+"codes": "ý",
+"count": 84
+},
+"ણા": {
+"codes": "ýk",
+"count": 34
+},
+"ણાં": {
+"codes": "ýkt",
+"count": 1
+},
+"ણિ": {
+"codes": "rý",
+"count": 2
+},
+"ણી": {
+"codes": "ýe",
+"count": 46
+},
+"ણું": {
+"codes": "ýwt",
+"count": 1
+},
+"ણે": {
+"codes": "ýu",
+"count": 16
+},
+"ણો": {
+"codes": "ýku",
+"count": 9
+},
+"ણ્યો": {
+"codes": "ÛÞku",
+"count": 1
+},
+"ત": {
+"codes": "Œ",
+"count": 287,
+"alternatives": {
+"ík": 1
+}
+},
+"તં": {
+"codes": "Œt",
+"count": 19,
+"alternatives": {
+"íkt": 3
+}
+},
+"તા": {
+"codes": "Œk",
+"count": 141,
+"alternatives": {
+"íkk": 4
+}
+},
+"તાં": {
+"codes": "Œkt",
+"count": 6
+},
+"તિ": {
+"codes": "rŒ",
+"count": 73,
+"alternatives": {
+"rík": 4
+}
+},
+"તી": {
+"codes": "Œe",
+"count": 57
+},
+"તુ": {
+"codes": "Œw",
+"count": 19
+},
+"તું": {
+"codes": "Œwt",
+"count": 13
+},
+"તૃ": {
+"codes": "Œ]",
+"count": 5
+},
+"તે": {
+"codes": "Œu",
+"count": 87
+},
+"તૈ": {
+"codes": "Œi",
+"count": 6
+},
+"તો": {
+"codes": "Œku",
+"count": 35
+},
+"ત્કા": {
+"codes": "ífk",
+"count": 3
+},
+"ત્કૃ": {
+"codes": "íf]",
+"count": 2
+},
+"ત્ત": {
+"codes": "¥k",
+"count": 6
+},
+"ત્તા": {
+"codes": "¥kk",
+"count": 10
+},
+"ત્તિ": {
+"codes": "r¥k",
+"count": 9
+},
+"ત્તે": {
+"codes": "¥ku",
+"count": 1
+},
+"ત્નો": {
+"codes": "Jku",
+"count": 2
+},
+"ત્પા": {
+"codes": "í…k",
+"count": 14
+},
+"ત્મ": {
+"codes": "í{",
+"count": 21
+},
+"ત્મા": {
+"codes": "í{k",
+"count": 2
+},
+"ત્મિ": {
+"codes": "Âí{",
+"count": 6
+},
+"ત્યં": {
+"codes": "íÞt",
+"count": 1
+},
+"ત્યા": {
+"codes": "íÞk",
+"count": 8
+},
+"ત્યે": {
+"codes": "íÞu",
+"count": 10
+},
+"ત્ર": {
+"codes": "ºk",
+"count": 29
+},
+"ત્રા": {
+"codes": "ºkk",
+"count": 6
+},
+"ત્રિ": {
+"codes": "rºk",
+"count": 4
+},
+"ત્રી": {
+"codes": "ºke",
+"count": 11
+},
+"ત્રો": {
+"codes": "ºkku",
+"count": 3
+},
+"ત્ર્ય": {
+"codes": "ºÞ",
+"count": 1
+},
+"ત્વ": {
+"codes": "íð",
+"count": 22
+},
+"ત્સ": {
+"codes": "í‚",
+"count": 1
+},
+"ત્સા": {
+"codes": "í‚k",
+"count": 8
+},
+"થ": {
+"codes": "Úk",
+"count": 60
+},
+"થા": {
+"codes": "Úkk",
+"count": 30
+},
+"થિ": {
+"codes": "rÚk",
+"count": 1
+},
+"થી": {
+"codes": "Úke",
+"count": 82
+},
+"થે": {
+"codes": "Úku",
+"count": 34
+},
+"થો": {
+"codes": "Úkku",
+"count": 2
+},
+"થ્થું": {
+"codes": "ÚÚkwt",
+"count": 1
+},
+"થ્થો": {
+"codes": "ÚÚkku",
+"count": 3
+},
+"થ્રી": {
+"codes": "Úkúe",
+"count": 3
+},
+"દ": {
+"codes": "Ë",
+"count": 140
+},
+"દા": {
+"codes": "Ëk",
+"count": 77
+},
+"દિ": {
+"codes": "rË",
+"count": 14
+},
+"દી": {
+"codes": "Ëe",
+"count": 17
+},
+"દુ": {
+"codes": "Ëw",
+"count": 6
+},
+"દૂ": {
+"codes": "Ëq",
+"count": 3
+},
+"દૃ": {
+"codes": "á",
+"count": 2
+},
+"દે": {
+"codes": "Ëu",
+"count": 39
+},
+"દૈ": {
+"codes": "Ëi",
+"count": 4
+},
+"દો": {
+"codes": "Ëku",
+"count": 9
+},
+"દ્ઘા": {
+"codes": "jk",
+"count": 1
+},
+"દ્દા": {
+"codes": "Æk",
+"count": 4
+},
+"દ્દે": {
+"codes": "Æu",
+"count": 6
+},
+"દ્ધ": {
+"codes": "Ø",
+"count": 10
+},
+"દ્ધિ": {
+"codes": "rØ",
+"count": 11
+},
+"દ્ધો": {
+"codes": "Øku",
+"count": 1
+},
+"દ્યા": {
+"codes": "ãk",
+"count": 1
+},
+"દ્યુ": {
+"codes": "ãw",
+"count": 1
+},
+"દ્યો": {
+"codes": "ãku",
+"count": 13
+},
+"દ્ર": {
+"codes": "ÿ",
+"count": 3
+},
+"દ્રા": {
+"codes": "ÿk",
+"count": 1
+},
+"દ્વા": {
+"codes": "îk",
+"count": 27
+},
+"ધ": {
+"codes": "Ä",
+"count": 65
+},
+"ધા": {
+"codes": "Äk",
+"count": 56
+},
+"ધિ": {
+"codes": "rÄ",
+"count": 39
+},
+"ધી": {
+"codes": "Äe",
+"count": 44
+},
+"ધુ": {
+"codes": "Äw",
+"count": 32
+},
+"ધું": {
+"codes": "Äwt",
+"count": 1
+},
+"ધો": {
+"codes": "Äku",
+"count": 6
+},
+"ધ્ય": {
+"codes": "æÞ",
+"count": 33
+},
+"ધ્યા": {
+"codes": "æÞk",
+"count": 16
+},
+"ન": {
+"codes": "™",
+"count": 403,
+"alternatives": {
+"Lk": 8
+}
+},
+"નં": {
+"codes": "™t",
+"count": 7
+},
+"ના": {
+"codes": "™k",
+"count": 284
+},
+"નિ": {
+"codes": "r™",
+"count": 79,
+"alternatives": {
+"rLk": 8
+}
+},
+"ની": {
+"codes": "™e",
+"count": 184
+},
+"નુ": {
+"codes": "™w",
+"count": 16
+},
+"નું": {
+"codes": "™wt",
+"count": 36
+},
+"નૂ": {
+"codes": "™q",
+"count": 6
+},
+"ને": {
+"codes": "™u",
+"count": 356,
+"alternatives": {
+"Lku": 2
+}
+},
+"નો": {
+"codes": "™ku",
+"count": 94,
+"alternatives": {
+"Lkku": 1
+}
+},
+"નોં": {
+"codes": "™kut",
+"count": 11
+},
+"ન્ચ": {
+"codes": "L[",
+"count": 2
+},
+"ન્જિ": {
+"codes": "ÂLs",
+"count": 1
+},
+"ન્જે": {
+"codes": "Lsu",
+"count": 4
+},
+"ન્ઝ્યુ": {
+"codes": "LÍâw",
+"count": 2
+},
+"ન્ટ": {
+"codes": "Lx",
+"count": 18
+},
+"ન્ટિ": {
+"codes": "ÂLx",
+"count": 1
+},
+"ન્ટે": {
+"codes": "Lxu",
+"count": 2
+},
+"ન્ટો": {
+"codes": "Lxku",
+"count": 6
+},
+"ન્ટ્રી": {
+"codes": "LxÙe",
+"count": 1
+},
+"ન્ડ": {
+"codes": "Lz",
+"count": 24
+},
+"ન્ડિ": {
+"codes": "ÂLz",
+"count": 2
+},
+"ન્ડો": {
+"codes": "Lzku",
+"count": 1
+},
+"ન્ડ્સ": {
+"codes": "LzT‚",
+"count": 2
+},
+"ન્દ્ર": {
+"codes": "Lÿ",
+"count": 6
+},
+"ન્દ્રિ": {
+"codes": "rLÿ",
+"count": 3
+},
+"ન્દ્રો": {
+"codes": "Lÿku",
+"count": 1
+},
+"ન્ફ": {
+"codes": "LV",
+"count": 4
+},
+"ન્મા": {
+"codes": "L{k",
+"count": 6
+},
+"ન્ય": {
+"codes": "LÞ",
+"count": 17
+},
+"ન્યુ": {
+"codes": "LÞw",
+"count": 1
+},
+"ન્યું": {
+"codes": "LÞwt",
+"count": 1
+},
+"ન્વ": {
+"codes": "Lð",
+"count": 1
+},
+"ન્વે": {
+"codes": "Lðu",
+"count": 1
+},
+"ન્શ": {
+"codes": "Lþ",
+"count": 2
+},
+"ન્સ": {
+"codes": "L‚",
+"count": 12
+},
+"ન્સિ": {
+"codes": "ÂL‚",
+"count": 2
+},
+"ન્સી": {
+"codes": "L‚e",
+"count": 1
+},
+"ન્સે": {
+"codes": "L‚u",
+"count": 1
+},
+"ન્સ્ટે": {
+"codes": "LMxu",
+"count": 1
+},
+"ન્હા": {
+"codes": "Lnk",
+"count": 2
+},
+"પ": {
+"codes": "…",
+"count": 231,
+"alternatives": {
+"Ãk": 2
+}
+},
+"પં": {
+"codes": "…t",
+"count": 11
+},
+"પા": {
+"codes": "…k",
+"count": 71,
+"alternatives": {
+"Ãkk": 1
+}
+},
+"પાં": {
+"codes": "…kt",
+"count": 2
+},
+"પિ": {
+"codes": "rÃk",
+"count": 7,
+"alternatives": {
+"r…": 3
+}
+},
+"પી": {
+"codes": "…e",
+"count": 38
+},
+"પુ": {
+"codes": "…w",
+"count": 21
+},
+"પૂ": {
+"codes": "…q",
+"count": 36,
+"alternatives": {
+"Ãkq": 1
+}
+},
+"પે": {
+"codes": "…u",
+"count": 19
+},
+"પેં": {
+"codes": "…U",
+"count": 1
+},
+"પૈ": {
+"codes": "…i",
+"count": 1
+},
+"પો": {
+"codes": "…ku",
+"count": 50
+},
+"પ્ટ": {
+"codes": "Ãx",
+"count": 1
+},
+"પ્ટે": {
+"codes": "Ãxu",
+"count": 1
+},
+"પ્ત": {
+"codes": "ó",
+"count": 9
+},
+"પ્તા": {
+"codes": "ók",
+"count": 2
+},
+"પ્તિ": {
+"codes": "ró",
+"count": 5
+},
+"પ્તે": {
+"codes": "óu",
+"count": 1
+},
+"પ્પ": {
+"codes": "Ã…",
+"count": 1
+},
+"પ્યા": {
+"codes": "ÃÞk",
+"count": 1
+},
+"પ્ર": {
+"codes": "«",
+"count": 152
+},
+"પ્રા": {
+"codes": "«k",
+"count": 21
+},
+"પ્રે": {
+"codes": "«u",
+"count": 14
+},
+"પ્રો": {
+"codes": "«ku",
+"count": 14
+},
+"પ્લા": {
+"codes": "Ã÷k",
+"count": 3
+},
+"પ્લે": {
+"codes": "Ã÷u",
+"count": 6
+},
+"ફ": {
+"codes": "V",
+"count": 72
+},
+"ફં": {
+"codes": "Vt",
+"count": 1
+},
+"ફા": {
+"codes": "Vk",
+"count": 3
+},
+"ફિ": {
+"codes": "rV",
+"count": 5
+},
+"ફી": {
+"codes": "Ve",
+"count": 1
+},
+"ફૂ": {
+"codes": "Vq",
+"count": 1
+},
+"ફે": {
+"codes": "Vu",
+"count": 4
+},
+"ફો": {
+"codes": "Vku",
+"count": 16
+},
+"ફ્ટી": {
+"codes": "^xe",
+"count": 1
+},
+"ફ્યુ": {
+"codes": "^Þw",
+"count": 1
+},
+"ફ્રિ": {
+"codes": "r£",
+"count": 1
+},
+"ફ્રી": {
+"codes": "£e",
+"count": 10
+},
+"ફ્રુ": {
+"codes": "£w",
+"count": 1
+},
+"ફ્લે": {
+"codes": "^÷u",
+"count": 3
+},
+"બ": {
+"codes": "ƒ",
+"count": 113
+},
+"બં": {
+"codes": "ƒt",
+"count": 17
+},
+"બા": {
+"codes": "ƒk",
+"count": 35
+},
+"બાં": {
+"codes": "ƒkt",
+"count": 2
+},
+"બિ": {
+"codes": "rƒ",
+"count": 17,
+"alternatives": {
+"rçk": 1
+}
+},
+"બિં": {
+"codes": "®ƒ",
+"count": 2
+},
+"બી": {
+"codes": "ƒe",
+"count": 12
+},
+"બુ": {
+"codes": "ƒw",
+"count": 7
+},
+"બૂ": {
+"codes": "ƒq",
+"count": 17
+},
+"બે": {
+"codes": "ƒu",
+"count": 31
+},
+"બો": {
+"codes": "ƒku",
+"count": 12
+},
+"બ્ધ": {
+"codes": "çÄ",
+"count": 1
+},
+"બ્યુ": {
+"codes": "çÞw",
+"count": 1
+},
+"બ્ર": {
+"codes": "ƒú",
+"count": 4
+},
+"બ્રા": {
+"codes": "ƒúk",
+"count": 3
+},
+"બ્રે": {
+"codes": "ƒúu",
+"count": 5
+},
+"બ્લિ": {
+"codes": "Âç÷",
+"count": 2
+},
+"બ્લુ": {
+"codes": "ç÷w",
+"count": 1
+},
+"ભ": {
+"codes": "¼",
+"count": 45
+},
+"ભં": {
+"codes": "¼t",
+"count": 5
+},
+"ભા": {
+"codes": "¼k",
+"count": 70
+},
+"ભાં": {
+"codes": "¼kt",
+"count": 1
+},
+"ભિ": {
+"codes": "r¼",
+"count": 6
+},
+"ભી": {
+"codes": "¼e",
+"count": 7
+},
+"ભૂ": {
+"codes": "¼q",
+"count": 10
+},
+"ભે": {
+"codes": "¼u",
+"count": 3
+},
+"ભો": {
+"codes": "¼ku",
+"count": 1
+},
+"ભૌ": {
+"codes": "¼ki",
+"count": 1
+},
+"ભ્ય": {
+"codes": "ÇÞ",
+"count": 1
+},
+"ભ્યા": {
+"codes": "ÇÞk",
+"count": 1
+},
+"ભ્યો": {
+"codes": "ÇÞku",
+"count": 2
+},
+"મ": {
+"codes": "{",
+"count": 328
+},
+"મં": {
+"codes": "{t",
+"count": 20
+},
+"મા": {
+"codes": "{k",
+"count": 169
+},
+"માં": {
+"codes": "{kt",
+"count": 244
+},
+"મિ": {
+"codes": "r{",
+"count": 39
+},
+"મિં": {
+"codes": "®{",
+"count": 1
+},
+"મી": {
+"codes": "{e",
+"count": 48
+},
+"મુ": {
+"codes": "{w",
+"count": 61
+},
+"મું": {
+"codes": "{wt",
+"count": 2
+},
+"મૂ": {
+"codes": "{q",
+"count": 11
+},
+"મૃ": {
+"codes": "{]",
+"count": 5
+},
+"મે": {
+"codes": "{u",
+"count": 61
+},
+"મો": {
+"codes": "{ku",
+"count": 26
+},
+"મ્બ": {
+"codes": "Bƒ",
+"count": 2
+},
+"મ્બિ": {
+"codes": "ÂBƒ",
+"count": 1
+},
+"મ્બ્યુ": {
+"codes": "BçÞw",
+"count": 1
+},
+"મ્ય": {
+"codes": "BÞ",
+"count": 1
+},
+"મ્યુ": {
+"codes": "BÞw",
+"count": 3
+},
+"ય": {
+"codes": "Þ",
+"count": 147
+},
+"યા": {
+"codes": "Þk",
+"count": 86
+},
+"યિ": {
+"codes": "rÞ",
+"count": 8
+},
+"યી": {
+"codes": "Þe",
+"count": 4
+},
+"યુ": {
+"codes": "Þw",
+"count": 12
+},
+"યું": {
+"codes": "Þwt",
+"count": 6
+},
+"યે": {
+"codes": "Þu",
+"count": 9
+},
+"યો": {
+"codes": "Þku",
+"count": 63
+},
+"ર": {
+"codes": "h",
+"count": 675
+},
+"રં": {
+"codes": "ht",
+"count": 16
+},
+"રા": {
+"codes": "hk",
+"count": 165
+},
+"રાં": {
+"codes": "hkt",
+"count": 3
+},
+"રિ": {
+"codes": "rh",
+"count": 42
+},
+"રિં": {
+"codes": "®h",
+"count": 2
+},
+"રી": {
+"codes": "he",
+"count": 208
+},
+"રુ": {
+"codes": "Á",
+"count": 10
+},
+"રું": {
+"codes": "Át",
+"count": 4
+},
+"રૂ": {
+"codes": "Y",
+"count": 34
+},
+"રે": {
+"codes": "hu",
+"count": 83
+},
+"રો": {
+"codes": "hku",
+"count": 115
+},
+"ર્ક": {
+"codes": "fo",
+"count": 6
+},
+"ર્કિં": {
+"codes": "‹f",
+"count": 7
+},
+"ર્કી": {
+"codes": "feo",
+"count": 1
+},
+"ર્કે": {
+"codes": "fuo",
+"count": 7
+},
+"ર્કો": {
+"codes": "fkuo",
+"count": 1
+},
+"ર્ગ": {
+"codes": "„o",
+"count": 9
+},
+"ર્ગિ": {
+"codes": "Š„",
+"count": 1
+},
+"ર્ગે": {
+"codes": "„uo",
+"count": 4
+},
+"ર્ચ": {
+"codes": "[o",
+"count": 2
+},
+"ર્ચા": {
+"codes": "[ko",
+"count": 2
+},
+"ર્જ": {
+"codes": "so",
+"count": 5
+},
+"ર્જા": {
+"codes": "òo",
+"count": 1
+},
+"ર્ટ": {
+"codes": "xo",
+"count": 29
+},
+"ર્ટિ": {
+"codes": "Šx",
+"count": 1
+},
+"ર્ટી": {
+"codes": "xeo",
+"count": 1
+},
+"ર્ટે": {
+"codes": "xuo",
+"count": 4
+},
+"ર્ટ્સ": {
+"codes": "xoT‚",
+"count": 2
+},
+"ર્ડ": {
+"codes": "zo",
+"count": 19
+},
+"ર્ડ્સ": {
+"codes": "zoT‚",
+"count": 2
+},
+"ર્ડ્સે": {
+"codes": "zoT‚u",
+"count": 1
+},
+"ર્ણ": {
+"codes": "ýo",
+"count": 31
+},
+"ર્ત": {
+"codes": "Œo",
+"count": 4
+},
+"ર્તા": {
+"codes": "Œko",
+"count": 2
+},
+"ર્થ": {
+"codes": "Úko",
+"count": 8
+},
+"ર્થિ": {
+"codes": "ŠÚk",
+"count": 3
+},
+"ર્થી": {
+"codes": "Úkeo",
+"count": 2
+},
+"ર્થે": {
+"codes": "Úkuo",
+"count": 1
+},
+"ર્થો": {
+"codes": "Úkkuo",
+"count": 1
+},
+"ર્દા": {
+"codes": "Ëko",
+"count": 1
+},
+"ર્દે": {
+"codes": "Ëuo",
+"count": 2
+},
+"ર્ધા": {
+"codes": "Äko",
+"count": 2
+},
+"ર્નિં": {
+"codes": "‹™",
+"count": 1
+},
+"ર્પ": {
+"codes": "…o",
+"count": 1
+},
+"ર્પિ": {
+"codes": "Š…",
+"count": 2
+},
+"ર્ભ": {
+"codes": "¼o",
+"count": 2
+},
+"ર્મ": {
+"codes": "{o",
+"count": 21
+},
+"ર્મા": {
+"codes": "{ko",
+"count": 5
+},
+"ર્મિ": {
+"codes": "Š{",
+"count": 3
+},
+"ર્મી": {
+"codes": "{eo",
+"count": 2
+},
+"ર્મે": {
+"codes": "{uo",
+"count": 1
+},
+"ર્ય": {
+"codes": "Þo",
+"count": 31
+},
+"ર્યા": {
+"codes": "Þko",
+"count": 7
+},
+"ર્યું": {
+"codes": "ÞwO",
+"count": 4
+},
+"ર્યો": {
+"codes": "Þkuo",
+"count": 7
+},
+"ર્લ્ડ": {
+"codes": "Õzo",
+"count": 2
+},
+"ર્વ": {
+"codes": "ðo",
+"count": 10
+},
+"ર્વિ": {
+"codes": "Šð",
+"count": 2
+},
+"ર્વે": {
+"codes": "ðuo",
+"count": 2
+},
+"ર્શ": {
+"codes": "þo",
+"count": 9
+},
+"ર્શા": {
+"codes": "þko",
+"count": 4
+},
+"ર્શિ": {
+"codes": "Šþ",
+"count": 4
+},
+"ર્શ્રી": {
+"codes": "©oe",
+"count": 1
+},
+"ર્ષ": {
+"codes": "»ko",
+"count": 8
+},
+"ર્ષિ": {
+"codes": "Š»k",
+"count": 5
+},
+"ર્ષી": {
+"codes": "»keo",
+"count": 1
+},
+"ર્ષે": {
+"codes": "»kuo",
+"count": 1
+},
+"ર્ષો": {
+"codes": "»kkuo",
+"count": 1
+},
+"ર્સ": {
+"codes": "‚o",
+"count": 13
+},
+"લ": {
+"codes": "÷",
+"count": 181
+},
+"લં": {
+"codes": "÷t",
+"count": 3
+},
+"લા": {
+"codes": "÷k",
+"count": 88
+},
+"લાં": {
+"codes": "÷kt",
+"count": 7
+},
+"લિ": {
+"codes": "r÷",
+"count": 19
+},
+"લી": {
+"codes": "÷e",
+"count": 46
+},
+"લુ": {
+"codes": "÷w",
+"count": 17
+},
+"લું": {
+"codes": "÷wt",
+"count": 1
+},
+"લૂ": {
+"codes": "÷q",
+"count": 1
+},
+"લે": {
+"codes": "÷u",
+"count": 23
+},
+"લૈ": {
+"codes": "÷i",
+"count": 1
+},
+"લો": {
+"codes": "÷ku",
+"count": 28
+},
+"લ્ટ": {
+"codes": "Õx",
+"count": 1
+},
+"લ્ડિં": {
+"codes": "ÂÕzt",
+"count": 4
+},
+"લ્થ": {
+"codes": "ÕÚk",
+"count": 8
+},
+"લ્પિ": {
+"codes": "ÂÕ…",
+"count": 2
+},
+"લ્ફ": {
+"codes": "ÕV",
+"count": 1
+},
+"લ્ફી": {
+"codes": "ÕVe",
+"count": 4
+},
+"લ્ય": {
+"codes": "ÕÞ",
+"count": 2
+},
+"લ્યાં": {
+"codes": "ÕÞkt",
+"count": 1
+},
+"લ્લં": {
+"codes": "Õ÷t",
+"count": 1
+},
+"લ્લા": {
+"codes": "Õ÷k",
+"count": 19
+},
+"લ્સ": {
+"codes": "Õ‚",
+"count": 2
+},
+"લ્સા": {
+"codes": "Õ‚k",
+"count": 1
+},
+"ળ": {
+"codes": "¤",
+"count": 73
+},
+"ળા": {
+"codes": "¤k",
+"count": 11
+},
+"ળી": {
+"codes": "¤e",
+"count": 10
+},
+"ળે": {
+"codes": "¤u",
+"count": 4
+},
+"ળો": {
+"codes": "¤ku",
+"count": 13
+},
+"ળ્યું": {
+"codes": "éÞwt",
+"count": 2
+},
+"ળ્યો": {
+"codes": "éÞku",
+"count": 2
+},
+"વ": {
+"codes": "ð",
+"count": 296
+},
+"વં": {
+"codes": "ðt",
+"count": 2
+},
+"વા": {
+"codes": "ðk",
+"count": 345
+},
+"વિ": {
+"codes": "rð",
+"count": 117
+},
+"વિં": {
+"codes": "®ð",
+"count": 1
+},
+"વી": {
+"codes": "ðe",
+"count": 70
+},
+"વું": {
+"codes": "ðwt",
+"count": 6
+},
+"વૃ": {
+"codes": "ð]",
+"count": 14
+},
+"વે": {
+"codes": "ðu",
+"count": 66
+},
+"વૈ": {
+"codes": "ði",
+"count": 16
+},
+"વો": {
+"codes": "ðku",
+"count": 19
+},
+"વ્ય": {
+"codes": "ÔÞ",
+"count": 31
+},
+"વ્યા": {
+"codes": "ÔÞk",
+"count": 16
+},
+"વ્યું": {
+"codes": "ÔÞwt",
+"count": 15
+},
+"વ્યૂ": {
+"codes": "ÔÞq",
+"count": 9
+},
+"વ્યો": {
+"codes": "ÔÞku",
+"count": 9
+},
+"વ્ર": {
+"codes": "ðú",
+"count": 1
+},
+"શ": {
+"codes": "þ",
+"count": 131
+},
+"શં": {
+"codes": "þt",
+"count": 2
+},
+"શા": {
+"codes": "þk",
+"count": 13
+},
+"શાં": {
+"codes": "þkt",
+"count": 2
+},
+"શિ": {
+"codes": "rþ",
+"count": 43
+},
+"શી": {
+"codes": "þe",
+"count": 6
+},
+"શું": {
+"codes": "þwt",
+"count": 1
+},
+"શે": {
+"codes": "þu",
+"count": 62
+},
+"શેં": {
+"codes": "þU",
+"count": 1
+},
+"શૈ": {
+"codes": "þi",
+"count": 9
+},
+"શો": {
+"codes": "þku",
+"count": 18
+},
+"શ્કે": {
+"codes": "~fu",
+"count": 2
+},
+"શ્ચિ": {
+"codes": "rù",
+"count": 8
+},
+"શ્નો": {
+"codes": "§ku",
+"count": 4
+},
+"શ્મિ": {
+"codes": "Â~{",
+"count": 1
+},
+"શ્ય": {
+"codes": "~Þ",
+"count": 2
+},
+"શ્રી": {
+"codes": "©e",
+"count": 21
+},
+"શ્રે": {
+"codes": "©u",
+"count": 10
+},
+"શ્વ": {
+"codes": "ï",
+"count": 19
+},
+"શ્વા": {
+"codes": "ïk",
+"count": 6
+},
+"શ્વિ": {
+"codes": "Âï",
+"count": 8
+},
+"ષ": {
+"codes": "»k",
+"count": 12
+},
+"ષા": {
+"codes": "»kk",
+"count": 3
+},
+"ષ્ક": {
+"codes": "»f",
+"count": 3
+},
+"ષ્ટ": {
+"codes": "ü",
+"count": 8
+},
+"ષ્ટિ": {
+"codes": "rü",
+"count": 4
+},
+"ષ્ટ્ર": {
+"codes": "üÙ",
+"count": 1
+},
+"ષ્ટ્રી": {
+"codes": "üÙe",
+"count": 7
+},
+"ષ્ઠ": {
+"codes": "c",
+"count": 9
+},
+"ષ્ઠા": {
+"codes": "ck",
+"count": 2
+},
+"ષ્ઠિ": {
+"codes": "rc",
+"count": 8
+},
+"ષ્ણા": {
+"codes": "»ýk",
+"count": 2
+},
+"ષ્ય": {
+"codes": "»Þ",
+"count": 3
+},
+"સ": {
+"codes": "‚",
+"count": 300,
+"alternatives": {
+"Mk": 2
+}
+},
+"સં": {
+"codes": "‚t",
+"count": 65
+},
+"સા": {
+"codes": "‚k",
+"count": 124,
+"alternatives": {
+"Mkk": 2
+}
+},
+"સાં": {
+"codes": "‚kt",
+"count": 8
+},
+"સિ": {
+"codes": "r‚",
+"count": 21
+},
+"સિં": {
+"codes": "®‚",
+"count": 9
+},
+"સી": {
+"codes": "‚e",
+"count": 25
+},
+"સુ": {
+"codes": "‚w",
+"count": 35,
+"alternatives": {
+"Mkw": 1
+}
+},
+"સૂ": {
+"codes": "‚q",
+"count": 4
+},
+"સે": {
+"codes": "‚u",
+"count": 59
+},
+"સેં": {
+"codes": "‚U",
+"count": 1
+},
+"સો": {
+"codes": "‚ku",
+"count": 22
+},
+"સૌ": {
+"codes": "‚ki",
+"count": 7
+},
+"સ્": {
+"codes": "M",
+"count": 1
+},
+"સ્કા": {
+"codes": "Mfk",
+"count": 4
+},
+"સ્કૃ": {
+"codes": "Mf]",
+"count": 6
+},
+"સ્કો": {
+"codes": "Mfku",
+"count": 3
+},
+"સ્ઝ": {
+"codes": "MC",
+"count": 1
+},
+"સ્ઝઁ": {
+"codes": "MCP",
+"count": 1
+},
+"સ્ટ": {
+"codes": "Mx",
+"count": 22
+},
+"સ્ટા": {
+"codes": "Mxk",
+"count": 1
+},
+"સ્ટિ": {
+"codes": "ÂMx",
+"count": 4
+},
+"સ્ટી": {
+"codes": "Mxe",
+"count": 2
+},
+"સ્ટે": {
+"codes": "Mxu",
+"count": 5
+},
+"સ્ટ્રિ": {
+"codes": "ÂMxÙ",
+"count": 3
+},
+"સ્ટ્રે": {
+"codes": "MxÙu",
+"count": 3
+},
+"સ્ત": {
+"codes": "MŒ",
+"count": 11
+},
+"સ્તા": {
+"codes": "MŒk",
+"count": 9
+},
+"સ્તી": {
+"codes": "MŒe",
+"count": 1
+},
+"સ્તુ": {
+"codes": "MŒw",
+"count": 2
+},
+"સ્તૃ": {
+"codes": "MŒ]",
+"count": 2
+},
+"સ્થ": {
+"codes": "MÚk",
+"count": 19
+},
+"સ્થા": {
+"codes": "MÚkk",
+"count": 28
+},
+"સ્થિ": {
+"codes": "ÂMÚk",
+"count": 21
+},
+"સ્થી": {
+"codes": "MÚke",
+"count": 4
+},
+"સ્થ્ય": {
+"codes": "MÚÞ",
+"count": 1
+},
+"સ્પ": {
+"codes": "M…",
+"count": 2
+},
+"સ્પિ": {
+"codes": "ÂM…",
+"count": 8
+},
+"સ્પો": {
+"codes": "M…ku",
+"count": 3
+},
+"સ્મ": {
+"codes": "M{",
+"count": 1
+},
+"સ્મા": {
+"codes": "M{k",
+"count": 4
+},
+"સ્મૃ": {
+"codes": "M{]",
+"count": 1
+},
+"સ્વ": {
+"codes": "Mð",
+"count": 11
+},
+"સ્વા": {
+"codes": "Mðk",
+"count": 3
+},
+"સ્વી": {
+"codes": "Mðe",
+"count": 2
+},
+"હ": {
+"codes": "n",
+"count": 140
+},
+"હં": {
+"codes": "nt",
+"count": 1
+},
+"હા": {
+"codes": "nk",
+"count": 44
+},
+"હિ": {
+"codes": "rn",
+"count": 32
+},
+"હિં": {
+"codes": "®n",
+"count": 1
+},
+"હી": {
+"codes": "ne",
+"count": 30
+},
+"હીં": {
+"codes": "nª",
+"count": 2
+},
+"હુ": {
+"codes": "nw",
+"count": 2
+},
+"હું": {
+"codes": "nwt",
+"count": 1
+},
+"હૃ": {
+"codes": "Ó",
+"count": 10
+},
+"હે": {
+"codes": "nu",
+"count": 78
+},
+"હો": {
+"codes": "nku",
+"count": 26
+},
+"હોં": {
+"codes": "nkut",
+"count": 5
+},
+"હ્ન": {
+"codes": "ö",
+"count": 1
+},
+"હ્ન્સ": {
+"codes": "öT‚",
+"count": 1
+},
+"હ્મા": {
+"codes": "ñk",
+"count": 4
+},
+"હ્ય": {
+"codes": "Ìk",
+"count": 1
+},
+"હ્યા": {
+"codes": "Ìkk",
+"count": 12
+},
+"હ્યાં": {
+"codes": "Ìkkt",
+"count": 1
+},
+"હ્યું": {
+"codes": "Ìkwt",
+"count": 9
+},
+"હ્યો": {
+"codes": "Ìkku",
+"count": 3
+},
+"૦": {
+"codes": "0",
+"count": 71
+},
+"૧": {
+"codes": "1",
+"count": 51
+},
+"૨": {
+"codes": "2",
+"count": 81
+},
+"૩": {
+"codes": "3",
+"count": 42
+},
+"૪": {
+"codes": "4",
+"count": 18
+},
+"૫": {
+"codes": "5",
+"count": 24
+},
+"૬": {
+"codes": "6",
+"count": 47
+},
+"૭": {
+"codes": "7",
+"count": 24
+},
+"૮": {
+"codes": "8",
+"count": 27
+},
+"૯": {
+"codes": "9",
+"count": 14
+}
+},
+"checks": {
+"spans": 1319,
+"chunked_exactly": 1317
+}
+}

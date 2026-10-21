@@ -49,7 +49,7 @@ Every element has a unique `id`, which must be unique across the whole issue. It
   "size": 128.4,               // px
   "lineHeight": 180.0,         // px, baseline to baseline
   "color": "#231f20",          // optional, default black
-  "align": "left",             // left | center | right | justify (optional, default left)
+  "align": "left",             // left | center | right | justify | justify-all (optional, default left)
   "hScale": 0.94,              // optional horizontal squeeze, 1 = none
   "letterSpacing": 0,          // optional, px
   "vAlign": "top",             // top | middle | bottom (optional)
@@ -57,8 +57,21 @@ Every element has a unique `id`, which must be unique across the whole issue. It
 ```
 
 - **Paragraphs:** a blank line (`"\n\n"`) starts a new paragraph; a single `"\n"` is a forced line break.
-- **Wrapping** is the one thing the frontend does itself. It breaks the text at spaces within `width`, using the given font, size, `hScale` and letter spacing. **Size your boxes so the text fits.** The frontend never shrinks, clips or moves text. Text that runs half a line or more past `height` is drawn anyway and reported as a `text-overflow` warning.
+- **Your own line breaks:** in `justify` text, a line ended by `"\n"` is stretched to the full width, like a printed line. So you can send the exact lines you set, and the frontend won't re-wrap them. A paragraph's last line is left alone, unless the text ends with `"\n"` (a paragraph that carries on into the next column).
+- **`justify-all`** stretches every line, the last one too, e.g. a headline set flush to both edges.
+- **Wrapping** is the one thing the frontend does itself, for lines you don't break yourself. It breaks the text at spaces within `width`, using the given font, size, `hScale` and letter spacing. **Size your boxes so the text fits.** The frontend never shrinks, clips or moves text. Text that runs half a line or more past `height` is drawn anyway and reported as a `text-overflow` warning.
 - **`hScale`** narrows or widens the glyphs without changing their height. The box still occupies exactly `width`.
+- **Mixed fonts in one block:** `text` can be a list of runs instead of a string. Each run can set its own `font`, `size` and `color`; anything it leaves out comes from the element. Line and paragraph breaks work across runs.
+
+  ```jsonc
+  "text": [
+    { "text": "આવૃત્તિએ " },
+    { "text": "NRI Achievers", "font": "serif-regular", "size": 54.17 },
+    { "text": " Awards ના વધતા જતા\nવૈશ્વિક વારસામાં" }
+  ]
+  ```
+
+  `hScale` applies to the whole element. If one run needs a different squeeze (an English word in a condensed Gujarati headline), send it as its own element.
 
 ### image
 
@@ -78,7 +91,7 @@ Photos, ad creatives, the masthead artwork, logos: anything that is a picture.
   "fill": "#231f20", "stroke": "#00aeef", "strokeWidth": 8.5, "radius": 31.1 }
 ```
 
-Background panels, boxes around stories, the edition bar's coloured field. `fill`, `stroke` and `radius` are all optional.
+Background panels, boxes around stories, the edition bar's coloured field. `fill`, `stroke` and `radius` are all optional. The stroke is centred on the rectangle's edge, as in PDF and SVG, so half of it lies outside `x`/`y`/`width`/`height`.
 
 ### line
 
@@ -86,6 +99,32 @@ Background panels, boxes around stories, the edition bar's coloured field. `fill
 { "id": "p1-rule3", "kind": "line", "x1": 62.0, "y1": 3180.0, "x2": 4550.0, "y2": 3180.0,
   "color": "#231f20", "width": 4.2, "dash": [25, 12] }   // dash optional
 ```
+
+### path
+
+```jsonc
+{ "id": "p2-label", "kind": "path", "d": "M75.0 212.0 C70.2 212.0 67.3 215.6 67.3 220.0 L67.3 328.6 ... Z",
+  "fill": "#231f20", "stroke": "#231f20", "strokeWidth": 6.0 }   // fill, stroke optional
+```
+
+Any vector shape, such as a rounded label box or an ornament, as SVG path data in page coordinates (contract px). Use absolute commands only: `M`, `L`, `C`, `Q`, `Z`.
+
+## Placing text exactly (pixel precision)
+
+The plotter draws a text element's first line box with its top at `y`. Where the letters sit inside that line depends on the font, so to put a line's **baseline** exactly where you want it, compute `y` from the font's own metrics. These are measured against Chromium, which draws both the website and the PDF:
+
+```
+ascent, descent  = the font's OS/2 typo metrics if it sets USE_TYPO_METRICS, else hhea   (in em)
+s  = size × 96/dpi,  L = lineHeight × 96/dpi                                 (CSS px)
+a  = round(ascent × s),  d = round(descent × s)
+offset = a + floor((L − a − d) / 2)                                          (CSS px, whole)
+printed baseline = round(top) + offset + 1                                   (CSS px; Chromium prints lines on whole CSS px)
+⇒ y = round(baseline × 96/72 − offset − 1) × dpi/96                          (baseline in pt)
+```
+
+Baselines land on a 0.75 pt grid, so any line is within 0.375 pt of where you asked. For the closest match to a design, send **one element per printed line**, each `justify-all`, as wide as the printed line and placed at its own baseline. Then both edges and the baseline land where you put them, whatever the font's widths. The 8 August replica does this for all 1,208 of its lines, and `scripts/replica/line_diff.py` checks every line against the source paper: baselines within 0.37 pt, and 99% of edges within 0.72 pt.
+
+A run in another font or size never changes where its line's baseline sits; the element's `lineHeight` alone sets the line.
 
 ## Page chrome
 
@@ -102,7 +141,7 @@ The masthead, edition bar (date, issue number), running headers, page numbers an
 - a missing required field, a wrong type, or a non-finite number;
 - a negative width, height or size;
 - an unknown element `kind`;
-- a text element whose `font` isn't declared in `fonts[]`;
+- a text element, or one of its runs, whose `font` isn't declared in `fonts[]`;
 - duplicate element ids, or duplicate page numbers.
 
 ## What is drawn but reported (warnings)
@@ -114,5 +153,6 @@ The masthead, edition bar (date, issue number), running headers, page numbers an
 | `image-failed` | The image URL didn't load. |
 | `font-failed` | The font URL didn't load, or the text isn't set in its declared font. |
 | `empty-text` | A text element with no text. |
+| `overlap` | Text whose letters run into other text, an image or a rule. |
 
 The website lists these above the pages. `GET /api/pdf?warnings=1` returns them as JSON, and the PDF response carries their count in an `X-Plot-Warnings` header.

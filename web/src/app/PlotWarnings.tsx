@@ -5,7 +5,7 @@
 // reports once it has laid out -- text running past its box, images or fonts
 // that failed to load. Report only; nothing on the page is changed to hide them.
 import { useEffect, useState } from "react";
-import type { PlotWarning } from "@/lib/plot";
+import type { PlotWarning } from "@ck/shared/plot";
 
 export function PlotWarnings({ initial }: { initial: PlotWarning[] }) {
   const [live, setLive] = useState<Record<number, PlotWarning[]>>({});

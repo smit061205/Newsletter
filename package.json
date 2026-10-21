@@ -1,0 +1,5 @@
+{
+  "name": "capital-kranti",
+  "private": true,
+  "workspaces": ["shared", "web", "backend"]
+}

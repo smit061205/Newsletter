@@ -1,0 +1,196 @@
+{
+  "id": "capital-kranti",
+  "name": "કેપિટલ ક્રાંતિ (Capital Kranti), Gandhinagar daily",
+  "language": {
+    "lang": "gu",
+    "direction": "ltr",
+    "digits": "gujarati",
+    "weekdays": [
+      "રવિવાર",
+      "સોમવાર",
+      "મંગળવાર",
+      "બુધવાર",
+      "ગુરુવાર",
+      "શુક્રવાર",
+      "શનિવાર"
+    ],
+    "dateLine": "તારીખ : {dd}-{mm}-{yyyy}, {weekday}",
+    "issueLine": "અંક : {issue}"
+  },
+  "issue": {
+    "referenceDate": "2026-08-08",
+    "referenceNumber": 196,
+    "pages": 4
+  },
+  "page": {
+    "width": 1105.5,
+    "height": 1488.2
+  },
+  "grid": {
+    "left": 14.4,
+    "columns": 8,
+    "column": 124.2,
+    "gutter": 11.884
+  },
+  "ink": "#231f20",
+  "fonts": {
+    "gopika-regular": {
+      "file": "/private/capital-kranti/fonts/gopika-two-regular.ttf",
+      "weight": 400,
+      "encoding": "bharati",
+      "restricted": true,
+      "latin": "serif-regular"
+    },
+    "gopika-bold": {
+      "file": "/private/capital-kranti/fonts/gopika-two-bold.ttf",
+      "weight": 700,
+      "encoding": "bharati",
+      "restricted": true,
+      "latin": "tinos-bold"
+    },
+    "gopika-light": {
+      "file": "/private/capital-kranti/fonts/gopika-light-two-regular.ttf",
+      "weight": 300,
+      "encoding": "bharati",
+      "restricted": true,
+      "latin": "serif-regular"
+    },
+    "gopika-bolditalic": {
+      "file": "/private/capital-kranti/fonts/gopika-two-bolditalic.ttf",
+      "weight": 700,
+      "style": "italic",
+      "encoding": "bharati",
+      "restricted": true,
+      "latin": "tinos-bold"
+    },
+    "tinos-bold": {
+      "file": "/fonts/Tinos-Bold.ttf",
+      "weight": 700
+    },
+    "serif-regular": {
+      "file": "/fonts/LiberationSerif-Regular.ttf",
+      "weight": 400
+    }
+  },
+  "type": {
+    "body": {
+      "font": "gopika-regular",
+      "size": 13,
+      "pitch": 15.6,
+      "indent": 12,
+      "pitches": [
+        15.6,
+        15.9,
+        16.2,
+        16.5,
+        15.3,
+        15.0
+      ],
+      "sizes": [
+        13,
+        12.5,
+        12
+      ]
+    },
+    "headline": {
+      "font": "gopika-bold",
+      "leading": 1.2,
+      "capByColumns": [
+        0,
+        19,
+        26,
+        34,
+        44,
+        50,
+        55,
+        60,
+        60
+      ],
+      "min": 16,
+      "rankScale": [
+        1.0,
+        0.8,
+        0.66,
+        0.56,
+        0.48
+      ],
+      "maxLines": [
+        2,
+        2,
+        2,
+        3,
+        3
+      ]
+    },
+    "kicker": {
+      "font": "gopika-bold",
+      "ratio": 0.5,
+      "min": 13,
+      "leading": 1.2
+    },
+    "deck": {
+      "font": "gopika-bold",
+      "ratio": 0.42,
+      "min": 13,
+      "leading": 1.25
+    },
+    "caption": {
+      "font": "gopika-bold",
+      "size": 11,
+      "pitch": 13.2
+    }
+  },
+  "spacing": {
+    "top": 2,
+    "afterKicker": 2,
+    "afterHeadline": 5,
+    "afterDeck": 5,
+    "afterPhoto": 3,
+    "afterCaption": 5,
+    "betweenStories": 8,
+    "storyRule": 0.75
+  },
+  "photo": {
+    "maxCrop": 0.15,
+    "minHeight": 80,
+    "minCols": 2,
+    "minPpi": 200,
+    "maxShare": 0.45
+  },
+  "chrome": "chrome.json",
+  "editorial": {
+    "workhorseModel": "openai/gpt-6-luna",
+    "leadModel": "google/gemini-3.8-flash",
+    "leadStories": 3
+  },
+  "fontLicence": "Bharati Gopika fonts (Oasis Systems, 2002), commercial. Their embedding flag (fsType 1, a pre-OpenType value) does not forbid embedding, so the print PDF embeds them. They are still kept server-side ('restricted' here): never at a public URL, so the website shows page images, until the paper confirms its licence covers web-font use.",
+  "fillers": {
+    "houseAd": [
+      {
+        "text": "કેપિટલ ક્રાંતિ",
+        "role": "headline",
+        "scale": 1.0
+      },
+      {
+        "text": "સમાજનો વિવેકપૂર્ણ દ્રષ્ટિકોણ",
+        "role": "deck",
+        "scale": 0.55
+      },
+      {
+        "text": "સમાચાર અને જાહેરાત માટે સંપર્ક કરો",
+        "role": "body",
+        "scale": 0.5
+      },
+      {
+        "text": "M. 98256 08744",
+        "role": "deck",
+        "scale": 0.5
+      },
+      {
+        "text": "capitalkranti@gmail.com",
+        "role": "deck",
+        "scale": 0.45
+      }
+    ]
+  }
+}

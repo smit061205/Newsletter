@@ -1,4 +1,4 @@
-// Plots an issue JSON with the frontend's own plotter (src/lib/plot.ts) in
+// Plots an issue JSON with the frontend's own plotter (shared/src/plot.ts) in
 // Chromium and prints its warnings as JSON -- no dev server needed. The mock
 // backend (scripts/mock_backend/from_source.py) uses this to fit its text the
 // way a real backend would: measured with the same fonts, by the same engine
@@ -8,7 +8,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
-import { plotPage, staticWarnings, type PlotWarning } from "../src/lib/plot.ts";
+import { plotPage, staticWarnings, type PlotWarning } from "../../shared/src/plot.ts";
 
 const ORIGIN = "http://plot.local";
 const PUBLIC = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "public");
@@ -25,7 +25,10 @@ await context.route(`${ORIGIN}/**`, async (route) => {
     return route.fulfill({ contentType: "text/html; charset=utf-8", body: plotPage(issue, Number(url.pathname.split("/").pop())) });
   }
   try {
-    const body = await readFile(path.join(PUBLIC, decodeURIComponent(url.pathname)));
+    // /private/<paper>/... is a publication's own folder (its licensed fonts)
+    const p = decodeURIComponent(url.pathname);
+    const m = p.match(/^\/private\/([a-z0-9-]+)\/(.+)$/);
+    const body = await readFile(m ? path.join(PUBLIC, "..", "..", "publications", m[1], m[2]) : path.join(PUBLIC, p));
     return route.fulfill({ body, contentType: TYPES[path.extname(url.pathname)] ?? "application/octet-stream" });
   } catch {
     return route.fulfill({ status: 404, body: "" });

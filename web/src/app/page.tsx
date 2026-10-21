@@ -1,9 +1,9 @@
 // The newspaper website view: every page of the backend's issue, plotted
-// exactly as positioned (/api/render/[page], lib/plot.ts) -- the same HTML the
+// exactly as positioned (/api/render/[page], shared/src/plot.ts) -- the same HTML the
 // PDF prints. Page count and each page's size come from the backend.
 
 import { fetchIssue } from "@/lib/apiClient";
-import { staticWarnings } from "@/lib/plot";
+import { staticWarnings } from "@ck/shared/plot";
 import { PlotWarnings } from "./PlotWarnings";
 
 const DISPLAY_WIDTH = 900;

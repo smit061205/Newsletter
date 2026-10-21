@@ -1,0 +1,247 @@
+// Builds one day's issue end to end: chrome for every page, the day's ads,
+// the planner's stories; validated against the render contract, checked with
+// the frontend's own plotter (no text may overflow or run into anything),
+// saved as a draft, and printed to PDF.
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { IssueRenderSchema, type Element, type IssueRender } from "@ck/shared/contract";
+import { printIssue } from "@ck/shared/pdf";
+import { assetFile, OUT_DIR, PLOT_ORIGIN } from "./config.ts";
+import { chromeFor } from "./chrome/chrome.ts";
+import { Measurer } from "./layout/measure.ts";
+import { reviewPages } from "./editorial/review.ts";
+import { closeGaps } from "./layout/fit.ts";
+import { headlineHeavy, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
+import { applyTextEdits, dedupe, inPaperLanguage, referenceAds } from "./layout/stories.ts";
+import { spanWidth } from "./layout/module.ts";
+import { BODY, DPI, FACES, FONTS, GRID, PAGE, PT } from "./layout/typography.ts";
+import { profile } from "./profile.ts";
+import type { Store, Story } from "./store.ts";
+
+type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean };
+
+/** Where a day's page images go (served by the API for the website). */
+export const pageImageDir = (date: string) => path.join(OUT_DIR, "pages", profile.id, date);
+
+/** Issue numbers count every day from the profile's reference issue. */
+export function issueNumberFor(date: string): number {
+  const { referenceDate, referenceNumber } = profile.issue;
+  const days = Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${referenceDate}T00:00:00Z`)) / 86_400_000);
+  return referenceNumber + days;
+}
+
+export interface BuildReport {
+  date: string; version: number; issueNumber: number; pages: number;
+  placed: { page: number; story: string; headline: string; variant: string; cols: number; rank: number; source: string }[];
+  /** column stretches left empty (taller than 1.5 body lines), pt */
+  whiteSpace: { page: number; col: number; height: number }[];
+  leftOut: { story: string; headline: string }[];
+  warnings: { page: number; elementId?: string; kind: string; detail: string }[];
+  pdf: string;
+  gates: { gate: string; pass: boolean; detail: string }[];
+  ready: boolean;
+  /** the page reviewer's findings, for the editor */
+  review: { page: number; issue: string; where: string; confidence: number; note: string }[];
+  /** OpenRouter spend on this build (length fitting), USD */
+  cost: number;
+}
+
+export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport }> {
+  const { log } = opts;
+  let stories = store.stories(date);
+  if (!stories.length && store.releases(date).length) {
+    const { rewriteDay } = await import("./editorial/rewrite.ts");
+    await rewriteDay(store, date, { log });
+    stories = store.stories(date);
+  }
+  if (!stories.length) throw new Error(`no stories for ${date}: ingest and rewrite the day first`);
+  let ads = store.ads(date);
+  if (!ads.length) {
+    ads = referenceAds(date);
+    for (const a of ads) store.putAd(a);
+    log(`no ads booked for ${date}: placed the 8 August ads as stand-ins`);
+  }
+  const total = opts.pages ?? profile.issue.pages;
+  const issueNumber = opts.issueNumber ?? issueNumberFor(date);
+
+  const m = await Measurer.open(FONTS, FACES);
+  let result!: { pages: Map<number, Element[]>; placed: { page: number; story: Story; variant: string; cols: number; rank: number }[];
+                 gaps: { page: number; col: number; y0: number; y1: number }[]; leftOut: Story[];
+                 plans: PagePlan[]; spent: number; factChecks: { story: string; detail: string }[] };
+  const chrome: Awaited<ReturnType<typeof chromeFor>>[] = [];
+  try {
+    for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m));
+    // content-sized pages (layout/pack.ts): every page packed in turn from the
+    // stories not placed yet, most important first
+    const edits = store.edits(date);
+    const dropped = new Set(edits.filter((e) => e.change.drop).map((e) => e.storyId));
+    const releases = new Map(store.releases(date).map((r) => [`r${r.id}`, r]));
+    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && inPaperLanguage(s)))
+      .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
+      .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
+    log(`planning ${date} (issue ${issueNumber}): ${pool.length} stories, ${ads.length} ads, ${total} pages`);
+    const packer = new Packer(m);
+    let spent = 0;
+    const factChecks: { story: string; detail: string }[] = [];
+    const finalPlans: PagePlan[] = [];
+    // spread the day's copy over all the pages: each page's share of it is
+    // its share of the room the pages have (their band, less their ads)
+    const room = Array.from({ length: total }, (_, i) => {
+      const band = (chrome[i].bodyBottom - chrome[i].bodyTop) * spanWidth(GRID.columns);
+      const adArea = ads.filter((a) => a.page === i + 1).reduce((s, a) =>
+        s + a.width * Math.max(0, Math.min(a.y + a.height, chrome[i].bodyBottom) - Math.max(a.y, chrome[i].bodyTop)), 0);
+      return Math.max(0, band - adArea);
+    });
+    const content = (await Promise.all(pool.map((s, i) => packer.naturalArea(s, i === 0)))).reduce((a, b) => a + b, 0);
+    const share = Math.min(1.05, content / room.reduce((a, b) => a + b, 0));
+    log(`  the day's copy fills ${(share * 100).toFixed(0)}% of the pages at its natural size`);
+    const pagesOut = new Map<number, Element[]>();
+    const placed: { page: number; story: Story; variant: string; cols: number; rank: number }[] = [];
+    const gaps: { page: number; col: number; y0: number; y1: number }[] = [];
+    const plans: PagePlan[] = [];
+    for (let n = 1; n <= total; n++) {
+      const pageAds = ads.filter((a) => a.page === n);
+      // what's left of the copy, over what's left of the room
+      const leftRoom = room.slice(n - 1).reduce((a, b) => a + b, 0);
+      const leftCopy = (await Promise.all(pool.map((s, i) => packer.naturalArea(s, i === 0)))).reduce((a, b) => a + b, 0);
+      const budget = n === total ? Infinity : room[n - 1] * Math.min(1.05, leftCopy / leftRoom);
+      const plan = await packer.packPage(n, pool, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, pageAds,
+                                         { leadFirst: true, budget });
+      plans.push(plan);
+      pool = pool.filter((s) => !plan.placed.some((p) => p.module.story.id === s.id));
+      log(`  page ${n}: ${plan.placed.length} stories, white space ${(plan.waste * 100).toFixed(1)}%: ` +
+          plan.placed.map((p) => `${p.module.story.id}(${p.module.cols}col ${p.module.variant}` +
+            `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" "));
+    }
+    // close the gaps: grow stories into them, then briefs and the house ad (layout/fit.ts)
+    for (const plan of plans) {
+      const n = plan.page;
+      const pageAds = ads.filter((a) => a.page === n);
+      const fit = await closeGaps(plan, { band: { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, ads: pageAds,
+                                         store, releases, m, leftOut: pool });
+      spent += fit.cost;
+      factChecks.push(...fit.factChecks);
+      pool = pool.filter((s) => !fit.used.includes(s));
+      for (const l of fit.log) log(`  p${n}${l}`);
+      pagesOut.set(n, [
+        ...pageAds.map((ad) => ({ id: `ad-${ad.id}`, kind: "image" as const, articleId: `ad-${ad.id}`, x: ad.x, y: ad.y,
+                                  width: ad.width, height: ad.height, url: ad.url, fit: "fill" as const })),
+        ...fit.elements,
+      ]);
+      for (const p of fit.plan.placed) placed.push({ page: n, story: p.module.story, variant: p.module.variant, cols: p.module.cols, rank: p.module.rank });
+      gaps.push(...fit.plan.gaps.map((g) => ({ page: n, ...g })));
+      finalPlans.push(fit.plan);
+    }
+    result = { pages: pagesOut, placed, gaps, leftOut: pool, plans: finalPlans, spent, factChecks };
+  } finally {
+    await m.close();
+  }
+  const pages = chrome.map((c, i) => ({
+    number: i + 1, width: PAGE.width, height: PAGE.height,
+    elements: [...c.elements, ...(result.pages.get(i + 1) ?? [])] as Element[],
+  }));
+  const issue = IssueRenderSchema.parse({ issueDate: date, issueNumber, dpi: DPI, fonts: FONTS, pages });
+
+  // page images too, for the website: licensed fonts never leave this server
+  const restricted = FONTS.some((f) => f.restricted);
+  const { pdf, warnings, images } = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, ...(restricted ? { images: 150 } : {}) });
+  await mkdir(OUT_DIR, { recursive: true });
+  const pdfPath = path.join(OUT_DIR, `${profile.id}-${date}.pdf`);
+  await writeFile(pdfPath, pdf);
+  if (images) {
+    const dir = pageImageDir(date);
+    await mkdir(dir, { recursive: true });
+    await Promise.all(images.map((png, i) => writeFile(path.join(dir, `${i + 1}.png`), png)));
+  }
+  // gate 5: a vision model reviews the finished pages (report only)
+  let review: Awaited<ReturnType<typeof reviewPages>> = null;
+  if (images && !opts.noReview) {
+    review = await reviewPages(images.map((_, i) => path.join(pageImageDir(date), `${i + 1}.png`)), { log });
+  }
+  if (m.unencodable.size) log(`  text the paper's fonts can't set (left as typed): ${[...m.unencodable].join(" ")}`);
+
+  const pt = 72 / DPI;
+  const whiteSpace = result.gaps.map((g) => ({ page: g.page, col: g.col + 1, height: Math.round((g.y1 - g.y0) * pt * 10) / 10 }));
+  const checks = whiteSpace.map((g) => ({ page: g.page, kind: "white-space", detail: `column ${g.col}: ${g.height}pt left empty` }));
+  // ---- the release gates: the issue is ready only when every one passes
+  const pitch = BODY.pitch;
+  const tombstones: string[] = [];
+  const hierarchy: string[] = [];
+  const headShare: string[] = [];
+  for (const plan of result.plans) {
+    for (const a of plan.placed) {
+      const ma = a.module;
+      if (headlineHeavy(ma)) headShare.push(`p${plan.page} ${ma.story.id}`);
+      for (const b of plan.placed) {
+        if (a === b) continue;
+        const mb = b.module;
+        // two headlines of about the same size side by side, starting level --
+        // they read as one run-on line ("tombstoned")
+        if (tombstoned(a, b)) tombstones.push(`p${plan.page} ${ma.story.id}|${mb.story.id}`);
+        // a less important story, no wider, with a bigger headline than a more important one
+        if (ma.rank < mb.rank && mb.cols <= ma.cols && mb.headSize > ma.headSize + 0.5 * PT) hierarchy.push(`p${plan.page} ${mb.story.id}>${ma.story.id}`);
+      }
+    }
+  }
+  const lead = result.placed.find((p) => p.page === 1 && p.rank === 1);
+  const plotterProblems = warnings;
+  const allFacts = [...result.factChecks, ...result.placed.flatMap((p) => (p.story.factCheck ? [{ story: p.story.id, detail: p.story.factCheck }] : []))];
+  const previous = store.latestIssue(date);
+  const same = previous ? JSON.stringify(previous.issue) === JSON.stringify(issue) : null;
+  const gates = [
+    { gate: "1 plotter: no overflow, overlap, off-page, failed fonts or images", pass: plotterProblems.length === 0, detail: `${plotterProblems.length} warning(s)` },
+    { gate: "2 every column ends within a line of what's below", pass: result.gaps.length === 0, detail: `${result.gaps.length} column gap(s)` },
+    { gate: "3 no tombstoned headlines", pass: tombstones.length === 0, detail: tombstones.join(", ") || "none" },
+    { gate: "3 headline sizes follow importance", pass: hierarchy.length === 0, detail: hierarchy.join(", ") || "ok" },
+    { gate: "3 no headline over 30% of its story", pass: headShare.length === 0, detail: headShare.join(", ") || "ok" },
+    { gate: "4 the lead on page 1; every story placed or left out with a reason", pass: !!lead,
+      detail: `lead ${lead?.story.id ?? "missing"}; left out (no room): ${result.leftOut.map((s) => s.id).join(", ") || "none"}` },
+    { gate: "6 fact checks: every number in the release", pass: allFacts.length === 0, detail: allFacts.map((f) => `${f.story}: ${f.detail}`).join("; ") || "ok" },
+    { gate: "7 same inputs, same issue", pass: same !== false, detail: same === null ? "first build" : same ? "identical to the last build" : "differs from the last build (inputs or edits changed?)" },
+  ];
+  const confident = (review?.findings ?? []).filter((f) => f.confidence >= 0.8);
+  gates.splice(6, 0, {
+    gate: "5 the page reviewer sees no clear problem", pass: confident.length === 0,
+    detail: !review ? "not run (no API key or no page images)"
+      : confident.map((f) => `p${f.page} ${f.issue} "${f.where.slice(0, 30)}": ${f.note}`).join("; ") || `ok (${review.findings.length} minor note(s))`,
+  });
+  const ready = gates.every((g) => g.pass);
+
+  const report: Omit<BuildReport, "version"> = {
+    date, issueNumber, pages: total,
+    placed: result.placed.map((p) => ({ page: p.page, story: p.story.id, headline: p.story.headline, variant: p.variant,
+                                        cols: p.cols, rank: p.rank, source: p.story.source })),
+    whiteSpace,
+    leftOut: result.leftOut.map((s) => ({ story: s.id, headline: s.headline })),
+    warnings: [...warnings.map((w) => ({ page: w.page, elementId: w.elementId, kind: w.kind, detail: w.detail })), ...checks],
+    pdf: pdfPath,
+    gates, ready, cost: Math.round((result.spent + (review?.cost ?? 0)) * 10000) / 10000,
+    review: review?.findings ?? [],
+  };
+  const version = store.saveIssue(date, issue, report);
+  log(`built ${date} v${version}: ${report.placed.length} stories placed, ${report.leftOut.length} left out, ` +
+      `${warnings.length} plotter warning(s), ${checks.length} white-space gap(s) -> ${pdfPath}`);
+  for (const w of report.warnings.filter((w) => w.kind !== "white-space")) log(`  warning p${w.page} ${w.elementId ?? ""}: ${w.kind} ${w.detail}`);
+  log(`gates (${ready ? "READY" : "NOT READY"}, AI cost $${report.cost.toFixed(4)}):`);
+  for (const g of gates) log(`  ${g.pass ? "pass" : "FAIL"}  ${g.gate} -- ${g.detail}`);
+  for (let n = 1; n <= total; n++) {
+    const g = whiteSpace.filter((x) => x.page === n);
+    if (g.length) log(`  page ${n}: ${g.length} column gap(s) over 1.5 lines, the tallest ${Math.max(...g.map((x) => x.height))}pt`);
+  }
+  return { issue, report: { ...report, version } };
+}
+
+/** The evening job: fetch from the inbox (when configured), rewrite, build a draft. */
+export async function runDay(store: Store, date: string, opts: Opts) {
+  const { log } = opts;
+  try {
+    const { ingestInbox } = await import("./ingest/inbox.ts");
+    const r = await ingestInbox(store, date, { log });
+    log(`inbox ${date}: ${r.fetched} new release(s)`);
+  } catch (e) {
+    log(`inbox not read: ${e instanceof Error ? e.message : e}`);
+  }
+  const { rewriteDay } = await import("./editorial/rewrite.ts");
+  if (store.releases(date).length) await rewriteDay(store, date, { log });
+  return buildIssue(store, date, opts);
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@ck/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Builds each day's Capital Kranti issue as render-contract JSON: fetch, rewrite, lay out, serve.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ck/shared": "*",
+    "playwright": "1.62.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5"
+  }
+}

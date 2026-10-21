@@ -1,4 +1,4 @@
-// Mock backend responses for MSW, in the render contract (lib/contract.ts):
+// Mock backend responses for MSW, in the render contract (shared/src/contract.ts):
 // the backend has already positioned everything; the frontend only plots it.
 //
 // `replica` is the real 8 August 2026 issue, "(196) Capital Kranti_08
@@ -11,7 +11,8 @@
 // URL that doesn't exist, deliberate overlaps, 6 pages. Plotting it must not
 // crash, and every planted problem must come back as a warning.
 
-import type { Element, IssueRender } from "@/lib/contract";
+import type { Element, IssueRender } from "@ck/shared/contract";
+import { plainText } from "@ck/shared/plot";
 import replicaJson from "./issue-2026-08-08.json";
 
 const REPLICA = replicaJson as IssueRender;
@@ -26,7 +27,7 @@ const W = 800 * PT; // a tabloid-ish page, deliberately not (196)'s size
 const H = 1100 * PT;
 // all of page 1's text joined -- far more than any one stress box can hold
 const LONG = REPLICA.pages[0].elements
-  .flatMap((e) => (e.kind === "text" ? [e.text] : []))
+  .flatMap((e) => (e.kind === "text" ? [plainText(e)] : []))
   .join("\n\n");
 
 function stressPage(n: number): Element[] {

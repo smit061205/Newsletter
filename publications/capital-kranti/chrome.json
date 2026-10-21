@@ -1,0 +1,263 @@
+{
+ "dpi": 300,
+ "roles": {
+  "first": {
+   "art": {
+    "url": "/chrome/blank-first.png",
+    "x": 0,
+    "y": 0,
+    "width": 4606.25,
+    "height": 1125.0
+   },
+   "bodyTop": 1125.0,
+   "fields": {
+    "issue": {
+     "x": 791.0,
+     "y": 1040.625,
+     "width": 202.8,
+     "height": 67.01,
+     "font": "hind-bold",
+     "size": 47.25,
+     "lineHeight": 67.01,
+     "color": "#231f20",
+     "hScale": 0.964,
+     "printed": "અંક : ૧૯૬",
+     "redact": [
+      189.65,
+      250.8,
+      240.17,
+      266.11
+     ],
+     "printedFont": "BBharatiGopikaTwo,Bold",
+     "printedSize": 58.33,
+     "baseline": 1094.92,
+     "left": 790.22
+    },
+    "date": {
+     "x": 1128.0,
+     "y": 1040.625,
+     "width": 614.15,
+     "height": 67.01,
+     "font": "hind-bold",
+     "size": 47.75,
+     "lineHeight": 67.01,
+     "color": "#231f20",
+     "hScale": 0.928,
+     "printed": "તારીખ : ૦૮-૦૮-૨૦૨૬, શનિવાર",
+     "redact": [
+      270.29,
+      250.8,
+      418.5,
+      266.11
+     ],
+     "printedFont": "BBharatiGopikaTwo,Bold",
+     "printedSize": 58.33,
+     "baseline": 1094.92,
+     "left": 1126.23
+    }
+   }
+  },
+  "inner": {
+   "art": {
+    "url": "/chrome/blank-inner.png",
+    "x": 0,
+    "y": 0,
+    "width": 4606.25,
+    "height": 179.17
+   },
+   "bodyTop": 179.17,
+   "fields": {
+    "date": {
+     "x": 298.0,
+     "y": 75.0,
+     "width": 573.05,
+     "height": 76.58,
+     "font": "hind-bold",
+     "size": 54.33,
+     "lineHeight": 76.58,
+     "color": "#ffffff",
+     "hScale": 0.759,
+     "printed": "તારીખ : ૦૮-૦૮-૨૦૨૬, શનિવાર",
+     "redact": [
+      71.21,
+      19.29,
+      240.54,
+      36.79
+     ],
+     "printedFont": "BBharatiGopikaTwo,Bold",
+     "printedSize": 66.67,
+     "baseline": 137.42,
+     "left": 296.73
+    },
+    "folio": {
+     "x": 109.0,
+     "y": 65.625,
+     "width": 15.45,
+     "height": 90.94,
+     "font": "hind-bold",
+     "size": 64.52,
+     "lineHeight": 90.94,
+     "color": "#ffffff",
+     "hScale": 0.45,
+     "printed": "૨",
+     "redact": [
+      24.29,
+      16.6,
+      34.95,
+      37.38
+     ],
+     "printedFont": "BBharatiGopikaTwo,Bold",
+     "printedSize": 79.17,
+     "baseline": 136.92,
+     "left": 101.23
+    }
+   }
+  },
+  "last": {
+   "art": {
+    "url": "/chrome/blank-last.png",
+    "x": 0,
+    "y": 0,
+    "width": 4606.25,
+    "height": 179.17
+   },
+   "bodyTop": 179.17,
+   "fields": {
+    "date": {
+     "x": 312.0,
+     "y": 78.125,
+     "width": 682.01,
+     "height": 76.58,
+     "font": "hind-bold",
+     "size": 54.33,
+     "lineHeight": 76.58,
+     "color": "#ffffff",
+     "hScale": 0.906,
+     "printed": "તારીખ : ૦૮-૦૮-૨૦૨૬, શનિવાર",
+     "redact": [
+      74.33,
+      19.77,
+      243.66,
+      37.27
+     ],
+     "printedFont": "BBharatiGopikaTwo,Bold",
+     "printedSize": 66.67,
+     "baseline": 139.42,
+     "left": 309.73
+    },
+    "folio": {
+     "x": 109.0,
+     "y": 65.625,
+     "width": 38.93,
+     "height": 90.94,
+     "font": "hind-bold",
+     "size": 64.52,
+     "lineHeight": 90.94,
+     "color": "#ffffff",
+     "hScale": 0.796,
+     "printed": "૪",
+     "redact": [
+      25.49,
+      16.6,
+      36.15,
+      37.38
+     ],
+     "printedFont": "BBharatiGopikaTwo,Bold",
+     "printedSize": 79.17,
+     "baseline": 136.92,
+     "left": 106.23
+    }
+   },
+   "footer": {
+    "url": "/chrome/footer-last.png",
+    "x": 0,
+    "y": 6062.5,
+    "width": 4606.25,
+    "height": 138.33
+   },
+   "bodyBottom": 6062.5
+  }
+ },
+ "page": {
+  "width": 4606.25,
+  "height": 6200.83
+ },
+ "fontMap": {
+  "BBharatiGopikaTwo,Bold": "gopika-bold",
+  "BBharatiGopikaTwo": "gopika-regular"
+ },
+ "ads": [
+  {
+   "id": "ad-ayurveda",
+   "page": 2,
+   "x": 58.96,
+   "y": 3422.92,
+   "width": 1653.54,
+   "height": 2698.96,
+   "url": "/chrome/ads/ad-ayurveda.png"
+  },
+  {
+   "id": "ad-nature-camp",
+   "page": 3,
+   "x": 62.5,
+   "y": 4189.38,
+   "width": 1638.33,
+   "height": 1931.04,
+   "url": "/chrome/ads/ad-nature-camp.png"
+  },
+  {
+   "id": "ad-bhagwat",
+   "page": 3,
+   "x": 1756.25,
+   "y": 4570.84,
+   "width": 1092.5,
+   "height": 1545.21,
+   "url": "/chrome/ads/ad-bhagwat.png"
+  },
+  {
+   "id": "ad-business-mela",
+   "page": 3,
+   "x": 2893.75,
+   "y": 3810.42,
+   "width": 1647.5,
+   "height": 2312.08,
+   "url": "/chrome/ads/ad-business-mela.png"
+  },
+  {
+   "id": "ad-business-strip",
+   "page": 4,
+   "x": 2334.81,
+   "y": 203.87,
+   "width": 2208.29,
+   "height": 130.31,
+   "url": "/chrome/ads/ad-business-strip.png"
+  },
+  {
+   "id": "ad-chardham",
+   "page": 4,
+   "x": 53.13,
+   "y": 4833.54,
+   "width": 2225.0,
+   "height": 1227.08,
+   "url": "/chrome/ads/ad-chardham.png"
+  },
+  {
+   "id": "ad-blood-donation",
+   "page": 4,
+   "x": 2330.39,
+   "y": 5421.75,
+   "width": 517.96,
+   "height": 617.54,
+   "url": "/chrome/ads/ad-blood-donation.png"
+  },
+  {
+   "id": "ad-film",
+   "page": 4,
+   "x": 3462.7,
+   "y": 4725.63,
+   "width": 1081.04,
+   "height": 1335.41,
+   "url": "/chrome/ads/ad-film.png"
+  }
+ ]
+}

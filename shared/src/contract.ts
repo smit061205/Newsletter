@@ -25,16 +25,32 @@ const base = {
 
 const boxed = { ...base, x: num, y: num, width: len, height: len };
 
+// A piece of text in its own style inside one text element, e.g. an English
+// name in a serif within a Gujarati sentence. Unset fields take the element's.
+export const TextRunSchema = z.object({
+  text: z.string(),
+  font: z.string().min(1).optional(), // a fonts[].id
+  size: len.positive().optional(),
+  color: color.optional(),
+});
+
 export const TextElementSchema = z.object({
   ...boxed,
   kind: z.literal("text"),
+  // A string, or runs in different styles that flow as one text.
   // "\n" = a forced line break, a blank line ("\n\n") = a new paragraph.
-  text: z.string(),
+  // In justified text, a line ended by "\n" is stretched to the full width
+  // (so the backend can keep its own line breaks); a paragraph's last line
+  // isn't, unless the text ends with "\n" (a paragraph that runs on into the
+  // next column).
+  text: z.union([z.string(), z.array(TextRunSchema).min(1)]),
   font: z.string().min(1), // a fonts[].id
   size: len.positive(),
   lineHeight: len.positive(),
   color: color.optional(),
-  align: z.enum(["left", "center", "right", "justify"]).optional(),
+  // "justify-all" also stretches each paragraph's last line, e.g. a headline
+  // set flush to both edges.
+  align: z.enum(["left", "center", "right", "justify", "justify-all"]).optional(),
   letterSpacing: num.optional(),
   // Horizontal squeeze applied to the glyphs (1 = none), e.g. to match a
   // source face's letter height at the same width.
@@ -42,6 +58,9 @@ export const TextElementSchema = z.object({
   vAlign: z.enum(["top", "middle", "bottom"]).optional(),
   // First-line indent of each paragraph.
   indent: num.optional(),
+  // The text as Unicode, when `text` is in a legacy (pre-Unicode) font's own
+  // glyph codes: what readers, search and screen readers get.
+  plainText: z.string().optional(),
 });
 
 export const ImageElementSchema = z.object({
@@ -72,11 +91,23 @@ export const LineElementSchema = z.object({
   dash: z.array(len).optional(),
 });
 
+// Any vector shape -- a rounded label box, an ornament -- as an SVG path:
+// `d` is SVG path data in contract px, page coordinates.
+export const PathElementSchema = z.object({
+  ...base,
+  kind: z.literal("path"),
+  d: z.string().min(1),
+  fill: color.optional(),
+  stroke: color.optional(),
+  strokeWidth: len.optional(),
+});
+
 export const ElementSchema = z.discriminatedUnion("kind", [
   TextElementSchema,
   ImageElementSchema,
   RectElementSchema,
   LineElementSchema,
+  PathElementSchema,
 ]);
 
 export const FontSchema = z.object({
@@ -84,6 +115,9 @@ export const FontSchema = z.object({
   url: z.string().min(1),
   weight: z.number().int().min(1).max(1000).optional(),
   style: z.enum(["normal", "italic"]).optional(),
+  // The font's licence doesn't allow serving it publicly: the website shows
+  // the page as an image rendered on the server instead of loading the font.
+  restricted: z.boolean().optional(),
 });
 
 export const PageSchema = z.object({
@@ -112,8 +146,17 @@ export const IssueRenderSchema = z
           ctx.addIssue({ code: "custom", path: [...path, "id"], message: `duplicate element id "${el.id}"` });
         }
         seen.add(el.id);
-        if (el.kind === "text" && !fontIds.has(el.font)) {
-          ctx.addIssue({ code: "custom", path: [...path, "font"], message: `font "${el.font}" is not declared in fonts[]` });
+        if (el.kind === "text") {
+          if (!fontIds.has(el.font)) {
+            ctx.addIssue({ code: "custom", path: [...path, "font"], message: `font "${el.font}" is not declared in fonts[]` });
+          }
+          if (Array.isArray(el.text)) {
+            el.text.forEach((run, ri) => {
+              if (run.font && !fontIds.has(run.font)) {
+                ctx.addIssue({ code: "custom", path: [...path, "text", ri, "font"], message: `font "${run.font}" is not declared in fonts[]` });
+              }
+            });
+          }
         }
       });
     });
@@ -123,10 +166,12 @@ export const IssueRenderSchema = z
     }
   });
 
+export type TextRun = z.infer<typeof TextRunSchema>;
 export type TextElement = z.infer<typeof TextElementSchema>;
 export type ImageElement = z.infer<typeof ImageElementSchema>;
 export type RectElement = z.infer<typeof RectElementSchema>;
 export type LineElement = z.infer<typeof LineElementSchema>;
+export type PathElement = z.infer<typeof PathElementSchema>;
 export type Element = z.infer<typeof ElementSchema>;
 export type Font = z.infer<typeof FontSchema>;
 export type Page = z.infer<typeof PageSchema>;

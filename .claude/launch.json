@@ -4,8 +4,27 @@
     {
       "name": "web-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "web"
+      ],
       "port": 3000
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--experimental-strip-types",
+        "--experimental-sqlite",
+        "--no-warnings",
+        "backend/src/cli.ts",
+        "serve",
+        "--port",
+        "4000"
+      ],
+      "port": 4000
     }
   ]
 }

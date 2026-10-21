@@ -8,3 +8,12 @@ web/public/review/*/
 web/public/review/index.json
 archive/legacy-pipeline/out/
 archive/legacy-pipeline/web/review-output/
+
+# backend data and fetched media
+backend/data/
+backend/.env
+web/public/media/
+
+# licensed publication fonts (restricted: never committed or served publicly)
+publications/*/fonts/*.ttf
+publications/*/fonts/*.otf

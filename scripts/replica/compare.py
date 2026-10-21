@@ -84,7 +84,7 @@ def main():
 
         groups = {}
         for el in page["elements"]:
-            if el.get("articleId") and el["kind"] != "line":
+            if el.get("articleId") and el["kind"] not in ("line", "path"):
                 r = fitz.Rect(el["x"] * pt, el["y"] * pt, (el["x"] + el["width"]) * pt, (el["y"] + el["height"]) * pt)
                 groups[el["articleId"]] = groups[el["articleId"]] | r if el["articleId"] in groups else r
         for aid, r in groups.items():

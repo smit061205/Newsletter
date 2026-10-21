@@ -11,7 +11,7 @@
 // change here.
 
 import { env } from "./env";
-import { IssueRenderSchema, type IssueRender } from "./contract";
+import { IssueRenderSchema, type IssueRender } from "@ck/shared/contract";
 
 // TBD with your brother (docs/FRONTEND_ROADMAP.md Part F) -- placeholder path.
 const ISSUE_ENDPOINT_PATH = "/api/issue";
