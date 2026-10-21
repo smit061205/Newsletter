@@ -6,7 +6,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { profile } from "../profile.ts";
-import { env } from "./rewrite.ts";
+import { env, openRouter } from "./rewrite.ts";
 
 export const ISSUES = ["headline-too-big", "headline-too-small", "gap", "cramped", "photo-too-small", "photo-too-big",
                        "imbalanced", "duplicate-topic", "unreadable"] as const;
@@ -49,7 +49,7 @@ export async function reviewPages(pngFiles: string[], opts: { log?: (s: string) 
   let cost = 0;
   for (const [i, file] of pngFiles.entries()) {
     const b64 = (await readFile(file)).toString("base64");
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const res = await openRouter({
       method: "POST",
       headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
       body: JSON.stringify({

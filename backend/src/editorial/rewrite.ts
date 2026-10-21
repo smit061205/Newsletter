@@ -27,6 +27,19 @@ import type { Release, Store, Story } from "../store.ts";
 export const DEFAULT_MODEL = profile.editorial.workhorseModel;
 export const LEAD_MODEL = profile.editorial.leadModel;
 
+/** One OpenRouter call, read in full, that gives up after `seconds`: a
+ * request that never answers would otherwise hold up the whole build. A
+ * timeout or network failure comes back as a 504, which every caller already
+ * treats as a failed call (the story keeps what it had). */
+export async function openRouter(init: RequestInit, seconds = 90): Promise<Response> {
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", { ...init, signal: AbortSignal.timeout(seconds * 1000) });
+    return new Response(await res.text(), { status: res.status });
+  } catch (e) {
+    return new Response(`no answer in ${seconds}s (${e instanceof Error ? e.message : e})`, { status: 504 });
+  }
+}
+
 export function env(name: string): string | undefined {
   if (process.env[name]) return process.env[name];
   try {
@@ -118,7 +131,7 @@ const digits = (s: string) => new Set((s.replace(/[૦-૯]/g, (d) => String("�
 
 export async function rewriteOne(r: Release, model: string, key: string): Promise<{ story: Story; cost: number; seconds: number }> {
   const t0 = Date.now();
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const res = await openRouter({
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
     body: JSON.stringify({
@@ -217,7 +230,7 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
   const model = env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
   const current = story.bodies.long;
   const now = current.split(/\s+/).filter(Boolean).length;
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const res = await openRouter({
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
     body: JSON.stringify({
@@ -271,7 +284,7 @@ export async function writeDeck(store: Store, story: Story, release: Release,
   const apiKey = env("OPENROUTER_API_KEY");
   if (!apiKey) return null;
   const model = env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const res = await openRouter({
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
     body: JSON.stringify({

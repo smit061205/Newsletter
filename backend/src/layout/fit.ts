@@ -159,9 +159,15 @@ export interface FillerCount { messages: Set<string>; houseAds: number }
 
 export async function closeGaps(plan: PagePlan, ctx: {
   band: Band; ads: Ad[]; store: Store; releases: Map<string, Release>; m: Measurer; leftOut: Story[]; fillers: FillerCount;
+  /** each step as it happens (the AI calls take a while) */
+  say?: (s: string) => void;
 }): Promise<FitResult> {
   const { band, ads, store, releases, m } = ctx;
   const log: string[] = [];
+  const note = (s: string) => {
+    log.push(s);
+    ctx.say?.(s);
+  };
   const factChecks: FitResult["factChecks"] = [];
   const used: Story[] = [];
   const extra: Element[] = [];
@@ -183,7 +189,7 @@ export async function closeGaps(plan: PagePlan, ctx: {
         if (brief.height <= h) {
           placed.push({ module: brief, col, x: colX(col), y });
           used.push(s);
-          log.push(`  ${s.id}: placed ${where}`);
+          note(`  ${s.id}: placed ${where}`);
           return true;
         }
       }
@@ -192,7 +198,7 @@ export async function closeGaps(plan: PagePlan, ctx: {
       const rel = releases.get(s.id);
       if (!rel) continue;
       for (const n of [60, 40]) {
-        const got = await fitLength(store, s, rel, n, { log: (x) => log.push(x) });
+        const got = await fitLength(store, s, rel, n, { log: (x) => note(x) });
         if (!got) break;
         cost += got.cost;
         // a brief keeps its sub-heading: every story is headline, sub-heading, body
@@ -203,7 +209,7 @@ export async function closeGaps(plan: PagePlan, ctx: {
           if (got.factCheck) factChecks.push({ story: s.id, detail: got.factCheck });
           placed.push({ module: brief, col, x: colX(col), y });
           used.push(s);
-          log.push(`  ${s.id}: placed as a ${n}-word brief ${where}`);
+          note(`  ${s.id}: placed as a ${n}-word brief ${where}`);
           return true;
         }
       }
@@ -221,7 +227,7 @@ export async function closeGaps(plan: PagePlan, ctx: {
     if (!ad && !msg) return false;
     extra.push(...(ad ?? msg!.elements));
     extraBlocks.push({ x0: colX(col), x1: colX(col) + w, y0: y });
-    log.push(`  ${ad ? "house ad" : "message"} ${where} (${((ad ? h : msg!.height) / PT).toFixed(0)}pt)`);
+    note(`  ${ad ? "house ad" : "message"} ${where} (${((ad ? h : msg!.height) / PT).toFixed(0)}pt)`);
     return true;
   };
 
@@ -259,7 +265,8 @@ export async function closeGaps(plan: PagePlan, ctx: {
         let over: Story | null = null; // the shortest version that ran over
         for (let round = 0; round < 3 && want !== 0; round++) {
           target = Math.max(20, Math.round(target + want * perLine * 0.95));
-          const got = await fitLength(store, base.story, release, target, { log: (s) => log.push(s) });
+          note(`  ${story.id}: AI length fit to ${target} words (round ${round + 1})`);
+          const got = await fitLength(store, base.story, release, target, { log: (s) => note(s) });
           if (!got) break;
           cost += got.cost;
           const fitted: Story = { ...base.story, bodies: { long: got.body, medium: got.body, short: got.body } };
@@ -305,7 +312,7 @@ export async function closeGaps(plan: PagePlan, ctx: {
       if (mod !== p.module && mod.height > p.module.height + 0.5) {
         placed[i] = { ...p, module: mod };
         changed = true;
-        log.push(`  ${story.id}: grew ${((mod.height - p.module.height) / PT).toFixed(0)}pt ` +
+        note(`  ${story.id}: grew ${((mod.height - p.module.height) / PT).toFixed(0)}pt ` +
                  `(${mod.variant}${mod.story.bodies.long !== p.module.story.bodies.long ? ", refitted" : ""}${mod.pitch !== pitch ? ", pitch +" + ((mod.pitch / pitch - 1) * 100).toFixed(1) + "%" : ""})`);
       }
       // d. / e. what's still empty under the story gets a story, a brief or a filler
@@ -341,12 +348,12 @@ export async function closeGaps(plan: PagePlan, ctx: {
   for (const p of placed) {
     const avail = room(p, placed, ads, band, extraBlocks);
     const g = avail - p.module.height;
-    if (g > 1.5 * pitch) log.push(`  ${p.module.story.id}: ${(g / PT).toFixed(0)}pt still open under it (${p.module.cols} col, ${p.module.variant}, ` +
+    if (g > 1.5 * pitch) note(`  ${p.module.story.id}: ${(g / PT).toFixed(0)}pt still open under it (${p.module.cols} col, ${p.module.variant}, ` +
                                   `${releases.has(p.module.story.id) ? "" : "no release, "}${p.module.bodyLines} lines)`);
     if (g > 1.5 * pitch && !extraBlocks.some((b) => b.x0 === p.x && Math.abs(b.y0 - (p.y + p.module.height + GAP.betweenStories)) < 1)) {
       for (let c = p.col; c < p.col + p.module.cols; c++) gaps.push({ col: c, y0: p.y + p.module.height, y1: p.y + avail });
     }
   }
-  if (extraBlocks.length > 2) log.push(`  short of copy: ${extraBlocks.length} fillers on this page`);
+  if (extraBlocks.length > 2) note(`  short of copy: ${extraBlocks.length} fillers on this page`);
   return { plan: { ...plan, placed, gaps }, elements: renderPlaced(placed, extra), cost, log, used, factChecks, blocks: blocksNow() };
 }
