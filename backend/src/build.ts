@@ -17,6 +17,7 @@ import { applyTextEdits, dedupe, inPaperLanguage, referenceAds, standInsMovable 
 import { arrangeAds } from "./layout/ads.ts";
 import { findGaps } from "./layout/occupancy.ts";
 import { styleChecks } from "./layout/style.ts";
+import { buildFingerprint } from "./fingerprint.ts";
 import { spanWidth } from "./layout/module.ts";
 import { BODY, DPI, FACES, FONTS, GRID, PAGE, PT } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
@@ -44,6 +45,8 @@ export interface BuildReport {
   leftOut: { story: string; headline: string }[];
   warnings: { page: number; elementId?: string; kind: string; detail: string }[];
   pdf: string;
+  /** the inputs and engine this issue was built from (fingerprint.ts) */
+  fingerprint: string;
   gates: { gate: string; pass: boolean; detail: string }[];
   ready: boolean;
   /** the page reviewer's findings, for the editor */
@@ -214,8 +217,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const lead = result.placed.find((p) => p.page === 1 && p.rank === 1);
   const plotterProblems = warnings;
   const allFacts = [...result.factChecks, ...result.placed.flatMap((p) => (p.story.factCheck ? [{ story: p.story.id, detail: p.story.factCheck }] : []))];
+  // gate 7 compares only builds made from the same inputs by the same engine:
+  // after a change to either, the paper is meant to differ
+  const fingerprint = buildFingerprint(store, date);
   const previous = store.latestIssue(date);
-  const same = previous ? JSON.stringify(previous.issue) === JSON.stringify(issue) : null;
+  const comparable = previous && (previous.report as { fingerprint?: string }).fingerprint === fingerprint;
+  const same = comparable ? JSON.stringify(previous.issue) === JSON.stringify(issue) : null;
   const gates = [
     { gate: "1 plotter: no overflow, overlap, off-page, failed fonts or images", pass: plotterProblems.length === 0, detail: `${plotterProblems.length} warning(s)` },
     { gate: "2 no empty space on the page (every column filled to what's below)", pass: result.gaps.length === 0,
@@ -227,7 +234,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       detail: `lead ${lead?.story.id ?? "missing"}; left out (no room): ${result.leftOut.map((s) => s.id).join(", ") || "none"}` },
     { gate: "6 fact checks: every number in the release", pass: allFacts.length === 0, detail: allFacts.map((f) => `${f.story}: ${f.detail}`).join("; ") || "ok" },
     ...style.gates,
-    { gate: "7 same inputs, same issue", pass: same !== false, detail: same === null ? "first build" : same ? "identical to the last build" : "differs from the last build (inputs or edits changed?)" },
+    { gate: "7 same inputs, same issue", pass: same !== false,
+      detail: !previous ? "first build"
+        : same === null ? `inputs or engine changed since v${previous.version}: nothing to compare (the next build of the same inputs will be)`
+        : same ? "identical to the last build of the same inputs" : "the same inputs and engine gave a different issue: not deterministic" },
   ];
   const confident = (review?.findings ?? []).filter((f) => f.confidence >= 0.8);
   gates.splice(6, 0, {
@@ -244,7 +254,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     whiteSpace,
     leftOut: result.leftOut.map((s) => ({ story: s.id, headline: s.headline })),
     warnings: [...warnings.map((w) => ({ page: w.page, elementId: w.elementId, kind: w.kind, detail: w.detail })), ...checks],
-    pdf: pdfPath,
+    pdf: pdfPath, fingerprint,
     gates, ready, cost: Math.round((result.spent + (review?.cost ?? 0)) * 10000) / 10000,
     review: review?.findings ?? [],
     style: style.stats,
