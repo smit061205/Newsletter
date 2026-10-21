@@ -246,13 +246,16 @@ export async function closeGaps(plan: PagePlan, ctx: {
           if (a === b || !tombstoned(a, b)) continue;
           const aLess = a.module.rank > b.module.rank || (a.module.rank === b.module.rank && a.module.headSize <= b.module.headSize);
           const [lesser, greater] = aLess ? [a, b] : [b, a];
-          const tries: [PlacedModule, { max?: number; min?: number }][] = [
-            [lesser, { max: greater.module.headSize * 0.82 }],
-            [greater, { min: lesser.module.headSize / 0.82 }],
+          // the lesser smaller; else the greater larger, its text shortened if
+          // that's what keeps it in its space
+          const shorter = (v: Variant): Variant[] => (v === "long" ? ["long", "medium", "short"] : v === "medium" ? ["medium", "short"] : ["short"]);
+          const tries: [PlacedModule, { max?: number; min?: number }, Variant][] = [
+            [lesser, { max: lesser.module.headSize > 0 ? greater.module.headSize * 0.82 : 0 }, lesser.module.variant],
+            ...shorter(greater.module.variant).map((v) => [greater, { min: lesser.module.headSize / 0.82 }, v] as [PlacedModule, { min: number }, Variant]),
           ];
-          for (const [p, head] of tries) {
+          for (const [p, head, variant] of tries) {
             const mod = p.module;
-            const next = await buildModule(mod.story, mod.rank, mod.cols, mod.variant, m, mod.photoMode, mod.pitch, head);
+            const next = await buildModule(mod.story, mod.rank, mod.cols, variant, m, mod.photoMode, mod.pitch, head);
             const i = placed.indexOf(p);
             const trial = { ...p, module: next };
             const others = placed.filter((q) => q !== p);
@@ -261,8 +264,17 @@ export async function closeGaps(plan: PagePlan, ctx: {
             if (!ok) continue;
             placed[i] = trial;
             changed = true;
-            note(`  ${mod.story.id}: headline ${(mod.headSize / PT).toFixed(0)}pt -> ${(next.headSize / PT).toFixed(0)}pt (not level with its neighbour's)`);
+            note(`  ${mod.story.id}: headline ${(mod.headSize / PT).toFixed(0)}pt -> ${(next.headSize / PT).toFixed(0)}pt` +
+                 `${variant !== mod.variant ? ` (${variant})` : ""} (not level with its neighbour's)`);
             break;
+          }
+          if (!changed) {
+            // sizes can't differ here (both at the smallest a headline may be,
+            // no room to grow): a rule in the gutter between them, as a desk does
+            const right = a.col < b.col ? b : a;
+            placed[placed.indexOf(right)] = { ...right, ruleLeft: true };
+            changed = true;
+            note(`  ${right.module.story.id}: a column rule between its headline and its neighbour's`);
           }
           if (changed) break;
         }
