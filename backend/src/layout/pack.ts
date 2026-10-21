@@ -18,7 +18,12 @@ import { BODY, GAP, GRID, INK, PT } from "./typography.ts";
 
 export interface Band { top: number; bottom: number }
 
-export interface PlacedModule { module: Module; col: number; x: number; y: number }
+export interface PlacedModule {
+  module: Module; col: number; x: number; y: number;
+  /** a vertical rule in the gutter on its left, from its top down its
+   * height: keeps its headline from reading on from its neighbour's */
+  ruleLeft?: boolean;
+}
 
 export interface PagePlan {
   page: number;
@@ -63,7 +68,7 @@ interface State {
  * they read as one run-on line. */
 export function tombstoned(a: PlacedModule, b: PlacedModule): boolean {
   const ha = a.module.headSize, hb = b.module.headSize;
-  return a.col + a.module.cols === b.col && Math.abs(a.y - b.y) < 2 * BODY.pitch && ha > 0 && hb > 0
+  return a.col + a.module.cols === b.col && !b.ruleLeft && Math.abs(a.y - b.y) < 2 * BODY.pitch && ha > 0 && hb > 0
     && Math.abs(ha - hb) < 0.15 * Math.max(ha, hb);
 }
 
@@ -81,6 +86,11 @@ export function renderPlaced(placed: PlacedModule[], extra: Element[] = []): Ele
   const elements: Element[] = [];
   for (const p of placed) {
     elements.push(...place(p.module.elements, p.x, p.y));
+    if (p.ruleLeft) {
+      const rx = p.x - GRID.gutter / 2;
+      elements.push({ id: `${p.module.story.id}-vrule`, kind: "line", articleId: p.module.story.id,
+                      x1: rx, y1: p.y, x2: rx, y2: p.y + p.module.height, color: INK, width: GAP.storyRule });
+    }
     const stacked = placed.some((q) => q !== p && Math.abs(q.y + q.module.height + gap - p.y) < 2
       && Math.min(q.col + q.module.cols, p.col + p.module.cols) > Math.max(q.col, p.col));
     if (stacked && GAP.storyRule > 0) {
