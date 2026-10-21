@@ -1,0 +1,192 @@
+{
+  "id": "dev-test",
+  "name": "Capital Kranti layout test (free fonts)",
+  "language": {
+    "lang": "gu",
+    "direction": "ltr",
+    "digits": "gujarati",
+    "weekdays": [
+      "રવિવાર",
+      "સોમવાર",
+      "મંગળવાર",
+      "બુધવાર",
+      "ગુરુવાર",
+      "શુક્રવાર",
+      "શનિવાર"
+    ],
+    "dateLine": "તારીખ : {dd}-{mm}-{yyyy}, {weekday}",
+    "issueLine": "અંક : {issue}"
+  },
+  "issue": {
+    "referenceDate": "2026-08-08",
+    "referenceNumber": 196,
+    "pages": 4
+  },
+  "page": {
+    "width": 1105.5,
+    "height": 1488.2
+  },
+  "grid": {
+    "left": 14.4,
+    "columns": 8,
+    "column": 124.2,
+    "gutter": 11.884
+  },
+  "ink": "#231f20",
+  "fonts": {
+    "gopika-regular": {
+      "file": "/fonts/HindVadodara-Regular.ttf",
+      "weight": 400,
+      "encoding": "unicode",
+      "restricted": false
+    },
+    "gopika-bold": {
+      "file": "/fonts/HindVadodara-Bold.ttf",
+      "weight": 700,
+      "encoding": "unicode",
+      "restricted": false
+    },
+    "gopika-light": {
+      "file": "/fonts/HindVadodara-Regular.ttf",
+      "weight": 300,
+      "encoding": "unicode",
+      "restricted": false
+    },
+    "gopika-bolditalic": {
+      "file": "/fonts/HindVadodara-Bold.ttf",
+      "weight": 700,
+      "style": "italic",
+      "encoding": "unicode",
+      "restricted": false
+    },
+    "tinos-bold": {
+      "file": "/fonts/Tinos-Bold.ttf",
+      "weight": 700
+    },
+    "serif-regular": {
+      "file": "/fonts/LiberationSerif-Regular.ttf",
+      "weight": 400
+    }
+  },
+  "type": {
+    "body": {
+      "font": "gopika-regular",
+      "size": 10.4,
+      "pitch": 15.6,
+      "indent": 12,
+      "pitches": [
+        15.6,
+        15.9,
+        16.2,
+        16.5,
+        15.3,
+        15.0
+      ],
+      "sizes": [
+        10.4,
+        10.0,
+        9.6
+      ]
+    },
+    "headline": {
+      "font": "gopika-bold",
+      "leading": 1.2,
+      "capByColumns": [
+        0.0,
+        15.2,
+        20.8,
+        27.2,
+        35.2,
+        40.0,
+        44.0,
+        48.0,
+        48.0
+      ],
+      "min": 12.8,
+      "rankScale": [
+        1.0,
+        0.8,
+        0.66,
+        0.56,
+        0.48
+      ],
+      "maxLines": [
+        2,
+        2,
+        2,
+        3,
+        3
+      ]
+    },
+    "kicker": {
+      "font": "gopika-bold",
+      "ratio": 0.5,
+      "min": 10.4,
+      "leading": 1.2
+    },
+    "deck": {
+      "font": "gopika-bold",
+      "ratio": 0.42,
+      "min": 10.4,
+      "leading": 1.25
+    },
+    "caption": {
+      "font": "gopika-bold",
+      "size": 8.8,
+      "pitch": 13.2
+    }
+  },
+  "spacing": {
+    "top": 2,
+    "afterKicker": 2,
+    "afterHeadline": 5,
+    "afterDeck": 5,
+    "afterPhoto": 3,
+    "afterCaption": 5,
+    "betweenStories": 8,
+    "storyRule": 0.75
+  },
+  "photo": {
+    "maxCrop": 0.15,
+    "minHeight": 80,
+    "minCols": 2,
+    "minPpi": 200,
+    "maxShare": 0.45
+  },
+  "chrome": "../capital-kranti/chrome.json",
+  "editorial": {
+    "workhorseModel": "openai/gpt-6-luna",
+    "leadModel": "google/gemini-3.8-flash",
+    "leadStories": 3
+  },
+  "fontLicence": "Free fonts (SIL OFL) -- for testing the engine only.",
+  "fillers": {
+    "houseAd": [
+      {
+        "text": "કેપિટલ ક્રાંતિ",
+        "role": "headline",
+        "scale": 1.0
+      },
+      {
+        "text": "સમાજનો વિવેકપૂર્ણ દ્રષ્ટિકોણ",
+        "role": "deck",
+        "scale": 0.55
+      },
+      {
+        "text": "સમાચાર અને જાહેરાત માટે સંપર્ક કરો",
+        "role": "body",
+        "scale": 0.5
+      },
+      {
+        "text": "M. 98256 08744",
+        "role": "deck",
+        "scale": 0.5
+      },
+      {
+        "text": "capitalkranti@gmail.com",
+        "role": "deck",
+        "scale": 0.45
+      }
+    ]
+  }
+}

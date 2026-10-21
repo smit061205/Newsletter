@@ -18,7 +18,9 @@ import { BODY, DPI, FACES, FONTS, GRID, PAGE, PT } from "./layout/typography.ts"
 import { profile } from "./profile.ts";
 import type { Store, Story } from "./store.ts";
 
-type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean };
+type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
+              /** page images even when the fonts may be served (tests read them) */
+              images?: boolean };
 
 /** Where a day's page images go (served by the API for the website). */
 export const pageImageDir = (date: string) => path.join(OUT_DIR, "pages", profile.id, date);
@@ -144,7 +146,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
 
   // page images too, for the website: licensed fonts never leave this server
   const restricted = FONTS.some((f) => f.restricted);
-  const { pdf, warnings, images } = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, ...(restricted ? { images: 150 } : {}) });
+  const { pdf, warnings, images } = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, ...(restricted || opts.images ? { images: 150 } : {}) });
   await mkdir(OUT_DIR, { recursive: true });
   const pdfPath = path.join(OUT_DIR, `${profile.id}-${date}.pdf`);
   await writeFile(pdfPath, pdf);
