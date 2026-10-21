@@ -6,6 +6,9 @@
 //   rewrite  turn them into newspaper stories (OpenRouter), or use them as-is
 //   build    plan and lay out the day's issue, check it, save it as a draft, print the PDF
 //   all      ingest + rewrite + build (what the 8 PM job runs)
+//   publish  copy the built issue into web/public/issues for a website with
+//            no backend (--push commits and pushes it; --force if NOT READY;
+//            --keep N days on the site, 14 by default)
 //   serve    run the API for the website (and the 8 PM job)
 import { ingestDay } from "./ingest/gujaratInfo.ts";
 import { Store } from "./store.ts";
@@ -47,13 +50,19 @@ async function main() {
       await runDay(store, date, { log });
       break;
     }
+    case "publish": {
+      const { publishIssue } = await import("./publish.ts");
+      await publishIssue(store, date, { log, force: args.includes("--force"), push: args.includes("--push"),
+                                       keep: flag("keep") ? Number(flag("keep")) : undefined });
+      break;
+    }
     case "serve": {
       const { serve } = await import("./server.ts");
-      await serve(store, { port: Number(flag("port") ?? 4000), log });
+      await serve(store, { port: Number(flag("port") ?? process.env.PORT ?? 4000), host: process.env.HOST?.trim() || undefined, log });
       return;
     }
     default:
-      log("usage: cli.ts ingest|rewrite|build|all|serve [--date YYYY-MM-DD]");
+      log("usage: cli.ts ingest|rewrite|build|all|publish|serve [--date YYYY-MM-DD]");
       process.exitCode = 2;
   }
 }

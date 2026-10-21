@@ -8,12 +8,17 @@
 //   GET   /api/stories?date=           the day's stories (what an editor edits)
 //   POST  /api/releases                one release, JSON (an editor's upload, or the browser reader)
 //   GET   /api/export/:date.svg?page=N an editable SVG of one page (CorelDRAW)
+//   GET   /healthz                     "ok" (for the host's health check)
+//
+// With BACKEND_API_TOKEN set, every POST needs "Authorization: Bearer <token>"
+// (builds and edits cost AI credit; approval publishes). Reads stay open: the
+// website's readers load page images straight from here.
 //
 // It also runs the evening job: at 20:00 India time, ingest + rewrite + build.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { PUBLIC_DIR } from "./config.ts";
+import { MEDIA_DIR } from "./config.ts";
 import type { Release, Store } from "./store.ts";
 
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json") {
@@ -51,7 +56,7 @@ export async function acceptRelease(store: Store, u: UploadedRelease): Promise<R
     if (m) date = `${m[3]}-${String(MONTHS.indexOf(m[1]) + 1).padStart(2, "0")}-${m[2].padStart(2, "0")}`;
   }
   if (!date || !u.headline || !u.paras?.length) throw new Error("a release needs a date, a headline and body paragraphs");
-  const dir = path.join(PUBLIC_DIR, "media", date);
+  const dir = path.join(MEDIA_DIR, date);
   await mkdir(dir, { recursive: true });
   const photos: string[] = [];
   for (const p of u.photos ?? []) {
@@ -85,7 +90,13 @@ function everyEvening(job: () => Promise<void>, log: (s: string) => void) {
   }, 30_000);
 }
 
-export async function serve(store: Store, opts: { port: number; log: (s: string) => void }) {
+/** Does this request carry the API token (or is none configured)? */
+function authorized(req: IncomingMessage): boolean {
+  const token = process.env.BACKEND_API_TOKEN?.trim();
+  return !token || req.headers.authorization === `Bearer ${token}`;
+}
+
+export async function serve(store: Store, opts: { port: number; host?: string; log: (s: string) => void }) {
   const { log } = opts;
   const { buildIssue, runDay } = await import("./build.ts");
   const server = createServer(async (req, res) => {
@@ -93,6 +104,8 @@ export async function serve(store: Store, opts: { port: number; log: (s: string)
       const url = new URL(req.url ?? "/", "http://localhost");
       const parts = url.pathname.split("/").filter(Boolean);
       if (req.method === "OPTIONS") return send(res, 204, "");
+      if (req.method === "GET" && url.pathname === "/healthz") return send(res, 200, "ok", "text/plain");
+      if (req.method === "POST" && !authorized(req)) return send(res, 401, { error: "missing or wrong API token" });
       if (req.method === "GET" && url.pathname === "/api/issue") {
         const date = url.searchParams.get("date") ?? store.latestDate();
         const got = date ? store.latestIssue(date) : null;
@@ -139,7 +152,9 @@ export async function serve(store: Store, opts: { port: number; log: (s: string)
             const o = document.getElementById("o");
             try {
               const body = decodeURIComponent(location.hash.slice(1));
-              const r = await fetch("/api/releases", { method: "POST", headers: { "content-type": "application/json" }, body });
+              const token = new URLSearchParams(location.search).get("token");
+              const headers = { "content-type": "application/json", ...(token ? { authorization: "Bearer " + token } : {}) };
+              const r = await fetch("/api/releases", { method: "POST", headers, body });
               const j = await r.json();
               document.title = r.ok ? "stored " + j.id : "error";
               o.textContent = JSON.stringify(j);
@@ -179,7 +194,9 @@ export async function serve(store: Store, opts: { port: number; log: (s: string)
       return send(res, 500, { error: e instanceof Error ? e.message : String(e) });
     }
   });
-  await new Promise<void>((resolve) => server.listen(opts.port, "127.0.0.1", resolve));
-  log(`backend listening on http://localhost:${opts.port}`);
+  // local by default; a host like Render needs 0.0.0.0 (HOST)
+  const host = opts.host ?? "127.0.0.1";
+  await new Promise<void>((resolve) => server.listen(opts.port, host, resolve));
+  log(`backend listening on http://${host}:${opts.port}`);
   everyEvening(() => runDay(store, new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()), { log }), log);
 }

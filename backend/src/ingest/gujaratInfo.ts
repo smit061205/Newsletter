@@ -10,7 +10,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium, type BrowserContext } from "playwright";
-import { PUBLIC_DIR } from "../config.ts";
+import { MEDIA_DIR } from "../config.ts";
 import type { Release, Store } from "../store.ts";
 
 const SITE = "https://gujaratinformation.gujarat.gov.in";
@@ -69,7 +69,7 @@ export async function ingestDay(store: Store, date: string, opts: { concurrency?
   const log = opts.log ?? (() => {});
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ locale: "gu-IN" });
-  const mediaDir = path.join(PUBLIC_DIR, "media", date);
+  const mediaDir = path.join(MEDIA_DIR, date);
   await mkdir(mediaDir, { recursive: true });
   let fetched = 0;
   let skipped = 0;

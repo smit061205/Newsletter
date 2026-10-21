@@ -2,14 +2,15 @@
 // Part G, "Env config") -- nothing about the backend's URL or auth is
 // hardcoded anywhere else. Defaults to mock mode so a fresh checkout with no
 // .env.local still runs (against MSW fixtures) instead of failing.
+// "static" reads issues published as files into public/issues (no backend).
 
-export type BackendMode = "mock" | "live";
+export type BackendMode = "mock" | "live" | "static";
 
 function readMode(): BackendMode {
   const raw = process.env.BACKEND_API_MODE?.trim().toLowerCase();
-  if (raw === "live") return "live";
+  if (raw === "live" || raw === "static") return raw;
   if (raw && raw !== "mock") {
-    throw new Error(`BACKEND_API_MODE must be "mock" or "live", got ${JSON.stringify(raw)}`);
+    throw new Error(`BACKEND_API_MODE must be "mock", "live" or "static", got ${JSON.stringify(raw)}`);
   }
   return "mock";
 }

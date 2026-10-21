@@ -6,7 +6,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { IssueRender } from "@ck/shared/contract";
-import { ROOT } from "./config.ts";
+import { DB_FILE } from "./config.ts";
 
 export interface Release {
   id: number;
@@ -57,7 +57,7 @@ export interface Edit {
   at: string;
 }
 
-const DB_PATH = path.join(ROOT, "backend", "data", "capital-kranti.sqlite");
+const DB_PATH = DB_FILE;
 
 export class Store {
   db: DatabaseSync;

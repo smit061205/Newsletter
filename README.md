@@ -110,6 +110,24 @@ npm run dev --prefix web          # http://localhost:3000
 ```
 `.claude/launch.json` has both as `backend` and `web-dev`.
 
+### Deploy for free: build at home, publish to Vercel (static mode)
+The backend runs on your own computer (where the licensed fonts are); the website on Vercel shows what you publish.
+1. **Vercel, once:** a project with root directory `web` and the environment variable `BACKEND_API_MODE=static`.
+2. **Every day, on your computer:**
+   ```bash
+   B="node --experimental-strip-types --experimental-sqlite --no-warnings backend/src/cli.ts"
+   $B all     --date 2026-10-21          # (or ingest/rewrite/build by hand)
+   $B publish --date 2026-10-21 --push   # page JPEGs + PDF + issue.json -> web/public/issues, commit, push
+   ```
+   Vercel redeploys on the push (from the branch its project deploys, usually `main`). `publish` refuses a NOT READY issue unless you add `--force`, and keeps the last 14 days on the site (`--keep N`).
+- Only page images and the PDF are published, never the font files.
+- Each day adds about 12 MB to the repository (4 page JPEGs of about 1.5 MB, plus the PDF). Older days leave the site but stay in git history. If the repository grows too large, move the files to cheaper storage.
+
+### Deploy with a hosted backend (website on Vercel, backend on Render, paid)
+- **Backend:** a Render web service built from the root `Dockerfile` (Node 22 + Playwright Chromium), on a paid instance with a **persistent disk mounted at `/var/data`** (`DATA_DIR`). The disk holds the SQLite database, PDFs, page images and release photos; copy the licensed fonts to `/var/data/publications/capital-kranti/fonts/` (never into git). Environment: `OPENROUTER_API_KEY`, `BACKEND_API_TOKEN` (required on every POST). Health check: `/healthz`.
+- **Website:** a Vercel project with root directory `web`, and `BACKEND_API_MODE=live`, `BACKEND_API_URL=<the Render URL>`, `BACKEND_API_TOKEN=<same token>`.
+- The browser hand-off page needs the token too: `/ingest?token=<token>#<json>`.
+
 ### Build an issue by hand
 ```bash
 B="node --experimental-strip-types --experimental-sqlite --no-warnings backend/src/cli.ts"
@@ -136,7 +154,8 @@ shared/                     used by both website and backend -- ONE copy
                             pdf-lib, optional PNG page images
   src/profile.ts            the publication profile schema
 backend/
-  src/cli.ts                ingest | rewrite | build | all | serve
+  src/cli.ts                ingest | rewrite | build | all | publish | serve
+  src/publish.ts            built issue -> web/public/issues (JPEG pages, PDF, issue.json)
   src/config.ts             paths; assetFile() maps /private/<paper>/... to the
                             publication folder (licensed fonts, never public)
   src/profile.ts            loads publications/$CK_PUBLICATION/profile.json
@@ -168,7 +187,8 @@ publications/capital-kranti/
   fonts/*.ttf               LICENSED -- not in git, supply yourself
 web/                        Next.js 16 website (see web/AGENTS.md: this Next differs
                             from older versions -- read node_modules/next/dist/docs)
-  src/app/page.tsx          issue viewer (one scaled iframe per page)
+  src/app/page.tsx          issue viewer (one scaled iframe per page; static mode: published images)
+  src/lib/published.ts      static mode: reads web/public/issues (written by cli.ts publish)
   src/app/api/render/[page] page HTML, or the backend's page image for restricted fonts
   src/app/api/pdf           PDF download (the backend's PDF for restricted fonts)
   src/app/api/issue         validated issue JSON
