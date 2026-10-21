@@ -1,0 +1,83 @@
+{
+ "issueDate": "2026-10-21",
+ "issueNumber": 270,
+ "version": 40,
+ "publishedAt": "2026-10-21T20:48:05.196Z",
+ "ready": true,
+ "dpi": 300,
+ "pdf": "/issues/2026-10-21/issue.pdf",
+ "pages": [
+  {
+   "number": 1,
+   "width": 4606.25,
+   "height": 6200.833333333334,
+   "image": "/issues/2026-10-21/1.jpg"
+  },
+  {
+   "number": 2,
+   "width": 4606.25,
+   "height": 6200.833333333334,
+   "image": "/issues/2026-10-21/2.jpg"
+  },
+  {
+   "number": 3,
+   "width": 4606.25,
+   "height": 6200.833333333334,
+   "image": "/issues/2026-10-21/3.jpg"
+  },
+  {
+   "number": 4,
+   "width": 4606.25,
+   "height": 6200.833333333334,
+   "image": "/issues/2026-10-21/4.jpg"
+  }
+ ],
+ "gates": [
+  {
+   "gate": "1 plotter: no overflow, overlap, off-page, failed fonts or images",
+   "pass": true,
+   "detail": "0 warning(s)"
+  },
+  {
+   "gate": "2 every column ends within a line of what's below",
+   "pass": true,
+   "detail": "0 column gap(s)"
+  },
+  {
+   "gate": "3 no tombstoned headlines",
+   "pass": true,
+   "detail": "none"
+  },
+  {
+   "gate": "3 headline sizes follow importance",
+   "pass": true,
+   "detail": "ok"
+  },
+  {
+   "gate": "3 no headline over 30% of its story",
+   "pass": true,
+   "detail": "ok"
+  },
+  {
+   "gate": "4 the lead on page 1; every story placed or left out with a reason",
+   "pass": true,
+   "detail": "lead r55055; left out (no room): none"
+  },
+  {
+   "gate": "5 the page reviewer sees no clear problem",
+   "pass": true,
+   "detail": "ok (0 minor note(s))"
+  },
+  {
+   "gate": "6 fact checks: every number in the release",
+   "pass": true,
+   "detail": "ok"
+  },
+  {
+   "gate": "7 same inputs, same issue",
+   "pass": true,
+   "detail": "identical to the last build"
+  }
+ ],
+ "warnings": []
+}
