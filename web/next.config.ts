@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname, ".."),
   },
   transpilePackages: ["@ck/shared"],
+  // static mode reads the published issues' JSON at request time
+  // (src/lib/published.ts); the images and PDFs are served as public files
+  outputFileTracingIncludes: {
+    "/*": ["public/issues/**/*.json"],
+    "/**": ["public/issues/**/*.json"],
+  },
 };
 
 export default nextConfig;

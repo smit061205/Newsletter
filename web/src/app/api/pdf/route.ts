@@ -5,10 +5,17 @@
 // `?warnings=1` returns them as JSON instead of the PDF.
 import { fetchIssue } from "@/lib/apiClient";
 import { env } from "@/lib/env";
+import { readPublished } from "@/lib/published";
 import { printIssue } from "@ck/shared/pdf";
 
 export async function GET(request: Request) {
   try {
+    if (env.backendMode === "static") {
+      // the published PDF, a plain file under public/issues
+      const published = await readPublished(new URL(request.url).searchParams.get("date") ?? undefined);
+      if (!published) return new Response("No issue has been published yet", { status: 404 });
+      return Response.redirect(new URL(published.pdf, request.url), 307);
+    }
     const issue = await fetchIssue();
     if (issue.fonts.some((f) => f.restricted) && env.backendMode === "live") {
       // the paper's licensed fonts live on the backend only: hand over its PDF

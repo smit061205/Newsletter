@@ -6,6 +6,7 @@
 // the browser never needs the font files.
 import { fetchIssue } from "@/lib/apiClient";
 import { env } from "@/lib/env";
+import { readPublished } from "@/lib/published";
 import { plotPage } from "@ck/shared/plot";
 
 function imagePage(src: string, pageNo: number, widthPx: number, heightPx: number, warnings: unknown[]): string {
@@ -23,6 +24,15 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/render/[pag
   const { page } = await ctx.params;
   const pageNo = Number(page);
   try {
+    if (env.backendMode === "static") {
+      // the published page image (public/issues), as on the home page
+      const published = await readPublished();
+      const p = published?.pages.find((x) => x.number === pageNo);
+      if (!published || !p) return new Response(`No published page ${page}`, { status: 404 });
+      const k = 96 / published.dpi;
+      return new Response(imagePage(p.image, pageNo, p.width * k, p.height * k, published.warnings.filter((w) => w.page === pageNo)),
+                          { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    }
     const issue = await fetchIssue();
     if (!issue.pages.some((p) => p.number === pageNo)) {
       return new Response(`This issue has no page ${page}`, { status: 404 });
