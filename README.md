@@ -154,7 +154,7 @@ shared/                     used by both website and backend -- ONE copy
                             pdf-lib, optional PNG page images
   src/profile.ts            the publication profile schema
 backend/
-  src/cli.ts                ingest | rewrite | build | all | publish | serve
+  src/cli.ts                ingest | rewrite | build | all | publish | serve | status
   src/publish.ts            built issue -> web/public/issues (JPEG pages, PDF, issue.json)
   src/config.ts             paths; assetFile() maps /private/<paper>/... to the
                             publication folder (licensed fonts, never public)
@@ -453,6 +453,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 - **The chosen automatic source is the paper's email inbox** (district information offices email releases and photos to newspapers every day). Building it is 15.2.
 - `backend/src/ingest/gujaratInfo.ts` (Playwright) is kept for when access is allowed, for example if the department allow-lists the server.
 - **Manual upload works today:** `POST /api/releases` with `{id, url, dateLine|date, office?, headline, subhead?, paras[], photos?[{name, base64}]}`.
+- **The release reader** (`http://localhost:4000/reader` while the server runs): a bookmark for your own browser. On a press release page it reads the headline, sub-heading, date line, paragraphs and photos (scaled to at most 1800px wide), sends them through the `/ingest` hand-off, and offers to open the previous release (ids run in order). One page at a time, read by you: the site's block on automated readers is respected. `cli.ts status` lists every day in the database with its releases, stories and latest build.
 
 ---
 
