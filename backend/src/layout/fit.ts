@@ -197,7 +197,7 @@ export async function closeGaps(plan: PagePlan, ctx: {
     for (const s of ctx.leftOut.filter((s) => !used.includes(s))) {
       const rel = releases.get(s.id);
       if (!rel) continue;
-      for (const n of [60, 40]) {
+      for (const n of [60, 40, 25]) {
         const got = await fitLength(store, s, rel, n, { log: (x) => note(x) });
         if (!got) break;
         cost += got.cost;
