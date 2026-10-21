@@ -1,8 +1,8 @@
 {
  "issueDate": "2026-10-21",
  "issueNumber": 270,
- "version": 40,
- "publishedAt": "2026-10-21T20:48:05.196Z",
+ "version": 45,
+ "publishedAt": "2026-10-21T22:24:44.168Z",
  "ready": true,
  "dpi": 300,
  "pdf": "/issues/2026-10-21/issue.pdf",
@@ -39,9 +39,9 @@
    "detail": "0 warning(s)"
   },
   {
-   "gate": "2 every column ends within a line of what's below",
+   "gate": "2 no empty space on the page (every column filled to what's below)",
    "pass": true,
-   "detail": "0 column gap(s)"
+   "detail": "0 empty stretch(es)"
   },
   {
    "gate": "3 no tombstoned headlines",
@@ -74,9 +74,39 @@
    "detail": "ok"
   },
   {
+   "gate": "S1 body text evenly spaced (no holes between words)",
+   "pass": true,
+   "detail": "extra word space p50 0.04em, p95 0.22em; 5 loose line(s) (0.5%, allowed 3%)"
+  },
+  {
+   "gate": "S2 every headline, kicker and deck line fills its width",
+   "pass": true,
+   "detail": "ok"
+  },
+  {
+   "gate": "S4 a story's columns end level",
+   "pass": true,
+   "detail": "ok"
+  },
+  {
+   "gate": "S5 enough copy for the pages (fillers under 12% of a page)",
+   "pass": true,
+   "detail": "ok"
+  },
+  {
+   "gate": "S7 every story: headline, smaller sub-heading, smaller body",
+   "pass": true,
+   "detail": "ok"
+  },
+  {
+   "gate": "S6 numbers in the paper's digits",
+   "pass": true,
+   "detail": "ok"
+  },
+  {
    "gate": "7 same inputs, same issue",
    "pass": true,
-   "detail": "identical to the last build"
+   "detail": "inputs or engine changed since v44: nothing to compare (the next build of the same inputs will be)"
   }
  ],
  "warnings": []
