@@ -116,7 +116,9 @@ export class Packer {
 
   /** Pack one page from `pool` (most important first). */
   async packPage(page: number, pool: Story[], band: Band, ads: Ad[],
-                 opts: { leadFirst: boolean; beam?: number; budget?: number }): Promise<PagePlan> {
+                 opts: { leadFirst: boolean; beam?: number; budget?: number;
+                         /** copy (natural area) that must stay in the pool for the pages after this one */
+                         reserve?: number }): Promise<PagePlan> {
     const gap = GAP.betweenStories;
     const obstacles: Obstacle[] = ads.map((a) => ({ x0: a.x, x1: a.x + a.width, y0: a.y, y1: a.y + a.height }));
     const inCol = (o: Obstacle, c: number) => Math.min(o.x1, colX(c) + GRID.column) - Math.max(o.x0, colX(c)) > 20;
@@ -190,11 +192,18 @@ export class Packer {
           // whatever layout it gets: wider photos only use up spare room
           const usual = await this.naturalArea(story, isLead);
           if (strict && st.area + usual > budget * 1.08 && st.placed.length) continue;
+          // over budget only while the later pages keep enough copy to fill
+          if (!strict && poolArea - st.area - usual < (opts.reserve ?? 0)) continue;
           const modes: PhotoMode[] = !story.photo ? [0] : (story.photos?.length ?? 0) >= 2 ? [0, 1, 2] : [0, 1];
           for (const k of spansFor(rank)) {
             if (k > run) continue;
-            const limit = Math.min(...Array.from({ length: k }, (_, i) => limitBelow(c0 + i, y)));
+            const limits = Array.from({ length: k }, (_, i) => limitBelow(c0 + i, y));
+            const limit = Math.min(...limits);
             if (limit - y < minBody) continue;
+            // a story over columns that end at different depths (an ad under
+            // some of them) leaves an L-shaped hole under the rest that no
+            // story can grow into: avoided where another width works
+            const straddle = Math.max(...limits) - limit > minBody;
             for (const mode of modes) for (const variant of VARIANTS) {
               const mod = await this.module(story, rank, k, variant, mode);
               if (y + mod.height > limit) continue; // too tall here: try shorter text
@@ -208,6 +217,7 @@ export class Packer {
                             - (onPage.some((o) => related(o, story)) ? 1.5 : 0)
                             // the desk's rules, as costs the search avoids
                             - (headlineHeavy(mod) ? 4 : 0)
+                            - (straddle ? 2 : 0)
                             // a headline that can't fill this width: another width, if one works
                             - (mod.displayFill < 0.97 ? 3 : 0)
                             // headline sizes follow importance: never a bigger headline than a

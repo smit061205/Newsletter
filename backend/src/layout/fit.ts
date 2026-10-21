@@ -43,6 +43,9 @@ export interface FitResult {
   log: string[];
   /** stories used as briefs in gaps */
   used: Story[];
+  /** what fills the page, as boxes: each story's whole rectangle (space
+   * inside a story is the story's), fillers and ads -- for the whitespace map */
+  blocks: Element[];
   factChecks: { story: string; detail: string }[];
 }
 
@@ -150,8 +153,12 @@ async function messageFiller(id: string, x: number, y: number, w: number, h: num
   };
 }
 
+/** Fillers used so far in the issue (shared by its pages): profile
+ * fillers.maxMessages / maxHouseAds cap them for the whole issue. */
+export interface FillerCount { messages: Set<string>; houseAds: number }
+
 export async function closeGaps(plan: PagePlan, ctx: {
-  band: Band; ads: Ad[]; store: Store; releases: Map<string, Release>; m: Measurer; leftOut: Story[];
+  band: Band; ads: Ad[]; store: Store; releases: Map<string, Release>; m: Measurer; leftOut: Story[]; fillers: FillerCount;
 }): Promise<FitResult> {
   const { band, ads, store, releases, m } = ctx;
   const log: string[] = [];
@@ -168,7 +175,7 @@ export async function closeGaps(plan: PagePlan, ctx: {
   // An empty area `cols` wide from column `col`, `h` tall from `y`: filled
   // with real content, never left blank -- a left-out story that fits, else
   // one summarised by the AI as a brief, else the paper's house ad.
-  const usedMessages = new Set<string>();
+  const usedMessages = ctx.fillers.messages;
   const fillArea = async (col: number, cols: number, y: number, h: number, where: string): Promise<boolean> => {
     for (const s of ctx.leftOut.filter((s) => !used.includes(s))) {
       for (const v of ["long", "medium", "short"] as Variant[]) {
@@ -188,7 +195,8 @@ export async function closeGaps(plan: PagePlan, ctx: {
         const got = await fitLength(store, s, rel, n, { log: (x) => log.push(x) });
         if (!got) break;
         cost += got.cost;
-        const briefStory: Story = { ...s, deck: "", kicker: "", photo: null, photos: [],
+        // a brief keeps its sub-heading: every story is headline, sub-heading, body
+        const briefStory: Story = { ...s, kicker: "", photo: null, photos: [],
                                     bodies: { long: got.body, medium: got.body, short: got.body } };
         const brief = await buildModule(briefStory, 5, cols, "long", m, 0);
         if (brief.height <= h) {
@@ -204,8 +212,11 @@ export async function closeGaps(plan: PagePlan, ctx: {
     // shallow, a public-service message otherwise
     const id = `filler-${plan.page}-${extraBlocks.length}`;
     const w = spanWidth(cols);
-    const ad = cols >= 3 && h <= 0.6 * w ? await houseAd(id, colX(col), y, w, h, m) : null;
-    const msg = ad ? null : await messageFiller(id, colX(col), y, w, h, plan.page * 3, m, usedMessages);
+    const ad = cols >= 3 && h <= 0.6 * w && ctx.fillers.houseAds < profile.fillers.maxHouseAds
+      ? await houseAd(id, colX(col), y, w, h, m) : null;
+    if (ad) ctx.fillers.houseAds++;
+    const msg = ad || usedMessages.size >= profile.fillers.maxMessages ? null
+      : await messageFiller(id, colX(col), y, w, h, plan.page * 3, m, usedMessages);
     if (msg) usedMessages.add(msg.text);
     if (!ad && !msg) return false;
     extra.push(...(ad ?? msg!.elements));
@@ -308,8 +319,13 @@ export async function closeGaps(plan: PagePlan, ctx: {
   // anything still empty anywhere on the page -- beside an ad, between
   // stories of different widths -- found on the page as it now stands
   // (layout/occupancy.ts), side-by-side column stretches taken as one area
+  const blocksNow = (): Element[] => [
+    ...placed.map((p) => ({ id: p.module.story.id, kind: "rect" as const, x: p.x, y: p.y, width: p.module.width, height: p.module.height })),
+    ...extra.filter((e) => e.kind === "rect"),
+    ...ads.map((a) => ({ id: a.id, kind: "rect" as const, x: a.x, y: a.y, width: a.width, height: a.height })),
+  ];
   for (let round = 0; round < 16; round++) {
-    const now = [...renderPlaced(placed, extra), ...ads.map((a) => ({ id: a.id, kind: "rect" as const, x: a.x, y: a.y, width: a.width, height: a.height }))];
+    const now = blocksNow();
     const holes = findGaps(now, band).sort((a, b) => a.y0 - b.y0 || a.col - b.col);
     if (!holes.length) break;
     let filled = false;
@@ -332,5 +348,5 @@ export async function closeGaps(plan: PagePlan, ctx: {
     }
   }
   if (extraBlocks.length > 2) log.push(`  short of copy: ${extraBlocks.length} fillers on this page`);
-  return { plan: { ...plan, placed, gaps }, elements: renderPlaced(placed, extra), cost, log, used, factChecks };
+  return { plan: { ...plan, placed, gaps }, elements: renderPlaced(placed, extra), cost, log, used, factChecks, blocks: blocksNow() };
 }

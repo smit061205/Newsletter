@@ -76,6 +76,13 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
     return { page: page.number, share: room > 0 ? fill / room : 0 };
   }).filter((x) => x.share > FILLER_SHARE);
 
+  // every story: a headline, a smaller sub-heading, then smaller body text
+  const structure = plans.flatMap((p) => p.placed.filter((x) => {
+    const mod = x.module;
+    return !(mod.headSize > 0 && mod.deckSize > 0 && mod.bodyLines > 0
+             && mod.headSize >= mod.deckSize * 1.25 - 0.01 && mod.deckSize >= BODY.size * 1.15 - 0.01);
+  }).map((x) => `p${p.page} ${x.module.story.id}${x.module.deckSize ? "" : " (no sub-heading)"}`));
+
   const gates = [
     { gate: "S1 body text evenly spaced (no holes between words)", pass: q(0.95) <= P95_EM && looseShare <= LOOSE_SHARE,
       detail: `extra word space p50 ${q(0.5).toFixed(2)}em, p95 ${q(0.95).toFixed(2)}em; ${loose.length} loose line(s) ` +
@@ -84,6 +91,7 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
     { gate: "S4 a story's columns end level", pass: ragged.length === 0, detail: ragged.join(", ") || "ok" },
     { gate: "S5 enough copy for the pages (fillers under 12% of a page)", pass: short.length === 0,
       detail: short.map((x) => `p${x.page} ${Math.round(x.share * 100)}% fillers -- add releases or print fewer pages`).join("; ") || "ok" },
+    { gate: "S7 every story: headline, smaller sub-heading, smaller body", pass: structure.length === 0, detail: structure.join(", ") || "ok" },
     { gate: "S6 numbers in the paper's digits", pass: latinDigits.length === 0, detail: latinDigits.slice(0, 8).join(", ") || "ok" },
   ];
   return {

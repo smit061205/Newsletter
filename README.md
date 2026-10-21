@@ -381,7 +381,7 @@ For a story with a given **rank** (1 = lead … 5 = brief), **column span k**, *
   2. **AI `fitLength`** to the word count the gap needs (words per line measured from the story itself). Up to 3 rounds; if the AI overshoots, it asks again for fewer words;
   3. **sentence trim** of the shortest version that overshot: drop whole sentences from the end until it fits exactly. News puts the most important facts first, so the end is what goes;
   4. pitch +≤2%, once.
-- Still more than 4 lines free, and then **every empty area found on the finished page** (`occupancy.ts`: all element boxes on a columns × 2pt grid, so holes beside ads or between stories of different widths count too): a left-out story, else a 60- or 40-word AI brief, else a filler -- the **house ad** where the area is wide and shallow, otherwise a **public-service message** (`fillers.messages` in the profile, e.g. "રક્તદાન મહાદાન ચક્ષુદાન શ્રેષ્ઠદાન") set in fitted display type in a ruled panel, each message once a page.
+- Still more than 4 lines free, and then **every empty area found on the finished page** (`occupancy.ts`: all element boxes on a columns × 2pt grid, so holes beside ads or between stories of different widths count too): a left-out story, else a 60- or 40-word AI brief, else a filler -- the **house ad** where the area is wide and shallow, otherwise a **public-service message** (`fillers.messages` in the profile, e.g. "રક્તદાન મહાદાન ચક્ષુદાન શ્રેષ્ઠદાન") set in fitted display type in a ruled panel. At most **one message and one house ad in a whole issue** (`fillers.maxMessages`, `maxHouseAds`): space is filled with stories, not slogans; a day short of copy fails gate 2 instead.
 - What remains is reported as `white-space` (gate 2). More than 2 fillers on a page is logged as "short of copy" (and gate S5 fails past 12% of the page).
 
 ### 8.5 Chrome (`chrome/chrome.ts`)
@@ -436,6 +436,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 - **S4 columns:** a story's columns end within one line of each other.
 - **S5 enough copy:** fillers cover under 12% of each page's story area; otherwise the day is short of news (add releases, or print fewer pages).
 - **S6 digits:** no number left in Latin digits that the paper prints in its own.
+- **S7 structure:** every story prints a headline, a smaller sub-heading (deck) and smaller body text: headline ≥ 1.25× the sub-heading, sub-heading ≥ 1.15× the body. A story without a deck gets its release's sub-heading, else one written by the AI (`rewrite.ts` `writeDeck`, cached); the rewrite prompt now always asks for one.
 
 ---
 
@@ -512,10 +513,10 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
   ```
   (See the scripts for how the inputs are made.)
 - **Model comparison:** `node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/compare-models.ts <date> <ids...>`
-- **Layout test without the licensed fonts:** `backend/test/pack-0808.ts` runs the 8 August stories through the whole engine (packer, gap closer, printer, every gate) in the free fonts of `publications/dev-test` (written by `python3 scripts/dev_profile.py` from the real profile: re-run it after changing the profile). No AI calls; it exits non-zero if any gate but S5 fails (the fixture has no releases to lengthen, so its copy runs short):
+- **Layout test without the licensed fonts:** `backend/test/pack-0808.ts` runs the 8 August stories through the whole engine (packer, gap closer, printer, every gate) in the free fonts of `publications/dev-test` (written by `python3 scripts/dev_profile.py` from the real profile: re-run it after changing the profile). Each story's text stands in as its release and `CK_FAKE_AI=1` stands in for the model (`rewrite.ts` `fakeFit`), so length fitting, briefs and sub-headings run with no network. It exits non-zero if any gate fails. Two pages by default; on three the fixture's copy runs short, which gate 2 reports:
   ```bash
   CK_PUBLICATION=dev-test DATA_DIR=/tmp/ck-test \
-    node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/pack-0808.ts   # TEST_PAGES=3 by default
+    node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/pack-0808.ts   # TEST_PAGES=2 by default
   ```
   Page images land in `$DATA_DIR/out/pages/dev-test/2026-08-08/`. `backend/test/gaps.mts <date>` lists a build's empty stretches.
 - **Typography by numbers:** `python3 scripts/replica/style_stats.py <issue.pdf>` prints word gaps, letter spacing, display-line fill, headline sizes and body lines per page, read back from any PDF. The 8 August reference: word gap p50 4.5 / p90 6.7pt, letter spacing up to 0.72pt, display lines 96-100% full, 273-390 body lines a page.

@@ -111,7 +111,10 @@ export const ProfileSchema = z.object({
     /** Short public-service messages (as the paper prints "રક્તદાન મહાદાન"),
      * set large in a ruled box where the day has no copy left for a space. */
     messages: z.array(z.string().min(1)).default([]),
-  }).default({ houseAd: [], messages: [] }),
+    /** at most this many message panels, and house ads, in a whole issue */
+    maxMessages: z.number().int().nonnegative().default(1),
+    maxHouseAds: z.number().int().nonnegative().default(1),
+  }).default({ houseAd: [], messages: [], maxMessages: 1, maxHouseAds: 1 }),
   editorial: z.object({
     workhorseModel: z.string().min(1),
     leadModel: z.string().min(1),

@@ -2,8 +2,13 @@
 // day's database: the 8 August issue's stories (archive/frontend-layout-engine/
 // article-level-issue-2026-08-08.json) go through the packer, the gap closer,
 // the printer and every release gate, set in the free fonts of the dev-test
-// profile (scripts/dev_profile.py). No AI calls: the stories have no releases.
+// profile (scripts/dev_profile.py). Each story's own text stands in as its
+// release, and CK_FAKE_AI=1 stands in for the model (rewrite.ts fakeFit): the
+// AI paths -- length fitting, briefs, sub-headings -- run with no network.
 // Writes the PDF and page images under DATA_DIR (a fresh folder each run).
+//
+// Two pages by default (TEST_PAGES): the fixture's 15 stories fill two;
+// on three its copy runs short, which gates 2 and S5 rightly report.
 //
 //   CK_PUBLICATION=dev-test DATA_DIR=/tmp/ck-test \
 //     node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/pack-0808.ts
@@ -15,6 +20,7 @@ import { DATA_DIR, PUBLIC_DIR, ROOT } from "../src/config.ts";
 import { PUBLICATION } from "../src/profile.ts";
 import type { Story } from "../src/store.ts";
 
+process.env.CK_FAKE_AI = "1";
 if (PUBLICATION !== "dev-test" || !DATA_DIR) {
   console.error("run with CK_PUBLICATION=dev-test and a scratch DATA_DIR (the test's database is thrown away)");
   process.exit(2);
@@ -81,14 +87,16 @@ for (const a of articles) {
 const store = new Store();
 for (const s of stories) {
   if (!s.headline.trim()) continue; // a continuation whose parent isn't in the data
+  // the story's text as its release (the build writes the missing sub-heading)
+  const releaseId = stories.indexOf(s) + 1;
+  store.putRelease({ id: releaseId, date, url: "", office: s.id, headline: s.headline, subhead: "", body: s.bodies.long,
+                     photos: s.photos ?? [], fetchedAt: "" });
   s.bodies.medium = cut(s.bodies.long, 0.6);
   s.bodies.short = cut(s.bodies.long, 0.35);
-  store.putStory(s);
+  store.putStory({ ...s, id: `r${releaseId}`, releaseId, source: s.id });
 }
-const { report } = await buildIssue(store, date, { log: (s) => console.log(s), noReview: true, images: true, pages: Number(process.env.TEST_PAGES ?? 3) });
+const { report } = await buildIssue(store, date, { log: (s) => console.log(s), noReview: true, images: true, pages: Number(process.env.TEST_PAGES ?? 2) });
 console.log(`pages: ${path.join(DATA_DIR, "out", "pages", PUBLICATION, date)}`);
-// The fixture has no releases, so nothing is lengthened by the AI: copy runs
-// short on the last page, which S5 rightly reports. Every other gate must pass.
-const failed = report.gates.filter((g) => !g.pass && !g.gate.startsWith("S5"));
+const failed = report.gates.filter((g) => !g.pass);
 for (const g of failed) console.error(`FAILED: ${g.gate} -- ${g.detail}`);
 process.exitCode = failed.length ? 1 : 0;

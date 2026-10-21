@@ -34,6 +34,9 @@ export interface DisplaySpec {
   /** prefer more, bigger lines over one long one (a lead's headline): each
    * extra line is worth this share of size */
   linesBonus?: number;
+  /** set like a short paragraph (a sub-heading): every line full but the
+   * last, which may end short of the width */
+  lastFree?: boolean;
 }
 
 export interface DisplayBlock {
@@ -50,7 +53,7 @@ interface Measured { word: string; width: number; letters: number; runs: Run[] }
 
 /** The best way to break `words` (measured at size 1) into `n` lines that can
  * each be fitted to `w` at `size`: the most even lines, no lone last word. */
-function breaksFor(words: Measured[], space: number, size: number, w: number, n: number): number[] | null {
+function breaksFor(words: Measured[], space: number, size: number, w: number, n: number, lastFree = false): number[] | null {
   const k = words.length;
   if (n > k) return null;
   const nat = (i: number, j: number) => (words.slice(i, j).reduce((a, x) => a + x.width, 0) + (j - i - 1) * space) * size;
@@ -66,9 +69,10 @@ function breaksFor(words: Measured[], space: number, size: number, w: number, n:
         if (cost[i][l - 1] === INF) continue;
         const width = nat(i, j);
         if (width * HMIN > w) continue; // can't squeeze it in
-        if (stretchable(i, j) < w && !(j - i === 1 && n === 1)) continue; // can't stretch it out
-        // how far the line's scale is from 1, both ways alike
-        let c = Math.log(w / width) ** 2;
+        const free = lastFree && l === n && j === k && width <= w;
+        if (!free && stretchable(i, j) < w && !(j - i === 1 && n === 1)) continue; // can't stretch it out
+        // how far the line's scale is from 1, both ways alike (a free last line: how short it falls)
+        let c = free ? (width < 0.35 * w ? 1 : 0) : Math.log(w / width) ** 2;
         if (l === n && j - i === 1 && n > 1) c += 0.5; // a lone last word
         if (cost[i][l - 1] + c < cost[j][l]) {
           cost[j][l] = cost[i][l - 1] + c;
@@ -131,7 +135,7 @@ export async function setDisplay(m: Measurer, text: string, spec: DisplaySpec, i
     let bestScore = -1;
     for (let n = 1; n <= spec.maxLines; n++) {
       for (let size = spec.max; size >= spec.min - 0.01; size -= PT / 2) {
-        const starts = breaksFor(words, space, size, w, n);
+        const starts = breaksFor(words, space, size, w, n, spec.lastFree);
         if (!starts) continue;
         const score = size * (1 + (spec.linesBonus ?? 0) * (n - 1));
         if (score > bestScore + 0.01) {
@@ -179,6 +183,10 @@ export async function setDisplay(m: Measurer, text: string, spec: DisplaySpec, i
       const hScale = Math.min(1, w / l.natural);
       return { ...base, x: r1(x), width: r1(w), align: spec.align,
                ...(hScale < 0.9999 ? { hScale: Math.round(hScale * 10000) / 10000 } : {}) };
+    }
+    if (spec.lastFree && l.line.end && l.natural <= w) {
+      // the last line of a paragraph-like block: at its natural width
+      return { ...base, x: r1(x), width: r1(w), align: "left" as const };
     }
     const f = fitLine(l.natural, l.letters, l.spaces, size, w);
     fillMin = Math.min(fillMin, f.fill);
