@@ -12,6 +12,8 @@ Every night it:
 
 The rule throughout: **the AI makes the judgement calls, and the code does the measuring.** AI writes, shortens and reviews. Every position on the page is computed by measuring real text in Chromium (the same browser engine that prints the PDF), so the layout is exact, repeatable and costs nothing to compute.
 
+> **New here? Read `HANDOFF.md` first:** what the October 2026 session changed, where things stand, and the daily routine.
+>
 > **This README is the hand-over document.** It is written for someone (or a Claude Code cloud session) starting with no prior context: what exists, how it works, how to run it, and exactly what is left to do.
 
 ---
