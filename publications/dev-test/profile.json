@@ -90,45 +90,45 @@
     },
     "headline": {
       "font": "gopika-bold",
-      "leading": 1.2,
+      "leading": 1.12,
       "capByColumns": [
         0.0,
-        15.2,
-        20.8,
-        27.2,
-        35.2,
-        40.0,
-        44.0,
+        17.6,
+        24.0,
+        32.0,
+        43.2,
         48.0,
-        48.0
+        51.2,
+        54.4,
+        57.6
       ],
-      "min": 12.8,
+      "min": 13.6,
       "rankScale": [
         1.0,
-        0.8,
-        0.66,
-        0.56,
-        0.48
+        0.78,
+        0.62,
+        0.5,
+        0.42
       ],
       "maxLines": [
         2,
-        2,
-        2,
+        3,
+        3,
         3,
         3
       ]
     },
     "kicker": {
       "font": "gopika-bold",
-      "ratio": 0.5,
-      "min": 10.4,
-      "leading": 1.2
+      "ratio": 0.6,
+      "min": 11.2,
+      "leading": 1.15
     },
     "deck": {
       "font": "gopika-bold",
-      "ratio": 0.42,
-      "min": 10.4,
-      "leading": 1.25
+      "ratio": 0.45,
+      "min": 11.2,
+      "leading": 1.15
     },
     "caption": {
       "font": "gopika-bold",

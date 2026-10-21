@@ -10,7 +10,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import type { Font, TextRun } from "@ck/shared/contract";
 import { assetFile, PLOT_ORIGIN, PUBLIC_DIR } from "../config.ts";
 import { BharatiEncoder } from "../fonts/bharati.ts";
-import { breakParagraph } from "./linebreak.ts";
+import { breakParagraph, type Word } from "./linebreak.ts";
 
 /** How each font's text is written: in Unicode, or in a legacy font's own
  * glyph codes -- and which font sets Latin letters and digits for it. */
@@ -174,22 +174,12 @@ export class Measurer {
     return new Measurer(browser, page, faces);
   }
 
-  /** Lines of text, many requests per round trip: Chromium measures every
-   * word once (its width, and how many letters letter spacing applies to),
-   * then the breaks are chosen here -- total-fit for justified text
-   * (`optimal`), greedy otherwise. A word longer than the whole width gets
-   * a line to itself (and its width says it overflows). Widths are measured
-   * on the text as printed (see shape()). */
-  async breakLines(requests: BreakRequest[]): Promise<Line[][]> {
-    const reqs = requests.map((r) => ({
-      size: r.size, hScale: r.hScale ?? 1,
-      base: family(r.font),
-      space: this.shape(" ", r.font)[0].text,
-      paras: r.paras.map((p) => p.split(/\s+/).filter(Boolean).map((w) => ({
-        word: w, runs: this.shape(w, r.font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? r.font) })),
-      }))),
-    }));
-    const measured = await this.page.evaluate(({ reqs }) => {
+  /** Widths of the words of each request's paragraphs (contract px, after
+   * hScale), how many letters letter spacing applies to in each, and the
+   * width of a space. */
+  private async measureWords(reqs: { size: number; hScale: number; base: string; space: string;
+                                     paras: { word: string; runs: { text: string; family: string }[] }[][] }[]) {
+    return this.page.evaluate(({ reqs }) => {
       const ctx = document.createElement("canvas").getContext("2d")! as CanvasRenderingContext2D & { letterSpacing: string };
       const TEST = 10;
       const measure = (runs: { text: string; family: string }[], size: number) => {
@@ -214,6 +204,24 @@ export class Measurer {
         })),
       }));
     }, { reqs });
+  }
+
+  /** Lines of text, many requests per round trip: Chromium measures every
+   * word once (its width, and how many letters letter spacing applies to),
+   * then the breaks are chosen here -- total-fit for justified text
+   * (`optimal`), greedy otherwise. A word longer than the whole width gets
+   * a line to itself (and its width says it overflows). Widths are measured
+   * on the text as printed (see shape()). */
+  async breakLines(requests: BreakRequest[]): Promise<Line[][]> {
+    const reqs = requests.map((r) => ({
+      size: r.size, hScale: r.hScale ?? 1,
+      base: family(r.font),
+      space: this.shape(" ", r.font)[0].text,
+      paras: r.paras.map((p) => p.split(/\s+/).filter(Boolean).map((w) => ({
+        word: w, runs: this.shape(w, r.font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? r.font) })),
+      }))),
+    }));
+    const measured = await this.measureWords(reqs);
 
     return requests.map((req, ri) => {
       const r = reqs[ri];
@@ -254,6 +262,24 @@ export class Measurer {
       });
       return out;
     });
+  }
+
+  /** The words of `text` as printed in `font` at `size`: each word's runs,
+   * width and letter count, and the space between words. For display lines,
+   * set and fitted by layout/display.ts. */
+  async words(text: string, font: string, size: number): Promise<{ words: (Word & { word: string; runs: Run[] })[]; space: number; spaceText: string }> {
+    const req = {
+      size, hScale: 1, base: family(font), space: this.shape(" ", font)[0].text,
+      paras: [text.split(/\s+/).filter(Boolean).map((w) => ({
+        word: w, runs: this.shape(w, font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? font) })),
+      }))],
+    };
+    const [m] = await this.measureWords([req]);
+    return {
+      space: m.space, spaceText: req.space,
+      words: m.paras[0].map((w, i) => ({ ...w, word: req.paras[0][i].word,
+                                          runs: req.paras[0][i].runs.map((x) => (x.font ? { text: x.text, font: x.font } : { text: x.text })) })),
+    };
   }
 
   /** Width of single strings as printed (after hScale), e.g. to size a headline line. */

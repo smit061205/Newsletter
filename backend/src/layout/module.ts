@@ -13,6 +13,7 @@
 import type { Element, ImageElement } from "@ck/shared/contract";
 import { columnElements, DISPLAY_SAFETY, r1, splitParagraphs, stackLines, widowed, type Frame } from "./compose.ts";
 import type { Line, Measurer } from "./measure.ts";
+import { setDisplay, type DisplaySpec } from "./display.ts";
 import { normalizeStory } from "./text.ts";
 import { BODY, CAPTION, DECK, GAP, GRID, HEADLINE, KICKER, PHOTO, PT } from "./typography.ts";
 import type { Story } from "../store.ts";
@@ -42,6 +43,8 @@ export interface Module {
   pitch: number;
   /** the headline's size (0 without one) */
   headSize: number;
+  /** the least full display line (headline, kicker, deck), as a share of its width */
+  displayFill: number;
 }
 
 export const spanWidth = (cols: number) => cols * GRID.column + (cols - 1) * GRID.gutter;
@@ -115,38 +118,50 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
   const text = normalizeStory(story); // what's printed: the paper's digits, clean spacing
   const els: Element[] = [];
 
-  // ---- header: kicker, headline, deck -- never larger than the rank allows
+  // ---- header: kicker, headline, deck -- each line fitted to the story's
+  // full width (display.ts), at the largest size the rank allows that fits
   let cursor = GAP.top;
   const hd = HEADLINE.sizeFor(rank, cols);
-  let headSize = hd;
-  const title = text.headline.trim();
-  let headLines: Line[] = [];
-  if (title) {
-    const got = await fitLines(m, title, w, HEADLINE.font, hd, Math.max(HEADLINE.min, hd * 0.75), HEADLINE.maxLines(rank));
-    headSize = got.size;
-    headLines = got.lines;
-  }
+  let headSize = 0;
+  let displayFill = 1;
+  // a block set to fit, else (text too long for the rank's lines) the old
+  // way: lines at their natural width, sized down to fit
+  const display = async (txt: string, idp: string, spec: DisplaySpec, fallbackLines: number) => {
+    const got = await setDisplay(m, txt, spec, `${aid}-${idp}`, aid, 0, cursor, w)
+      ?? (spec.align === "fit" ? await setDisplay(m, txt, { ...spec, maxLines: spec.maxLines + 1, min: spec.min * 0.85 }, `${aid}-${idp}`, aid, 0, cursor, w) : null);
+    if (got) {
+      displayFill = Math.min(displayFill, spec.align === "fit" ? got.fill : 1);
+      return got;
+    }
+    const lines = await fitLines(m, txt, w, spec.font, spec.max, spec.min, fallbackLines);
+    const st = await stackLines(m, lines.lines, `${aid}-${idp}`, aid, 0, cursor, w, spec.font, lines.size, lines.size * spec.leading);
+    displayFill = 0;
+    return { elements: st.elements, bottom: st.bottom, size: lines.size, lines: lines.lines.length, fill: 0 };
+  };
   const kicker = text.kicker.trim();
   if (kicker) {
-    const ks = Math.max(KICKER.min, Math.round(headSize * KICKER.ratio));
-    const got = await fitLines(m, kicker, w, KICKER.font, ks, KICKER.min, 2);
-    const st = await stackLines(m, got.lines, `${aid}-k`, aid, 0, cursor, w, KICKER.font, got.size, got.size * KICKER.leading);
-    els.push(...st.elements);
-    cursor = st.bottom + GAP.afterKicker;
+    const ks = Math.max(KICKER.min, hd * KICKER.ratio);
+    const got = await display(kicker, "k", { font: KICKER.font, max: ks, min: KICKER.min, maxLines: 1, leading: KICKER.leading,
+                                             align: rank <= 2 ? "center" : "left" }, 2);
+    els.push(...got.elements);
+    cursor = got.bottom + GAP.afterKicker;
   }
-  if (headLines.length) {
-    const st = await stackLines(m, headLines, `${aid}-h`, aid, 0, cursor, w, HEADLINE.font, headSize, headSize * HEADLINE.leading);
-    els.push(...st.elements);
-    cursor = st.bottom + GAP.afterHeadline;
+  const title = text.headline.trim();
+  if (title) {
+    const got = await display(title, "h", { font: HEADLINE.font, max: hd, min: Math.max(HEADLINE.min, hd * 0.72),
+                                            maxLines: HEADLINE.maxLines(rank), leading: HEADLINE.leading, align: "fit",
+                                            linesBonus: rank === 1 ? 0.25 : 0 }, HEADLINE.maxLines(rank));
+    els.push(...got.elements);
+    headSize = got.size;
+    cursor = got.bottom + GAP.afterHeadline;
   }
   const headlineHeight = cursor;
   const deck = text.deck.trim();
   if (deck) {
-    const ds = Math.max(DECK.min, Math.round(headSize * DECK.ratio));
-    const got = await fitLines(m, deck, w, DECK.font, ds, DECK.min, 3);
-    const st = await stackLines(m, got.lines, `${aid}-d`, aid, 0, cursor, w, DECK.font, got.size, got.size * DECK.leading);
-    els.push(...st.elements);
-    cursor = st.bottom + GAP.afterDeck;
+    const ds = Math.max(DECK.min, (headSize || hd) * DECK.ratio);
+    const got = await display(deck, "d", { font: DECK.font, max: ds, min: DECK.min, maxLines: 2, leading: DECK.leading, align: "fit" }, 3);
+    els.push(...got.elements);
+    cursor = got.bottom + GAP.afterDeck;
   }
 
   // ---- body lines, measured once
@@ -166,12 +181,12 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
   // landscape picture: a tall one spread across the story would take it over
   const maxShare = photoMode ? Math.min(0.65, PHOTO.maxShare + 0.2) : PHOTO.maxShare;
   const none = (): Module => ({ story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [],
-                                photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize: headLines.length ? headSize : 0 });
+                                photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill });
   if (photoMode && (!photo || photo.width / photo.height < 1.25)) return none();
 
   if (photoMode === 2) {
     const pair = await photoPair(story, cols, cursor, m);
-    if (!pair) return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0 };
+    if (!pair) return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill };
     const tops = Array.from({ length: cols }, () => pair.bottom);
     const { bottom, caps } = balance(tops, lines.length, pitch);
     const out: Element[] = [...pair.elements];
@@ -185,10 +200,10 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
     });
     const height = Math.max(bottom, pair.bottom);
     if (pair.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0) > maxShare * w * height) {
-      return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0 };
+      return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill };
     }
     return { story, rank, cols, variant, photoMode, width: w, height, elements: [...els, ...out], photoDropped: false,
-             headlineHeight, bodyLines: lines.length, pitch, headSize: headLines.length ? headSize : 0 };
+             headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill };
   }
 
   let best: { elements: Element[]; height: number; k: number } | null = null;
@@ -235,13 +250,13 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
   }
   if (!best) {
     // a wide layout that the photo rules don't allow: not an option
-    return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize: headLines.length ? headSize : 0 };
+    return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill };
   }
 
   return {
     story, rank, cols, variant, photoMode, width: w, height: best.height,
     elements: [...els, ...best.elements],
     photoDropped: !!photo && best.k === 0,
-    headlineHeight, bodyLines: lines.length, pitch, headSize: headLines.length ? headSize : 0,
+    headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill,
   };
 }

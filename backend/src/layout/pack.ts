@@ -36,7 +36,8 @@ export interface Obstacle { x0: number; x1: number; y0: number; y1: number }
 
 /** Column spans worth trying for a story of this rank, widest-preferred first. */
 export function spansFor(rank: number): number[] {
-  return [[5, 4, 6, 8, 3], [4, 3, 5, 2], [3, 2, 4], [2, 3, 1], [1, 2]][Math.min(rank, 5) - 1];
+  // a headline in one column is only for a brief: anything bigger gets two at least
+  return [[4, 5, 6, 3, 8], [4, 3, 5, 2], [3, 2, 4], [2, 3], [1, 2]][Math.min(rank, 5) - 1];
 }
 
 /** A story's rank on its page: the page's lead is 1; short items are briefs. */
