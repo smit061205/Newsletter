@@ -10,6 +10,7 @@
 //            no backend (--push commits and pushes it; --force if NOT READY;
 //            --keep N days on the site, 14 by default)
 //   serve    run the API for the website (and the 8 PM job)
+//   status   every day in the database: releases, stories, built issues
 import { ingestDay } from "./ingest/gujaratInfo.ts";
 import { Store } from "./store.ts";
 
@@ -56,13 +57,29 @@ async function main() {
                                        keep: flag("keep") ? Number(flag("keep")) : undefined });
       break;
     }
+    case "status": {
+      // every day that has anything: what's there, and the latest build
+      const count = (table: string) => new Map((store.db.prepare(`select date, count(*) n from ${table} group by date`).all() as
+        { date: string; n: number }[]).map((r) => [r.date, r.n]));
+      const releases = count("releases"), stories = count("stories");
+      const days = [...new Set([...releases.keys(), ...stories.keys(),
+        ...(store.db.prepare("select distinct date from issues").all() as { date: string }[]).map((r) => r.date)])].sort();
+      log("date        releases stories  latest issue");
+      for (const d of days) {
+        const got = store.latestIssue(d);
+        const ready = (got?.report as { ready?: boolean } | undefined)?.ready;
+        log(`${d}  ${String(releases.get(d) ?? 0).padStart(8)} ${String(stories.get(d) ?? 0).padStart(7)}  ` +
+            (got ? `v${got.version} ${got.status}${ready === undefined ? "" : ready ? ", READY" : ", NOT READY"}` : "-"));
+      }
+      break;
+    }
     case "serve": {
       const { serve } = await import("./server.ts");
       await serve(store, { port: Number(flag("port") ?? process.env.PORT ?? 4000), host: process.env.HOST?.trim() || undefined, log });
       return;
     }
     default:
-      log("usage: cli.ts ingest|rewrite|build|all|publish|serve [--date YYYY-MM-DD]");
+      log("usage: cli.ts ingest|rewrite|build|all|publish|serve|status [--date YYYY-MM-DD]");
       process.exitCode = 2;
   }
 }

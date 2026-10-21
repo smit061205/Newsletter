@@ -9,6 +9,7 @@
 //   POST  /api/releases                one release, JSON (an editor's upload, or the browser reader)
 //   GET   /api/export/:date.svg?page=N an editable SVG of one page (CorelDRAW)
 //   GET   /healthz                     "ok" (for the host's health check)
+//   GET   /reader                      the release reader: a bookmark that sends the release page you're reading here
 //
 // With BACKEND_API_TOKEN set, every POST needs "Authorization: Bearer <token>"
 // (builds and edits cost AI credit; approval publishes). Reads stay open: the
@@ -72,6 +73,44 @@ export async function acceptRelease(store: Store, u: UploadedRelease): Promise<R
   store.putRelease(release);
   return release;
 }
+
+/** The release reader: a bookmark to keep in your own browser. On a press
+ * release page of gujaratinformation.gujarat.gov.in it reads what's on the
+ * page -- headline, sub-heading, date line, paragraphs, photos (scaled to at
+ * most 1800px wide, enough for 200 ppi across four columns) -- and hands it
+ * to this server through /ingest in a new tab (the release page's security
+ * policy doesn't let it call a local server directly); then, if you like,
+ * it opens the previous release. One page at a time, read by you: the
+ * site's block on automated readers is respected, not worked around. */
+function readerPage(req: IncomingMessage): string {
+  const origin = `http://${req.headers.host ?? "localhost:4000"}`;
+  const token = process.env.BACKEND_API_TOKEN?.trim();
+  const target = `${origin}/ingest${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  const js = `(function(){var q=function(s){var e=document.querySelector(s);return e?e.textContent.replace(/\\s+/g," ").trim():""};` +
+    `var headline=q(".ttm-service-single-content-area .title h4");` +
+    `if(!headline){alert("Capital Kranti: open a press release page (PressReleaseDetails) first, and wait for its text to appear.");return}` +
+    `var id=Number(new URL(location.href).searchParams.get("id"));var desc=document.querySelector(".ttm-service-description");` +
+    `var paras=desc?Array.prototype.map.call(desc.querySelectorAll("p"),function(p){return p.textContent.replace(/\\s+/g," ").trim()}).filter(Boolean):[];` +
+    `var photos=[];(desc?Array.prototype.slice.call(desc.querySelectorAll("img")):[]).filter(function(i){return i.naturalWidth>=300}).slice(0,4).forEach(function(img,k){` +
+    `try{var s=Math.min(1,1800/img.naturalWidth),c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*s);c.height=Math.round(img.naturalHeight*s);` +
+    `c.getContext("2d").drawImage(img,0,0,c.width,c.height);photos.push({name:k+".jpg",base64:c.toDataURL("image/jpeg",0.85).split(",")[1]})}catch(e){}});` +
+    `var data={id:id,url:location.href,dateLine:q(".ReleaseDateSubHeaddateTime"),headline:headline,subhead:q("h5.subtitle"),paras:paras,photos:photos};` +
+    `window.open(${JSON.stringify(target)}+"#"+encodeURIComponent(JSON.stringify(data)),"_blank");` +
+    `if(confirm("Sent release "+id+" ("+data.dateLine+", "+photos.length+" photo(s)). Open the previous release?"))location.href=location.href.replace(/id=\\d+/,"id="+(id-1))})();`;
+  return `<!doctype html><meta charset="utf-8"><title>Capital Kranti release reader</title>
+<style>body{font:16px/1.5 system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px;color:#1f1f24}
+a.bm{display:inline-block;padding:10px 18px;background:#2e3092;color:#fff;border-radius:6px;text-decoration:none;font-weight:600}</style>
+<h1>Release reader</h1>
+<p>Drag this button to your browser's bookmarks bar:</p>
+<p><a class="bm" href="${esc(`javascript:${js}`)}">Send to Capital Kranti</a></p>
+<ol><li>Keep this server running.</li>
+<li>Open a press release on <a href="https://gujaratinformation.gujarat.gov.in" target="_blank">gujaratinformation.gujarat.gov.in</a> (a <code>PressReleaseDetails</code> page, Gujarati) and wait for its text.</li>
+<li>Click the bookmark. The release is stored for the date on its date line; a tab opens briefly to confirm.</li>
+<li>Choose OK to open the previous release (ids run in order across departments), and repeat for the whole day.</li></ol>
+<p>Then: <code>cli.ts rewrite --date YYYY-MM-DD</code> and <code>cli.ts build --date YYYY-MM-DD</code>.</p>`;
+}
+
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 /** Calls `job` once a day at 20:00 Asia/Kolkata. */
 function everyEvening(job: () => Promise<void>, log: (s: string) => void) {
@@ -142,6 +181,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           return send(res, 200, r.report);
         }
       }
+      if (req.method === "GET" && url.pathname === "/reader") return send(res, 200, readerPage(req), "text/html; charset=utf-8");
       if (req.method === "GET" && url.pathname === "/ingest") {
         // A hand-off page for reading releases in a browser: a release page
         // can't call this server (browsers keep public pages off local
@@ -157,7 +197,9 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
               const r = await fetch("/api/releases", { method: "POST", headers, body });
               const j = await r.json();
               document.title = r.ok ? "stored " + j.id : "error";
-              o.textContent = JSON.stringify(j);
+              o.textContent = r.ok ? "Stored release " + j.id + " for " + j.date + " (" + j.photos + " photo(s)). This tab closes itself."
+                                   : JSON.stringify(j);
+              if (r.ok) setTimeout(() => window.close(), 1500);
             } catch (e) { document.title = "error"; o.textContent = String(e); }
           })();
         </script>`, "text/html; charset=utf-8");
