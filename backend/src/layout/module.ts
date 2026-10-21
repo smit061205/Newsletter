@@ -13,6 +13,7 @@
 import type { Element, ImageElement } from "@ck/shared/contract";
 import { columnElements, DISPLAY_SAFETY, r1, splitParagraphs, stackLines, widowed, type Frame } from "./compose.ts";
 import type { Line, Measurer } from "./measure.ts";
+import { normalizeStory } from "./text.ts";
 import { BODY, CAPTION, DECK, GAP, GRID, HEADLINE, KICKER, PHOTO, PT } from "./typography.ts";
 import type { Story } from "../store.ts";
 
@@ -111,20 +112,21 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
                                   photoMode: PhotoMode = 0, pitch = BODY.pitch): Promise<Module> {
   const aid = story.id;
   const w = spanWidth(cols);
+  const text = normalizeStory(story); // what's printed: the paper's digits, clean spacing
   const els: Element[] = [];
 
   // ---- header: kicker, headline, deck -- never larger than the rank allows
   let cursor = GAP.top;
   const hd = HEADLINE.sizeFor(rank, cols);
   let headSize = hd;
-  const title = story.headline?.trim();
+  const title = text.headline.trim();
   let headLines: Line[] = [];
   if (title) {
     const got = await fitLines(m, title, w, HEADLINE.font, hd, Math.max(HEADLINE.min, hd * 0.75), HEADLINE.maxLines(rank));
     headSize = got.size;
     headLines = got.lines;
   }
-  const kicker = story.kicker?.trim();
+  const kicker = text.kicker.trim();
   if (kicker) {
     const ks = Math.max(KICKER.min, Math.round(headSize * KICKER.ratio));
     const got = await fitLines(m, kicker, w, KICKER.font, ks, KICKER.min, 2);
@@ -138,7 +140,7 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
     cursor = st.bottom + GAP.afterHeadline;
   }
   const headlineHeight = cursor;
-  const deck = story.deck?.trim();
+  const deck = text.deck.trim();
   if (deck) {
     const ds = Math.max(DECK.min, Math.round(headSize * DECK.ratio));
     const got = await fitLines(m, deck, w, DECK.font, ds, DECK.min, 3);
@@ -148,9 +150,9 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
   }
 
   // ---- body lines, measured once
-  const paras = splitParagraphs(story.bodies[variant]);
+  const paras = splitParagraphs(text.bodies[variant]);
   const [lines] = paras.length
-    ? await m.breakLines([{ paras, width: GRID.column, font: BODY.font, size: BODY.size, indent: BODY.indent }])
+    ? await m.breakLines([{ paras, width: GRID.column, font: BODY.font, size: BODY.size, indent: BODY.indent, optimal: true }])
     : [[] as Line[]];
 
   // ---- photo options: natural shape, the print desk's rules
@@ -203,7 +205,7 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
                                   width: r1(pw), height: r1(ph), url: story.photo!, fit: "cover" };
       out.push(img);
       photoBottom = cursor + ph + GAP.afterPhoto;
-      const caption = story.caption?.trim();
+      const caption = text.caption.trim();
       if (caption) {
         const [cl] = await m.breakLines([{ paras: [caption], width: pw, font: CAPTION.font, size: CAPTION.size, safety: DISPLAY_SAFETY }]);
         const st = await stackLines(m, cl, `${aid}-cap`, aid, px, photoBottom, pw, CAPTION.font, CAPTION.size, CAPTION.pitch);

@@ -10,6 +10,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import type { Font, TextRun } from "@ck/shared/contract";
 import { assetFile, PLOT_ORIGIN, PUBLIC_DIR } from "../config.ts";
 import { BharatiEncoder } from "../fonts/bharati.ts";
+import { breakParagraph } from "./linebreak.ts";
 
 /** How each font's text is written: in Unicode, or in a legacy font's own
  * glyph codes -- and which font sets Latin letters and digits for it. */
@@ -34,6 +35,9 @@ export interface BreakRequest {
   /** Share of the width a line may fill (default SAFETY). Display lines are
    * single elements with nothing to give: they keep a wider margin. */
   safety?: number;
+  /** Total-fit breaking for justified text (linebreak.ts), every line then
+   * spread to exactly the width; otherwise greedy, lines at natural width. */
+  optimal?: boolean;
 }
 
 export interface Line {
@@ -48,6 +52,12 @@ export interface Line {
   end: boolean;
   /** Natural width (after hScale). */
   width: number;
+  /** Word spaces in the line, and the letters spacing goes between (for
+   * spreading it to a width: linebreak.ts spread()). */
+  spaces: number;
+  letters: number;
+  /** The font's space at this size. */
+  spaceWidth: number;
 }
 
 // A line must come out no wider than this share of its box: Chromium's own
@@ -164,61 +174,86 @@ export class Measurer {
     return new Measurer(browser, page, faces);
   }
 
-  /** Greedy line breaking, many requests per round trip. A word longer than
-   * the whole width gets a line to itself (and its width says it overflows).
-   * Widths are measured on the text as printed (see shape()). */
+  /** Lines of text, many requests per round trip: Chromium measures every
+   * word once (its width, and how many letters letter spacing applies to),
+   * then the breaks are chosen here -- total-fit for justified text
+   * (`optimal`), greedy otherwise. A word longer than the whole width gets
+   * a line to itself (and its width says it overflows). Widths are measured
+   * on the text as printed (see shape()). */
   async breakLines(requests: BreakRequest[]): Promise<Line[][]> {
     const reqs = requests.map((r) => ({
-      width: r.width, size: r.size, hScale: r.hScale ?? 1, indent: r.indent ?? 0, safety: r.safety ?? SAFETY,
+      size: r.size, hScale: r.hScale ?? 1,
       base: family(r.font),
       space: this.shape(" ", r.font)[0].text,
       paras: r.paras.map((p) => p.split(/\s+/).filter(Boolean).map((w) => ({
         word: w, runs: this.shape(w, r.font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? r.font) })),
       }))),
     }));
-    const raw = await this.page.evaluate(({ reqs }) => {
-      const ctx = document.createElement("canvas").getContext("2d")!;
-      return reqs.map((r) => {
-        const width = (runs: { text: string; family: string }[]) => runs.reduce((a, x) => {
-          ctx.font = `${r.size}px "${x.family}"`;
-          return a + ctx.measureText(x.text).width;
-        }, 0) * r.hScale;
-        ctx.font = `${r.size}px "${r.base}"`;
-        const spaceW = ctx.measureText(r.space).width * r.hScale;
-        const out: { words: number[]; para: number; start: boolean; end: boolean; width: number }[] = [];
-        r.paras.forEach((words, pi) => {
-          const ws = words.map((w) => width(w.runs));
-          let cur: number[] = [];
-          let curW = 0;
-          let first = true;
-          ws.forEach((wWidth, i) => {
-            const candW = cur.length ? curW + spaceW + wWidth : wWidth;
-            const avail = (r.width - (first ? r.indent : 0)) * r.safety;
-            if (!cur.length || candW <= avail) {
-              cur.push(i);
-              curW = candW;
-            } else {
-              out.push({ words: cur, para: pi, start: first, end: false, width: curW });
-              cur = [i];
-              curW = wWidth;
-              first = false;
-            }
-          });
-          if (cur.length) out.push({ words: cur, para: pi, start: first, end: true, width: curW });
-        });
-        return out;
-      });
+    const measured = await this.page.evaluate(({ reqs }) => {
+      const ctx = document.createElement("canvas").getContext("2d")! as CanvasRenderingContext2D & { letterSpacing: string };
+      const TEST = 10;
+      const measure = (runs: { text: string; family: string }[], size: number) => {
+        let w = 0;
+        let spaced = 0;
+        for (const x of runs) {
+          ctx.font = `${size}px "${x.family}"`;
+          ctx.letterSpacing = "0px";
+          const plain = ctx.measureText(x.text).width;
+          ctx.letterSpacing = `${TEST}px`;
+          spaced += ctx.measureText(x.text).width - plain;
+          w += plain;
+        }
+        ctx.letterSpacing = "0px";
+        return { w, letters: Math.round(spaced / TEST) };
+      };
+      return reqs.map((r) => ({
+        space: measure([{ text: r.space, family: r.base }], r.size).w * r.hScale,
+        paras: r.paras.map((words) => words.map((w) => {
+          const m = measure(w.runs, r.size);
+          return { width: m.w * r.hScale, letters: m.letters };
+        })),
+      }));
     }, { reqs });
-    return raw.map((lines, ri) => lines.map((l) => {
-      const words = reqs[ri].paras[l.para];
-      const runs: Run[] = [];
-      l.words.forEach((wi, k) => {
-        if (k) runs.push({ text: reqs[ri].space });
-        for (const x of words[wi].runs) runs.push(x.font ? { text: x.text, font: x.font } : { text: x.text });
+
+    return requests.map((req, ri) => {
+      const r = reqs[ri];
+      const { space, paras } = measured[ri];
+      const width = req.width;
+      const indent = req.indent ?? 0;
+      const safety = req.safety ?? SAFETY;
+      const out: Line[] = [];
+      paras.forEach((words, pi) => {
+        let starts: number[];
+        if (req.optimal) {
+          starts = breakParagraph(words, space, req.size, width - indent, width);
+        } else {
+          starts = [0];
+          let cur = 0;
+          words.forEach((w, i) => {
+            if (i === 0) { cur = w.width; return; }
+            const avail = (width - (starts.length === 1 ? indent : 0)) * safety;
+            if (cur + space + w.width <= avail) cur += space + w.width;
+            else { starts.push(i); cur = w.width; }
+          });
+        }
+        starts.forEach((i, k) => {
+          const j = starts[k + 1] ?? words.length;
+          const runs: Run[] = [];
+          for (let wi = i; wi < j; wi++) {
+            if (wi > i) runs.push({ text: r.space });
+            for (const x of r.paras[pi][wi].runs) runs.push(x.font ? { text: x.text, font: x.font } : { text: x.text });
+          }
+          const spaces = j - i - 1;
+          out.push({
+            text: r.paras[pi].slice(i, j).map((w) => w.word).join(" "), runs: mergeRuns(runs), para: pi,
+            start: k === 0, end: j === words.length,
+            width: words.slice(i, j).reduce((a, w) => a + w.width, 0) + spaces * space,
+            spaces, letters: words.slice(i, j).reduce((a, w) => a + w.letters, 0) + spaces - 1, spaceWidth: space,
+          });
+        });
       });
-      return { text: l.words.map((wi) => words[wi].word).join(" "), runs: mergeRuns(runs),
-               para: l.para, start: l.start, end: l.end, width: l.width };
-    }));
+      return out;
+    });
   }
 
   /** Width of single strings as printed (after hScale), e.g. to size a headline line. */

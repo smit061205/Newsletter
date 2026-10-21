@@ -10,6 +10,7 @@
 // leading and steps the body size down. What still doesn't fit is reported
 // (overflow, with the leftover text), never dropped silently.
 import type { Element, TextElement } from "@ck/shared/contract";
+import { spread } from "./linebreak.ts";
 import { elementText, topFor, type Line, type Measurer } from "./measure.ts";
 import { BODY, CAPTION, DECK, GAP, GRID, HEADLINE, INK, KICKER, PHOTO, PT } from "./typography.ts";
 
@@ -46,6 +47,9 @@ export interface Composed {
 export interface Frame { x: number; y: number; w: number; h: number }
 
 export const r1 = (v: number) => Math.round(v * 10) / 10;
+const r2 = (v: number) => Math.round(v * 100) / 100;
+const r3 = (v: number) => Math.round(v * 1000) / 1000;
+const r4 = (v: number) => Math.round(v * 10000) / 10000;
 export const DISPLAY_SAFETY = 0.98;
 
 export function splitParagraphs(text: string): string[] {
@@ -97,36 +101,32 @@ function balancedCaps(frames: Frame[], pitch: number, n: number): number[] {
   return capsAt(hi);
 }
 
-/** The body lines of one column as text elements: lines continuing a
- * paragraph from the column before get their own element (no indent), the
- * rest share one with a first-line indent. Inner lines end with "\n" so the
- * plotter stretches them to the column edge; a paragraph's last line isn't,
- * unless the paragraph runs on into the next column. */
+/** The body lines of one column as text elements, one per line, each set
+ * by the backend to exactly its width (linebreak.ts spread(): word spacing,
+ * a little letter spacing and an imperceptible squeeze) -- never left to the
+ * browser's justification, which puts all the slack into word gaps. A
+ * paragraph's first line is indented; its last keeps its natural spacing. */
 export function columnElements(lines: Line[], id: string, aid: string, f: Frame, size: number, pitch: number, legacy: boolean): TextElement[] {
-  const out: TextElement[] = [];
-  const chunks: Line[][] = [];
-  const firstStart = lines.findIndex((l) => l.start);
-  if (firstStart !== 0) chunks.push(lines.slice(0, firstStart === -1 ? lines.length : firstStart));
-  if (firstStart !== -1) chunks.push(lines.slice(firstStart));
-  let row = 0;
-  chunks.forEach((chunk, k) => {
-    if (!chunk.length) return;
-    const pieces: (Line | string)[] = [];
-    chunk.forEach((l, i) => {
-      if (i) pieces.push(l.start ? "\n\n" : "\n");
-      pieces.push(l);
-    });
-    if (!chunk[chunk.length - 1].end) pieces.push("\n");
-    const indented = chunk[0].start;
-    out.push({
-      id: `${id}${k ? "b" : "a"}`, kind: "text", articleId: aid,
-      x: r1(f.x), y: r1(f.y + row * pitch), width: r1(f.w), height: r1(chunk.length * pitch),
-      ...elementText(pieces, legacy), font: BODY.font, size: r1(size), lineHeight: r1(pitch), color: INK, align: "justify",
-      ...(indented ? { indent: r1(BODY.indent) } : {}),
-    });
-    row += chunk.length;
+  return lines.map((l, i) => {
+    const indent = l.start ? BODY.indent : 0;
+    const width = f.w - indent;
+    const base = {
+      id: `${id}l${i}`, kind: "text" as const, articleId: aid,
+      x: r2(f.x + indent), y: r2(f.y + i * pitch), width: r2(width), height: r2(pitch),
+      ...elementText([l], legacy), font: BODY.font, size: r2(size), lineHeight: r2(pitch), color: INK, nowrap: true,
+    };
+    if (l.end && l.width <= width) return { ...base, align: "left" as const };
+    const s = spread({ natural: l.width, spaces: l.spaces, letters: l.letters }, width, size, l.spaceWidth);
+    // one word too short for its line, with no spaces to spread: flush left,
+    // as a typesetter would leave it, rather than letters pulled apart
+    if (!l.spaces && s.ratio > 1) return { ...base, align: "left" as const };
+    return {
+      ...base, align: "justify-all" as const,
+      ...(Math.abs(s.letterSpacing) > 0.005 ? { letterSpacing: r3(s.letterSpacing) } : {}),
+      ...(Math.abs(s.wordSpacing) > 0.005 ? { wordSpacing: r3(s.wordSpacing) } : {}),
+      ...(Math.abs(s.hScale - 1) > 0.0001 ? { hScale: r4(s.hScale) } : {}),
+    };
   });
-  return out;
 }
 
 export async function compose(story: Story, box: Rect, m: Measurer): Promise<Composed> {

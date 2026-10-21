@@ -52,6 +52,11 @@ export const TextElementSchema = z.object({
   // set flush to both edges.
   align: z.enum(["left", "center", "right", "justify", "justify-all"]).optional(),
   letterSpacing: num.optional(),
+  // Extra space added to every word space (on top of the font's own).
+  wordSpacing: num.optional(),
+  // One line set by the backend to exactly its width (its spacing and hScale
+  // already computed): it never wraps, and the plotter checks it fills the box.
+  nowrap: z.boolean().optional(),
   // Horizontal squeeze applied to the glyphs (1 = none), e.g. to match a
   // source face's letter height at the same width.
   hScale: num.positive().optional(),
