@@ -20,13 +20,13 @@
 /** How far each kind of spacing may move, as a share. */
 export const MICRO = {
   /** word space, as a share of the font's own space */
-  spaceMin: 0.8, spaceMax: 2.0,
+  spaceMin: 0.7, spaceMax: 2.0,
   /** letter spacing, in em (the 8 August body runs up to about 0.055) */
-  letterMin: -0.01, letterMax: 0.06,
+  letterMin: -0.02, letterMax: 0.06,
   /** a hard ceiling for letter spacing on a line past its budget */
   letterLimit: 0.08,
   /** horizontal glyph scale */
-  scaleMin: 0.98, scaleMax: 1.02,
+  scaleMin: 0.97, scaleMax: 1.02,
 };
 
 /** A word as measured: its natural width and how many letters letter

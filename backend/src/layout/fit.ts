@@ -101,7 +101,7 @@ async function houseAd(id: string, x: number, y: number, w: number, h: number, m
     const pitchOf = (s: { size: number }) => s.size * 1.35;
     const total = sets.reduce((a, s) => a + pitchOf(s), 0);
     if (total > h - 2 * pad) continue;
-    const out: Element[] = [{ id: `${id}-box`, kind: "rect", x, y, width: w, height: h, stroke: INK, strokeWidth: 1.2 * PT }];
+    const out: Element[] = [{ id: `${id}-box`, kind: "rect", articleId: id, x, y, width: w, height: h, stroke: INK, strokeWidth: 1.2 * PT }];
     let cy = y + (h - total) / 2;
     for (const [i, s] of sets.entries()) {
       const st = await stackLines(m, s.lines, `${id}-l${i}`, id, x + pad, cy, inner, s.font, s.size, pitchOf(s));
@@ -117,11 +117,14 @@ async function houseAd(id: string, x: number, y: number, w: number, h: number, m
  * box allows in fitted display type, centred in a ruled panel -- the way the
  * paper prints "રક્તદાન મહાદાન ચક્ષુદાન શ્રેષ્ઠદાન". The `n`th message first,
  * so a page's fillers differ. Returns the elements and the height used. */
-async function messageFiller(id: string, x: number, y: number, w: number, h: number, n: number, m: Measurer):
-  Promise<{ elements: Element[]; height: number } | null> {
-  const messages = profile.fillers.messages;
-  if (!messages.length || h < 50 * PT || w < GRID.column) return null;
-  const pad = 8 * PT;
+async function messageFiller(id: string, x: number, y: number, w: number, h: number, n: number, m: Measurer, skip: Set<string>):
+  Promise<{ elements: Element[]; height: number; text: string } | null> {
+  // each message once a page while there are others left
+  const fresh = profile.fillers.messages.filter((t) => !skip.has(t));
+  const messages = fresh.length ? fresh : profile.fillers.messages;
+  // down to a one-line strip, the way papers run a slogan across a gap
+  if (!messages.length || h < 28 * PT || w < GRID.column) return null;
+  const pad = Math.min(8 * PT, h * 0.15);
   const inner = w - 2 * pad;
   // a panel no taller than its width allows to look like one: a deeper hole takes more than one
   let boxH = Math.min(h, Math.max(1.6 * w, 120 * PT));
@@ -130,7 +133,7 @@ async function messageFiller(id: string, x: number, y: number, w: number, h: num
   for (let k = 0; k < messages.length; k++) {
     const text = messages[(n + k) % messages.length];
     for (let lines = 1; lines <= 6; lines++) {
-      const got = await setDisplay(m, text, { font: HEADLINE.font, max: Math.min(64 * PT, boxH * 0.4), min: 14 * PT, maxLines: lines,
+      const got = await setDisplay(m, text, { font: HEADLINE.font, max: Math.min(64 * PT, boxH * 0.4), min: 12 * PT, maxLines: lines,
                                              leading: 1.2, align: "fit" }, `${id}-t`, id, 0, 0, inner);
       if (!got || got.lines !== lines || got.bottom > boxH - 2 * pad) continue;
       if (!best || got.size > best.size + 0.5) best = { text, size: got.size, lines, height: got.bottom };
@@ -143,7 +146,7 @@ async function messageFiller(id: string, x: number, y: number, w: number, h: num
   if (!set) return null;
   return {
     elements: [{ id: `${id}-box`, kind: "rect", articleId: id, x, y, width: w, height: boxH, stroke: INK, strokeWidth: 1.5 * PT }, ...set.elements],
-    height: boxH,
+    height: boxH, text: best.text,
   };
 }
 
@@ -165,6 +168,7 @@ export async function closeGaps(plan: PagePlan, ctx: {
   // An empty area `cols` wide from column `col`, `h` tall from `y`: filled
   // with real content, never left blank -- a left-out story that fits, else
   // one summarised by the AI as a brief, else the paper's house ad.
+  const usedMessages = new Set<string>();
   const fillArea = async (col: number, cols: number, y: number, h: number, where: string): Promise<boolean> => {
     for (const s of ctx.leftOut.filter((s) => !used.includes(s))) {
       for (const v of ["long", "medium", "short"] as Variant[]) {
@@ -201,7 +205,8 @@ export async function closeGaps(plan: PagePlan, ctx: {
     const id = `filler-${plan.page}-${extraBlocks.length}`;
     const w = spanWidth(cols);
     const ad = cols >= 3 && h <= 0.6 * w ? await houseAd(id, colX(col), y, w, h, m) : null;
-    const msg = ad ? null : await messageFiller(id, colX(col), y, w, h, plan.page * 3 + extraBlocks.length, m);
+    const msg = ad ? null : await messageFiller(id, colX(col), y, w, h, plan.page * 3, m, usedMessages);
+    if (msg) usedMessages.add(msg.text);
     if (!ad && !msg) return false;
     extra.push(...(ad ?? msg!.elements));
     extraBlocks.push({ x0: colX(col), x1: colX(col) + w, y0: y });
@@ -326,5 +331,6 @@ export async function closeGaps(plan: PagePlan, ctx: {
       for (let c = p.col; c < p.col + p.module.cols; c++) gaps.push({ col: c, y0: p.y + p.module.height, y1: p.y + avail });
     }
   }
+  if (extraBlocks.length > 2) log.push(`  short of copy: ${extraBlocks.length} fillers on this page`);
   return { plan: { ...plan, placed, gaps }, elements: renderPlaced(placed, extra), cost, log, used, factChecks };
 }

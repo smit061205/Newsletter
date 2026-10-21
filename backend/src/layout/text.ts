@@ -28,10 +28,11 @@ export function normalizeText(text: string): string {
   let out = text;
   if (digits && digits !== DIGITS.latin) {
     out = out.replace(/\d+/g, (num, offset: number) => {
-      // the whole number token, e.g. "1800-233-0222" or "2025-26": decide once for it
-      const s = out.slice(0, offset).search(/[\d.,:/-]*$/);
+      // the whole number, e.g. "1800-233-0222", "2025-26" or "98256 08744"
+      // (digit groups split by single spaces): decided once for all of it
+      const s = out.slice(0, offset).search(/(?:\d[\d.,:/ -]*)?$/);
       const tokenStart = s < 0 ? offset : s;
-      const tokenEnd = offset + num.length + (out.slice(offset + num.length).match(/^[\d.,:/-]*\d/)?.[0].length ?? 0);
+      const tokenEnd = offset + num.length + (out.slice(offset + num.length).match(/^(?:[\d.,:/-]| (?=\d))*\d/)?.[0].length ?? 0);
       return belongsToEnglish(out, tokenStart, tokenEnd) ? num : num.replace(/\d/g, (d) => digits[Number(d)]);
     });
   }

@@ -11,10 +11,11 @@ import { chromeFor } from "./chrome/chrome.ts";
 import { Measurer } from "./layout/measure.ts";
 import { reviewPages } from "./editorial/review.ts";
 import { closeGaps } from "./layout/fit.ts";
-import { headlineHeavy, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
+import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
 import { applyTextEdits, dedupe, inPaperLanguage, referenceAds, standInsMovable } from "./layout/stories.ts";
 import { arrangeAds } from "./layout/ads.ts";
 import { findGaps } from "./layout/occupancy.ts";
+import { styleChecks } from "./layout/style.ts";
 import { spanWidth } from "./layout/module.ts";
 import { BODY, DPI, FACES, FONTS, GRID, PAGE, PT } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
@@ -48,6 +49,8 @@ export interface BuildReport {
   review: { page: number; issue: string; where: string; confidence: number; note: string }[];
   /** OpenRouter spend on this build (length fitting), USD */
   cost: number;
+  /** spacing and fill measures, and the loosest body lines (for the editor) */
+  style: ReturnType<typeof styleChecks>["stats"];
 }
 
 export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport }> {
@@ -187,10 +190,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         // they read as one run-on line ("tombstoned")
         if (tombstoned(a, b)) tombstones.push(`p${plan.page} ${ma.story.id}|${mb.story.id}`);
         // a less important story, no wider, with a bigger headline than a more important one
-        if (ma.rank < mb.rank && mb.cols <= ma.cols && mb.headSize > ma.headSize + 0.5 * PT) hierarchy.push(`p${plan.page} ${mb.story.id}>${ma.story.id}`);
+        if (outranks(ma, mb)) hierarchy.push(`p${plan.page} ${mb.story.id}>${ma.story.id}`);
       }
     }
   }
+  // ---- style: what a reader sees (layout/style.ts)
+  const style = styleChecks(issue, result.plans, chrome.map((c) => ({ top: c.bodyTop, bottom: c.bodyBottom })));
   const lead = result.placed.find((p) => p.page === 1 && p.rank === 1);
   const plotterProblems = warnings;
   const allFacts = [...result.factChecks, ...result.placed.flatMap((p) => (p.story.factCheck ? [{ story: p.story.id, detail: p.story.factCheck }] : []))];
@@ -206,6 +211,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     { gate: "4 the lead on page 1; every story placed or left out with a reason", pass: !!lead,
       detail: `lead ${lead?.story.id ?? "missing"}; left out (no room): ${result.leftOut.map((s) => s.id).join(", ") || "none"}` },
     { gate: "6 fact checks: every number in the release", pass: allFacts.length === 0, detail: allFacts.map((f) => `${f.story}: ${f.detail}`).join("; ") || "ok" },
+    ...style.gates,
     { gate: "7 same inputs, same issue", pass: same !== false, detail: same === null ? "first build" : same ? "identical to the last build" : "differs from the last build (inputs or edits changed?)" },
   ];
   const confident = (review?.findings ?? []).filter((f) => f.confidence >= 0.8);
@@ -226,6 +232,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     pdf: pdfPath,
     gates, ready, cost: Math.round((result.spent + (review?.cost ?? 0)) * 10000) / 10000,
     review: review?.findings ?? [],
+    style: style.stats,
   };
   const version = store.saveIssue(date, issue, report);
   log(`built ${date} v${version}: ${report.placed.length} stories placed, ${report.leftOut.length} left out, ` +

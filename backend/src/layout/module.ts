@@ -135,9 +135,13 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
   let displayFill = 1;
   // a block set to fit, else (text too long for the rank's lines) the old
   // way: lines at their natural width, sized down to fit
-  const display = async (txt: string, idp: string, spec: DisplaySpec, fallbackLines: number) => {
-    const got = await setDisplay(m, txt, spec, `${aid}-${idp}`, aid, 0, cursor, w)
-      ?? (spec.align === "fit" ? await setDisplay(m, txt, { ...spec, maxLines: spec.maxLines + 1, min: spec.min * 0.85 }, `${aid}-${idp}`, aid, 0, cursor, w) : null);
+  const display = async (txt: string, idp: string, spec: DisplaySpec, fallbackLines: number, upTo?: number) => {
+    const at = (sp: DisplaySpec) => setDisplay(m, txt, sp, `${aid}-${idp}`, aid, 0, cursor, w);
+    const got = await at(spec)
+      // too short to fill the width at this size: up to `upTo` (one rank up), the size it needs
+      ?? (upTo && upTo > spec.max ? await at({ ...spec, max: upTo, min: spec.max }) : null)
+      // too long: one more line, a little smaller
+      ?? (spec.align === "fit" ? await at({ ...spec, maxLines: spec.maxLines + 1, min: spec.min * 0.85 }) : null);
     if (got) {
       displayFill = Math.min(displayFill, spec.align === "fit" ? got.fill : 1);
       return got;
@@ -159,7 +163,8 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
   if (title) {
     const got = await display(title, "h", { font: HEADLINE.font, max: hd, min: Math.max(HEADLINE.min, hd * 0.72),
                                             maxLines: HEADLINE.maxLines(rank), leading: HEADLINE.leading, align: "fit",
-                                            linesBonus: rank === 1 ? 0.25 : 0 }, HEADLINE.maxLines(rank));
+                                            linesBonus: rank === 1 ? 0.25 : 0 }, HEADLINE.maxLines(rank),
+                        HEADLINE.sizeFor(Math.max(1, rank - 1), cols));
     els.push(...got.elements);
     headSize = got.size;
     cursor = got.bottom + GAP.afterHeadline;

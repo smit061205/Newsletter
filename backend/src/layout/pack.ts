@@ -14,7 +14,7 @@ import type { Ad, Story } from "../store.ts";
 import type { Measurer } from "./measure.ts";
 import { buildModule, place, spanWidth, type Module, type PhotoMode, type Variant } from "./module.ts";
 import { related } from "./stories.ts";
-import { BODY, GAP, GRID, INK } from "./typography.ts";
+import { BODY, GAP, GRID, INK, PT } from "./typography.ts";
 
 export interface Band { top: number; bottom: number }
 
@@ -66,6 +66,10 @@ export function tombstoned(a: PlacedModule, b: PlacedModule): boolean {
   return a.col + a.module.cols === b.col && Math.abs(a.y - b.y) < 2 * BODY.pitch && ha > 0 && hb > 0
     && Math.abs(ha - hb) < 0.15 * Math.max(ha, hb);
 }
+
+/** `b` is less important than `a`, no wider, yet has the bigger headline. */
+export const outranks = (a: Module, b: Module) =>
+  a.rank < b.rank && b.cols <= a.cols && b.headSize > a.headSize + 0.5 * PT;
 
 /** A headline (with kicker) taking over 30% of its story -- briefs aside. */
 export const headlineHeavy = (m: Module) => m.headSize > 0 && m.rank < 5 && m.headlineHeight / m.height > 0.3;
@@ -204,8 +208,13 @@ export class Packer {
                             - (onPage.some((o) => related(o, story)) ? 1.5 : 0)
                             // the desk's rules, as costs the search avoids
                             - (headlineHeavy(mod) ? 4 : 0)
+                            // a headline that can't fill this width: another width, if one works
+                            - (mod.displayFill < 0.97 ? 3 : 0)
+                            // headline sizes follow importance: never a bigger headline than a
+                            // more important story no narrower, nor smaller than a lesser one
+                            - (st.placed.some((q) => outranks(q.module, mod) || outranks(mod, q.module)) ? 4 : 0)
                             - (st.placed.some((q) => tombstoned(q, { module: mod, col: c0, x: colX(c0), y })
-                                                  || tombstoned({ module: mod, col: c0, x: colX(c0), y }, q)) ? 1.2 : 0);
+                                                  || tombstoned({ module: mod, col: c0, x: colX(c0), y }, q)) ? 4 : 0);
               const nst: State = {
                 free, placed: [...st.placed, { module: mod, col: c0, x: colX(c0), y }],
                 used: new Set([...st.used, story.id]), waste: st.waste + stranded,

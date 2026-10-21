@@ -19,7 +19,7 @@ from pdfminer.layout import LAParams, LTChar, LTTextLine
 
 
 def lines_of(pdf):
-    for page in extract_pages(pdf, laparams=LAParams(line_margin=0.1, char_margin=1.0)):
+    for page in extract_pages(pdf, laparams=LAParams(line_margin=0.1, char_margin=1.0, all_texts=True)):
         found = []
 
         def walk(o):
