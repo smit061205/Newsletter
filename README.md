@@ -110,6 +110,11 @@ npm run dev --prefix web          # http://localhost:3000
 ```
 `.claude/launch.json` has both as `backend` and `web-dev`.
 
+### Deploy (website on Vercel, backend on Render)
+- **Backend:** a Render web service built from the root `Dockerfile` (Node 22 + Playwright Chromium), on a paid instance with a **persistent disk mounted at `/var/data`** (`DATA_DIR`). The disk holds the SQLite database, PDFs, page images and release photos; copy the licensed fonts to `/var/data/publications/capital-kranti/fonts/` (never into git). Environment: `OPENROUTER_API_KEY`, `BACKEND_API_TOKEN` (required on every POST). Health check: `/healthz`.
+- **Website:** a Vercel project with root directory `web`, and `BACKEND_API_MODE=live`, `BACKEND_API_URL=<the Render URL>`, `BACKEND_API_TOKEN=<same token>`.
+- The browser hand-off page needs the token too: `/ingest?token=<token>#<json>`.
+
 ### Build an issue by hand
 ```bash
 B="node --experimental-strip-types --experimental-sqlite --no-warnings backend/src/cli.ts"

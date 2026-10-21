@@ -1,0 +1,13 @@
+**/node_modules
+.git
+.next
+web/.next
+out
+archive
+backend/data
+backend/.env
+web/.env*
+*.pdf
+canonical_*.png
+scripts
+docs

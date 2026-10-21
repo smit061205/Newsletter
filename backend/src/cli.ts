@@ -49,7 +49,7 @@ async function main() {
     }
     case "serve": {
       const { serve } = await import("./server.ts");
-      await serve(store, { port: Number(flag("port") ?? 4000), log });
+      await serve(store, { port: Number(flag("port") ?? process.env.PORT ?? 4000), host: process.env.HOST?.trim() || undefined, log });
       return;
     }
     default:
