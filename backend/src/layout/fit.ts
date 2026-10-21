@@ -17,7 +17,7 @@ import type { Ad, Release, Store, Story } from "../store.ts";
 import { stackLines } from "./compose.ts";
 import type { Measurer } from "./measure.ts";
 import { buildModule, spanWidth, type Module, type Variant } from "./module.ts";
-import { colX, renderPlaced, type Band, type PagePlan, type PlacedModule } from "./pack.ts";
+import { colX, outranks, renderPlaced, tombstoned, type Band, type PagePlan, type PlacedModule } from "./pack.ts";
 import { findGaps, type Gap } from "./occupancy.ts";
 import { BODY, DECK, GAP, GRID, HEADLINE, INK, PT } from "./typography.ts";
 
@@ -231,6 +231,48 @@ export async function closeGaps(plan: PagePlan, ctx: {
     return true;
   };
 
+  // Two headlines side by side, starting level, about the same size, read as
+  // one run-on line ("tombstoned"). Fitting sizes every headline to its own
+  // width, so neighbours of the same rank can land within a few points of
+  // each other: the desk's fix -- the less important one at most 0.82x the
+  // other's size, or, if that's below what its sub-heading needs, the other
+  // one larger. Only if the story still fits its space; the rest of the gap
+  // closing then takes up any height it gave back.
+  const detombstone = async () => {
+    for (let round = 0; round < 6; round++) {
+      let changed = false;
+      for (const a of placed) {
+        for (const b of placed) {
+          if (a === b || !tombstoned(a, b)) continue;
+          const aLess = a.module.rank > b.module.rank || (a.module.rank === b.module.rank && a.module.headSize <= b.module.headSize);
+          const [lesser, greater] = aLess ? [a, b] : [b, a];
+          const tries: [PlacedModule, { max?: number; min?: number }][] = [
+            [lesser, { max: greater.module.headSize * 0.82 }],
+            [greater, { min: lesser.module.headSize / 0.82 }],
+          ];
+          for (const [p, head] of tries) {
+            const mod = p.module;
+            const next = await buildModule(mod.story, mod.rank, mod.cols, mod.variant, m, mod.photoMode, mod.pitch, head);
+            const i = placed.indexOf(p);
+            const trial = { ...p, module: next };
+            const others = placed.filter((q) => q !== p);
+            const ok = next.headSize > 0 && next.displayFill >= 0.97 && next.height <= room(p, placed, ads, band, extraBlocks) + 0.5
+              && !others.some((q) => tombstoned(q, trial) || tombstoned(trial, q) || outranks(q.module, next) || outranks(next, q.module));
+            if (!ok) continue;
+            placed[i] = trial;
+            changed = true;
+            note(`  ${mod.story.id}: headline ${(mod.headSize / PT).toFixed(0)}pt -> ${(next.headSize / PT).toFixed(0)}pt (not level with its neighbour's)`);
+            break;
+          }
+          if (changed) break;
+        }
+        if (changed) break;
+      }
+      if (!changed) return;
+    }
+  };
+  await detombstone();
+
   // briefs go into gaps too, so a few passes until nothing changes
   for (let pass = 0; pass < 3; pass++) {
     let changed = false;
@@ -239,11 +281,11 @@ export async function closeGaps(plan: PagePlan, ctx: {
       let mod = p.module;
       if (close(mod, avail)) continue;
       const story = mod.story;
-      const rebuild = (s: Story, v: Variant, pt = BODY.pitch) => buildModule(s, mod.rank, mod.cols, v, m, mod.photoMode, pt);
+      const rebuild = (s: Story, v: Variant, pt = BODY.pitch) => buildModule(s, mod.rank, mod.cols, v, m, mod.photoMode, pt, mod.head);
 
       // a0. display before copy: a landscape picture across the whole story
       if (mod.photoMode === 0 && story.photo && !mod.photoDropped) {
-        const wide = await buildModule(story, mod.rank, mod.cols, mod.variant, m, 1, mod.pitch);
+        const wide = await buildModule(story, mod.rank, mod.cols, mod.variant, m, 1, mod.pitch, mod.head);
         if (fits(wide, avail) && wide.height > mod.height) mod = wide;
       }
       // a. the next longer version
@@ -323,6 +365,8 @@ export async function closeGaps(plan: PagePlan, ctx: {
     if (!changed) break;
   }
 
+  await detombstone();
+
   // anything still empty anywhere on the page -- beside an ad, between
   // stories of different widths -- found on the page as it now stands
   // (layout/occupancy.ts), side-by-side column stretches taken as one area
@@ -342,6 +386,8 @@ export async function closeGaps(plan: PagePlan, ctx: {
     }
     if (!filled) break;
   }
+
+  await detombstone();
 
   // what's still open, for the white-space check
   const gaps: PagePlan["gaps"] = [];

@@ -47,7 +47,13 @@ export interface Module {
   displayFill: number;
   /** the sub-heading's size (0 without one) */
   deckSize: number;
+  /** a headline size band set from outside (layout/fit.ts, so two
+   * neighbours' headlines differ): kept by every rebuild */
+  head?: HeadBand;
 }
+
+/** Bounds on a module's headline size, contract px. */
+export interface HeadBand { max?: number; min?: number }
 
 export const spanWidth = (cols: number) => cols * GRID.column + (cols - 1) * GRID.gutter;
 
@@ -123,7 +129,13 @@ async function photoPair(story: Story, cols: number, y: number, m: Measurer): Pr
 }
 
 export async function buildModule(story: Story, rank: number, cols: number, variant: Variant, m: Measurer,
-                                  photoMode: PhotoMode = 0, pitch = BODY.pitch): Promise<Module> {
+                                  photoMode: PhotoMode = 0, pitch = BODY.pitch, head?: HeadBand): Promise<Module> {
+  const mod = await build(story, rank, cols, variant, m, photoMode, pitch, head);
+  return head ? { ...mod, head } : mod;
+}
+
+async function build(story: Story, rank: number, cols: number, variant: Variant, m: Measurer,
+                     photoMode: PhotoMode, pitch: number, head?: HeadBand): Promise<Module> {
   const aid = story.id;
   const w = spanWidth(cols);
   const text = normalizeStory(story); // what's printed: the paper's digits, clean spacing
@@ -164,10 +176,14 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
   }
   const title = text.headline.trim();
   if (title) {
-    const got = await display(title, "h", { font: HEADLINE.font, max: hd, min: Math.max(HEADLINE.min, hd * 0.72),
+    // the rank's band, or the one set from outside (never below what the sub-heading needs)
+    const floor = DECK.min * 1.3;
+    const hMax = Math.max(floor, head?.max ?? Math.max(hd, head?.min ?? 0));
+    const hMin = Math.min(hMax, Math.max(floor, head?.min ?? Math.max(HEADLINE.min, hMax * 0.72)));
+    const got = await display(title, "h", { font: HEADLINE.font, max: hMax, min: hMin,
                                             maxLines: HEADLINE.maxLines(rank), leading: HEADLINE.leading, align: "fit",
                                             linesBonus: rank === 1 ? 0.25 : 0 }, HEADLINE.maxLines(rank),
-                        HEADLINE.sizeFor(Math.max(1, rank - 1), cols), DECK.min * 1.3);
+                        head?.max ? undefined : HEADLINE.sizeFor(Math.max(1, rank - 1), cols), floor);
     els.push(...got.elements);
     headSize = got.size;
     cursor = got.bottom + GAP.afterHeadline;
