@@ -12,7 +12,9 @@ import { Measurer } from "./layout/measure.ts";
 import { reviewPages } from "./editorial/review.ts";
 import { closeGaps } from "./layout/fit.ts";
 import { headlineHeavy, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
-import { applyTextEdits, dedupe, inPaperLanguage, referenceAds } from "./layout/stories.ts";
+import { applyTextEdits, dedupe, inPaperLanguage, referenceAds, standInsMovable } from "./layout/stories.ts";
+import { arrangeAds } from "./layout/ads.ts";
+import { findGaps } from "./layout/occupancy.ts";
 import { spanWidth } from "./layout/module.ts";
 import { BODY, DPI, FACES, FONTS, GRID, PAGE, PT } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
@@ -36,7 +38,7 @@ export interface BuildReport {
   date: string; version: number; issueNumber: number; pages: number;
   placed: { page: number; story: string; headline: string; variant: string; cols: number; rank: number; source: string }[];
   /** column stretches left empty (taller than 1.5 body lines), pt */
-  whiteSpace: { page: number; col: number; height: number }[];
+  whiteSpace: { page: number; col: number; height: number; y: number }[];
   leftOut: { story: string; headline: string }[];
   warnings: { page: number; elementId?: string; kind: string; detail: string }[];
   pdf: string;
@@ -57,7 +59,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     stories = store.stories(date);
   }
   if (!stories.length) throw new Error(`no stories for ${date}: ingest and rewrite the day first`);
-  let ads = store.ads(date);
+  let ads = standInsMovable(store.ads(date));
   if (!ads.length) {
     ads = referenceAds(date);
     for (const a of ads) store.putAd(a);
@@ -73,6 +75,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const chrome: Awaited<ReturnType<typeof chromeFor>>[] = [];
   try {
     for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m));
+    // the ads the layout may place go to the foot of their page (layout/ads.ts)
+    ads = chrome.flatMap((c, i) => arrangeAds(ads.filter((a) => a.page === i + 1), { top: c.bodyTop, bottom: c.bodyBottom }));
     // content-sized pages (layout/pack.ts): every page packed in turn from the
     // stories not placed yet, most important first
     const edits = store.edits(date);
@@ -131,7 +135,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         ...fit.elements,
       ]);
       for (const p of fit.plan.placed) placed.push({ page: n, story: p.module.story, variant: p.module.variant, cols: p.module.cols, rank: p.module.rank });
-      gaps.push(...fit.plan.gaps.map((g) => ({ page: n, ...g })));
+      // what's empty on the finished page, wherever it is (layout/occupancy.ts)
+      gaps.push(...findGaps(pagesOut.get(n)!, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }).map((g) => ({ page: n, ...g })));
       finalPlans.push(fit.plan);
     }
     result = { pages: pagesOut, placed, gaps, leftOut: pool, plans: finalPlans, spent, factChecks };
@@ -163,7 +168,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   if (m.unencodable.size) log(`  text the paper's fonts can't set (left as typed): ${[...m.unencodable].join(" ")}`);
 
   const pt = 72 / DPI;
-  const whiteSpace = result.gaps.map((g) => ({ page: g.page, col: g.col + 1, height: Math.round((g.y1 - g.y0) * pt * 10) / 10 }));
+  const whiteSpace = result.gaps.map((g) => ({ page: g.page, col: g.col + 1, height: Math.round((g.y1 - g.y0) * pt * 10) / 10,
+                                               y: Math.round(g.y0 * pt * 10) / 10 }));
   const checks = whiteSpace.map((g) => ({ page: g.page, kind: "white-space", detail: `column ${g.col}: ${g.height}pt left empty` }));
   // ---- the release gates: the issue is ready only when every one passes
   const pitch = BODY.pitch;
@@ -192,7 +198,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const same = previous ? JSON.stringify(previous.issue) === JSON.stringify(issue) : null;
   const gates = [
     { gate: "1 plotter: no overflow, overlap, off-page, failed fonts or images", pass: plotterProblems.length === 0, detail: `${plotterProblems.length} warning(s)` },
-    { gate: "2 every column ends within a line of what's below", pass: result.gaps.length === 0, detail: `${result.gaps.length} column gap(s)` },
+    { gate: "2 no empty space on the page (every column filled to what's below)", pass: result.gaps.length === 0,
+      detail: `${result.gaps.length} empty stretch(es)` },
     { gate: "3 no tombstoned headlines", pass: tombstones.length === 0, detail: tombstones.join(", ") || "none" },
     { gate: "3 headline sizes follow importance", pass: hierarchy.length === 0, detail: hierarchy.join(", ") || "ok" },
     { gate: "3 no headline over 30% of its story", pass: headShare.length === 0, detail: headShare.join(", ") || "ok" },

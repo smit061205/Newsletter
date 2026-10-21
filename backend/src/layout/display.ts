@@ -175,9 +175,9 @@ export async function setDisplay(m: Measurer, text: string, spec: DisplaySpec, i
       lineHeight: Math.round(pitch * 100) / 100, color: INK, nowrap: true,
     };
     if (spec.align !== "fit") {
+      // the story's full width, the line centred (or flush left) in it, squeezed only if it must be
       const hScale = Math.min(1, w / l.natural);
-      const shown = l.natural * hScale;
-      return { ...base, x: r1(spec.align === "center" ? x + (w - shown) / 2 : x), width: r1(shown + 0.5), align: "left" as const,
+      return { ...base, x: r1(x), width: r1(w), align: spec.align,
                ...(hScale < 0.9999 ? { hScale: Math.round(hScale * 10000) / 10000 } : {}) };
     }
     const f = fitLine(l.natural, l.letters, l.spaces, size, w);

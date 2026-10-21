@@ -176,12 +176,16 @@ export class Packer {
         const remaining = pool.filter((s) => !st.used.has(s.id));
         const candidates = isLead ? remaining.slice(0, 1)
           : [...new Set([...remaining.slice(0, 4), ...[...remaining].sort((a, b) => a.bodies.long.length - b.bodies.long.length).slice(0, 3)])];
+        // the page's budget keeps copy for the pages after it -- but only as
+        // a preference: a story that fits here is better than a hole
+        for (const strict of [true, false]) {
+        if (!strict && options.length) break;
         for (const story of candidates) {
           const rank = rankOf(story, isLead);
           // the story's own usual size counts against the page's budget,
           // whatever layout it gets: wider photos only use up spare room
           const usual = await this.naturalArea(story, isLead);
-          if (st.area + usual > budget * 1.08 && st.placed.length) continue;
+          if (strict && st.area + usual > budget * 1.08 && st.placed.length) continue;
           const modes: PhotoMode[] = !story.photo ? [0] : (story.photos?.length ?? 0) >= 2 ? [0, 1, 2] : [0, 1];
           for (const k of spansFor(rank)) {
             if (k > run) continue;
@@ -216,6 +220,7 @@ export class Packer {
               break; // the longest version that fits (in this photo layout) is the one worth keeping
             }
           }
+        }
         }
         if (!options.length) {
           // nothing fits this stretch: close it up to the next level and count the space

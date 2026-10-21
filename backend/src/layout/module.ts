@@ -71,16 +71,25 @@ async function fitLines(m: Measurer, text: string, width: number, font: string, 
   return { size: sizes[i], lines: tries[i] };
 }
 
-/** The smallest common bottom at which `n` lines fit in columns starting at `tops`. */
+/** The smallest common bottom at which `n` lines fit in columns starting at
+ * `tops`, and how many lines each column takes: every column ends on that
+ * bottom or one line above it -- the spare lines come off the last columns
+ * one each, never all off the last one (which left it several lines short). */
 function balance(tops: number[], n: number, pitch: number): { bottom: number; caps: number[] } {
   const capsAt = (b: number) => tops.map((t) => Math.max(0, Math.floor((b - t + 0.01) / pitch)));
   const candidates = tops.flatMap((t) => Array.from({ length: n + 1 }, (_, j) => t + j * pitch)).sort((a, b) => a - b);
+  let bottom = Math.max(...tops) + n * pitch;
   for (const b of candidates) {
-    const caps = capsAt(b);
-    if (caps.reduce((a, c) => a + c, 0) >= n) return { bottom: b, caps };
+    if (capsAt(b).reduce((a, c) => a + c, 0) >= n) { bottom = b; break; }
   }
-  const b = Math.max(...tops) + n * pitch;
-  return { bottom: b, caps: capsAt(b) };
+  const caps = capsAt(bottom);
+  let spare = caps.reduce((a, c) => a + c, 0) - n;
+  for (let round = 0; spare > 0 && round < n; round++) {
+    for (let i = caps.length - 1; i >= 0 && spare > 0; i--) {
+      if (caps[i] > 0) { caps[i]--; spare--; }
+    }
+  }
+  return { bottom, caps };
 }
 
 const imageSizes = new Map<string, { width: number; height: number } | null>();
