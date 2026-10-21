@@ -10,15 +10,21 @@ import { assetFile, OUT_DIR, PLOT_ORIGIN } from "./config.ts";
 import { chromeFor } from "./chrome/chrome.ts";
 import { Measurer } from "./layout/measure.ts";
 import { reviewPages } from "./editorial/review.ts";
-import { closeGaps } from "./layout/fit.ts";
-import { headlineHeavy, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
-import { applyTextEdits, dedupe, inPaperLanguage, referenceAds } from "./layout/stories.ts";
+import { writeDeck } from "./editorial/rewrite.ts";
+import { closeGaps, type FillerCount } from "./layout/fit.ts";
+import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
+import { applyTextEdits, dedupe, inPaperLanguage, referenceAds, standInsMovable } from "./layout/stories.ts";
+import { arrangeAds } from "./layout/ads.ts";
+import { findGaps } from "./layout/occupancy.ts";
+import { styleChecks } from "./layout/style.ts";
 import { spanWidth } from "./layout/module.ts";
 import { BODY, DPI, FACES, FONTS, GRID, PAGE, PT } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
 import type { Store, Story } from "./store.ts";
 
-type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean };
+type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
+              /** page images even when the fonts may be served (tests read them) */
+              images?: boolean };
 
 /** Where a day's page images go (served by the API for the website). */
 export const pageImageDir = (date: string) => path.join(OUT_DIR, "pages", profile.id, date);
@@ -34,7 +40,7 @@ export interface BuildReport {
   date: string; version: number; issueNumber: number; pages: number;
   placed: { page: number; story: string; headline: string; variant: string; cols: number; rank: number; source: string }[];
   /** column stretches left empty (taller than 1.5 body lines), pt */
-  whiteSpace: { page: number; col: number; height: number }[];
+  whiteSpace: { page: number; col: number; height: number; y: number }[];
   leftOut: { story: string; headline: string }[];
   warnings: { page: number; elementId?: string; kind: string; detail: string }[];
   pdf: string;
@@ -44,6 +50,8 @@ export interface BuildReport {
   review: { page: number; issue: string; where: string; confidence: number; note: string }[];
   /** OpenRouter spend on this build (length fitting), USD */
   cost: number;
+  /** spacing and fill measures, and the loosest body lines (for the editor) */
+  style: ReturnType<typeof styleChecks>["stats"];
 }
 
 export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport }> {
@@ -55,7 +63,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     stories = store.stories(date);
   }
   if (!stories.length) throw new Error(`no stories for ${date}: ingest and rewrite the day first`);
-  let ads = store.ads(date);
+  let ads = standInsMovable(store.ads(date));
   if (!ads.length) {
     ads = referenceAds(date);
     for (const a of ads) store.putAd(a);
@@ -71,11 +79,24 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const chrome: Awaited<ReturnType<typeof chromeFor>>[] = [];
   try {
     for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m));
+    // the ads the layout may place go to the foot of their page (layout/ads.ts)
+    ads = chrome.flatMap((c, i) => arrangeAds(ads.filter((a) => a.page === i + 1), { top: c.bodyTop, bottom: c.bodyBottom }));
     // content-sized pages (layout/pack.ts): every page packed in turn from the
     // stories not placed yet, most important first
     const edits = store.edits(date);
     const dropped = new Set(edits.filter((e) => e.change.drop).map((e) => e.storyId));
     const releases = new Map(store.releases(date).map((r) => [`r${r.id}`, r]));
+    // every story prints a headline, a sub-heading and its body: a story
+    // without a deck gets its release's own sub-heading, else one written for it
+    for (const s of stories) {
+      if (s.deck?.trim()) continue;
+      const r = releases.get(s.id);
+      const deck = r?.subhead?.trim() || (r ? (await writeDeck(store, s, r, { log }))?.deck : undefined);
+      if (deck) {
+        s.deck = deck;
+        store.putStory(s);
+      }
+    }
     let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && inPaperLanguage(s)))
       .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
       .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
@@ -105,8 +126,11 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       const leftRoom = room.slice(n - 1).reduce((a, b) => a + b, 0);
       const leftCopy = (await Promise.all(pool.map((s, i) => packer.naturalArea(s, i === 0)))).reduce((a, b) => a + b, 0);
       const budget = n === total ? Infinity : room[n - 1] * Math.min(1.05, leftCopy / leftRoom);
+      // what the later pages need kept for them: most of their room (length
+      // fitting grows the stories into the rest)
+      const reserve = room.slice(n).reduce((a, b) => a + b, 0) * 0.7;
       const plan = await packer.packPage(n, pool, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, pageAds,
-                                         { leadFirst: true, budget });
+                                         { leadFirst: true, budget, reserve });
       plans.push(plan);
       pool = pool.filter((s) => !plan.placed.some((p) => p.module.story.id === s.id));
       log(`  page ${n}: ${plan.placed.length} stories, white space ${(plan.waste * 100).toFixed(1)}%: ` +
@@ -114,11 +138,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
             `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" "));
     }
     // close the gaps: grow stories into them, then briefs and the house ad (layout/fit.ts)
+    const fillers: FillerCount = { messages: new Set(), houseAds: 0 };
     for (const plan of plans) {
       const n = plan.page;
       const pageAds = ads.filter((a) => a.page === n);
       const fit = await closeGaps(plan, { band: { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, ads: pageAds,
-                                         store, releases, m, leftOut: pool });
+                                         store, releases, m, leftOut: pool, fillers });
       spent += fit.cost;
       factChecks.push(...fit.factChecks);
       pool = pool.filter((s) => !fit.used.includes(s));
@@ -129,7 +154,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         ...fit.elements,
       ]);
       for (const p of fit.plan.placed) placed.push({ page: n, story: p.module.story, variant: p.module.variant, cols: p.module.cols, rank: p.module.rank });
-      gaps.push(...fit.plan.gaps.map((g) => ({ page: n, ...g })));
+      // what's empty on the finished page, wherever it is (layout/occupancy.ts)
+      gaps.push(...findGaps(fit.blocks, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }).map((g) => ({ page: n, ...g })));
       finalPlans.push(fit.plan);
     }
     result = { pages: pagesOut, placed, gaps, leftOut: pool, plans: finalPlans, spent, factChecks };
@@ -144,7 +170,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
 
   // page images too, for the website: licensed fonts never leave this server
   const restricted = FONTS.some((f) => f.restricted);
-  const { pdf, warnings, images } = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, ...(restricted ? { images: 150 } : {}) });
+  const { pdf, warnings, images } = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, ...(restricted || opts.images ? { images: 150 } : {}) });
   await mkdir(OUT_DIR, { recursive: true });
   const pdfPath = path.join(OUT_DIR, `${profile.id}-${date}.pdf`);
   await writeFile(pdfPath, pdf);
@@ -161,7 +187,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   if (m.unencodable.size) log(`  text the paper's fonts can't set (left as typed): ${[...m.unencodable].join(" ")}`);
 
   const pt = 72 / DPI;
-  const whiteSpace = result.gaps.map((g) => ({ page: g.page, col: g.col + 1, height: Math.round((g.y1 - g.y0) * pt * 10) / 10 }));
+  const whiteSpace = result.gaps.map((g) => ({ page: g.page, col: g.col + 1, height: Math.round((g.y1 - g.y0) * pt * 10) / 10,
+                                               y: Math.round(g.y0 * pt * 10) / 10 }));
   const checks = whiteSpace.map((g) => ({ page: g.page, kind: "white-space", detail: `column ${g.col}: ${g.height}pt left empty` }));
   // ---- the release gates: the issue is ready only when every one passes
   const pitch = BODY.pitch;
@@ -179,10 +206,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         // they read as one run-on line ("tombstoned")
         if (tombstoned(a, b)) tombstones.push(`p${plan.page} ${ma.story.id}|${mb.story.id}`);
         // a less important story, no wider, with a bigger headline than a more important one
-        if (ma.rank < mb.rank && mb.cols <= ma.cols && mb.headSize > ma.headSize + 0.5 * PT) hierarchy.push(`p${plan.page} ${mb.story.id}>${ma.story.id}`);
+        if (outranks(ma, mb)) hierarchy.push(`p${plan.page} ${mb.story.id}>${ma.story.id}`);
       }
     }
   }
+  // ---- style: what a reader sees (layout/style.ts)
+  const style = styleChecks(issue, result.plans, chrome.map((c) => ({ top: c.bodyTop, bottom: c.bodyBottom })));
   const lead = result.placed.find((p) => p.page === 1 && p.rank === 1);
   const plotterProblems = warnings;
   const allFacts = [...result.factChecks, ...result.placed.flatMap((p) => (p.story.factCheck ? [{ story: p.story.id, detail: p.story.factCheck }] : []))];
@@ -190,13 +219,15 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const same = previous ? JSON.stringify(previous.issue) === JSON.stringify(issue) : null;
   const gates = [
     { gate: "1 plotter: no overflow, overlap, off-page, failed fonts or images", pass: plotterProblems.length === 0, detail: `${plotterProblems.length} warning(s)` },
-    { gate: "2 every column ends within a line of what's below", pass: result.gaps.length === 0, detail: `${result.gaps.length} column gap(s)` },
+    { gate: "2 no empty space on the page (every column filled to what's below)", pass: result.gaps.length === 0,
+      detail: `${result.gaps.length} empty stretch(es)` },
     { gate: "3 no tombstoned headlines", pass: tombstones.length === 0, detail: tombstones.join(", ") || "none" },
     { gate: "3 headline sizes follow importance", pass: hierarchy.length === 0, detail: hierarchy.join(", ") || "ok" },
     { gate: "3 no headline over 30% of its story", pass: headShare.length === 0, detail: headShare.join(", ") || "ok" },
     { gate: "4 the lead on page 1; every story placed or left out with a reason", pass: !!lead,
       detail: `lead ${lead?.story.id ?? "missing"}; left out (no room): ${result.leftOut.map((s) => s.id).join(", ") || "none"}` },
     { gate: "6 fact checks: every number in the release", pass: allFacts.length === 0, detail: allFacts.map((f) => `${f.story}: ${f.detail}`).join("; ") || "ok" },
+    ...style.gates,
     { gate: "7 same inputs, same issue", pass: same !== false, detail: same === null ? "first build" : same ? "identical to the last build" : "differs from the last build (inputs or edits changed?)" },
   ];
   const confident = (review?.findings ?? []).filter((f) => f.confidence >= 0.8);
@@ -217,6 +248,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     pdf: pdfPath,
     gates, ready, cost: Math.round((result.spent + (review?.cost ?? 0)) * 10000) / 10000,
     review: review?.findings ?? [],
+    style: style.stats,
   };
   const version = store.saveIssue(date, issue, report);
   log(`built ${date} v${version}: ${report.placed.length} stories placed, ${report.leftOut.length} left out, ` +

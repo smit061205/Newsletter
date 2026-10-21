@@ -7,11 +7,18 @@ import type { Ad, Edit, Story } from "../store.ts";
 
 /** The reference issue's ads, as bookings for `date` (stand-ins until real
  * bookings are uploaded): each creative cut cleanly from the source by
- * scripts/mock_backend/chrome_assets.py, at its printed position. */
+ * scripts/mock_backend/chrome_assets.py, on the page it was printed on. */
 export function referenceAds(date: string): Ad[] {
   const template = JSON.parse(readFileSync(profilePath(profile.chrome), "utf8")) as
     { ads: { id: string; page: number; x: number; y: number; width: number; height: number; url: string }[] };
-  return template.ads.map((a) => ({ ...a, date }));
+  // their sizes, not their 8 August positions: the layout places them
+  return template.ads.map((a) => ({ ...a, date, pinned: false }));
+}
+
+/** Ads stored as stand-ins before they became movable keep moving. */
+export function standInsMovable(ads: Ad[]): Ad[] {
+  const ids = new Set(referenceAds("").map((a) => a.id));
+  return ads.map((a) => (a.pinned === undefined && ids.has(a.id) ? { ...a, pinned: false } : a));
 }
 
 /** Share of words two stories have in common (headline and opening). */

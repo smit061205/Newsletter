@@ -1,0 +1,104 @@
+// Release gates for what a reader sees, measured on the finished issue -- the
+// typographic standard of the 8 August paper, not just "nothing overflows":
+//
+//   S1 body spacing  -- the extra space justification put between words
+//                       (word + letter spacing, in em): even across the page,
+//                       holes rare. The loosest lines are listed for the editor.
+//   S2 display fill  -- every headline, kicker and deck line fills its width.
+//   S4 column ends   -- a story's columns end within one line of each other.
+//   S6 digits        -- numbers in the paper's own digits (English ones aside).
+// (S3, white space, is gate 2: layout/occupancy.ts.)
+import type { IssueRender, TextElement } from "@ck/shared/contract";
+import type { PagePlan } from "./pack.ts";
+import { normalizeText } from "./text.ts";
+import { BODY, GRID, PT } from "./typography.ts";
+
+/** Body lines whose extra word space (em) is past this count as loose. */
+const LOOSE_EM = 0.6;
+/** At most this share of body lines may be loose ... */
+const LOOSE_SHARE = 0.03;
+/** ... and 95% of lines must stay under this. */
+const P95_EM = 0.5;
+/** Every display line must fill at least this share of its width. */
+const FILL = 0.97;
+/** Fillers (house ad, messages) may cover at most this share of a page's story area. */
+const FILLER_SHARE = 0.12;
+
+const isBodyLine = (e: TextElement) => /-c\d+l\d+$/.test(e.id);
+const textOf = (e: TextElement) => (typeof e.text === "string" ? e.text : e.text.map((r) => r.text).join(""));
+
+export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top: number; bottom: number }[]) {
+  const extra: { em: number; page: number; id: string; text: string }[] = [];
+  const columns = new Map<string, number[]>(); // story|column -> bottoms of its lines
+  const latinDigits: string[] = [];
+  for (const page of issue.pages) {
+    for (const e of page.elements) {
+      if (e.kind !== "text" || !e.articleId || e.articleId.startsWith("ad-")) continue;
+      const plain = e.plainText ?? textOf(e);
+      // a number left in Latin digits that the paper prints in its own
+      const digits = (t: string) => t.replace(/[^0-9૦-૯۰-۹]/g, "");
+      if (/[0-9]/.test(plain) && digits(normalizeText(plain)) !== digits(plain)) latinDigits.push(`p${page.number} ${e.id}`);
+      if (!isBodyLine(e)) continue;
+      const col = e.id.replace(/l\d+$/, "");
+      columns.set(col, [...(columns.get(col) ?? []), e.y + e.height]);
+      if (e.align === "justify-all") {
+        extra.push({ em: ((e.wordSpacing ?? 0) + (e.letterSpacing ?? 0)) / e.size, page: page.number, id: e.id, text: plain });
+      }
+    }
+  }
+  const ems = extra.map((x) => x.em).sort((a, b) => a - b);
+  const q = (p: number) => (ems.length ? ems[Math.min(ems.length - 1, Math.floor(p * (ems.length - 1)))] : 0);
+  const loose = extra.filter((x) => x.em > LOOSE_EM).sort((a, b) => b.em - a.em);
+  const looseShare = extra.length ? loose.length / extra.length : 0;
+
+  // the display lines' fill, as each module recorded it
+  const unfilled = plans.flatMap((p) => p.placed.filter((x) => x.module.displayFill < FILL)
+    .map((x) => `p${p.page} ${x.module.story.id} (${Math.round(x.module.displayFill * 100)}%)`));
+
+  // column ends per story: the bottoms of each column's last line
+  const stories = new Map<string, number[]>();
+  for (const [col, bottoms] of columns) {
+    const story = col.replace(/-c\d+$/, "");
+    stories.set(story, [...(stories.get(story) ?? []), Math.max(...bottoms)]);
+  }
+  // one line apart is level enough (at the story's own pitch, up to 2% looser)
+  const ragged = [...stories].filter(([, ends]) => ends.length > 1 && Math.max(...ends) - Math.min(...ends) > BODY.pitch * 1.02 + 0.5)
+    .map(([id, ends]) => `${id} (${((Math.max(...ends) - Math.min(...ends)) / PT).toFixed(0)}pt)`);
+
+  // a page mostly of fillers is a day short of news, not a layout to polish
+  const short = issue.pages.map((page, i) => {
+    const band = bands[i];
+    const ads = page.elements.filter((e) => e.kind === "image" && e.articleId?.startsWith("ad-"))
+      .reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0);
+    const room = (band.bottom - band.top) * (GRID.columns * GRID.column + (GRID.columns - 1) * GRID.gutter) - ads;
+    const fill = page.elements.filter((e) => e.kind === "rect" && e.articleId?.startsWith("filler-"))
+      .reduce((a, e) => a + (e.kind === "rect" ? e.width * e.height : 0), 0);
+    return { page: page.number, share: room > 0 ? fill / room : 0 };
+  }).filter((x) => x.share > FILLER_SHARE);
+
+  // every story: a headline, a smaller sub-heading, then smaller body text
+  const structure = plans.flatMap((p) => p.placed.filter((x) => {
+    const mod = x.module;
+    return !(mod.headSize > 0 && mod.deckSize > 0 && mod.bodyLines > 0
+             && mod.headSize >= mod.deckSize * 1.25 - 0.01 && mod.deckSize >= BODY.size * 1.15 - 0.01);
+  }).map((x) => `p${p.page} ${x.module.story.id}${x.module.deckSize ? "" : " (no sub-heading)"}`));
+
+  const gates = [
+    { gate: "S1 body text evenly spaced (no holes between words)", pass: q(0.95) <= P95_EM && looseShare <= LOOSE_SHARE,
+      detail: `extra word space p50 ${q(0.5).toFixed(2)}em, p95 ${q(0.95).toFixed(2)}em; ${loose.length} loose line(s) ` +
+              `(${(looseShare * 100).toFixed(1)}%, allowed ${LOOSE_SHARE * 100}%)` },
+    { gate: "S2 every headline, kicker and deck line fills its width", pass: unfilled.length === 0, detail: unfilled.join(", ") || "ok" },
+    { gate: "S4 a story's columns end level", pass: ragged.length === 0, detail: ragged.join(", ") || "ok" },
+    { gate: "S5 enough copy for the pages (fillers under 12% of a page)", pass: short.length === 0,
+      detail: short.map((x) => `p${x.page} ${Math.round(x.share * 100)}% fillers -- add releases or print fewer pages`).join("; ") || "ok" },
+    { gate: "S7 every story: headline, smaller sub-heading, smaller body", pass: structure.length === 0, detail: structure.join(", ") || "ok" },
+    { gate: "S6 numbers in the paper's digits", pass: latinDigits.length === 0, detail: latinDigits.slice(0, 8).join(", ") || "ok" },
+  ];
+  return {
+    gates,
+    stats: {
+      wordSpaceEm: { p50: +q(0.5).toFixed(3), p95: +q(0.95).toFixed(3), max: +q(1).toFixed(3) },
+      looseLines: loose.slice(0, 12).map((x) => ({ page: x.page, id: x.id, em: +x.em.toFixed(2), text: x.text })),
+    },
+  };
+}

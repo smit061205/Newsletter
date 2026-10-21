@@ -14,7 +14,7 @@ import type { Ad, Story } from "../store.ts";
 import type { Measurer } from "./measure.ts";
 import { buildModule, place, spanWidth, type Module, type PhotoMode, type Variant } from "./module.ts";
 import { related } from "./stories.ts";
-import { BODY, GAP, GRID, INK } from "./typography.ts";
+import { BODY, GAP, GRID, INK, PT } from "./typography.ts";
 
 export interface Band { top: number; bottom: number }
 
@@ -36,7 +36,8 @@ export interface Obstacle { x0: number; x1: number; y0: number; y1: number }
 
 /** Column spans worth trying for a story of this rank, widest-preferred first. */
 export function spansFor(rank: number): number[] {
-  return [[5, 4, 6, 8, 3], [4, 3, 5, 2], [3, 2, 4], [2, 3, 1], [1, 2]][Math.min(rank, 5) - 1];
+  // a headline in one column is only for a brief: anything bigger gets two at least
+  return [[4, 5, 6, 3, 8], [4, 3, 5, 2], [3, 2, 4], [2, 3], [1, 2]][Math.min(rank, 5) - 1];
 }
 
 /** A story's rank on its page: the page's lead is 1; short items are briefs. */
@@ -65,6 +66,10 @@ export function tombstoned(a: PlacedModule, b: PlacedModule): boolean {
   return a.col + a.module.cols === b.col && Math.abs(a.y - b.y) < 2 * BODY.pitch && ha > 0 && hb > 0
     && Math.abs(ha - hb) < 0.15 * Math.max(ha, hb);
 }
+
+/** `b` is less important than `a`, no wider, yet has the bigger headline. */
+export const outranks = (a: Module, b: Module) =>
+  a.rank < b.rank && b.cols <= a.cols && b.headSize > a.headSize + 0.5 * PT;
 
 /** A headline (with kicker) taking over 30% of its story -- briefs aside. */
 export const headlineHeavy = (m: Module) => m.headSize > 0 && m.rank < 5 && m.headlineHeight / m.height > 0.3;
@@ -111,7 +116,9 @@ export class Packer {
 
   /** Pack one page from `pool` (most important first). */
   async packPage(page: number, pool: Story[], band: Band, ads: Ad[],
-                 opts: { leadFirst: boolean; beam?: number; budget?: number }): Promise<PagePlan> {
+                 opts: { leadFirst: boolean; beam?: number; budget?: number;
+                         /** copy (natural area) that must stay in the pool for the pages after this one */
+                         reserve?: number }): Promise<PagePlan> {
     const gap = GAP.betweenStories;
     const obstacles: Obstacle[] = ads.map((a) => ({ x0: a.x, x1: a.x + a.width, y0: a.y, y1: a.y + a.height }));
     const inCol = (o: Obstacle, c: number) => Math.min(o.x1, colX(c) + GRID.column) - Math.max(o.x0, colX(c)) > 20;
@@ -175,17 +182,28 @@ export class Packer {
         const remaining = pool.filter((s) => !st.used.has(s.id));
         const candidates = isLead ? remaining.slice(0, 1)
           : [...new Set([...remaining.slice(0, 4), ...[...remaining].sort((a, b) => a.bodies.long.length - b.bodies.long.length).slice(0, 3)])];
+        // the page's budget keeps copy for the pages after it -- but only as
+        // a preference: a story that fits here is better than a hole
+        for (const strict of [true, false]) {
+        if (!strict && options.length) break;
         for (const story of candidates) {
           const rank = rankOf(story, isLead);
           // the story's own usual size counts against the page's budget,
           // whatever layout it gets: wider photos only use up spare room
           const usual = await this.naturalArea(story, isLead);
-          if (st.area + usual > budget * 1.08 && st.placed.length) continue;
+          if (strict && st.area + usual > budget * 1.08 && st.placed.length) continue;
+          // over budget only while the later pages keep enough copy to fill
+          if (!strict && poolArea - st.area - usual < (opts.reserve ?? 0)) continue;
           const modes: PhotoMode[] = !story.photo ? [0] : (story.photos?.length ?? 0) >= 2 ? [0, 1, 2] : [0, 1];
           for (const k of spansFor(rank)) {
             if (k > run) continue;
-            const limit = Math.min(...Array.from({ length: k }, (_, i) => limitBelow(c0 + i, y)));
+            const limits = Array.from({ length: k }, (_, i) => limitBelow(c0 + i, y));
+            const limit = Math.min(...limits);
             if (limit - y < minBody) continue;
+            // a story over columns that end at different depths (an ad under
+            // some of them) leaves an L-shaped hole under the rest that no
+            // story can grow into: avoided where another width works
+            const straddle = Math.max(...limits) - limit > minBody;
             for (const mode of modes) for (const variant of VARIANTS) {
               const mod = await this.module(story, rank, k, variant, mode);
               if (y + mod.height > limit) continue; // too tall here: try shorter text
@@ -199,8 +217,14 @@ export class Packer {
                             - (onPage.some((o) => related(o, story)) ? 1.5 : 0)
                             // the desk's rules, as costs the search avoids
                             - (headlineHeavy(mod) ? 4 : 0)
+                            - (straddle ? 2 : 0)
+                            // a headline that can't fill this width: another width, if one works
+                            - (mod.displayFill < 0.97 ? 3 : 0)
+                            // headline sizes follow importance: never a bigger headline than a
+                            // more important story no narrower, nor smaller than a lesser one
+                            - (st.placed.some((q) => outranks(q.module, mod) || outranks(mod, q.module)) ? 4 : 0)
                             - (st.placed.some((q) => tombstoned(q, { module: mod, col: c0, x: colX(c0), y })
-                                                  || tombstoned({ module: mod, col: c0, x: colX(c0), y }, q)) ? 1.2 : 0);
+                                                  || tombstoned({ module: mod, col: c0, x: colX(c0), y }, q)) ? 4 : 0);
               const nst: State = {
                 free, placed: [...st.placed, { module: mod, col: c0, x: colX(c0), y }],
                 used: new Set([...st.used, story.id]), waste: st.waste + stranded,
@@ -215,6 +239,7 @@ export class Packer {
               break; // the longest version that fits (in this photo layout) is the one worth keeping
             }
           }
+        }
         }
         if (!options.length) {
           // nothing fits this stretch: close it up to the next level and count the space

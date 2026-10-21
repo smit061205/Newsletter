@@ -11,13 +11,30 @@
 // Every change is re-measured, so every story still fits exactly.
 import type { Element, TextElement } from "@ck/shared/contract";
 import { fitLength } from "../editorial/rewrite.ts";
+import { setDisplay } from "./display.ts";
 import { profile } from "../profile.ts";
 import type { Ad, Release, Store, Story } from "../store.ts";
 import { stackLines } from "./compose.ts";
 import type { Measurer } from "./measure.ts";
 import { buildModule, spanWidth, type Module, type Variant } from "./module.ts";
 import { colX, renderPlaced, type Band, type PagePlan, type PlacedModule } from "./pack.ts";
+import { findGaps, type Gap } from "./occupancy.ts";
 import { BODY, DECK, GAP, GRID, HEADLINE, INK, PT } from "./typography.ts";
+
+/** Side-by-side column gaps that start and end about level, as areas. */
+function mergeGaps(gaps: Gap[]): { col: number; cols: number; y0: number; y1: number }[] {
+  const out: { col: number; cols: number; y0: number; y1: number }[] = [];
+  for (const g of [...gaps].sort((a, b) => a.col - b.col || a.y0 - b.y0)) {
+    const last = out.find((o) => o.col + o.cols === g.col && Math.abs(o.y0 - g.y0) < BODY.pitch && Math.abs(o.y1 - g.y1) < 2 * BODY.pitch);
+    if (last) {
+      last.cols++;
+      last.y0 = Math.max(last.y0, g.y0);
+      last.y1 = Math.min(last.y1, g.y1);
+    } else out.push({ col: g.col, cols: 1, y0: g.y0, y1: g.y1 });
+  }
+  // the widest first: a story needs the room more than a brief
+  return out.sort((a, b) => b.cols * (b.y1 - b.y0) - a.cols * (a.y1 - a.y0));
+}
 
 export interface FitResult {
   plan: PagePlan;
@@ -26,6 +43,9 @@ export interface FitResult {
   log: string[];
   /** stories used as briefs in gaps */
   used: Story[];
+  /** what fills the page, as boxes: each story's whole rectangle (space
+   * inside a story is the story's), fillers and ads -- for the whitespace map */
+  blocks: Element[];
   factChecks: { story: string; detail: string }[];
 }
 
@@ -84,7 +104,7 @@ async function houseAd(id: string, x: number, y: number, w: number, h: number, m
     const pitchOf = (s: { size: number }) => s.size * 1.35;
     const total = sets.reduce((a, s) => a + pitchOf(s), 0);
     if (total > h - 2 * pad) continue;
-    const out: Element[] = [{ id: `${id}-box`, kind: "rect", x, y, width: w, height: h, stroke: INK, strokeWidth: 1.2 * PT }];
+    const out: Element[] = [{ id: `${id}-box`, kind: "rect", articleId: id, x, y, width: w, height: h, stroke: INK, strokeWidth: 1.2 * PT }];
     let cy = y + (h - total) / 2;
     for (const [i, s] of sets.entries()) {
       const st = await stackLines(m, s.lines, `${id}-l${i}`, id, x + pad, cy, inner, s.font, s.size, pitchOf(s));
@@ -96,8 +116,49 @@ async function houseAd(id: string, x: number, y: number, w: number, h: number, m
   return null;
 }
 
+/** A public-service message (profile fillers.messages), set as large as the
+ * box allows in fitted display type, centred in a ruled panel -- the way the
+ * paper prints "રક્તદાન મહાદાન ચક્ષુદાન શ્રેષ્ઠદાન". The `n`th message first,
+ * so a page's fillers differ. Returns the elements and the height used. */
+async function messageFiller(id: string, x: number, y: number, w: number, h: number, n: number, m: Measurer, skip: Set<string>):
+  Promise<{ elements: Element[]; height: number; text: string } | null> {
+  // each message once a page while there are others left
+  const fresh = profile.fillers.messages.filter((t) => !skip.has(t));
+  const messages = fresh.length ? fresh : profile.fillers.messages;
+  // down to a one-line strip, the way papers run a slogan across a gap
+  if (!messages.length || h < 28 * PT || w < GRID.column) return null;
+  const pad = Math.min(8 * PT, h * 0.15);
+  const inner = w - 2 * pad;
+  // a panel no taller than its width allows to look like one: a deeper hole takes more than one
+  let boxH = Math.min(h, Math.max(1.6 * w, 120 * PT));
+  if (h - boxH < 70 * PT) boxH = h; // what would be left is too thin for another: take it all
+  let best: { text: string; size: number; lines: number; height: number } | null = null;
+  for (let k = 0; k < messages.length; k++) {
+    const text = messages[(n + k) % messages.length];
+    for (let lines = 1; lines <= 6; lines++) {
+      const got = await setDisplay(m, text, { font: HEADLINE.font, max: Math.min(64 * PT, boxH * 0.4), min: 12 * PT, maxLines: lines,
+                                             leading: 1.2, align: "fit" }, `${id}-t`, id, 0, 0, inner);
+      if (!got || got.lines !== lines || got.bottom > boxH - 2 * pad) continue;
+      if (!best || got.size > best.size + 0.5) best = { text, size: got.size, lines, height: got.bottom };
+    }
+    if (best) break; // the first message that fits; the rotation varies them
+  }
+  if (!best) return null;
+  const set = await setDisplay(m, best.text, { font: HEADLINE.font, max: best.size, min: best.size, maxLines: best.lines,
+                                              leading: 1.2, align: "fit" }, `${id}-t`, id, x + pad, y + (boxH - best.height) / 2, inner);
+  if (!set) return null;
+  return {
+    elements: [{ id: `${id}-box`, kind: "rect", articleId: id, x, y, width: w, height: boxH, stroke: INK, strokeWidth: 1.5 * PT }, ...set.elements],
+    height: boxH, text: best.text,
+  };
+}
+
+/** Fillers used so far in the issue (shared by its pages): profile
+ * fillers.maxMessages / maxHouseAds cap them for the whole issue. */
+export interface FillerCount { messages: Set<string>; houseAds: number }
+
 export async function closeGaps(plan: PagePlan, ctx: {
-  band: Band; ads: Ad[]; store: Store; releases: Map<string, Release>; m: Measurer; leftOut: Story[];
+  band: Band; ads: Ad[]; store: Store; releases: Map<string, Release>; m: Measurer; leftOut: Story[]; fillers: FillerCount;
 }): Promise<FitResult> {
   const { band, ads, store, releases, m } = ctx;
   const log: string[] = [];
@@ -111,6 +172,59 @@ export async function closeGaps(plan: PagePlan, ctx: {
   const fits = (mod: Module, avail: number) => mod.height <= avail + 0.5;
   const close = (mod: Module, avail: number) => avail - mod.height < pitch; // within one line
 
+  // An empty area `cols` wide from column `col`, `h` tall from `y`: filled
+  // with real content, never left blank -- a left-out story that fits, else
+  // one summarised by the AI as a brief, else the paper's house ad.
+  const usedMessages = ctx.fillers.messages;
+  const fillArea = async (col: number, cols: number, y: number, h: number, where: string): Promise<boolean> => {
+    for (const s of ctx.leftOut.filter((s) => !used.includes(s))) {
+      for (const v of ["long", "medium", "short"] as Variant[]) {
+        const brief = await buildModule(s, cols >= 3 ? 4 : 5, cols, v, m, 0);
+        if (brief.height <= h) {
+          placed.push({ module: brief, col, x: colX(col), y });
+          used.push(s);
+          log.push(`  ${s.id}: placed ${where}`);
+          return true;
+        }
+      }
+    }
+    for (const s of ctx.leftOut.filter((s) => !used.includes(s))) {
+      const rel = releases.get(s.id);
+      if (!rel) continue;
+      for (const n of [60, 40]) {
+        const got = await fitLength(store, s, rel, n, { log: (x) => log.push(x) });
+        if (!got) break;
+        cost += got.cost;
+        // a brief keeps its sub-heading: every story is headline, sub-heading, body
+        const briefStory: Story = { ...s, kicker: "", photo: null, photos: [],
+                                    bodies: { long: got.body, medium: got.body, short: got.body } };
+        const brief = await buildModule(briefStory, 5, cols, "long", m, 0);
+        if (brief.height <= h) {
+          if (got.factCheck) factChecks.push({ story: s.id, detail: got.factCheck });
+          placed.push({ module: brief, col, x: colX(col), y });
+          used.push(s);
+          log.push(`  ${s.id}: placed as a ${n}-word brief ${where}`);
+          return true;
+        }
+      }
+    }
+    // no copy left for it: the paper's own house ad where it's wide and
+    // shallow, a public-service message otherwise
+    const id = `filler-${plan.page}-${extraBlocks.length}`;
+    const w = spanWidth(cols);
+    const ad = cols >= 3 && h <= 0.6 * w && ctx.fillers.houseAds < profile.fillers.maxHouseAds
+      ? await houseAd(id, colX(col), y, w, h, m) : null;
+    if (ad) ctx.fillers.houseAds++;
+    const msg = ad || usedMessages.size >= profile.fillers.maxMessages ? null
+      : await messageFiller(id, colX(col), y, w, h, plan.page * 3, m, usedMessages);
+    if (msg) usedMessages.add(msg.text);
+    if (!ad && !msg) return false;
+    extra.push(...(ad ?? msg!.elements));
+    extraBlocks.push({ x0: colX(col), x1: colX(col) + w, y0: y });
+    log.push(`  ${ad ? "house ad" : "message"} ${where} (${((ad ? h : msg!.height) / PT).toFixed(0)}pt)`);
+    return true;
+  };
+
   // briefs go into gaps too, so a few passes until nothing changes
   for (let pass = 0; pass < 3; pass++) {
     let changed = false;
@@ -121,6 +235,11 @@ export async function closeGaps(plan: PagePlan, ctx: {
       const story = mod.story;
       const rebuild = (s: Story, v: Variant, pt = BODY.pitch) => buildModule(s, mod.rank, mod.cols, v, m, mod.photoMode, pt);
 
+      // a0. display before copy: a landscape picture across the whole story
+      if (mod.photoMode === 0 && story.photo && !mod.photoDropped) {
+        const wide = await buildModule(story, mod.rank, mod.cols, mod.variant, m, 1, mod.pitch);
+        if (fits(wide, avail) && wide.height > mod.height) mod = wide;
+      }
       // a. the next longer version
       for (let v = NEXT[mod.variant]; v; v = NEXT[v]) {
         const next = await rebuild(story, v);
@@ -189,59 +308,32 @@ export async function closeGaps(plan: PagePlan, ctx: {
         log.push(`  ${story.id}: grew ${((mod.height - p.module.height) / PT).toFixed(0)}pt ` +
                  `(${mod.variant}${mod.story.bodies.long !== p.module.story.bodies.long ? ", refitted" : ""}${mod.pitch !== pitch ? ", pitch +" + ((mod.pitch / pitch - 1) * 100).toFixed(1) + "%" : ""})`);
       }
-      // d. / e. what's still empty under the story gets a brief or the house ad
+      // d. / e. what's still empty under the story gets a story, a brief or a filler
       const left = avail - mod.height - GAP.betweenStories;
       if (left < 4 * pitch) continue;
-      const y = p.y + mod.height + GAP.betweenStories;
-      let filled = false;
-      for (const s of ctx.leftOut.filter((s) => !used.includes(s))) {
-        for (const v of ["long", "medium", "short"] as Variant[]) {
-          const brief = await buildModule(s, 5, mod.cols, v, m, 0);
-          if (brief.height <= left) {
-            placed.push({ module: brief, col: p.col, x: p.x, y });
-            used.push(s);
-            filled = changed = true;
-            log.push(`  ${s.id}: placed as a brief under ${story.id}`);
-            break;
-          }
-        }
-        if (filled) break;
-      }
-      // a left-out story as a two- or three-line brief, summarised by the AI from its release
-      if (!filled) {
-        for (const s of ctx.leftOut.filter((s) => !used.includes(s))) {
-          const rel = releases.get(s.id);
-          if (!rel) continue;
-          for (const n of [60, 40]) {
-            const got = await fitLength(store, s, rel, n, { log: (x) => log.push(x) });
-            if (!got) break;
-            cost += got.cost;
-            const briefStory: Story = { ...s, deck: "", kicker: "", photo: null, photos: [],
-                                        bodies: { long: got.body, medium: got.body, short: got.body } };
-            const brief = await buildModule(briefStory, 5, mod.cols, "long", m, 0);
-            if (brief.height <= left) {
-              if (got.factCheck) factChecks.push({ story: s.id, detail: got.factCheck });
-              placed.push({ module: brief, col: p.col, x: p.x, y });
-              used.push(s);
-              filled = changed = true;
-              log.push(`  ${s.id}: placed as a ${n}-word brief under ${story.id}`);
-              break;
-            }
-          }
-          if (filled) break;
-        }
-      }
-      if (!filled) {
-        const ad = await houseAd(`house-${plan.page}-${i}`, p.x, y, spanWidth(mod.cols), left, m);
-        if (ad) {
-          extra.push(...ad);
-          extraBlocks.push({ x0: p.x, x1: p.x + spanWidth(mod.cols), y0: y });
-          changed = true;
-          log.push(`  house ad under ${story.id} (${(left / PT).toFixed(0)}pt)`);
-        }
-      }
+      if (await fillArea(p.col, mod.cols, p.y + mod.height + GAP.betweenStories, left, `under ${story.id}`)) changed = true;
     }
     if (!changed) break;
+  }
+
+  // anything still empty anywhere on the page -- beside an ad, between
+  // stories of different widths -- found on the page as it now stands
+  // (layout/occupancy.ts), side-by-side column stretches taken as one area
+  const blocksNow = (): Element[] => [
+    ...placed.map((p) => ({ id: p.module.story.id, kind: "rect" as const, x: p.x, y: p.y, width: p.module.width, height: p.module.height })),
+    ...extra.filter((e) => e.kind === "rect"),
+    ...ads.map((a) => ({ id: a.id, kind: "rect" as const, x: a.x, y: a.y, width: a.width, height: a.height })),
+  ];
+  for (let round = 0; round < 16; round++) {
+    const now = blocksNow();
+    const holes = findGaps(now, band).sort((a, b) => a.y0 - b.y0 || a.col - b.col);
+    if (!holes.length) break;
+    let filled = false;
+    for (const area of mergeGaps(holes)) {
+      const top = area.y0 + (area.y0 > band.top + 1 ? GAP.betweenStories : 0);
+      if (await fillArea(area.col, area.cols, top, area.y1 - top, "in an empty area")) { filled = true; break; }
+    }
+    if (!filled) break;
   }
 
   // what's still open, for the white-space check
@@ -255,5 +347,6 @@ export async function closeGaps(plan: PagePlan, ctx: {
       for (let c = p.col; c < p.col + p.module.cols; c++) gaps.push({ col: c, y0: p.y + p.module.height, y1: p.y + avail });
     }
   }
-  return { plan: { ...plan, placed, gaps }, elements: renderPlaced(placed, extra), cost, log, used, factChecks };
+  if (extraBlocks.length > 2) log.push(`  short of copy: ${extraBlocks.length} fillers on this page`);
+  return { plan: { ...plan, placed, gaps }, elements: renderPlaced(placed, extra), cost, log, used, factChecks, blocks: blocksNow() };
 }

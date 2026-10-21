@@ -47,6 +47,8 @@ export interface Ad {
   page: number;
   x: number; y: number; width: number; height: number; // contract px
   url: string;
+  /** false: the layout may place it (layout/ads.ts); otherwise it's booked at x, y */
+  pinned?: boolean;
 }
 
 export interface Edit {

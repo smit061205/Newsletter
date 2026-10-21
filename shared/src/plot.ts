@@ -15,7 +15,7 @@ export interface PlotWarning {
   page: number;
   elementId?: string;
   articleId?: string;
-  kind: "off-page" | "text-overflow" | "image-failed" | "font-failed" | "empty-text" | "overlap";
+  kind: "off-page" | "text-overflow" | "image-failed" | "font-failed" | "empty-text" | "overlap" | "line-fit";
   detail: string;
   /** text-overflow only: how far the text runs past its box, in contract px */
   amount?: number;
@@ -43,6 +43,8 @@ function textHtml(el: TextElement, px: (v: number) => string): string {
     `color:${el.color ?? "#000"}`, `text-align:${el.align === "justify-all" ? "justify" : el.align ?? "left"}`,
   ];
   if (el.letterSpacing) styles.push(`letter-spacing:${px(el.letterSpacing)}`);
+  if (el.wordSpacing) styles.push(`word-spacing:${px(el.wordSpacing)}`);
+  if (el.nowrap) styles.push("white-space:nowrap");
   if (h !== 1) styles.push(`transform:scaleX(${h})`, "transform-origin:0 0");
   if (el.vAlign && el.vAlign !== "top") {
     styles.push("display:flex", "flex-direction:column", `justify-content:${el.vAlign === "middle" ? "center" : "flex-end"}`);
@@ -86,7 +88,9 @@ function textHtml(el: TextElement, px: (v: number) => string): string {
     .join("");
   // text in a legacy font's glyph codes reads as its Unicode to search and screen readers
   const label = el.plainText ? ` role="text" aria-label="${esc(el.plainText)}"` : "";
-  return `<div class="t" data-el="${esc(el.id)}"${label} style="${styles.join(";")}">${body}</div>`;
+  // a line set to fill its box exactly is checked to fill it
+  const fit = el.nowrap && el.align === "justify-all" ? " data-fit" : "";
+  return `<div class="t" data-el="${esc(el.id)}"${fit}${label} style="${styles.join(";")}">${body}</div>`;
 }
 
 /** The element's text as styled runs (a plain string is one unstyled run). */
@@ -196,6 +200,25 @@ const PROBE = `
       if (over > 0.5 * parseFloat(getComputedStyle(el).lineHeight)) {
         var units = Math.round(over * meta.__dpi / 96);
         add("text-overflow", el.dataset.el, "text runs " + units + " px past its box", units);
+      }
+    });
+    // A line the backend set to fill its box exactly must print at that
+    // width: where its last letter ends (less the spacing CSS adds after
+    // it), against the box's right edge, after any squeeze -- within 1 CSS px.
+    document.querySelectorAll("div.t[data-fit]").forEach(function (el) {
+      // from the first letter to the last (not the line's block box, which is always the full width)
+      var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), first = walker.nextNode(), last = first;
+      for (var n = first; n; n = walker.nextNode()) last = n;
+      if (!first) return;
+      var range = document.createRange();
+      range.setStart(first, 0);
+      range.setEnd(last, last.data.length);
+      var box = el.getBoundingClientRect(), squeeze = box.width / el.offsetWidth;
+      var trailing = (parseFloat(getComputedStyle(el).letterSpacing) || 0) * squeeze;
+      var off = range.getBoundingClientRect().right - trailing - box.right;
+      if (Math.abs(off) > 1) {
+        var units = Math.round(Math.abs(off) * meta.__dpi / 96);
+        add("line-fit", el.dataset.el, "line ends " + units + " px " + (off > 0 ? "past" : "short of") + " its box", units);
       }
     });
     // Letters running into other letters, a picture, a rule or a box edge.

@@ -93,7 +93,7 @@ const SCHEMA = {
     properties: {
       kicker: { type: "string", description: "A short line above the headline (4-8 words), or empty" },
       headline: { type: "string", description: "Newspaper headline, 6-14 words" },
-      deck: { type: "string", description: "One supporting line under the headline, or empty" },
+      deck: { type: "string", description: "The sub-heading: one supporting line under the headline, 8-16 words -- always" },
       body_long: { type: "string", description: "The full story, paragraphs separated by a blank line" },
       body_medium: { type: "string", description: "About 60% of body_long" },
       body_short: { type: "string", description: "About 35% of body_long, the essentials" },
@@ -108,9 +108,9 @@ const SYSTEM = `તમે ગાંધીનગરના ગુજરાતી �
 You turn a Gujarat government press release into a newspaper story in clear, formal newspaper Gujarati.
 Rules:
 - Use ONLY facts in the release. Never add names, numbers, dates, places or quotes that are not in it.
-- Keep every number, name and date exactly as in the release (Gujarati digits as in the release).
+- Keep every number, name and date exactly as in the release, written in Gujarati digits (૦-૯) -- except inside English names and codes (ATM 2026, COVID-19).
 - Start body_long with the dateline the release uses (e.g. "ગાંધીનગર, મંગળવાર ::"), if it has one.
-- Headline: active, specific, no exclamation marks. Kicker and deck may be empty.
+- Headline: active, specific, no exclamation marks. Always write a deck (the sub-heading: one line adding the next most important fact). The kicker may be empty.
 - body_medium and body_short are shorter versions of body_long, keeping the most important facts first.
 Return JSON matching the schema.`;
 
@@ -211,6 +211,7 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
   const key = `${story.id}|${words}`;
   const cached = store.fitted(key);
   if (cached) return { body: cached.body, cost: 0, ...(cached.factCheck ? { factCheck: cached.factCheck } : {}) };
+  if (process.env.CK_FAKE_AI === "1") return { body: fakeFit(release, words), cost: 0 };
   const apiKey = env("OPENROUTER_API_KEY");
   if (!apiKey) return null;
   const model = env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
@@ -247,4 +248,70 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
   const factCheck = unknown.length ? `numbers not in the release: ${unknown.join(", ")}` : undefined;
   store.putFitted(key, { body, model, ...(factCheck ? { factCheck } : {}) });
   return { body, cost: data.usage?.cost ?? 0, ...(factCheck ? { factCheck } : {}) };
+}
+
+const DECK_SCHEMA = {
+  name: "deck",
+  strict: true,
+  schema: {
+    type: "object", additionalProperties: false, required: ["deck"],
+    properties: { deck: { type: "string", description: "The sub-heading, one line of 8-16 words" } },
+  },
+};
+
+/** A sub-heading for a story that has none (every story prints headline,
+ * sub-heading, body): written from the release's facts, its numbers checked,
+ * cached per story. Null without an API key or when it can't be trusted. */
+export async function writeDeck(store: Store, story: Story, release: Release,
+                                opts: { log?: (s: string) => void } = {}): Promise<{ deck: string; cost: number } | null> {
+  const key = `${story.id}|deck`;
+  const cached = store.fitted(key);
+  if (cached) return cached.body ? { deck: cached.body, cost: 0 } : null;
+  if (process.env.CK_FAKE_AI === "1") return { deck: release.body.split(/\s+/).slice(0, 10).join(" ").replace(/[,.:;]+$/, ""), cost: 0 };
+  const apiKey = env("OPENROUTER_API_KEY");
+  if (!apiKey) return null;
+  const model = env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
+    body: JSON.stringify({
+      model, temperature: 0.2, usage: { include: true },
+      response_format: { type: "json_schema", json_schema: DECK_SCHEMA },
+      messages: [
+        { role: "system", content: SYSTEM + "\nNow write only the sub-heading (deck) for the story below: one line of 8-16 words that adds " +
+          "the next most important fact after the headline, without repeating it. Return JSON {deck}." },
+        { role: "user", content: `RELEASE:\n${paragraphs(release.body).join("\n\n")}\n\nHEADLINE: ${story.headline}` },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    opts.log?.(`  ${story.id}: sub-heading failed (OpenRouter ${res.status})`);
+    return null;
+  }
+  const data = (await res.json()) as { choices: { message: { content: string } }[]; usage?: { cost?: number } };
+  let deck = "";
+  try {
+    deck = cleanHead(JSON.parse(data.choices[0].message.content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")).deck ?? "");
+  } catch {
+    return null;
+  }
+  const known = digits(`${release.headline} ${release.subhead} ${release.body}`);
+  if ([...digits(deck)].some((n) => !known.has(n))) deck = ""; // a number not in the release: not printed
+  store.putFitted(key, { body: deck, model });
+  return deck ? { deck, cost: data.usage?.cost ?? 0 } : null;
+}
+
+/** TESTS ONLY (CK_FAKE_AI=1): a stand-in for the model's length fit, so the
+ * layout's AI paths run with no network -- the release's own sentences, in
+ * order (from the start again if it's too short), to about `words` words. */
+function fakeFit(release: Release, words: number): string {
+  const paras = paragraphs(release.body);
+  const out: string[][] = [];
+  let n = 0;
+  for (let i = 0; n < words && i < 50 * paras.length; i++) {
+    const p = paras[i % paras.length].split(/\s+/).filter(Boolean).slice(0, words - n);
+    out.push(p);
+    n += p.length;
+  }
+  return out.map((p) => p.join(" ")).join("\n\n").replace(/[^.!?।]$/, (c) => `${c}.`);
 }

@@ -173,6 +173,12 @@ backend/
                             (legacy encoding + Latin runs) -- all in Chromium
     typography.ts           profile values in contract px (PT, GRID, BODY, HEADLINE...)
     module.ts               a story at its natural size (k columns)
+    linebreak.ts            total-fit line breaking + spacing of a justified line (8.6)
+    display.ts              headlines, kickers, decks fitted to the full width (8.7)
+    text.ts                 printed text: the paper's digits, clean spacing
+    ads.ts                  ads as modules at the foot of the page (unless pinned)
+    occupancy.ts            the page's whitespace map (gate 2, gap filling)
+    style.ts                style gates S1-S6
     pack.ts                 page packer (skyline + beam search), tombstone/headline rules
     fit.ts                  gap closing: longer version, AI fit, sentence trim, pitch,
                             briefs, house ad
@@ -259,7 +265,7 @@ The full spec is in **`docs/RENDER_CONTRACT.md`**; the source of truth is `share
 - **Units:** every length is in px at `dpi` (300); 1 px = 0.24 pt.
 - **Document:** `issueDate`, `issueNumber`, `dpi`, `fonts[]`, `pages[]`. Each font has `id`, `url`, `weight` and `style`, plus `restricted` for licensed fonts. Each page has `number`, `width`, `height` and `elements[]`, drawn in order.
 - **Element kinds:**
-  - `text`: `x, y, width, height, text` (a string or runs `[{text, font?, size?, color?}]`), `font, size, lineHeight, color, align` (`left|center|right|justify|justify-all`), and optionally `hScale, letterSpacing, indent, vAlign, plainText`.
+  - `text`: `x, y, width, height, text` (a string or runs `[{text, font?, size?, color?}]`), `font, size, lineHeight, color, align` (`left|center|right|justify|justify-all`), and optionally `hScale, letterSpacing, wordSpacing, indent, vAlign, plainText, nowrap`. `nowrap` marks one line the backend set to its width itself (spacing and squeeze already computed); with `justify-all` the plotter checks it prints at that width.
   - `image`: `url, fit`.
   - `rect`: `fill, stroke, strokeWidth, radius`. The stroke is centred on the edge.
   - `line`: `x1, y1, x2, y2, color, width, dash`.
@@ -276,7 +282,7 @@ The full spec is in **`docs/RENDER_CONTRACT.md`**; the source of truth is `share
   ```
   `backend/src/layout/measure.ts` `topFor()` implements it.
 - **`plainText`:** the Unicode text when `text` is in legacy glyph codes. The plotter exposes it as `aria-label`.
-- **Plotter warnings** (in-page PROBE): `text-overflow`, `overlap` (ink box per word), `off-page`, `image-failed`, `font-failed`, `empty-text`.
+- **Plotter warnings** (in-page PROBE): `text-overflow`, `overlap` (ink box per word), `off-page`, `image-failed`, `font-failed`, `empty-text`, `line-fit` (a fitted line not printing at its width).
 
 ---
 
@@ -341,45 +347,54 @@ The profile is `publications/<id>/profile.json`, validated by `shared/src/profil
 
 ### 8.1 Measurement (`layout/measure.ts`)
 - One long-lived headless Chromium loads the issue's fonts.
-- `breakLines()` breaks lines with canvas `measureText`, which uses the same shaping (HarfBuzz) that Chromium uses on the page. It checks against a 0.995 width safety margin (0.98 for display lines).
+- `breakLines()`: Chromium measures every word once with canvas `measureText` (the same HarfBuzz shaping it uses on the page): its width, and how many letters letter spacing applies to. The breaks are then chosen in Node: **total-fit** for body text (`optimal`, see 8.6), greedy otherwise.
+- `words()`: one text's measured words, for display lines (8.7).
 - `ink()` returns ink extents and font metrics; `widths()` and `imageSize()` are also here.
 
 ### 8.2 Story module (`layout/module.ts`), a story at its natural size
 For a story with a given **rank** (1 = lead … 5 = brief), **column span k**, **variant** (`long|medium|short`) and **photo mode** (0 = beside the text, 1 = across the whole story, 2 = two photos side by side):
-- **Headline:**
-  - size = `capByColumns[k] × rankScale[rank]`. It only ever steps *down*: to stay within `maxLines(rank)`, to avoid a lone last word (a widow), or when a single word is wider than the column;
-  - lines are stacked by measured ink, so descenders always clear the next line (`compose.ts` `stackLines`).
-- **Kicker and deck:** sized from the headline size by their profile ratios.
+- **Headline, kicker, deck:** set by `display.ts` (8.7): every line fitted to the story's full width, at the largest size the rank allows (`capByColumns[k] × rankScale[rank]`; a short headline may go one rank up to fill). Kicker 0.6× and deck 0.45× the headline size; kickers centred over leads (ranks 1-2), flush left otherwise.
+- **Text** is normalised first (`text.ts`): numbers in the paper's digits (English ones like "ATM 2026" stay Latin), clean spacing.
 - **Photo:**
   - natural aspect ratio, nothing cropped in mode 0;
   - must meet the photo rules (minimum height, ppi, share of the story);
   - must not be taller than the text beside it, which would leave a hole;
   - modes 1 and 2 need landscape photos (width/height ≥ 1.25).
-- **Body:** 13 pt on 15.6 pt (or a pitch within 2% from the gap closer), balanced so every column ends on the same line (`balance()`), justified, with first-line indent.
+- **Body:** 13 pt on 15.6 pt (or a pitch within 2% from the gap closer), one element per line, each spread to exactly the column width (8.6); columns balanced so they end at most one line apart (`balance()`); first-line indent.
 - **Result:** exact `width`, `height` and `elements`, positioned at (0, 0); `place()` moves them onto the page.
 
 ### 8.3 Page packing (`layout/pack.ts`)
-- **Fixed blocks:** chrome and ads. Each column's "free y" skips over ads (`settle`).
+- **Fixed blocks:** chrome and ads. Ads are placed first (`ads.ts`): a booking may pin its position; any other ad (the 8 August stand-ins included) is snapped to whole columns, shape kept, and stacked up from the foot of the page, so stories get one unbroken area. Each column's "free y" skips over ads (`settle`).
 - **Skyline:** take the lowest, leftmost open stretch of columns and try candidate stories × spans (`spansFor(rank)`) × photo modes × variants. Keep the longest variant that fits under the next obstacle.
 - **The lead:** the first story placed on each page is that page's lead (rank 1).
 - **Beam search:** keep the 12 best partial pages at each step. A state's score combines:
   - white space already stranded, plus white space projected once the copy still allowed on the page fills the open area;
-  - minus the value of what's placed: importance × length, less penalties for a dropped photo, a related story on the same page (−1.5), a headline over 30% of its story (−4), and tombstoned headlines (−1.2).
-- **Page budgets** (`build.ts`): the day's copy at natural size, divided between pages in proportion to their free room. That stops page 1 from taking everything. Spare room goes to bigger photo layouts.
+  - minus the value of what's placed: importance × length, less penalties for a dropped photo, a related story on the same page (−1.5), a headline over 30% of its story (−4), tombstoned headlines (−4), headline sizes out of importance order (−4), and a headline that can't fill its width (−3, so a narrower span wins).
+- **Page budgets** (`build.ts`): the day's copy at natural size, divided between pages in proportion to their free room. That stops page 1 from taking everything. A budget is a preference: when only an over-budget story fits a stretch, it goes in rather than leaving a hole. No headline in one column except briefs.
 - **Rules between stacked stories:** an 8 pt gap and a 0.75 pt rule (`renderPlaced`).
 
 ### 8.4 Gap closing (`layout/fit.ts`)
 - For each placed story, `room()` measures the space down to the next element below in its columns: a story, an ad, a house ad, or the foot of the band.
 - If more than one line is free, it tries, in order:
+  0. display before copy: a landscape photo across the whole story;
   1. the next longer variant;
   2. **AI `fitLength`** to the word count the gap needs (words per line measured from the story itself). Up to 3 rounds; if the AI overshoots, it asks again for fewer words;
   3. **sentence trim** of the shortest version that overshot: drop whole sentences from the end until it fits exactly. News puts the most important facts first, so the end is what goes;
   4. pitch +≤2%, once.
-- Still more than 4 lines free: place a left-out story as a 60- or 40-word AI brief, or else the **house ad** (a ruled panel, sized to fit).
-- What remains is reported as `white-space` (gate 2).
+- Still more than 4 lines free, and then **every empty area found on the finished page** (`occupancy.ts`: all element boxes on a columns × 2pt grid, so holes beside ads or between stories of different widths count too): a left-out story, else a 60- or 40-word AI brief, else a filler -- the **house ad** where the area is wide and shallow, otherwise a **public-service message** (`fillers.messages` in the profile, e.g. "રક્તદાન મહાદાન ચક્ષુદાન શ્રેષ્ઠદાન") set in fitted display type in a ruled panel. At most **one message and one house ad in a whole issue** (`fillers.maxMessages`, `maxHouseAds`): space is filled with stories, not slogans; a day short of copy fails gate 2 instead.
+- What remains is reported as `white-space` (gate 2). More than 2 fillers on a page is logged as "short of copy" (and gate S5 fails past 12% of the page).
 
 ### 8.5 Chrome (`chrome/chrome.ts`)
 The art is the 8 August masthead and headers with the date, issue number and page number **removed** (PyMuPDF redaction, text only). Today's values are set in Gopika Bold at the printed size, on the printed baseline. Page 1 gets the masthead, inner pages the inner header, and the last page the last-page header plus the legal footer.
+
+### 8.6 Body justification (`layout/linebreak.ts`)
+A browser breaks lines greedily and puts all the slack of a justified line into its word gaps: holes and rivers, worst on lines of two or three long Gujarati words. Instead:
+- **Total-fit breaking** (Knuth & Plass, 1981 -- TeX and InDesign's Paragraph Composer): all of a paragraph's breaks chosen at once, so no line is much looser than the rest. Lines past the budget cost more the further past; a lone word mid-paragraph costs most.
+- **Micro-typography** (pdfTeX's font expansion, after Zapf's hz program): a line's slack is shared between word spacing (70-200% of a space), letter spacing (−0.02 to +0.06 em; the 8 August body letter-spaces up to about 0.055 em) and a glyph scale of 97-102%. Past the budget the letters keep spreading to 0.08 em, then the word spaces take the rest. A lone word too short for its line is set flush left.
+- Each line is one text element (`compose.ts` `columnElements`) with its own `letterSpacing`, `wordSpacing` and `hScale`, `nowrap`, `justify-all`: the browser never reflows it. The plotter's probe reports a fitted line that doesn't print at its width (`line-fit`).
+
+### 8.7 Display type (`layout/display.ts`)
+Headlines, kickers and decks never end ragged: the text is broken into a few balanced lines and each line fitted to the exact measure with horizontal scaling (0.86-1.2) plus letter spacing, at the largest size that allows it (the paper itself scales headlines 0.6-1.4×). A lead's headline prefers two big lines to one long one. Baselines sit on a fixed tight pitch (1.12× the size), opened only where two lines' marks would touch.
 
 ---
 
@@ -405,7 +420,7 @@ All AI calls go through **OpenRouter** (an OpenAI-compatible `chat/completions` 
 Printed at the end of every build and stored in the report (`GET /api/issues/<date>`). The issue is **READY** only if all pass:
 
 1. **Plotter:** no overflow, overlap, off-page, failed font or failed image warnings.
-2. **Every column ends within one body line** of what's below it.
+2. **No empty space on the page:** the whitespace map (`occupancy.ts`) finds no column stretch empty for longer than the story gap plus 1.5 body lines, anywhere.
 3. **Desk rules:**
    - no tombstoned headlines (same size, side by side, starting level);
    - headline sizes follow importance (no less-important, no-wider story with a bigger headline);
@@ -414,6 +429,14 @@ Printed at the end of every build and stored in the report (`GET /api/issues/<da
 5. **The AI page reviewer** reports nothing it is at least 0.8 confident about.
 6. **Fact checks:** every number in a rewritten or fitted story is in its release.
 7. **Determinism:** the same inputs give an identical issue JSON. The gate compares with the previous version, so it legitimately "fails" once after a code or input change.
+
+Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper's standard:
+- **S1 body spacing:** extra word space (word + letter spacing) p95 ≤ 0.5 em, and at most 3% of lines past 0.6 em. The loosest lines are listed in the report (`style.looseLines`) for the editor.
+- **S2 display fill:** every headline, kicker and deck line fills ≥ 97% of its width.
+- **S4 columns:** a story's columns end within one line of each other.
+- **S5 enough copy:** fillers cover under 12% of each page's story area; otherwise the day is short of news (add releases, or print fewer pages).
+- **S6 digits:** no number left in Latin digits that the paper prints in its own.
+- **S7 structure:** every story prints a headline, a smaller sub-heading (deck) and smaller body text: headline ≥ 1.25× the sub-heading, sub-heading ≥ 1.15× the body. A story without a deck gets its release's sub-heading, else one written by the AI (`rewrite.ts` `writeDeck`, cached); the rewrite prompt now always asks for one.
 
 ---
 
@@ -490,7 +513,14 @@ Printed at the end of every build and stored in the report (`GET /api/issues/<da
   ```
   (See the scripts for how the inputs are made.)
 - **Model comparison:** `node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/compare-models.ts <date> <ids...>`
-- **Stale:** `backend/test/recompose-0808.ts` uses the old box composer and the rough 8 August ad regions, so it reports ad overlaps. Replace it (15.9).
+- **Layout test without the licensed fonts:** `backend/test/pack-0808.ts` runs the 8 August stories through the whole engine (packer, gap closer, printer, every gate) in the free fonts of `publications/dev-test` (written by `python3 scripts/dev_profile.py` from the real profile: re-run it after changing the profile). Each story's text stands in as its release and `CK_FAKE_AI=1` stands in for the model (`rewrite.ts` `fakeFit`), so length fitting, briefs and sub-headings run with no network. It exits non-zero if any gate fails. Two pages by default; on three the fixture's copy runs short, which gate 2 reports:
+  ```bash
+  CK_PUBLICATION=dev-test DATA_DIR=/tmp/ck-test \
+    node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/pack-0808.ts   # TEST_PAGES=2 by default
+  ```
+  Page images land in `$DATA_DIR/out/pages/dev-test/2026-08-08/`. `backend/test/gaps.mts <date>` lists a build's empty stretches.
+- **Typography by numbers:** `python3 scripts/replica/style_stats.py <issue.pdf>` prints word gaps, letter spacing, display-line fill, headline sizes and body lines per page, read back from any PDF. The 8 August reference: word gap p50 4.5 / p90 6.7pt, letter spacing up to 0.72pt, display lines 96-100% full, 273-390 body lines a page.
+- **Stale:** `backend/test/recompose-0808.ts` uses the old box composer and the rough 8 August ad regions, so it reports ad overlaps. Superseded by `pack-0808.ts`; remove it (15.9).
 
 ---
 
