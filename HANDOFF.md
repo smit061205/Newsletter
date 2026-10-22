@@ -155,7 +155,7 @@ $B publish --date 2026-10-20 --push
 ## 5. Rules and decisions (don't re-litigate)
 
 - **Don't get around the government site's bot block.** Read pages like a person, through your own browser, or use email or official access.
-- **Never commit the fonts**, `backend/.env` or `backend/data/`. The repo is public.
+- **Never commit** `backend/.env` or `backend/data/`. The repo is public. (The Gopika fonts *are* committed: the paper confirmed it's fine, 22 Oct 2026. Fonts copied from a computer's system folder for a test are not.)
 - **No Anthropic models** for the paper's AI (cost); it uses OpenRouter (GPT-6 Luna, Gemini 3.8 Flash).
 - **At most one slogan panel and one house ad per issue.** Fill space with stories.
 - **Every story is headline, sub-heading, body,** in decreasing sizes. **Kickers are centred.**

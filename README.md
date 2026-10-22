@@ -83,7 +83,7 @@ npx playwright install chromium
 pip install pymupdf pillow fonttools numpy
 ```
 
-### Secrets and licensed files (not in git; you must supply them)
+### Secrets (not in git; you supply them) and the fonts (in git)
 1. **`backend/.env`**:
    ```
    OPENROUTER_API_KEY=sk-or-...
@@ -92,7 +92,7 @@ pip install pymupdf pillow fonttools numpy
    # OPENROUTER_LEAD_MODEL=google/gemini-3.8-flash
    # OPENROUTER_VISION_MODEL=google/gemini-3.8-flash
    ```
-2. **The Gopika fonts**, commercial, from the paper's DTP machine, copied to `publications/capital-kranti/fonts/` with exactly these names:
+2. **The Gopika fonts** are in git (the paper confirmed that's fine), in `publications/capital-kranti/fonts/` under these names (`scripts/install-fonts.mjs <folder>` copies new copies in from the paper's own names):
    - `gopika-two-regular.ttf` (B Bharati GopikaTwo Normal)
    - `gopika-two-bold.ttf` (B Bharati GopikaTwo Bold)
    - `gopika-two-bolditalic.ttf` (B Bharati GopikaTwo BoldItalic)
@@ -129,7 +129,7 @@ The backend runs on your own computer (where the licensed fonts are); the websit
 - Each day adds about 12 MB to the repository (4 page JPEGs of about 1.5 MB, plus the PDF). Older days leave the site but stay in git history. If the repository grows too large, move the files to cheaper storage.
 
 ### Deploy with a hosted backend (website on Vercel, backend on Render, paid)
-- **Backend:** a Render web service built from the root `Dockerfile` (Node 22 + Playwright Chromium), on a paid instance with a **persistent disk mounted at `/var/data`** (`DATA_DIR`). The disk holds the SQLite database, PDFs, page images and release photos; copy the licensed fonts to `/var/data/publications/capital-kranti/fonts/` (never into git). Environment: `OPENROUTER_API_KEY`, `BACKEND_API_TOKEN` (required on every POST). Health check: `/healthz`.
+- **Backend:** a Render web service built from the root `Dockerfile` (Node 22 + Playwright Chromium), on a paid instance with a **persistent disk mounted at `/var/data`** (`DATA_DIR`). The disk holds the SQLite database, PDFs, page images and release photos; the fonts come with the repository. Environment: `OPENROUTER_API_KEY`, `BACKEND_API_TOKEN` (required on every POST). Health check: `/healthz`.
 - **Website:** a Vercel project with root directory `web`, and `BACKEND_API_MODE=live`, `BACKEND_API_URL=<the Render URL>`, `BACKEND_API_TOKEN=<same token>`.
 - The browser hand-off page needs the token too: `/ingest?token=<token>#<json>`.
 
@@ -195,7 +195,7 @@ publications/capital-kranti/
   profile.json              everything that makes Capital Kranti look like itself
   chrome.json               masthead/header/footer art + field positions + stand-in ads
   fonts/bharati.json        learned syllable spellings + glyph table (for the encoder)
-  fonts/*.ttf               LICENSED -- not in git, supply yourself
+  fonts/*.ttf               the Gopika fonts (in git, with the paper's go-ahead)
 web/                        Next.js 16 website (see web/AGENTS.md: this Next differs
                             from older versions -- read node_modules/next/dist/docs)
   src/app/page.tsx          issue viewer (one scaled iframe per page; static mode: published images)

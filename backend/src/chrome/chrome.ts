@@ -65,10 +65,12 @@ async function field(f: Field, id: string, text: string, m?: Measurer): Promise<
     };
   }
   // left-aligned from the printed start, with room to spare: today's text
-  // (other digits, another weekday) is not the printed width
+  // (other digits, another weekday) is not the printed width; in a legacy
+  // font, in its own glyph codes like the rest of the paper
+  const legacy = m && m.isLegacy(f.font) ? elementText((await m.breakLines([{ paras: [text], width: 1e6, font: f.font, size: f.size }]))[0], true) : { text };
   return {
     id, kind: "text", x: f.x, y: f.y, width: Math.round(f.width * 1.4), height: f.height,
-    text, font: f.font, size: f.size, lineHeight: f.lineHeight, color: f.color, align: "left",
+    ...legacy, font: f.font, size: f.size, lineHeight: f.lineHeight, color: f.color, align: "left",
     ...(f.hScale !== 1 ? { hScale: f.hScale } : {}),
   };
 }
