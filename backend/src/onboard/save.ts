@@ -2,7 +2,7 @@
 // chrome template and its assets, written as publications/<id>/ -- the
 // engine then builds it like any other paper (CK_PUBLICATION=<id>), in its
 // own data folder (papers/<id>/) so papers never share a database.
-import { mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PUBLIC_DIR, ROOT } from "../config.ts";
 import type { Band, Draft } from "./extract.ts";
@@ -40,6 +40,10 @@ export async function savePaper(p: NewPaper): Promise<{ id: string; dir: string 
   await mkdir(fontDir, { recursive: true });
   await mkdir(artDir, { recursive: true });
   const legacy = d.language.encoding !== "unicode";
+  // a legacy encoding's table goes with the paper's fonts (the same for every paper using it)
+  if (d.language.encoding === "bharati") {
+    await copyFile(path.join(ROOT, "publications", "capital-kranti", "fonts", "bharati.json"), path.join(fontDir, "bharati.json"));
+  }
 
   // fonts: each role's file; a missing deck or caption font uses the headline's or the body's
   const fonts: Record<string, unknown> = {};

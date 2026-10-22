@@ -485,7 +485,7 @@ async function papersApi(req: IncomingMessage, res: ServerResponse, parts: strin
     for (const id of (await readdir(pubs)).filter((d) => existsSync(path.join(pubs, d, "profile.json")))) {
       const prof = JSON.parse(readFileSync(path.join(pubs, id, "profile.json"), "utf8")) as { name: string; language: { lang: string }; issue: { pages: number } };
       out.push({ id, name: prof.name, lang: prof.language.lang, pages: prof.issue.pages, own: id === (process.env.CK_PUBLICATION?.trim() || "capital-kranti"),
-                 test: id === "dev-test" || id === "sample-english", issue: await issueOf(id) });
+                 test: ["dev-test", "sample-english", "sample-urdu"].includes(id), issue: await issueOf(id) });
     }
     return send(res, 200, out);
   }

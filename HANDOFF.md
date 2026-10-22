@@ -179,3 +179,17 @@ $B publish --date 2026-10-20 --push
    - vowel signs in letter-spaced body lines (Gopika is a legacy font; spacing applies per glyph code);
    - the look of the column rules;
    - the message panel.
+
+
+---
+
+## The newsroom (22 Oct 2026, branch `newsroom`)
+
+What changed, so a later session can carry on:
+- **News is PIB** (`backend/src/ingest/pib.ts`): PIB Ahmedabad's Gujarati releases, topped up with PIB Delhi's Hindi translated into Gujarati (`editorial/translate.ts`) until the pages are full. The state site stays off (PIB only, the user's choice).
+- **One pipeline** (`backend/src/pipeline.ts`) is what the 8 PM run, the newsroom's Run now and `cli.ts all` do; every run is a job with a live log (`/api/events`) and can be retried from a failed step.
+- **The newsroom** (`web/src/app/newsroom/`) runs on the paper's own computer only (`NEWSROOM=1`): Today, News, Stories (edit, rank, photo, drop/restore, Hindi original alongside), Pages (click a story to edit), Ads (book with size and days), Papers (add a newspaper from its PDFs), Settings (run time, OpenRouter key into `backend/.env`).
+- **Apps:** `windows/` and `mac/` installers, both over `scripts/launch.mjs`; CI builds and runs them on Windows and macOS (`.github/workflows/apps.yml`).
+- **New gates:** F (every printed letter in its own font, `fonts/cmap.ts`) and P (print preflight, `export/preflight.ts`). The 8 August test, `sample-english` and the extractor test (`test/extract-0808.ts`) must stay green.
+- **Other papers:** profiles in `publications/<id>/` (from the Papers screen: `onboard/extract.ts`, `onboard/save.ts`), each built in its own process and data folder `papers/<id>/`. `sample-urdu` proves right to left.
+- **Keep:** never two engines on one database (stop with `launch.mjs --stop`, which forces a stuck one); `publish` pushes the current branch, so publish from `main`.
