@@ -31,7 +31,7 @@
       "category": "public.app-category.productivity",
       "target": [{ "target": "dmg" }, { "target": "zip" }],
       "artifactName": "Capital-Kranti-mac-${arch}.${ext}",
-      "identity": null,
+      "identity": "-",
       "hardenedRuntime": false
     },
     "dmg": {
