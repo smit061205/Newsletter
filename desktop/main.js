@@ -9,6 +9,7 @@ const { spawn, execFile, execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
+const { pathToFileURL } = require("node:url");
 
 const REPO = "smit061205/Newsletter";
 // a GitHub OAuth App's client id for "Connect the website" (README: how to make one)
@@ -80,7 +81,10 @@ async function startAll() {
     PLAYWRIGHT_BROWSERS_PATH: "0",
   };
   if (!(await answers(`http://127.0.0.1:${ENGINE}/healthz`))) {
+    // inside the app, @ck/shared comes from app-engine/shared (engine-hooks.mjs)
+    const hooks = path.join(RES, "engine-hooks.mjs");
     startChild("engine", ["--experimental-strip-types", "--experimental-sqlite", "--no-warnings",
+      ...(fs.existsSync(hooks) ? ["--import", pathToFileURL(hooks).href] : []),
       path.join(RES, "backend", "src", "cli.ts"), "serve", "--port", String(ENGINE)], { cwd: RES, env: engineEnv });
   }
   if (!(await answers(URL_HOME))) {

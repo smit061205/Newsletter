@@ -32,6 +32,7 @@ const copy = (rel, opts = {}) => {
 for (const rel of ["package.json", "backend/package.json", "backend/src", "shared", "publications",
                    "web/package.json", "web/next.config.ts", "web/.next", "web/public"]) copy(rel);
 mkdirSync(path.join(OUT, "web", "public", "issues"), { recursive: true });
+cpSync(path.join(ROOT, "desktop", "engine-hooks.mjs"), path.join(OUT, "engine-hooks.mjs"));
 
 // the packages: the workspace links (node_modules/@ck/shared -> shared, ...) become
 // real folders where the app needs them and are dropped where it doesn't
@@ -51,8 +52,9 @@ function copyModules(rel) {
 function link(src, rel) {
   if (lstatSync(src).isSymbolicLink()) {
     const real = realpathSync(src);
-    // the workspace packages themselves (web, backend) are already in place
-    if (real === path.join(ROOT, "web") || real === path.join(ROOT, "backend")) return;
+    // the workspace packages themselves (web, backend, shared) are already in place:
+    // shared is found through engine-hooks.mjs (Node won't run TypeScript in node_modules)
+    if ([path.join(ROOT, "web"), path.join(ROOT, "backend"), path.join(ROOT, "shared")].includes(real)) return;
     cpSync(real, path.join(OUT, rel), { recursive: true, filter: (f) => !skip.some((r) => r.test(f)) && !/[\\/]node_modules[\\/]/.test(path.relative(real, f)) });
     return;
   }

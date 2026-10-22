@@ -63,8 +63,8 @@ jobs:
           npm install --no-audit --no-fund
           E=$(node -p "require('electron')")
           cd app-engine
-          "$E" --experimental-strip-types --experimental-sqlite --no-warnings backend/src/cli.ts serve --port 4000 &
-          for i in $(seq 60); do curl -fsS http://127.0.0.1:4000/healthz && break; sleep 1; done
+          "$E" --experimental-strip-types --experimental-sqlite --no-warnings --import ./engine-hooks.mjs backend/src/cli.ts serve --port 4000 &
+          for i in $(seq 60); do curl -fsS http://127.0.0.1:4000/healthz 2>/dev/null && break; sleep 1; done
           curl -fsS http://127.0.0.1:4000/api/status
           (cd web && NEWSROOM=1 "$E" node_modules/next/dist/bin/next start --port 3000 --hostname 127.0.0.1 2>/dev/null || NEWSROOM=1 "$E" ../node_modules/next/dist/bin/next start --port 3000 --hostname 127.0.0.1) &
           for i in $(seq 90); do curl -fsS -o /dev/null http://127.0.0.1:3000/newsroom && break; sleep 1; done
