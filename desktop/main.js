@@ -224,18 +224,77 @@ async function firstLaunchChores() {
     app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
     writeState({ loginItemSet: true });
   }
-  // macOS: in the Dock by default -- once (taken out again, it stays out)
-  if (isMac && app.isPackaged && !st.dockAdded && app.isInApplicationsFolder()) {
-    const appPath = app.getPath("exe").replace(/\/Contents\/MacOS\/.*$/, "");
+  // macOS: in the Dock by default -- once (taken out again, it stays out);
+  // an entry already there (the earlier app, pinned by hand) counts, and a
+  // second one for the same app is taken out
+  if (isMac && app.isPackaged && app.isInApplicationsFolder()) {
     try {
-      const has = execFileSync("defaults", ["read", "com.apple.dock", "persistent-apps"], { encoding: "utf8" }).includes(appPath);
-      if (!has) {
+      const mine = dockEntries().filter((e) => e.url === APP_URL);
+      if (mine.length === 0 && !st.dockAdded) {
         execFileSync("defaults", ["write", "com.apple.dock", "persistent-apps", "-array-add",
-          `<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>${appPath}</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>`]);
+          `<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>${APP_URL}</string><key>_CFURLStringType</key><integer>15</integer></dict></dict></dict>`]);
         execFile("killall", ["Dock"], () => {});
-      }
+      } else if (mine.length > 1) removeDockEntries((e) => e.url === APP_URL, 1);
       writeState({ dockAdded: true });
     } catch (e) { log(`dock: ${e.message}`); }
+  }
+}
+
+/* ---------------- the Dock's own entries (macOS) */
+const APP_PATH = isMac ? app.getPath("exe").replace(/\/Contents\/MacOS\/.*$/, "") : "";
+// the Dock keeps an app as a file URL ("file:///Applications/Capital%20Kranti.app/")
+const APP_URL = isMac ? pathToFileURL(APP_PATH).href.replace(/\/?$/, "/") : "";
+const PLISTBUDDY = "/usr/libexec/PlistBuddy";
+function dockEntries() {
+  const file = path.join(os.tmpdir(), `ck-dock-${process.pid}.plist`);
+  execFileSync("defaults", ["export", "com.apple.dock", file]);
+  const out = [];
+  try {
+    for (let i = 0; i < 500; i++) {
+      let url;
+      try { url = execFileSync(PLISTBUDDY, ["-c", `Print :persistent-apps:${i}:tile-data:file-data:_CFURLString`, file], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); }
+      catch { try { execFileSync(PLISTBUDDY, ["-c", `Print :persistent-apps:${i}`, file], { stdio: "ignore" }); url = ""; } catch { break; } }
+      out.push({ index: i, url: url.startsWith("/") ? pathToFileURL(url).href.replace(/\/?$/, "/") : url });
+    }
+  } finally { fs.rmSync(file, { force: true }); }
+  return out;
+}
+/** Take out the Dock entries that match, keeping the first `keep` of them. */
+function removeDockEntries(match, keep = 0) {
+  const gone = dockEntries().filter(match).slice(keep);
+  if (!gone.length) return;
+  const file = path.join(os.tmpdir(), `ck-dock-${process.pid}.plist`);
+  execFileSync("defaults", ["export", "com.apple.dock", file]);
+  try {
+    // from the last, so the indexes before it stay put
+    for (const e of gone.reverse()) execFileSync(PLISTBUDDY, ["-c", `Delete :persistent-apps:${e.index}`, file]);
+    execFileSync("defaults", ["import", "com.apple.dock", file]);
+  } finally { fs.rmSync(file, { force: true }); }
+  execFile("killall", ["Dock"], () => {});
+}
+
+/* ---------------- the engine's and the newsroom's ports: ours alone */
+// Something else on them (the earlier app's engine, left running; a copy of
+// ours that outlived a crash) would be used in place of ours, with its own
+// data: whatever listens there and isn't this app's is stopped.
+function freePorts() {
+  for (const port of [ENGINE, NEWSROOM]) {
+    let pids = [];
+    try {
+      if (isWin) {
+        for (const line of execFileSync("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8" }).split(/\r?\n/)) {
+          const f = line.trim().split(/\s+/);
+          if (f[1]?.endsWith(`:${port}`) && f[3] === "LISTENING") pids.push(f[4]);
+        }
+      } else {
+        pids = execFileSync("lsof", ["-ti", `tcp:${port}`, "-sTCP:LISTEN"], { encoding: "utf8" }).split(/\s+/).filter(Boolean);
+      }
+    } catch { continue; } // nothing listening
+    for (const pid of new Set(pids)) {
+      if (children.some((c) => String(c.pid) === pid) || pid === String(process.pid)) continue;
+      log(`port ${port}: stopping process ${pid}, not this app's`);
+      try { if (isWin) execFileSync("taskkill", ["/PID", pid, "/T", "/F"], { stdio: "ignore" }); else process.kill(Number(pid), "SIGKILL"); } catch {}
+    }
   }
 }
 
@@ -248,6 +307,7 @@ async function migrateOldInstall() {
   log(`migrating ${old}`);
   // stop it (its engine would hold the ports)
   try { execFileSync(process.execPath, [path.join(old, "scripts", "launch.mjs"), "--stop"], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, stdio: "ignore", timeout: 20000 }); } catch {}
+  freePorts();
   const copy = (from, to) => { if (fs.existsSync(from) && !fs.existsSync(to)) fs.cpSync(from, to, { recursive: true }); };
   copy(path.join(old, "backend", "data", "capital-kranti.sqlite"), path.join(DATA, "capital-kranti.sqlite"));
   copy(path.join(old, "backend", ".env"), path.join(DATA, "settings.env"));
@@ -259,7 +319,11 @@ async function migrateOldInstall() {
     fs.rmSync(path.join(os.homedir(), "Library", "LaunchAgents", "in.capitalkranti.newsroom.plist"), { force: true });
     // the old script app (its executable is "capital-kranti"), not this one
     for (const a of [path.join(os.homedir(), "Applications", "Capital Kranti.app"), "/Applications/Capital Kranti.app"]) {
-      if (fs.existsSync(path.join(a, "Contents", "MacOS", "capital-kranti"))) fs.rmSync(a, { recursive: true, force: true });
+      if (!fs.existsSync(path.join(a, "Contents", "MacOS", "capital-kranti"))) continue;
+      fs.rmSync(a, { recursive: true, force: true });
+      // its Dock entry would point at nothing
+      const url = pathToFileURL(a).href.replace(/\/?$/, "/");
+      if (url !== APP_URL) { try { removeDockEntries((e) => e.url === url); } catch (e) { log(`dock: ${e.message}`); } }
     }
   }
   if (isWin) {
@@ -329,11 +393,7 @@ async function uninstall() {
   const appPath = app.getPath("exe").replace(/\/Contents\/MacOS\/.*$/, "");
   if (isMac) {
     // out of the Dock
-    try {
-      const xml = execFileSync("defaults", ["export", "com.apple.dock", "-"], { encoding: "utf8" });
-      const cleaned = xml.replace(/<dict>(?:(?!<\/dict>\s*<\/dict>\s*<\/dict>)[\s\S])*?Capital Kranti\.app[\s\S]*?<\/dict>\s*<\/dict>\s*<\/dict>/, "");
-      if (cleaned !== xml) { execFileSync("defaults", ["import", "com.apple.dock", "-"], { input: cleaned }); execFile("killall", ["Dock"], () => {}); }
-    } catch (e) { log(`dock removal: ${e.message}`); }
+    try { removeDockEntries((e) => e.url === APP_URL); } catch (e) { log(`dock removal: ${e.message}`); }
     // the 7:55 PM wake (an administrator's password, once)
     if (readState().wakeSet) {
       try { execFileSync("osascript", ["-e", 'do shell script "pmset repeat cancel" with administrator privileges']); } catch {}
@@ -427,6 +487,10 @@ if (!app.requestSingleInstanceLock()) {
     showSplash();
     const moved = await migrateOldInstall().catch((e) => { log(`migration: ${e.message}`); return null; });
     await firstLaunchChores().catch((e) => log(`first launch: ${e.message}`));
+    if (app.isPackaged) {
+      freePorts();
+      await new Promise((r) => setTimeout(r, 500));
+    }
     try {
       await startAll();
     } catch (e) {

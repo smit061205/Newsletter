@@ -32,6 +32,12 @@ export default function Welcome() {
       router.replace("/newsroom");
     } catch (e) { setError((e as Error).message); setBusy(false); }
   };
+  const setLang = (l: "gu" | "en") => {
+    setError("");
+    call("/api/settings", { json: { lang: l } }).then(refresh).catch((e) => setError((e as Error).message));
+  };
+  // back one screen (past the key screen when the key was already there)
+  const back = () => { setError(""); setStep(step === 2 && status?.openrouterKey && !key ? 0 : step - 1); };
   const saveKey = async () => {
     setError(""); setBusy(true);
     try { await call("/api/settings", { json: { openrouterKey: key } }); setStep(2); }
@@ -48,10 +54,11 @@ export default function Welcome() {
             <h1 className={s.welcomeTitle}>{t("welcome.1.title")}</h1>
             <p className={s.muted}>{t("welcome.1.body")}</p>
             <div className={s.segmented} style={{ alignSelf: "flex-start" }}>
-              <button aria-pressed={lang === "gu"} onClick={() => call("/api/settings", { json: { lang: "gu" } }).then(refresh)}>ગુજરાતી</button>
-              <button aria-pressed={lang === "en"} onClick={() => call("/api/settings", { json: { lang: "en" } }).then(refresh)}>English</button>
+              <button aria-pressed={lang === "gu"} onClick={() => setLang("gu")}>ગુજરાતી</button>
+              <button aria-pressed={lang === "en"} onClick={() => setLang("en")}>English</button>
             </div>
-            <Button kind="primary" big onClick={() => setStep(status?.openrouterKey ? 2 : 1)}>{t("welcome.start")}</Button>
+            {error && <Note tone="bad">{error}</Note>}
+            <Button kind="primary" big onClick={() => { setError(""); setStep(status?.openrouterKey ? 2 : 1); }}>{t("welcome.start")}</Button>
           </>
         )}
         {step === 1 && (
@@ -63,6 +70,7 @@ export default function Welcome() {
             <div className={s.row}>
               <Button kind="primary" big onClick={saveKey} disabled={!key || busy}>{t("welcome.2.check")}</Button>
               <Button kind="quiet" onClick={() => setStep(2)}>{t("welcome.2.later")}</Button>
+              <Button kind="quiet" onClick={back}>{t("welcome.back")}</Button>
             </div>
           </>
         )}
@@ -72,7 +80,10 @@ export default function Welcome() {
             <p className={s.muted}>{t("welcome.3.body")}</p>
             <input className={`${s.input} ${s.headlineInput}`} type="time" value={runAt} onChange={(e) => setRunAt(e.target.value)} style={{ maxWidth: 180 }} aria-label={t("welcome.3.title")} />
             {desktop && desktop.platform !== "linux" && <label className={s.switch}><input type="checkbox" checked={wake} onChange={(e) => setWake(e.target.checked)} /><span>{t("settings.wake.body")}</span></label>}
-            <Button kind="primary" big onClick={() => setStep(3)}>{t("welcome.next")}</Button>
+            <div className={s.row}>
+              <Button kind="primary" big onClick={() => setStep(3)}>{t("welcome.next")}</Button>
+              <Button kind="quiet" onClick={back}>{t("welcome.back")}</Button>
+            </div>
           </>
         )}
         {step === 3 && (
@@ -84,6 +95,7 @@ export default function Welcome() {
             <div className={s.row}>
               <Button kind="primary" big icon={Icon.wand()} onClick={() => finish(true)} disabled={busy}>{t("welcome.makeNow")}</Button>
               <Button big onClick={() => finish(false)} disabled={busy}>{t("welcome.later")}</Button>
+              <Button kind="quiet" onClick={back} disabled={busy}>{t("welcome.back")}</Button>
             </div>
           </>
         )}
