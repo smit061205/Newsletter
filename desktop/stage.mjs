@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-// Gathers what the desktop app carries into desktop/app-engine: the engine
+// Gathers what the desktop app carries into desktop/stage-root/app-engine: the engine
 // (backend, shared, the papers' profiles and fonts), the built newsroom, their
 // packages, and the Chromium the engine lays pages out with. Run after
 //   npm ci && npm run build --prefix web
 //   PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium
-// (the release workflow does all of it; electron-builder then packs app-engine).
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, symlinkSync } from "node:fs";
+// (the release workflow does all of it; electron-builder then packs it into the app's Resources).
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const OUT = path.join(ROOT, "desktop", "app-engine");
+// packed from stage-root (desktop/package.json): electron-builder leaves out the
+// top-level node_modules of a folder it copies, so app-engine sits one level down
+const OUT = path.join(ROOT, "desktop", "stage-root", "app-engine");
 const say = (s) => console.log(`[stage] ${s}`);
 
 if (!existsSync(path.join(ROOT, "web", ".next", "BUILD_ID"))) throw new Error("build the newsroom first: npm run build --prefix web");
@@ -65,21 +67,21 @@ copyModules("web/node_modules");
 copyModules("backend/node_modules");
 say("node_modules");
 
-// links that point outside (the newsroom's build links its external packages,
-// such as playwright, by this checkout's full path): to the same place inside,
-// relative, so the app can be signed and moved
-(function fixLinks(dir) {
+// no links in what's packed, they don't survive it (Windows: "cannot find the
+// path"; macOS signing: a link out of the bundle): the newsroom's build links
+// its external packages (playwright) by this checkout's full path -- a real
+// copy instead; .bin shortcuts aren't needed. Chromium's own app bundle keeps
+// its internal links (macOS needs them).
+(function noLinks(dir) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
     if (e.isSymbolicLink()) {
       const target = path.resolve(path.dirname(p), readlinkSync(p));
-      const inside = target.startsWith(OUT + path.sep) ? target
-        : target.startsWith(ROOT + path.sep) ? path.join(OUT, path.relative(ROOT, target)) : null;
       rmSync(p, { force: true });
-      if (inside && existsSync(inside)) symlinkSync(path.relative(path.dirname(p), inside), p);
-      else if (existsSync(target)) cpSync(target, p, { recursive: true, dereference: true });
-      say(`link ${path.relative(OUT, p)} -> ${inside ? path.relative(path.dirname(p), inside) : "(copied in)"}`);
-    } else if (e.isDirectory()) fixLinks(p);
+      if (path.basename(dir) === ".bin" || !existsSync(target)) continue;
+      cpSync(target, p, { recursive: true, dereference: true, filter: (f) => !/[\\/]\.bin([\\/]|$)/.test(f) });
+      say(`link ${path.relative(OUT, p)}: copied in`);
+    } else if (e.isDirectory() && e.name !== ".local-browsers") noLinks(p);
   }
 })(OUT);
 

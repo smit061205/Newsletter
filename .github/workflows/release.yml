@@ -62,7 +62,7 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           E=$(node -p "require('electron')")
-          cd app-engine
+          cd stage-root/app-engine
           "$E" --experimental-strip-types --experimental-sqlite --no-warnings --import ./engine-hooks.mjs backend/src/cli.ts serve --port 4000 &
           for i in $(seq 60); do curl -fsS http://127.0.0.1:4000/healthz 2>/dev/null && break; sleep 1; done
           curl -fsS http://127.0.0.1:4000/api/status
@@ -82,6 +82,28 @@ jobs:
           node -e "const f='main.js',s=require('fs');s.writeFileSync(f,s.readFileSync(f,'utf8').replace('process.env.CK_GITHUB_CLIENT_ID || \"\"',JSON.stringify(process.env.CK_GITHUB_CLIENT_ID||'')))"
           if [ "${{ runner.os }}" = "macOS" ]; then A="--mac --${{ matrix.arch }}"; else A="--win --x64"; fi
           npx electron-builder $A --publish never
+      - name: The packed app carries everything, and its engine starts
+        shell: bash
+        working-directory: desktop
+        env:
+          ELECTRON_RUN_AS_NODE: "1"
+          DATA_DIR: ${{ runner.temp }}/ck-packed
+          PLAYWRIGHT_BROWSERS_PATH: "0"
+          CK_PUBLICATION: dev-test
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            APP=$(ls -d dist/mac*/"Capital Kranti.app"); E="$APP/Contents/MacOS/Capital Kranti"; R="$APP/Contents/Resources/app-engine"
+            codesign --verify --deep --strict "$APP"
+          else
+            E="$PWD/dist/win-unpacked/Capital Kranti.exe"; R="dist/win-unpacked/resources/app-engine"
+          fi
+          test -d "$R/node_modules/playwright-core/.local-browsers" || { echo "the packed app has no engine packages"; exit 1; }
+          test -d "$R/web/.next" || { echo "the packed app has no newsroom"; exit 1; }
+          cd "$R"
+          "$E" --experimental-strip-types --experimental-sqlite --no-warnings --import ./engine-hooks.mjs backend/src/cli.ts serve --port 4100 &
+          for i in $(seq 60); do curl -fsS http://127.0.0.1:4100/healthz 2>/dev/null && break; sleep 1; done
+          curl -fsS http://127.0.0.1:4100/api/status
+          kill %1 || true
       - name: Attach to the release
         if: github.event_name == 'release'
         shell: bash

@@ -23,7 +23,7 @@
     "copyright": "Capital Kranti, Gandhinagar",
     "directories": { "output": "dist" },
     "files": ["main.js", "preload.js", "splash.html", "icon/**", "package.json"],
-    "extraResources": [{ "from": "app-engine", "to": "app-engine", "filter": ["**/*"] }],
+    "extraResources": [{ "from": "stage-root", "to": ".", "filter": ["**/*"] }],
     "asarUnpack": ["icon/**"],
     "publish": [{ "provider": "github", "owner": "smit061205", "repo": "Newsletter", "releaseType": "release" }],
     "mac": {
