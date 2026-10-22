@@ -22,16 +22,26 @@ The rule throughout: **the AI makes the judgement calls, and the code does the m
 
 The app runs on the paper's own computer. It's a proper desktop app, with its own window, icon, menus and menu-bar / tray status. Inside it run two parts: an **engine** that makes the paper and the **newsroom** you work in, both on that computer only. It carries everything it needs (its own Node, the Chromium it lays pages out with, the fonts), so there's nothing else to install: no Node.js, Git or Terminal.
 
-Download it from the **Releases** page: <https://github.com/smit061205/Newsletter/releases/latest>.
+Download it with one click, in the browser (always the newest version):
+
+| Computer | Download |
+|---|---|
+| Mac with Apple silicon (M1 and later) | [Capital-Kranti-mac-arm64.dmg](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-mac-arm64.dmg) |
+| Mac with an Intel processor | [Capital-Kranti-mac-x64.dmg](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-mac-x64.dmg) |
+| Windows PC | [Capital-Kranti-Setup.exe](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-Setup.exe) |
+
+Not sure which Mac? Apple menu → About This Mac: "Chip: Apple M…" is Apple silicon, "Processor: Intel…" is Intel. Everything is also on the [Releases page](https://github.com/smit061205/Newsletter/releases/latest).
+
+**Replacing the earlier install:** don't uninstall it first. Install the new app and open it: it moves the earlier setup's issues, settings and key in, then removes the old app by itself.
 
 ### macOS
-1. Download **Capital-Kranti-…-mac-arm64.dmg** for an Apple-silicon Mac (M1 and later), or **…-mac-x64.dmg** for an Intel Mac (Apple menu → About This Mac shows which).
-2. Open it and drag **Capital Kranti** onto **Applications**.
+1. Download the `.dmg` for your Mac (above).
+2. Open it and drag **Capital Kranti** onto **Applications**. If Finder asks to replace an existing "Capital Kranti" (the earlier install), click **Replace**.
 3. The first time only: in Applications, **right-click Capital Kranti → Open → Open**. The app isn't notarised by Apple yet, so macOS asks once. On newer macOS, if there's no Open button: System Settings → Privacy & Security → **Open Anyway**.
 4. The welcome screens ask for the language, the OpenRouter key and the time to make the paper. The app adds itself to the Dock and starts at log-in. It also offers to wake the Mac five minutes before the run, which needs the Mac's password once.
 
 ### Windows
-1. Download **Capital-Kranti-Setup-….exe** and open it. If Windows shows "Windows protected your PC", click **More info → Run anyway** (the app isn't code-signed yet).
+1. Download **Capital-Kranti-Setup.exe** (above) and open it. If Windows shows "Windows protected your PC", click **More info → Run anyway** (the app isn't code-signed yet).
 2. Next → Install → Finish. It installs for this user only, so no administrator password is needed, and adds shortcuts to the desktop and the Start menu.
 3. The welcome screens are the same as on the Mac. To keep it on the taskbar: right-click its icon there → **Pin to taskbar**.
 
@@ -49,7 +59,7 @@ Download it from the **Releases** page: <https://github.com/smit061205/Newslette
 - **The earlier script install** (the `Install Capital Kranti` scripts) is moved in automatically the first time the new app opens. Its issues, settings and key come across; its folder, log-in agent / scheduled tasks and old shortcut are removed.
 
 ### For the developer: making a release
-- Tag and push: `git tag v1.0.0 && git push origin v1.0.0`. The **release** workflow (`.github/workflows/release.yml`) builds the `.dmg` (both Mac kinds) and the setup `.exe`, then attaches them to a GitHub Release. Running it by hand (Actions → release → Run workflow) makes a test build as a downloadable artifact instead.
+- On GitHub, no Terminal needed: **Releases → Draft a new release → Choose a tag**, type a new one (`v1.0.0`, then `v1.0.1`, …) and pick **Create new tag on publish**, give it a title, then **Publish release**. The **release** workflow (`.github/workflows/release.yml`) builds the `.dmg` (both Mac kinds) and the setup `.exe` and attaches them to that release in about half an hour. The download links above then serve them, and installed apps offer the update. Running the workflow by hand (Actions → release → Run workflow) makes a test build as a downloadable artifact instead.
 - **Connect the website** needs a GitHub OAuth App, set up once:
   1. GitHub → Settings → Developer settings → OAuth Apps → New. Use any homepage URL, and the callback URL `http://127.0.0.1`.
   2. Tick **Enable Device Flow**.

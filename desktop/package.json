@@ -30,7 +30,7 @@
       "icon": "icon/icon.icns",
       "category": "public.app-category.productivity",
       "target": [{ "target": "dmg" }, { "target": "zip" }],
-      "artifactName": "Capital-Kranti-${version}-mac-${arch}.${ext}",
+      "artifactName": "Capital-Kranti-mac-${arch}.${ext}",
       "identity": null,
       "hardenedRuntime": false
     },
@@ -47,7 +47,7 @@
     "win": {
       "icon": "icon/icon.ico",
       "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "artifactName": "Capital-Kranti-Setup-${version}.${ext}"
+      "artifactName": "Capital-Kranti-Setup.${ext}"
     },
     "nsis": {
       "oneClick": false,

@@ -1,12 +1,14 @@
 # The desktop app's installers: a .dmg for Macs (Apple silicon and Intel) and
 # a setup .exe for Windows, built here and attached to a GitHub Release.
-#   git tag v1.0.0 && git push origin v1.0.0      (or run it by hand: a test build)
-# The app checks the latest Release for updates, so a tagged build reaches the
+# Making one needs no Terminal: on GitHub, Releases -> Draft a new release ->
+# a new tag such as v1.0.1 -> Publish release; the installers appear on it in
+# about half an hour. (Run by hand from Actions: a test build, not released.)
+# The app checks the latest Release for updates, so a release reaches the
 # paper's computer by itself.
 name: release
 on:
-  push:
-    tags: ["v*"]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -79,8 +81,17 @@ jobs:
         run: |
           node -e "const f='main.js',s=require('fs');s.writeFileSync(f,s.readFileSync(f,'utf8').replace('process.env.CK_GITHUB_CLIENT_ID || \"\"',JSON.stringify(process.env.CK_GITHUB_CLIENT_ID||'')))"
           if [ "${{ runner.os }}" = "macOS" ]; then A="--mac --${{ matrix.arch }}"; else A="--win --x64"; fi
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then P=always; else P=never; fi
-          npx electron-builder $A --publish $P
+          npx electron-builder $A --publish never
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        shell: bash
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # latest.yml and the blockmap let the Windows app update itself; the Macs' zip, theirs
+          shopt -s nullglob
+          gh release upload "$GITHUB_REF_NAME" --clobber --repo "$GITHUB_REPOSITORY" dist/*.dmg dist/*.zip dist/*.exe dist/*.blockmap dist/latest.yml
       - uses: actions/upload-artifact@v4
         with:
           name: capital-kranti-${{ matrix.os }}-${{ matrix.arch }}

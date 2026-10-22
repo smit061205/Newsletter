@@ -3,12 +3,17 @@
 
 ## એક વખત: સ્થાપના (Once: setting it up)
 
-**Releases** પાના પરથી એપ લો: <https://github.com/smit061205/Newsletter/releases/latest>
-*Get the app from the Releases page.*
+એક ક્લિકે એપ લો *(Download the app with one click)*:
+- Mac (M1 કે નવું / Apple silicon): [Capital-Kranti-mac-arm64.dmg](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-mac-arm64.dmg)
+- Mac (Intel): [Capital-Kranti-mac-x64.dmg](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-mac-x64.dmg)
+- Windows: [Capital-Kranti-Setup.exe](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-Setup.exe)
+
+જૂની એપ પહેલાં કાઢવાની નથી: નવી એપ ખોલતાં જ જૂનાં છાપાં અને સેટિંગ્સ પોતે લઈ લે છે અને જૂની એપ કાઢી નાખે છે.
+*Don't uninstall the earlier app first: the new one takes its issues and settings when it opens, then removes it.*
 
 - **Mac:** `.dmg` ખોલો, **Capital Kranti** ને **Applications** પર ખેંચો. પહેલી વાર: જમણું-ક્લિક → **Open** → **Open**.
   *Open the `.dmg` and drag **Capital Kranti** onto **Applications**. The first time: right-click → **Open** → **Open**.*
-- **Windows:** `Capital-Kranti-Setup-….exe` ખોલો → Next → Install → Finish. "Windows protected your PC" દેખાય તો **More info → Run anyway**.
+- **Windows:** `Capital-Kranti-Setup.exe` ખોલો → Next → Install → Finish. "Windows protected your PC" દેખાય તો **More info → Run anyway**.
   *Open the setup, then Next → Install → Finish. If Windows warns, click **More info → Run anyway**.*
 
 પહેલી વાર ખોલતાં ચાર સરળ પગલાં આવે છે: ભાષા, OpenRouter key, છાપું બનાવવાનો સમય, અને "બધું તૈયાર".
