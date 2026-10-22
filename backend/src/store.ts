@@ -18,7 +18,18 @@ export interface Release {
   body: string; // paragraphs separated by blank lines
   photos: string[]; // local URLs under /media/
   fetchedAt: string;
+  /** where it came from: the state's Information Department (the default, for older rows) or PIB */
+  source?: "gujinfo" | "pib";
+  /** its language: Gujarati (the default) or Hindi, which is translated */
+  lang?: "gu" | "hi";
+  /** PIB: the ministry that issued it */
+  ministry?: string;
+  /** PIB: the same release in other languages (their PRIDs) */
+  langVersions?: number[];
 }
+
+/** The story made from a release: "r<id>" for the state's, "p<PRID>" for PIB's. */
+export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${r.source === "pib" ? "p" : "r"}${r.id}`;
 
 export interface Story {
   id: string;
@@ -39,6 +50,28 @@ export interface Story {
   needsReview: boolean;
   /** Numbers in the rewrite that aren't in the release, if any. */
   factCheck?: string;
+  /** Releases written up together as this one story (a round-up of the same occasion). */
+  mergedFrom?: number[];
+  /** Translated from another language (its code, e.g. "hi"): the editor checks it against the original. */
+  translatedFrom?: string;
+}
+
+export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build";
+export interface JobStep {
+  name: StepName;
+  status: "waiting" | "running" | "done" | "failed" | "skipped";
+  startedAt?: string; endedAt?: string;
+  log: string[];
+  error?: string;
+}
+export interface Job {
+  id: number;
+  date: string;
+  /** who started it: the 8 PM run, or someone in the newsroom */
+  by: "schedule" | "newsroom" | "cli";
+  status: "running" | "done" | "failed";
+  startedAt: string; endedAt?: string;
+  steps: JobStep[];
 }
 
 export interface Ad {
@@ -75,6 +108,8 @@ export class Store {
                                          report text, primary key (date, version));
       create table if not exists edits (n integer primary key autoincrement, issue_date text, json text);
       create table if not exists fitted (key text primary key, json text);
+      create table if not exists jobs (id integer primary key autoincrement, date text, json text);
+      create table if not exists settings (key text primary key, json text);
     `);
   }
 
@@ -91,6 +126,10 @@ export class Store {
   }
   putRelease(r: Release) { this.put("releases", r.id, r.date, r); }
   releases(date: string) { return this.all<Release>("releases", date); }
+  release(id: number): Release | null {
+    const row = this.db.prepare("select json from releases where id = ?").get(id) as { json: string } | undefined;
+    return row ? JSON.parse(row.json) : null;
+  }
 
   putStory(s: Story) { this.put("stories", s.id, s.date, s); }
   stories(date: string) { return this.all<Story>("stories", date); }
@@ -118,6 +157,33 @@ export class Store {
   }
   putFitted(key: string, value: { body: string; model: string; factCheck?: string }) {
     this.db.prepare("insert or replace into fitted (key, json) values (?, ?)").run(key, JSON.stringify(value));
+  }
+
+  /** A pipeline run (pipeline.ts): its steps, their logs and outcome. */
+  newJob(date: string, job: Omit<Job, "id">): Job {
+    const r = this.db.prepare("insert into jobs (date, json) values (?, ?)").run(date, JSON.stringify(job));
+    const saved = { ...job, id: Number(r.lastInsertRowid) };
+    this.putJob(saved);
+    return saved;
+  }
+  putJob(job: Job) { this.db.prepare("update jobs set json = ? where id = ?").run(JSON.stringify(job), job.id); }
+  job(id: number): Job | null {
+    const row = this.db.prepare("select json from jobs where id = ?").get(id) as { json: string } | undefined;
+    return row ? JSON.parse(row.json) : null;
+  }
+  jobs(date?: string, limit = 20): Job[] {
+    const rows = date ? this.db.prepare("select json from jobs where date = ? order by id desc limit ?").all(date, limit)
+      : this.db.prepare("select json from jobs order by id desc limit ?").all(limit);
+    return rows.map((r) => JSON.parse((r as { json: string }).json));
+  }
+
+  /** The newsroom's settings (Settings screen), each a JSON value. */
+  setting<T>(key: string, fallback: T): T {
+    const row = this.db.prepare("select json from settings where key = ?").get(key) as { json: string } | undefined;
+    return row ? JSON.parse(row.json) : fallback;
+  }
+  putSetting(key: string, value: unknown) {
+    this.db.prepare("insert or replace into settings (key, json) values (?, ?)").run(key, JSON.stringify(value));
   }
 
   saveIssue(date: string, issue: IssueRender, report: unknown): number {

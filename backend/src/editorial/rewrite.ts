@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { ROOT } from "../config.ts";
 import { profile } from "../profile.ts";
-import type { Release, Store, Story } from "../store.ts";
+import { storyIdOf, type Release, type Store, type Story } from "../store.ts";
 
 /** Chosen by backend/test/compare-models.ts on 21 Oct 2026 releases (every
  * candidate kept every number and name). Anthropic models are left out on
@@ -52,7 +52,7 @@ export function env(name: string): string | undefined {
 
 // releases separate sections with rows of zeros, dashes or stars: not text to print
 const filler = /^[\s0૦.\-–—*_=~•]+$/;
-const paragraphs = (text: string) => text.split(/\n\s*\n/)
+export const paragraphs = (text: string) => text.split(/\n\s*\n/)
   .map((p) => p.replace(/[0૦]{5,}|[-–—*_=]{4,}/g, "").trim())
   .filter((p) => p && !filler.test(p));
 
@@ -71,8 +71,16 @@ function cut(body: string, share: number): string {
 }
 
 // Gandhinagar is the paper's home: its own and the state government's news
-// lead; district news follows.
-function priorityOf(r: Release): number {
+// lead; district news follows. From PIB: the Prime Minister and anything
+// about Gujarat first, then the President's and the Cabinet's, then the rest.
+export function priorityOf(r: Release): number {
+  if (r.source === "pib") {
+    const o = `${r.ministry ?? ""} ${r.headline}`;
+    if (/ગુજરાત|ગાંધીનગર|અમદાવાદ|गुजरात|गांधीनगर|अहमदाबाद/.test(o)) return 1;
+    if (/પ્રધાનમંત્રી|प्रधानमंत्री|મંત્રીમંડળ|मंत्रिमंडल/.test(o)) return 2;
+    if (/રાષ્ટ્રપતિ|राष्ट्रपति/.test(o) || r.photos.length) return 3;
+    return 4;
+  }
   const o = r.office + " " + r.headline;
   if (/મુખ્યમંત્રી/.test(o)) return 1;
   if (/ગાંધીનગર|રાજ્યપાલ|લોકભવન|વિભાગ/.test(o)) return 2;
@@ -81,13 +89,13 @@ function priorityOf(r: Release): number {
 }
 
 /** A release headline as a newspaper headline: no leading "*" or stray quotes. */
-const cleanHead = (h: string) => h.replace(/^[\s*]+|[\s*]+$/g, "").replace(/\s+/g, " ");
+export const cleanHead = (h: string) => h.replace(/^[\s*]+|[\s*]+$/g, "").replace(/\s+/g, " ");
 
 export function asIs(r: Release): Story {
   // a dateline-led first paragraph ("આણંદ, બુધવાર :: ...") is how the paper starts a story too
   const body = paragraphs(r.body).join("\n\n");
   return {
-    id: `r${r.id}`, releaseId: r.id, date: r.date,
+    id: storyIdOf(r), releaseId: r.id, date: r.date,
     kicker: "", headline: cleanHead(r.headline), deck: cleanHead(r.subhead),
     bodies: { long: body, medium: cut(body, 0.6), short: cut(body, 0.35) },
     priority: priorityOf(r), page: null,
@@ -96,7 +104,7 @@ export function asIs(r: Release): Story {
   };
 }
 
-const SCHEMA = {
+export const SCHEMA = {
   name: "story",
   strict: true,
   schema: {
@@ -117,8 +125,8 @@ const SCHEMA = {
   },
 };
 
-const SYSTEM = `તમે ગાંધીનગરના ગુજરાતી દૈનિક "કેપિટલ ક્રાંતિ"ના ઉપતંત્રી છો.
-You turn a Gujarat government press release into a newspaper story in clear, formal newspaper Gujarati.
+export const SYSTEM = `તમે ગાંધીનગરના ગુજરાતી દૈનિક "કેપિટલ ક્રાંતિ"ના ઉપતંત્રી છો.
+You turn a government press release (the Gujarat government's, or the central government's from PIB) into a newspaper story in clear, formal newspaper Gujarati.
 Rules:
 - Use ONLY facts in the release. Never add names, numbers, dates, places or quotes that are not in it.
 - Keep every number, name and date exactly as in the release, written in Gujarati digits (૦-૯) -- except inside English names and codes (ATM 2026, COVID-19).
@@ -127,9 +135,73 @@ Rules:
 - body_medium and body_short are shorter versions of body_long, keeping the most important facts first.
 Return JSON matching the schema.`;
 
-const digits = (s: string) => new Set((s.replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d))).match(/\d+(?:[.,]\d+)*/g) ?? []));
+/** Every number in `s`, in Latin digits: Gujarati (૦-૯) and Devanagari (०-९) digits read as theirs. */
+export const digits = (s: string) => new Set((s.replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d)))
+  .replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d))).match(/\d+(?:[.,]\d+)*/g) ?? []));
 
-export async function rewriteOne(r: Release, model: string, key: string): Promise<{ story: Story; cost: number; seconds: number }> {
+// small numbers as the releases often spell them, 1-20 (Gujarati, then Hindi)
+const NUMBER_WORDS: string[][] = [
+  [], ["એક", "एक"], ["બે", "दो"], ["ત્રણ", "तीन"], ["ચાર", "चार"], ["પાંચ", "पांच", "पाँच"], ["છ", "छह", "छः"], ["સાત", "सात"],
+  ["આઠ", "आठ"], ["નવ", "नौ"], ["દસ", "दस"], ["અગિયાર", "ग्यारह"], ["બાર", "बारह"], ["તેર", "तेरह"], ["ચૌદ", "चौदह"],
+  ["પંદર", "पंद्रह"], ["સોળ", "सोलह"], ["સત્તર", "सत्रह"], ["અઢાર", "अठारह"], ["ઓગણીસ", "उन्नीस"], ["વીસ", "बीस"],
+];
+/** The numbers in `out` that aren't in `source` -- written in any digits,
+ * with or without commas between them, or (up to 20) spelt out there. */
+export function numbersNotIn(out: string, source: string): string[] {
+  const plain = (n: string) => n.replace(/,/g, "");
+  const known = new Set([...digits(source)].map(plain));
+  // "9 हज़ार", "2 લાખ": the same number written out in full
+  const latin = source.replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d))).replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d)));
+  for (const m of latin.matchAll(/(\d+(?:\.\d+)?)\s*(हज़ार|हजार|હજાર|लाख|લાખ)/g)) {
+    known.add(String(Math.round(Number(m[1]) * (/लाख|લાખ/.test(m[2]) ? 100_000 : 1000))));
+  }
+  const words = new Set(source.split(/[\s,.;:()'"‘’“”!?।-]+/));
+  return [...digits(out)].filter((n) => {
+    const v = plain(n);
+    if (known.has(v)) return false;
+    const k = Number(v);
+    return !(Number.isInteger(k) && k >= 1 && k <= 20 && NUMBER_WORDS[k].some((w) => words.has(w) || [...words].some((x) => x.startsWith(w) && x.length <= w.length + 3)));
+  });
+}
+
+/** What the model is told about a release: where it's from, then its text. */
+export const releaseText = (r: Release) =>
+  `${r.source === "pib" ? `Source: PIB (Press Information Bureau), ${r.ministry ?? ""}, ${r.office}` : `Office: ${r.office}`}\n` +
+  `Headline: ${r.headline}\nSubheading: ${r.subhead}\n\n${paragraphs(r.body).join("\n\n")}`;
+
+// Near-identical releases from one office on the same occasion -- PIB
+// issues one "the Prime Minister congratulates ..." per medal winner -- are
+// written up as one round-up, the way a desk would print them.
+const headWords = (h: string) => new Set(h.replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").split(/\s+/).filter((w) => w.length > 2));
+function similar(a: Release, b: Release): boolean {
+  if ((a.source ?? "gujinfo") !== (b.source ?? "gujinfo") || (a.ministry ?? a.office) !== (b.ministry ?? b.office)) return false;
+  const x = headWords(a.headline), y = headWords(b.headline);
+  const both = [...x].filter((w) => y.has(w)).length;
+  return both / Math.max(1, new Set([...x, ...y]).size) >= 0.5;
+}
+/** The releases in groups of the same occasion (most are alone), in order. */
+export function groupSimilar(releases: Release[]): Release[][] {
+  const groups: Release[][] = [];
+  for (const r of releases) {
+    const g = groups.find((g) => g.some((m) => similar(m, r)));
+    if (g) g.push(r);
+    else groups.push([r]);
+  }
+  return groups;
+}
+/** A group as one release for the writer: every member's headline and text. */
+function merged(group: Release[]): Release {
+  if (group.length === 1) return group[0];
+  return {
+    ...group[0],
+    headline: group.map((r) => r.headline).join(" / "),
+    subhead: "",
+    body: group.map((r) => `${r.headline}\n\n${paragraphs(r.body).join("\n\n")}`).join("\n\n"),
+    photos: [...new Set(group.flatMap((r) => r.photos))],
+  };
+}
+
+export async function rewriteOne(r: Release, model: string, key: string, together = 1): Promise<{ story: Story; cost: number; seconds: number }> {
   const t0 = Date.now();
   const res = await openRouter({
     method: "POST",
@@ -140,8 +212,9 @@ export async function rewriteOne(r: Release, model: string, key: string): Promis
       usage: { include: true },
       response_format: { type: "json_schema", json_schema: SCHEMA },
       messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: `Office: ${r.office}\nHeadline: ${r.headline}\nSubheading: ${r.subhead}\n\n${paragraphs(r.body).join("\n\n")}` },
+        { role: "system", content: SYSTEM + (together > 1 ? `\nThe text below is ${together} releases on the same occasion: write them up as ONE combined story ` +
+          "(a round-up) that names everyone and everything in them, with one headline for all." : "") },
+        { role: "user", content: releaseText(r) },
       ],
     }),
   });
@@ -150,10 +223,9 @@ export async function rewriteOne(r: Release, model: string, key: string): Promis
   // some models wrap JSON in a ```json fence despite the schema
   const out = JSON.parse(data.choices[0].message.content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, ""));
   // every number the story uses must be in the release
-  const known = digits(`${r.headline} ${r.subhead} ${r.body}`);
-  const unknown = [...digits(`${out.headline} ${out.deck} ${out.body_long}`)].filter((n) => !known.has(n));
+  const unknown = numbersNotIn(`${out.headline} ${out.deck} ${out.body_long}`, `${r.headline} ${r.subhead} ${r.body}`);
   const story: Story = {
-    id: `r${r.id}`, releaseId: r.id, date: r.date,
+    id: storyIdOf(r), releaseId: r.id, date: r.date,
     kicker: out.kicker, headline: out.headline, deck: out.deck,
     bodies: { long: out.body_long, medium: out.body_medium, short: out.body_short },
     priority: out.priority, page: out.page,
@@ -164,15 +236,18 @@ export async function rewriteOne(r: Release, model: string, key: string): Promis
   return { story, cost: data.usage?.cost ?? 0, seconds: (Date.now() - t0) / 1000 };
 }
 
-const gujaratiShare = (s: string) => (s.match(/[\u0A80-\u0AFF]/g)?.length ?? 0) / Math.max(1, s.replace(/\s/g, "").length);
+export const gujaratiShare = (s: string) => (s.match(/[\u0A80-\u0AFF]/g)?.length ?? 0) / Math.max(1, s.replace(/\s/g, "").length);
 
 export async function rewriteDay(store: Store, date: string, opts: { log: (s: string) => void; model?: string; force?: boolean }) {
   // The department issues some releases twice, in Gujarati and in English;
   // the English one is the same news -- translating it would print the
   // story twice. Only Gujarati releases become stories.
-  const all = store.releases(date);
+  // (Hindi releases are translated, not rewritten: editorial/translate.ts)
+  const all = store.releases(date).filter((r) => r.lang !== "hi");
   const releases = all.filter((r) => gujaratiShare(r.headline + r.body.slice(0, 400)) > 0.5);
-  for (const r of all) if (!releases.includes(r)) store.deleteStory(`r${r.id}`);
+  for (const r of all) if (!releases.includes(r)) store.deleteStory(storyIdOf(r));
+  // a PIB release is only ever "p<PRID>" (never a state-style "r<id>" from older code)
+  for (const r of all) if (r.source === "pib") store.deleteStory(`r${r.id}`);
   if (all.length > releases.length) opts.log(`skipped ${all.length - releases.length} English release(s): the same news is issued in Gujarati`);
   const key = env("OPENROUTER_API_KEY");
   const workhorse = opts.model ?? env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
@@ -183,27 +258,37 @@ export async function rewriteDay(store: Store, date: string, opts: { log: (s: st
   // the day's three biggest lead stories (the Chief Minister's) get the stronger writer
   const leads = new Set(releases.filter((r) => priorityOf(r) === 1)
     .sort((a, b) => b.body.length - a.body.length).slice(0, profile.editorial.leadStories).map((r) => r.id));
-  const one = async (r: Release) => {
-    if (!key) return asIs(r);
-    // already rewritten by a model: keep it (a rebuild shouldn't pay twice)
-    const have = store.story(`r${r.id}`);
-    if (have && have.model !== "as-is" && !opts.force) return have;
-    const model = leads.has(r.id) ? lead : workhorse;
+  const groups = groupSimilar(releases);
+  for (const g of groups) {
+    if (g.length < 2) continue;
+    opts.log(`  ${g.length} releases on one occasion, written up together: ${g[0].headline.slice(0, 60)}`);
+    for (const r of g.slice(1)) store.deleteStory(storyIdOf(r));
+  }
+  const one = async (group: Release[]) => {
+    const r = merged(group);
+    const ids = group.map((m) => m.id);
+    const withIds = (s: Story): Story => (group.length > 1 ? { ...s, mergedFrom: ids } : s);
+    if (!key) return withIds(asIs(r));
+    // already rewritten by a model, from the same releases: keep it (a rebuild shouldn't pay twice)
+    const have = store.story(storyIdOf(r));
+    if (have && have.model !== "as-is" && !opts.force && String(have.mergedFrom ?? [r.id]) === String(group.length > 1 ? ids : [r.id])) return have;
+    const model = group.some((m) => leads.has(m.id)) ? lead : workhorse;
     try {
-      const got = await rewriteOne(r, model, key);
+      const got = await rewriteOne(r, model, key, group.length);
+      got.story = withIds(got.story);
       spent += got.cost;
       if (got.story.factCheck) opts.log(`  ${r.id}: ${got.story.factCheck} -- check before printing`);
       return got.story;
     } catch (e) {
       failed++;
       opts.log(`  ${r.id}: rewrite failed (${e instanceof Error ? e.message : e}); using it as published`);
-      return asIs(r);
+      return withIds(asIs(r));
     }
   };
-  for (let i = 0; i < releases.length; i += 5) {
-    for (const story of await Promise.all(releases.slice(i, i + 5).map(one))) store.putStory(story);
+  for (let i = 0; i < groups.length; i += 5) {
+    for (const story of await Promise.all(groups.slice(i, i + 5).map(one))) store.putStory(story);
   }
-  opts.log(`rewrite ${date}: ${releases.length} stories` +
+  opts.log(`rewrite ${date}: ${groups.length} stories from ${releases.length} releases` +
            (key ? ` (${workhorse}; leads ${lead}), $${spent.toFixed(3)}${failed ? `, ${failed} kept as published` : ""}` : " (as published)"));
 }
 
@@ -256,8 +341,7 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
     return null;
   }
   body = paragraphs(body).join("\n\n");
-  const known = digits(`${release.headline} ${release.subhead} ${release.body}`);
-  const unknown = [...digits(body)].filter((n) => !known.has(n));
+  const unknown = numbersNotIn(body, `${release.headline} ${release.subhead} ${release.body}`);
   const factCheck = unknown.length ? `numbers not in the release: ${unknown.join(", ")}` : undefined;
   store.putFitted(key, { body, model, ...(factCheck ? { factCheck } : {}) });
   return { body, cost: data.usage?.cost ?? 0, ...(factCheck ? { factCheck } : {}) };
@@ -308,8 +392,7 @@ export async function writeDeck(store: Store, story: Story, release: Release,
   } catch {
     return null;
   }
-  const known = digits(`${release.headline} ${release.subhead} ${release.body}`);
-  if ([...digits(deck)].some((n) => !known.has(n))) deck = ""; // a number not in the release: not printed
+  if (numbersNotIn(deck, `${release.headline} ${release.subhead} ${release.body}`).length) deck = ""; // a number not in the release: not printed
   store.putFitted(key, { body: deck, model });
   return deck ? { deck, cost: data.usage?.cost ?? 0 } : null;
 }

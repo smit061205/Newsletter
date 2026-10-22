@@ -67,7 +67,15 @@ export function applyTextEdits(stories: Story[], edits: Edit[]): Story[] {
       if (typeof change.caption === "string") out.caption = change.caption;
       if (typeof change.photo === "string" || change.photo === null) out.photo = change.photo as string | null;
       if (typeof change.body === "string") out.bodies = { long: change.body, medium: change.body, short: change.body };
+      if (typeof change.priority === "number" && change.priority >= 1 && change.priority <= 5) out.priority = Math.round(change.priority);
     }
     return out;
   });
+}
+
+/** The stories an editor left out: each one's latest drop (true) or restore (false) wins. */
+export function droppedBy(edits: Edit[]): Set<string> {
+  const state = new Map<string, boolean>();
+  for (const e of edits) if (typeof e.change.drop === "boolean") state.set(e.storyId, e.change.drop);
+  return new Set([...state].filter(([, d]) => d).map(([id]) => id));
 }

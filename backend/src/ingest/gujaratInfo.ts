@@ -51,8 +51,8 @@ async function readRelease(ctx: BrowserContext, id: number): Promise<Raw | null>
       const headline = q(".ttm-service-single-content-area .title h4");
       if (!headline) return null;
       const desc = document.querySelector(".ttm-service-description");
-      const paras = desc ? [...desc.querySelectorAll("p")].map((p) => p.textContent!.replace(/\s+/g, " ").trim()).filter(Boolean) : [];
-      const photos = desc ? [...desc.querySelectorAll("img")]
+      const paras = desc ? Array.from(desc.querySelectorAll("p")).map((p) => p.textContent!.replace(/\s+/g, " ").trim()).filter(Boolean) : [];
+      const photos = desc ? Array.from(desc.querySelectorAll("img"))
         .filter((i) => (i as HTMLImageElement).naturalWidth >= 300)
         .map((i) => (i as HTMLImageElement).src) : [];
       return { headline, subhead: q("h5.subtitle"), dateLine: q(".ReleaseDateSubHeaddateTime"), paras, photos };

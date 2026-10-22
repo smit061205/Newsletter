@@ -7,8 +7,10 @@
 // all stays inside the repository, as on a developer's machine.
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-export const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");
+// fileURLToPath, not URL.pathname: on Windows that would be "/C:/..."
+export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const PUBLIC_DIR = path.join(ROOT, "web", "public");
 export const DATA_DIR = process.env.DATA_DIR?.trim() || "";
 export const DB_FILE = DATA_DIR ? path.join(DATA_DIR, "capital-kranti.sqlite") : path.join(ROOT, "backend", "data", "capital-kranti.sqlite");

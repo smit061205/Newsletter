@@ -17,3 +17,7 @@ web/public/media/
 # licensed publication fonts (restricted: never committed or served publicly)
 publications/*/fonts/*.ttf
 publications/*/fonts/*.otf
+
+# the app on a desk computer: its logs and nightly database backups
+logs/
+backups/

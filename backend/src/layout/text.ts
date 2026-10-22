@@ -23,9 +23,25 @@ function belongsToEnglish(text: string, start: number, end: number): boolean {
     || after !== after.trimStart() && LATIN_WORD.test(nextWord.replace(/[,.:;)]$/, ""));
 }
 
+/** Devanagari (a Sanskrit verse, a Hindi name) in Gujarati script, as
+ * Gujarati papers print it: the two Unicode blocks line up letter for
+ * letter (U+0900 -> U+0A80); the danda (।, ॥) is shared and stays. Letters
+ * Gujarati lacks (ऩ ऱ ऴ, the nukta forms) fall back to their base letter. */
+export function devanagariToGujarati(text: string): string {
+  const BASE: Record<string, string> = { "ऩ": "न", "ऱ": "र", "ऴ": "ळ", "क़": "क", "ख़": "ख", "ग़": "ग", "ज़": "ज", "ड़": "ड", "ढ़": "ढ", "फ़": "फ", "य़": "य" };
+  return text.normalize("NFC").replace(/[\u0900-\u097F]/g, (c) => {
+    const ch = BASE[c] ?? c;
+    const code = ch.codePointAt(0)!;
+    if (code === 0x0964 || code === 0x0965) return ch; // danda, double danda
+    if (code === 0x093c) return ""; // nukta
+    const g = String.fromCodePoint(code + 0x180);
+    return /\p{Cn}/u.test(g) ? ch : g; // a slot Gujarati leaves empty: keep it (reported as unsettable)
+  });
+}
+
 export function normalizeText(text: string): string {
   const digits = DIGITS[profile.language.digits];
-  let out = text;
+  let out = profile.language.lang === "gu" ? devanagariToGujarati(text) : text;
   if (digits && digits !== DIGITS.latin) {
     out = out.replace(/\d+/g, (num, offset: number) => {
       // the whole number, e.g. "1800-233-0222", "2025-26" or "98256 08744"
