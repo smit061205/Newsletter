@@ -13,7 +13,7 @@
 // lengths at paragraph boundaries.
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { ROOT } from "../config.ts";
+import { ENV_FILE } from "../config.ts";
 import { profile } from "../profile.ts";
 import { storyIdOf, type Progress, type Release, type Store, type Story } from "../store.ts";
 
@@ -43,7 +43,7 @@ export async function openRouter(init: RequestInit, seconds = 90): Promise<Respo
 export function env(name: string): string | undefined {
   if (process.env[name]) return process.env[name];
   try {
-    const line = readFileSync(path.join(ROOT, "backend", ".env"), "utf8").split("\n").find((l) => l.startsWith(`${name}=`));
+    const line = readFileSync(ENV_FILE, "utf8").split("\n").find((l) => l.startsWith(`${name}=`));
     return line?.slice(name.length + 1).trim() || undefined;
   } catch {
     return undefined;

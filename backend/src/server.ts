@@ -33,7 +33,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR } from "./config.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { DATA_DIR, ROOT } from "./config.ts";
+import { DATA_DIR, ENV_FILE, ROOT } from "./config.ts";
 import { currentJob, onJob, runPipeline, settleInterrupted, STEPS } from "./pipeline.ts";
 import type { Ad, Release, StepName, Store } from "./store.ts";
 
@@ -175,7 +175,7 @@ export function settingsOf(store: Store) {
   };
 }
 
-const ENV_FILE = path.join(ROOT, "backend", ".env");
+// (backend/.env, or the app-data folder's settings.env: config.ts ENV_FILE)
 /** Is a key set in backend/.env (its value is never sent anywhere)? */
 const envHas = (name: string) => !!process.env[name] || (existsSync(ENV_FILE) && readFileSync(ENV_FILE, "utf8").split("\n").some((l) => l.startsWith(`${name}=`) && l.length > name.length + 1));
 /** Set one key in backend/.env, keeping the rest of the file. */
@@ -222,6 +222,15 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
       const parts = url.pathname.split("/").filter(Boolean);
       if (req.method === "OPTIONS") return send(res, 204, "");
       if (req.method === "GET" && url.pathname === "/healthz") return send(res, 200, "ok", "text/plain");
+      // release photos and ads (the newsroom shows them from here: MEDIA_DIR may be the app's data folder)
+      if (req.method === "GET" && parts[0] === "media" && parts.length > 1 && !parts.includes("..")) {
+        const type = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" }[path.extname(url.pathname).slice(1).toLowerCase()];
+        if (!type) return send(res, 404, { error: "not an image" });
+        const file = path.resolve(MEDIA_DIR, ...parts.slice(1).map(decodeURIComponent));
+        if (!file.startsWith(path.resolve(MEDIA_DIR) + path.sep)) return send(res, 404, { error: "not found" });
+        try { return send(res, 200, new Uint8Array(await readFile(file)), type); }
+        catch { return send(res, 404, { error: `no file ${url.pathname}` }); }
+      }
       if (req.method === "POST" && !authorized(req)) return send(res, 401, { error: "missing or wrong API token" });
       if (req.method === "GET" && url.pathname === "/api/issue") {
         const date = url.searchParams.get("date") ?? store.latestDate();
