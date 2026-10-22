@@ -22,7 +22,7 @@ jobs:
         include:
           - os: macos-14      # Apple silicon
             arch: arm64
-          - os: macos-13      # Intel
+          - os: macos-15-intel   # Intel
             arch: x64
           - os: windows-latest
             arch: x64
