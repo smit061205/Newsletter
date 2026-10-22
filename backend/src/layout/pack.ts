@@ -91,10 +91,12 @@ export function renderPlaced(placed: PlacedModule[], extra: Element[] = []): Ele
       elements.push({ id: `${p.module.story.id}-vrule`, kind: "line", articleId: p.module.story.id,
                       x1: rx, y1: p.y, x2: rx, y2: p.y + p.module.height, color: INK, width: GAP.storyRule });
     }
-    const stacked = placed.some((q) => q !== p && Math.abs(q.y + q.module.height + gap - p.y) < 2
-      && Math.min(q.col + q.module.cols, p.col + p.module.cols) > Math.max(q.col, p.col));
-    if (stacked && GAP.storyRule > 0) {
-      const ry = p.y - gap / 2;
+    // the story above, sharing columns, ending in the space just over this one
+    // (exactly the gap, or a little short of it): the rule halfway between
+    const above = placed.filter((q) => q !== p && Math.min(q.col + q.module.cols, p.col + p.module.cols) > Math.max(q.col, p.col))
+      .map((q) => q.y + q.module.height).filter((b) => b <= p.y - gap + 2 && b > p.y - gap - 2 * BODY.pitch);
+    if (above.length && GAP.storyRule > 0) {
+      const ry = (Math.max(...above) + p.y) / 2;
       elements.push({ id: `${p.module.story.id}-rule`, kind: "line", articleId: p.module.story.id,
                       x1: p.x, y1: ry, x2: p.x + p.module.width, y2: ry, color: INK, width: GAP.storyRule });
     }

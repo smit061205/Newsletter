@@ -9,6 +9,7 @@ import { printIssue } from "@ck/shared/pdf";
 import { assetFile, OUT_DIR, PLOT_ORIGIN } from "./config.ts";
 import { chromeFor } from "./chrome/chrome.ts";
 import { Measurer } from "./layout/measure.ts";
+import { FEATURE_KICKER } from "./editorial/features.ts";
 import { reviewPages } from "./editorial/review.ts";
 import { writeDeck } from "./editorial/rewrite.ts";
 import { closeGaps, type FillerCount } from "./layout/fit.ts";
@@ -110,6 +111,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && inPaperLanguage(s)))
       .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
       .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
+    // "વિશેષ લેખ" marks the paper's one special article: the first feature
+    // keeps it, the others print without a kicker
+    let special = false;
+    pool = pool.map((s) => (s.kicker !== FEATURE_KICKER ? s : special ? { ...s, kicker: "" } : ((special = true), s)));
     log(`planning ${date} (issue ${issueNumber}): ${pool.length} stories, ${ads.length} ads, ${total} pages`);
     const packer = new Packer(m);
     let spent = 0;
