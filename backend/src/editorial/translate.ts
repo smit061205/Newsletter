@@ -129,25 +129,26 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
   const target = profile.editorial.fillTarget;
   const ctx = await fillContext(store, date);
   try {
+    // first, what's already in Gujarati, by every PRID it goes by
+    const gujarati = store.releases(date).filter((r) => r.source === "pib" && r.lang !== "hi");
+    const have = new Set(gujarati.flatMap((r) => [r.id, ...(r.langVersions ?? [])]));
+    // a translation the Gujarati release (published later in the day) now covers: the Gujarati one prints
+    for (const s of store.stories(date).filter((s) => s.translatedFrom === "hi")) {
+      const hi = s.releaseId ? store.release(s.releaseId) : null;
+      const linked = hi && gujarati.find((g) => g.id === hi.id || (g.langVersions ?? []).includes(hi.id) || (hi.langVersions ?? []).includes(g.id));
+      const twin = hi && (linked ?? sameNewsIn(hi, gujarati));
+      if (hi && twin) {
+        store.deleteStory(s.id);
+        ctx.content -= await ctx.areaOf(s);
+        log(`  ${hi.id}: now in Gujarati from PIB (${twin.id}), so its translation is dropped`);
+      }
+    }
     const before = ctx.share();
     log(`the day's Gujarati copy fills ${(before * 100).toFixed(0)}% of the pages (wanted: ${(target * 100).toFixed(0)}%)`);
     if (before >= target && !opts.force) return { before, after: before, translated: 0, cost: 0 };
     if (!key) {
       log("no OPENROUTER_API_KEY in backend/.env: no translations");
       return { before, after: before, translated: 0, cost: 0 };
-    }
-    // what's already in Gujarati, by every PRID it goes by
-    const gujarati = store.releases(date).filter((r) => r.source === "pib" && r.lang !== "hi");
-    const have = new Set(gujarati.flatMap((r) => [r.id, ...(r.langVersions ?? [])]));
-    // a translation the Gujarati release (published later in the day) now covers: the Gujarati one prints
-    for (const s of store.stories(date).filter((s) => s.translatedFrom === "hi")) {
-      const hi = s.releaseId ? store.release(s.releaseId) : null;
-      const twin = hi && (have.has(hi.id) || (hi.langVersions ?? []).some((v) => have.has(v)) ? gujarati[0] : sameNewsIn(hi, gujarati));
-      if (hi && twin) {
-        store.deleteStory(s.id);
-        ctx.content -= await ctx.areaOf(s);
-        log(`  ${hi.id}: now in Gujarati from PIB (${twin.id}), so its translation is dropped`);
-      }
     }
     const done = new Set(store.stories(date).filter((s) => s.translatedFrom).map((s) => s.releaseId));
     const list = await listPib(date, "hi");

@@ -66,7 +66,7 @@ export function gateLabel(g: string): string {
   const k = g.split(" ")[0];
   if (k === "3") return /tombstone/.test(g) ? "No headlines side by side" : /importance/.test(g) ? "Bigger news, bigger headline" : "No oversized headline";
   const plain: Record<string, string> = {
-    "1": "Nothing overflows or overlaps", P: "Ready for the printer", "2": "No empty space on the pages", "4": "Every story placed",
+    "1": "Nothing overflows or overlaps", P: "Ready for the printer", F: "Every letter in the paper's fonts", "2": "No empty space on the pages", "4": "Every story placed",
     "5": "AI page review", "6": "Numbers match the releases", "7": "Same result on a rebuild", S1: "Even word spacing",
     S2: "Headlines fill their width", S4: "Columns end level", S5: "Enough news for the pages", S6: "Gujarati digits", S7: "Headline, sub-heading, text",
   };

@@ -41,7 +41,10 @@ export function devanagariToGujarati(text: string): string {
 
 export function normalizeText(text: string): string {
   const digits = DIGITS[profile.language.digits];
-  let out = profile.language.lang === "gu" ? devanagariToGujarati(text) : text;
+  // no zero-width spaces (no font draws them); in Gujarati, a Devanagari
+  // danda (। ॥, a quoted verse) ends the sentence as Gujarati prose does: "."
+  let out = text.replace(/\u200b/g, "");
+  if (profile.language.lang === "gu") out = devanagariToGujarati(out).replace(/\s*॥\s*/g, ". ").replace(/\s*।\s*/g, ". ").replace(/\. +$/, ".");
   if (digits && digits !== DIGITS.latin) {
     out = out.replace(/\d+/g, (num, offset: number) => {
       // the whole number, e.g. "1800-233-0222", "2025-26" or "98256 08744"

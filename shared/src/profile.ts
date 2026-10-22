@@ -24,6 +24,9 @@ export const FontRoleSchema = z.object({
   restricted: z.boolean().default(false),
   /** For a legacy font: the font (a fonts key) that sets Latin letters and digits. */
   latin: z.string().optional(),
+  /** For a Unicode font: the font (a fonts key) that sets the characters it
+   * lacks (e.g. ₹), instead of whatever face the browser would pick. */
+  fallback: z.string().optional(),
 });
 
 const TextStyleSchema = z.object({

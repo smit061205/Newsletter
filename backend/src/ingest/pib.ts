@@ -24,17 +24,21 @@ const MAX_PAGES = 300; // a day's ceiling, whatever happens
 export const FEEDS = {
   gu: { reg: 22, lang: 13, name: "PIB Ahmedabad, Gujarati" },
   hi: { reg: 3, lang: 2, name: "PIB Delhi, Hindi" },
+  en: { reg: 3, lang: 1, name: "PIB Delhi, English" },
 } as const;
 export type FeedLang = keyof typeof FEEDS;
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
-const ENTITIES: Record<string, string> = { nbsp: " ", amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", rsquo: "’", lsquo: "‘",
-  rdquo: "”", ldquo: "“", ndash: "–", mdash: "—", hellip: "…", bull: "•", zwj: "‍", zwnj: "‌" };
+// HTML's named characters up to the arrows (Latin-1, accents, typographic
+// marks): Malé, ₹-adjacent dashes and quotes, as PIB writes them
+const NAMED: Record<string, number> = { apos: 0x27, AElig: 0xc6, Aacute: 0xc1, Acirc: 0xc2, Agrave: 0xc0, Alpha: 0x391, Aring: 0xc5, Atilde: 0xc3, Auml: 0xc4, Beta: 0x392, Ccedil: 0xc7, Chi: 0x3a7, Dagger: 0x2021, Delta: 0x394, ETH: 0xd0, Eacute: 0xc9, Ecirc: 0xca, Egrave: 0xc8, Epsilon: 0x395, Eta: 0x397, Euml: 0xcb, Gamma: 0x393, Iacute: 0xcd, Icirc: 0xce, Igrave: 0xcc, Iota: 0x399, Iuml: 0xcf, Kappa: 0x39a, Lambda: 0x39b, Mu: 0x39c, Ntilde: 0xd1, Nu: 0x39d, OElig: 0x152, Oacute: 0xd3, Ocirc: 0xd4, Ograve: 0xd2, Omega: 0x3a9, Omicron: 0x39f, Oslash: 0xd8, Otilde: 0xd5, Ouml: 0xd6, Phi: 0x3a6, Pi: 0x3a0, Prime: 0x2033, Psi: 0x3a8, Rho: 0x3a1, Scaron: 0x160, Sigma: 0x3a3, THORN: 0xde, Tau: 0x3a4, Theta: 0x398, Uacute: 0xda, Ucirc: 0xdb, Ugrave: 0xd9, Upsilon: 0x3a5, Uuml: 0xdc, Xi: 0x39e, Yacute: 0xdd, Yuml: 0x178, Zeta: 0x396, aacute: 0xe1, acirc: 0xe2, acute: 0xb4, aelig: 0xe6, agrave: 0xe0, alefsym: 0x2135, alpha: 0x3b1, amp: 0x26, aring: 0xe5, atilde: 0xe3, auml: 0xe4, bdquo: 0x201e, beta: 0x3b2, brvbar: 0xa6, bull: 0x2022, ccedil: 0xe7, cedil: 0xb8, cent: 0xa2, chi: 0x3c7, circ: 0x2c6, copy: 0xa9, crarr: 0x21b5, curren: 0xa4, dArr: 0x21d3, dagger: 0x2020, darr: 0x2193, deg: 0xb0, delta: 0x3b4, divide: 0xf7, eacute: 0xe9, ecirc: 0xea, egrave: 0xe8, emsp: 0x2003, ensp: 0x2002, epsilon: 0x3b5, eta: 0x3b7, eth: 0xf0, euml: 0xeb, euro: 0x20ac, fnof: 0x192, frac12: 0xbd, frac14: 0xbc, frac34: 0xbe, frasl: 0x2044, gamma: 0x3b3, gt: 0x3e, hArr: 0x21d4, harr: 0x2194, hellip: 0x2026, iacute: 0xed, icirc: 0xee, iexcl: 0xa1, igrave: 0xec, image: 0x2111, iota: 0x3b9, iquest: 0xbf, iuml: 0xef, kappa: 0x3ba, lArr: 0x21d0, lambda: 0x3bb, laquo: 0xab, larr: 0x2190, ldquo: 0x201c, lrm: 0x200e, lsaquo: 0x2039, lsquo: 0x2018, lt: 0x3c, macr: 0xaf, mdash: 0x2014, micro: 0xb5, middot: 0xb7, mu: 0x3bc, nbsp: 0xa0, ndash: 0x2013, not: 0xac, ntilde: 0xf1, nu: 0x3bd, oacute: 0xf3, ocirc: 0xf4, oelig: 0x153, ograve: 0xf2, oline: 0x203e, omega: 0x3c9, omicron: 0x3bf, ordf: 0xaa, ordm: 0xba, oslash: 0xf8, otilde: 0xf5, ouml: 0xf6, para: 0xb6, permil: 0x2030, phi: 0x3c6, pi: 0x3c0, piv: 0x3d6, plusmn: 0xb1, pound: 0xa3, prime: 0x2032, psi: 0x3c8, quot: 0x22, rArr: 0x21d2, raquo: 0xbb, rarr: 0x2192, rdquo: 0x201d, real: 0x211c, reg: 0xae, rho: 0x3c1, rlm: 0x200f, rsaquo: 0x203a, rsquo: 0x2019, sbquo: 0x201a, scaron: 0x161, sect: 0xa7, shy: 0xad, sigma: 0x3c3, sigmaf: 0x3c2, sup1: 0xb9, sup2: 0xb2, sup3: 0xb3, szlig: 0xdf, tau: 0x3c4, theta: 0x3b8, thetasym: 0x3d1, thinsp: 0x2009, thorn: 0xfe, tilde: 0x2dc, times: 0xd7, trade: 0x2122, uArr: 0x21d1, uacute: 0xfa, uarr: 0x2191, ucirc: 0xfb, ugrave: 0xf9, uml: 0xa8, upsih: 0x3d2, upsilon: 0x3c5, uuml: 0xfc, weierp: 0x2118, xi: 0x3be, yacute: 0xfd, yen: 0xa5, yuml: 0xff, zeta: 0x3b6, zwj: 0x200d, zwnj: 0x200c };
+// (a non-breaking space reads as a plain one in a release's text)
+const ENTITIES: Record<string, string> = { ...Object.fromEntries(Object.entries(NAMED).map(([k, v]) => [k, String.fromCodePoint(v)])), nbsp: " " };
 export function decodeEntities(s: string): string {
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) =>
     e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1)))
-      : ENTITIES[e.toLowerCase()] ?? m);
+      : ENTITIES[e] ?? ENTITIES[e.toLowerCase()] ?? m);
 }
 const text = (html: string) => decodeEntities(html.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
 
@@ -223,7 +227,7 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
     const release: Release = {
       id: it.prid, date, url: `${SITE}/PressReleasePage.aspx?PRID=${it.prid}`, office: r.office,
       headline: r.headline, subhead: r.subhead, body: r.paras.join("\n\n"), photos, fetchedAt: new Date().toISOString(),
-      source: "pib", lang: feed, ministry: r.ministry || it.ministry, langVersions: r.langVersions,
+      source: "pib", lang: feed === "en" ? undefined : feed, ministry: r.ministry || it.ministry, langVersions: r.langVersions,
     };
     store.putRelease(release);
     fetched++;

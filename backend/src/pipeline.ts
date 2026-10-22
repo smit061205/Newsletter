@@ -42,6 +42,20 @@ function keepAwake(): () => void {
 }
 
 let running: Job | null = null;
+
+/** Runs a previous engine left "running" (it was stopped or the computer
+ * restarted): marked stopped, so the newsroom offers to run them again. */
+export function settleInterrupted(store: Store) {
+  for (const job of store.jobs(undefined, 50)) {
+    if (job.status !== "running") continue;
+    job.status = "failed";
+    job.endedAt = new Date().toISOString();
+    for (const s of job.steps) {
+      if (s.status === "running") { s.status = "failed"; s.error = "stopped: the engine was restarted"; }
+    }
+    store.putJob(job);
+  }
+}
 /** The job running now, if any: one at a time. */
 export const currentJob = () => running;
 

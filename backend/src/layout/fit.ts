@@ -139,9 +139,12 @@ async function messageFiller(id: string, x: number, y: number, w: number, h: num
       const got = await setDisplay(m, text, { font: HEADLINE.font, max: Math.min(64 * PT, most * 0.4), min: 12 * PT, maxLines: lines,
                                              leading: 1.2, align: "fit" }, `${id}-t`, id, 0, 0, inner);
       if (!got || got.lines !== lines || got.bottom > most - 2 * pad) continue;
-      if (!best || got.size > best.size + 0.5) best = { text, size: got.size, lines, height: got.bottom };
+      // the message and setting that fill the panel best (a tall box round two
+      // short lines reads as empty); among equals, the larger type
+      if (!best || got.bottom > best.height + 0.5 || (Math.abs(got.bottom - best.height) <= 0.5 && got.size > best.size)) {
+        best = { text, size: got.size, lines, height: got.bottom };
+      }
     }
-    if (best) break; // the first message that fits; the rotation varies them
   }
   if (!best) return null;
   // the panel fills the hole up to the shape a panel can have, the message
@@ -221,7 +224,8 @@ export async function closeGaps(plan: PagePlan, ctx: {
     // no story left for it: a "જાણવા જેવું" item written to its size
     // (editorial/features.ts) -- copy, not a slogan: the paper runs at most
     // one of those. Its length from what a first try measured.
-    if (h >= 6 * pitch) {
+    // (wide enough, four lines hold a one-line headline and its text)
+    if (h >= (cols >= 3 ? 4 : 6) * pitch) {
       const slot = `${plan.page}-${col}-${cols}`;
       const avoid = [...placed.map((p) => p.module.story.headline)];
       let target = Math.max(12, Math.round((h / pitch - 5) * cols * 5));

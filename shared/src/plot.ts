@@ -344,7 +344,9 @@ export function staticWarnings(issue: IssueRender): PlotWarning[] {
         ? { x0: Math.min(el.x1, el.x2), y0: Math.min(el.y1, el.y2), x1: Math.max(el.x1, el.x2), y1: Math.max(el.y1, el.y2) }
         : el.kind === "path" ? pathBounds(el.d)
         : { x0: el.x, y0: el.y, x1: el.x + el.width, y1: el.y + el.height };
-      if (box.x0 < 0 || box.y0 < 0 || box.x1 > page.width || box.y1 > page.height) {
+      // half a pixel for rounding: 0.02px past the edge (a line set to end at it) can't print
+      const e = 0.5;
+      if (box.x0 < -e || box.y0 < -e || box.x1 > page.width + e || box.y1 > page.height + e) {
         out.push({ page: page.number, elementId: el.id, articleId: el.articleId, kind: "off-page",
                    detail: "extends past the page edge (clipped when printed)" });
       }

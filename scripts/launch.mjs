@@ -58,13 +58,20 @@ function start(name, cmd, cmdArgs, opts = {}) {
   say(`started the ${name} (process ${child.pid})`);
 }
 
-function stop(name) {
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
+async function stop(name) {
   const file = path.join(RUN, `${name}.pid`);
   if (!existsSync(file)) return;
   const pid = Number(readFileSync(file, "utf8"));
   try {
     if (isWin) spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" });
-    else process.kill(-pid, "SIGTERM"); // the whole group: npm's children too
+    else {
+      process.kill(-pid, "SIGTERM"); // the whole group: its browser too
+      // the engine's browser can hold it open: a few seconds, then for good
+      for (let i = 0; i < 10 && alive(pid); i++) await new Promise((r) => setTimeout(r, 500));
+      if (alive(pid)) process.kill(-pid, "SIGKILL");
+    }
     say(`stopped the ${name}`);
   } catch { /* already gone */ }
   rmSync(file, { force: true });
@@ -111,16 +118,16 @@ async function main() {
     return;
   }
   if (args.has("--stop")) {
-    stop("newsroom");
-    stop("engine");
+    await stop("newsroom");
+    await stop("engine");
     return;
   }
   if (args.has("--update")) {
     run("git", ["pull", "--ff-only"]);
     run(npm, ["ci", "--no-audit", "--no-fund"]);
     build();
-    stop("newsroom");
-    stop("engine");
+    await stop("newsroom");
+    await stop("engine");
     await new Promise((r) => setTimeout(r, 1500));
   }
   await startAll();

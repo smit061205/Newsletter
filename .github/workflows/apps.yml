@@ -39,6 +39,13 @@ jobs:
         run: |
           export DATA_DIR="$RUNNER_TEMP/ck-test"
           node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/pack-0808.ts
+      - name: A second paper with no engine changes (The Sample Herald, must be READY)
+        shell: bash
+        env:
+          CK_PUBLICATION: sample-english
+        run: |
+          export DATA_DIR="$RUNNER_TEMP/ck-en"
+          node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/sample-english.ts
       - name: Newsroom website
         run: npm run build --prefix web
       - name: The app starts, answers and stops

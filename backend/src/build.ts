@@ -2,7 +2,7 @@
 // the planner's stories; validated against the render contract, checked with
 // the frontend's own plotter (no text may overflow or run into anything),
 // saved as a draft, and printed to PDF.
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { IssueRenderSchema, type Element, type IssueRender } from "@ck/shared/contract";
 import { printIssue } from "@ck/shared/pdf";
@@ -12,6 +12,7 @@ import { Measurer } from "./layout/measure.ts";
 import { FEATURE_KICKER } from "./editorial/features.ts";
 import { planDay } from "./editorial/plan.ts";
 import { preflight } from "./export/preflight.ts";
+import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
 import { writeDeck } from "./editorial/rewrite.ts";
 import { closeGaps, type FillerCount } from "./layout/fit.ts";
@@ -293,8 +294,31 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const comparable = previous && (previous.report as { fingerprint?: string }).fingerprint === fingerprint;
   const same = comparable ? JSON.stringify(previous.issue) === JSON.stringify(issue) : null;
   const print = await preflight(pdf, issue);
+  // every printed character in its own font (fonts/cmap.ts): none left to a fallback face
+  const coverage = new Map<string, Set<number>>();
+  for (const f of issue.fonts) {
+    try { coverage.set(f.id, cmapCoverage(await readFile(assetFile(new URL(f.url, "http://x").pathname)))); } catch { /* the plotter reports a failed font */ }
+  }
+  const missingGlyphs = new Map<string, Set<string>>(); // char -> where
+  for (const page of issue.pages) {
+    for (const e of page.elements) {
+      if (e.kind !== "text") continue;
+      for (const run of typeof e.text === "string" ? [{ text: e.text, font: e.font }] : e.text.map((r) => ({ text: r.text, font: r.font ?? e.font }))) {
+        const has = coverage.get(run.font);
+        if (!has) continue;
+        for (const ch of run.text) {
+          const c = ch.codePointAt(0)!;
+          if (c < 0x20 || /\s/.test(ch) || c === 0x200c || c === 0x200d || c === 0xad || has.has(c)) continue;
+          if (!missingGlyphs.has(ch)) missingGlyphs.set(ch, new Set());
+          missingGlyphs.get(ch)!.add(`p${page.number} ${e.articleId ?? e.id}`);
+        }
+      }
+    }
+  }
   const gates = [
     { gate: "1 plotter: no overflow, overlap, off-page, failed fonts or images", pass: plotterProblems.length === 0, detail: `${plotterProblems.length} warning(s)` },
+    { gate: "F every letter in the paper's own fonts", pass: missingGlyphs.size === 0,
+      detail: missingGlyphs.size ? [...missingGlyphs].map(([ch, at]) => `"${ch}" (U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}) in ${[...at].slice(0, 3).join(", ")}`).join("; ") : "ok" },
     { gate: "P print preflight: trim size, fonts embedded, photos 200 ppi+, nothing off the page", pass: print.every((c) => c.pass),
       detail: print.map((c) => `${c.name} ${c.pass ? "ok" : c.detail}`).join("; ") },
     { gate: "2 no empty space on the page (every column filled to what's below)", pass: result.gaps.length === 0,

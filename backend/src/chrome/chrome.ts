@@ -93,6 +93,7 @@ export async function chromeFor(n: number, total: number, issueDate: string, iss
   // a one-page paper has no "last page" header; give its last page the footer anyway
   const footer = role.footer ?? (n === total ? template.roles.last.footer : undefined);
   if (footer) els.push({ id: `p${n}-footer`, kind: "image", ...footer, fit: "fill" });
-  const bottom = footer ? footer.y : template.page.height;
+  // the template's own foot margin, else the footer's top, else the page's
+  const bottom = Math.min(role.bodyBottom ?? template.page.height, footer ? footer.y : template.page.height);
   return { elements: els, bodyTop: role.bodyTop, bodyBottom: bottom };
 }

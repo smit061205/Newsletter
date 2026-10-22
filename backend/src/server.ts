@@ -31,7 +31,7 @@ import path from "node:path";
 import { MEDIA_DIR } from "./config.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { DATA_DIR, ROOT } from "./config.ts";
-import { currentJob, onJob, runPipeline, STEPS } from "./pipeline.ts";
+import { currentJob, onJob, runPipeline, settleInterrupted, STEPS } from "./pipeline.ts";
 import type { Ad, Release, StepName, Store } from "./store.ts";
 
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json") {
@@ -183,6 +183,7 @@ function authorized(req: IncomingMessage): boolean {
 
 export async function serve(store: Store, opts: { port: number; host?: string; log: (s: string) => void }) {
   const { log } = opts;
+  settleInterrupted(store);
   /** Start a run in the background and answer at once with its job. */
   const startJob = (res: ServerResponse, date: string, from?: StepName) => {
     if (currentJob()) return send(res, 409, { error: `a run for ${currentJob()!.date} is still going`, job: currentJob() });
