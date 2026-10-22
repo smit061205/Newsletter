@@ -37,7 +37,7 @@ Not sure which Mac? Apple menu → About This Mac: "Chip: Apple M…" is Apple s
 ### macOS
 1. Download the `.dmg` for your Mac (above).
 2. Open it and drag **Capital Kranti** onto **Applications**. If Finder asks to replace an existing "Capital Kranti" (the earlier install), click **Replace**.
-3. The first time only: in Applications, **right-click Capital Kranti → Open → Open**. The app isn't notarised by Apple yet, so macOS asks once. On newer macOS, if there's no Open button: System Settings → Privacy & Security → **Open Anyway**.
+3. The first time only (the app isn't notarised by Apple yet), macOS says it "could not verify" Capital Kranti. Click **Done** (not Move to Trash). Then open **System Settings → Privacy & Security**, scroll to **Security**, click **Open Anyway** next to "Capital Kranti was blocked…", confirm with the Mac's password, and click **Open Anyway** again. (On macOS 14 and earlier, right-click the app → **Open** → **Open** also works.)
 4. The welcome screens ask for the language, the OpenRouter key and the time to make the paper. The app adds itself to the Dock and starts at log-in. It also offers to wake the Mac five minutes before the run, which needs the Mac's password once.
 
 ### Windows

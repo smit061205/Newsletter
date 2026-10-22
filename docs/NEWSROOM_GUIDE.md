@@ -11,8 +11,8 @@
 જૂની એપ પહેલાં કાઢવાની નથી: નવી એપ ખોલતાં જ જૂનાં છાપાં અને સેટિંગ્સ પોતે લઈ લે છે અને જૂની એપ કાઢી નાખે છે.
 *Don't uninstall the earlier app first: the new one takes its issues and settings when it opens, then removes it.*
 
-- **Mac:** `.dmg` ખોલો, **Capital Kranti** ને **Applications** પર ખેંચો. પહેલી વાર: જમણું-ક્લિક → **Open** → **Open**.
-  *Open the `.dmg` and drag **Capital Kranti** onto **Applications**. The first time: right-click → **Open** → **Open**.*
+- **Mac:** `.dmg` ખોલો, **Capital Kranti** ને **Applications** પર ખેંચો. પહેલી વાર "Not Opened" દેખાય તો **Done** દબાવો, પછી **System Settings → Privacy & Security** માં નીચે **Open Anyway** દબાવો અને પાસવર્ડ નાખો.
+  *Open the `.dmg` and drag **Capital Kranti** onto **Applications**. The first time, if it says "Not Opened", click **Done**, then in **System Settings → Privacy & Security** click **Open Anyway** and enter the password.*
 - **Windows:** `Capital-Kranti-Setup.exe` ખોલો → Next → Install → Finish. "Windows protected your PC" દેખાય તો **More info → Run anyway**.
   *Open the setup, then Next → Install → Finish. If Windows warns, click **More info → Run anyway**.*
 
