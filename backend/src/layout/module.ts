@@ -167,7 +167,10 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     const lines = await fitLines(m, txt, w, spec.font, spec.max, spec.min, fallbackLines);
     const st = await stackLines(m, lines.lines, `${aid}-${idp}`, aid, 0, cursor, w, spec.font, lines.size, lines.size * spec.leading);
     displayFill = 0;
-    return { elements: st.elements, bottom: st.bottom, size: lines.size, lines: lines.lines.length, fill: 0 };
+    // a one-column brief's short headline is centred, as the paper prints it
+    const centred = rank === 5 && cols === 1;
+    return { elements: centred ? st.elements.map((e) => (e.kind === "text" ? { ...e, align: "center" as const } : e)) : st.elements,
+             bottom: st.bottom, size: lines.size, lines: lines.lines.length, fill: 0 };
   };
   const kicker = text.kicker.trim();
   if (kicker) {

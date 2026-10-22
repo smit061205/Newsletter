@@ -32,6 +32,8 @@ jobs:
           npx tsc --noEmit -p web
       - name: PIB parser (saved pages)
         run: node --experimental-strip-types --no-warnings backend/test/pib-parse.ts
+      - name: Add-a-newspaper extractor finds Capital Kranti's own profile in its 8 August PDF
+        run: node --experimental-strip-types --no-warnings backend/test/extract-0808.ts
       - name: Layout engine, the 8 August stories in free fonts (must be READY)
         shell: bash
         env:

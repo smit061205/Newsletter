@@ -62,10 +62,13 @@ export const currentJob = () => running;
 async function step(store: Store, date: string, name: StepName, say: (s: string) => void) {
   switch (name) {
     case "fetch": {
-      const { ingestPib } = await import("./ingest/pib.ts");
-      const r = await ingestPib(store, date, "gu", { log: say });
+      // the paper's own language from PIB (Gujarati: PIB Ahmedabad)
+      const { ingestPib, FEEDS } = await import("./ingest/pib.ts");
+      const { profile } = await import("./profile.ts");
+      const feed = (profile.language.lang in FEEDS ? profile.language.lang : "en") as keyof typeof FEEDS;
+      const r = await ingestPib(store, date, feed, { log: say });
       say(`${r.listed} listed, ${r.fetched} new, ${r.skipped} already stored`);
-      if (!store.releases(date).length) throw new Error(`PIB has no Gujarati releases for ${date} yet`);
+      if (!store.releases(date).length) throw new Error(`PIB has no releases in the paper's language for ${date} yet`);
       return;
     }
     case "rewrite": {
@@ -73,6 +76,9 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       return rewriteDay(store, date, { log: say });
     }
     case "topup": {
+      // (translating Hindi tops up a Gujarati paper; other papers take their own language whole)
+      const { profile } = await import("./profile.ts");
+      if (profile.language.lang !== "gu") return say(`a ${profile.language.lang} paper: no translation step`);
       const { topUp } = await import("./editorial/translate.ts");
       await topUp(store, date, { log: say });
       return;

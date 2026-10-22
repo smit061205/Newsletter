@@ -56,7 +56,9 @@ const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
 function dropLastSentence(body: string): string | null {
   const paras = body.split(/\n\s*\n/);
   const last = paras[paras.length - 1].trim();
-  const sentences = last.match(/[^.!?।]+[.!?।]+["'”’)]*\s*|[^.!?।]+$/g) ?? [last];
+  // a sentence ends at its stop followed by a space or the paragraph's end
+  // (not at the dots inside "nmba.dosje.gov.in" or "૩.૫")
+  const sentences = last.match(/[\s\S]*?[.!?।]+["'”’)]*(?:\s+|$)|[\s\S]+$/g)?.filter(Boolean) ?? [last];
   if (sentences.length > 1) paras[paras.length - 1] = sentences.slice(0, -1).join("").trim();
   else if (paras.length > 1) paras.pop();
   else return null;
@@ -241,7 +243,8 @@ export async function closeGaps(plan: PagePlan, ctx: {
           const body = sentences.slice(0, n).join(" ");
           brief = await buildModule({ ...got.story, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", m, 0);
         }
-        const fitsHere = brief.height <= h && brief.displayFill >= 0.97;
+        // (a one-column brief may centre a headline it can't justify)
+        const fitsHere = brief.height <= h && (brief.displayFill >= 0.97 || cols === 1);
         note(`  brief try ${attempt + 1}: ${words(brief.story.bodies.long)} words, ${(brief.height / PT).toFixed(0)} of ${(h / PT).toFixed(0)}pt`);
         if (fitsHere && (!best || brief.height > best.height)) best = brief;
         if (best && h - best.height < 1.5 * pitch) break;

@@ -125,12 +125,23 @@ export const SCHEMA = {
   },
 };
 
-export const SYSTEM = `તમે ગાંધીનગરના ગુજરાતી દૈનિક "કેપિટલ ક્રાંતિ"ના ઉપતંત્રી છો.
-You turn a government press release (the Gujarat government's, or the central government's from PIB) into a newspaper story in clear, formal newspaper Gujarati.
+// the paper's language, as the model is told it
+const LANGUAGE: Record<string, { name: string; digits: string; dateline: string }> = {
+  gu: { name: "Gujarati", digits: "Gujarati digits (૦-૯)", dateline: "ગાંધીનગર, મંગળવાર ::" },
+  hi: { name: "Hindi", digits: "Latin digits (0-9), as Hindi papers print them", dateline: "नई दिल्ली, मंगलवार ::" },
+  ur: { name: "Urdu", digits: "Latin digits (0-9)", dateline: "نئی دہلی، منگل ::" },
+  en: { name: "English", digits: "Latin digits (0-9)", dateline: "NEW DELHI, Tuesday:" },
+};
+const paperLang = LANGUAGE[profile.language.lang] ?? LANGUAGE.en;
+const paperName = profile.name.split(" (")[0];
+/** The desk editor the model plays: this paper, in its own language. */
+export const SYSTEM = `${profile.language.lang === "gu" ? `તમે ગાંધીનગરના ગુજરાતી દૈનિક "${paperName}"ના ઉપતંત્રી છો.\n` : ""}` +
+`You are a sub-editor of the ${paperLang.name} daily "${paperName}". You turn a government press release (a state government's, or the ` +
+`central government's from PIB) into a newspaper story in clear, formal newspaper ${paperLang.name}.
 Rules:
 - Use ONLY facts in the release. Never add names, numbers, dates, places or quotes that are not in it.
-- Keep every number, name and date exactly as in the release, written in Gujarati digits (૦-૯) -- except inside English names and codes (ATM 2026, COVID-19).
-- Start body_long with the dateline the release uses (e.g. "ગાંધીનગર, મંગળવાર ::"), if it has one.
+- Keep every number, name and date exactly as in the release, written in ${paperLang.digits} -- except inside English names and codes (ATM 2026, COVID-19).
+- Start body_long with the dateline the release uses (e.g. "${paperLang.dateline}"), if it has one.
 - Headline: active, specific, no exclamation marks. Always write a deck (the sub-heading: one line adding the next most important fact). The kicker may be empty.
 - body_medium and body_short are shorter versions of body_long, keeping the most important facts first.
 Return JSON matching the schema.`;
@@ -236,15 +247,19 @@ export async function rewriteOne(r: Release, model: string, key: string, togethe
   return { story, cost: data.usage?.cost ?? 0, seconds: (Date.now() - t0) / 1000 };
 }
 
+const SCRIPT: Record<string, RegExp> = { gu: /[\u0A80-\u0AFF]/g, hi: /[\u0900-\u097F]/g, ur: /[\u0600-\u06FF]/g, en: /[A-Za-z]/g };
+const share = (s: string, re: RegExp) => (s.match(re)?.length ?? 0) / Math.max(1, s.replace(/\s/g, "").length);
 export const gujaratiShare = (s: string) => (s.match(/[\u0A80-\u0AFF]/g)?.length ?? 0) / Math.max(1, s.replace(/\s/g, "").length);
 
 export async function rewriteDay(store: Store, date: string, opts: { log: (s: string) => void; model?: string; force?: boolean }) {
   // The department issues some releases twice, in Gujarati and in English;
   // the English one is the same news -- translating it would print the
   // story twice. Only Gujarati releases become stories.
-  // (Hindi releases are translated, not rewritten: editorial/translate.ts)
-  const all = store.releases(date).filter((r) => r.lang !== "hi");
-  const releases = all.filter((r) => gujaratiShare(r.headline + r.body.slice(0, 400)) > 0.5);
+  // (a Gujarati paper translates its Hindi releases instead: editorial/translate.ts)
+  const all = store.releases(date).filter((r) => profile.language.lang !== "gu" || r.lang !== "hi");
+  // releases in the paper's own script (a release issued in two languages is the same news)
+  const own = SCRIPT[profile.language.lang] ?? /[A-Za-z]/g;
+  const releases = all.filter((r) => share(r.headline + r.body.slice(0, 400), own) > 0.5);
   for (const r of all) if (!releases.includes(r)) store.deleteStory(storyIdOf(r));
   // a PIB release is only ever "p<PRID>" (never a state-style "r<id>" from older code)
   for (const r of all) if (r.source === "pib") store.deleteStory(`r${r.id}`);

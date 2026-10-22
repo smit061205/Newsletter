@@ -16,6 +16,9 @@
 //   GET   /api/ads?date= POST /api/ads DELETE /api/ads/:id   the ad bookings (an image, its size, its page and days)
 //   POST  /api/issues/:date/publish    approve the latest version and put it on the website
 //   GET   /api/status  GET|POST /api/settings   the newsroom's dashboard and settings
+//   POST  /api/papers/draft            {pdfs: [base64]} -- a new paper's profile, drafted from its PDFs
+//   GET   /api/papers  POST /api/papers   the papers; save a new one from its reviewed draft
+//   GET   /api/papers/:id  POST /api/papers/:id/test  GET /api/papers/:id/pdf   a paper's test issue
 //   GET   /healthz                     "ok" (for the host's health check)
 //   GET   /reader                      the release reader: a bookmark that sends the release page you're reading here
 //
@@ -370,6 +373,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
         }
       }
+      if (parts[0] === "api" && parts[1] === "papers") return await papersApi(req, res, parts, url);
       return send(res, 404, { error: "not found" });
     } catch (e) {
       log(`error: ${e instanceof Error ? e.stack : e}`);
@@ -451,4 +455,72 @@ function backupDaily(store: Store, log: (s: string) => void) {
   const safe = () => once().catch((e) => log(`backup failed: ${e instanceof Error ? e.message : e}`));
   safe();
   setInterval(safe, 60 * 60_000);
+}
+
+/** The papers: publications/<id>/ each; every one but this engine's own is
+ * built in its own process and data folder (papers/<id>/). */
+async function papersApi(req: IncomingMessage, res: ServerResponse, parts: string[], url: URL) {
+  const { readdir } = await import("node:fs/promises");
+  const pubs = path.join(ROOT, "publications");
+  const dataOf = (id: string) => path.join(ROOT, "papers", id);
+  const issueOf = async (id: string) => {
+    const file = path.join(dataOf(id), "capital-kranti.sqlite");
+    if (!existsSync(file)) return null;
+    const { Store } = await import("./store.ts");
+    const st = new Store(file);
+    const day = st.latestDate();
+    const got = day ? st.latestIssue(day) : null;
+    st.db.close();
+    return got ? { date: day, version: got.version, ready: (got.report as { ready?: boolean }).ready, pdf: (got.report as { pdf?: string }).pdf,
+                   gates: (got.report as { gates?: unknown[] }).gates } : null;
+  };
+  if (req.method === "POST" && parts[2] === "draft") {
+    const body = (await readJson(req)) as { pdfs?: string[] };
+    if (!body.pdfs?.length) return send(res, 400, { error: "upload one or more of the paper's PDF issues" });
+    const { extractDraft } = await import("./onboard/extract.ts");
+    return send(res, 200, await extractDraft(body.pdfs.map((b) => new Uint8Array(Buffer.from(b, "base64")))));
+  }
+  if (req.method === "GET" && !parts[2]) {
+    const out = [];
+    for (const id of (await readdir(pubs)).filter((d) => existsSync(path.join(pubs, d, "profile.json")))) {
+      const prof = JSON.parse(readFileSync(path.join(pubs, id, "profile.json"), "utf8")) as { name: string; language: { lang: string }; issue: { pages: number } };
+      out.push({ id, name: prof.name, lang: prof.language.lang, pages: prof.issue.pages, own: id === (process.env.CK_PUBLICATION?.trim() || "capital-kranti"),
+                 test: id === "dev-test" || id === "sample-english", issue: await issueOf(id) });
+    }
+    return send(res, 200, out);
+  }
+  if (req.method === "POST" && !parts[2]) {
+    const { savePaper } = await import("./onboard/save.ts");
+    const saved = await savePaper((await readJson(req)) as import("./onboard/save.ts").NewPaper);
+    // the profile must load as the engine will load it
+    const { ProfileSchema } = await import("@ck/shared/profile");
+    const check = ProfileSchema.safeParse(JSON.parse(readFileSync(path.join(saved.dir, "profile.json"), "utf8")));
+    if (!check.success) return send(res, 400, { error: `the profile doesn't validate: ${check.error.issues.slice(0, 3).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
+    return send(res, 200, saved);
+  }
+  const id = parts[2];
+  if (!id || !/^[a-z0-9-]+$/.test(id) || !existsSync(path.join(pubs, id, "profile.json"))) return send(res, 404, { error: `no paper "${id}"` });
+  if (req.method === "POST" && parts[3] === "test") {
+    const body = (await readJson(req)) as { date?: string };
+    const date = body.date ?? indiaNow().day;
+    const { spawn } = await import("node:child_process");
+    const { openSync } = await import("node:fs");
+    await mkdir(dataOf(id), { recursive: true });
+    const log = openSync(path.join(dataOf(id), "test.log"), "w");
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--experimental-sqlite", "--no-warnings", path.join(ROOT, "backend", "src", "cli.ts"), "all", "--date", date],
+      { cwd: ROOT, env: { ...process.env, CK_PUBLICATION: id, DATA_DIR: dataOf(id) }, stdio: ["ignore", log, log], detached: false });
+    child.on("error", () => {});
+    return send(res, 202, { id, date, started: true });
+  }
+  if (req.method === "GET" && parts[3] === "pdf") {
+    const got = await issueOf(id);
+    if (!got?.pdf || !existsSync(got.pdf)) return send(res, 404, { error: `no test issue for ${id} yet` });
+    return send(res, 200, new Uint8Array(await readFile(got.pdf)), "application/pdf");
+  }
+  if (req.method === "GET" && !parts[3]) {
+    const logFile = path.join(dataOf(id), "test.log");
+    const log = existsSync(logFile) ? readFileSync(logFile, "utf8").split("\n").filter((l) => l && !/^  p\d  |fit to/.test(l)).slice(-40) : [];
+    return send(res, 200, { id, issue: await issueOf(id), log });
+  }
+  return send(res, 404, { error: "not found" });
 }

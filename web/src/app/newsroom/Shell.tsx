@@ -13,6 +13,7 @@ const TABS: [string, string, string][] = [
   ["/newsroom/stories", "લેખ", "Stories"],
   ["/newsroom/pages", "પાનાં", "Pages"],
   ["/newsroom/ads", "જાહેરાત", "Ads"],
+  ["/newsroom/papers", "છાપાં", "Papers"],
   ["/newsroom/settings", "સેટિંગ્સ", "Settings"],
 ];
 

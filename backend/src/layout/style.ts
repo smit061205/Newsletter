@@ -52,7 +52,8 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
   const looseShare = extra.length ? loose.length / extra.length : 0;
 
   // the display lines' fill, as each module recorded it
-  const unfilled = plans.flatMap((p) => p.placed.filter((x) => x.module.displayFill < FILL)
+  // (a one-column brief centres a headline too short to justify, as the paper does)
+  const unfilled = plans.flatMap((p) => p.placed.filter((x) => x.module.displayFill < FILL && !(x.module.rank === 5 && x.module.cols === 1))
     .map((x) => `p${p.page} ${x.module.story.id} (${Math.round(x.module.displayFill * 100)}%)`));
 
   // column ends per story: the bottoms of each column's last line

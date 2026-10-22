@@ -167,3 +167,8 @@
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.4rem 1rem; margin: 0; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; }
+
+/* Papers */
+.howto { margin: 0; padding-left: 1.2rem; color: var(--muted); display: flex; flex-direction: column; gap: 0.2rem; }
+.paperRow { display: grid; grid-template-columns: 1fr auto; gap: 0.15rem 1rem; padding: 0.7rem 0.25rem; }
+.paperRow .chips { align-items: center; }

@@ -21,3 +21,4 @@ publications/*/fonts/*.otf
 # the app on a desk computer: its logs and nightly database backups
 logs/
 backups/
+papers/
