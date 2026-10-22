@@ -92,7 +92,7 @@ jobs:
           CK_PUBLICATION: dev-test
         run: |
           if [ "${{ runner.os }}" = "macOS" ]; then
-            APP=$(ls -d dist/mac*/"Capital Kranti.app"); E="$APP/Contents/MacOS/Capital Kranti"; R="$APP/Contents/Resources/app-engine"
+            APP="$PWD/$(ls -d dist/mac*/"Capital Kranti.app")"; E="$APP/Contents/MacOS/Capital Kranti"; R="$APP/Contents/Resources/app-engine"
             codesign --verify --deep --strict "$APP"
           else
             E="$PWD/dist/win-unpacked/Capital Kranti.exe"; R="dist/win-unpacked/resources/app-engine"
