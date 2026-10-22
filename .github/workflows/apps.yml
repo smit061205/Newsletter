@@ -26,10 +26,9 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npx playwright install chromium
-      - name: Typecheck
-        run: |
-          npx tsc --noEmit -p backend
-          npx tsc --noEmit -p web
+      # (the website is typechecked by its own build below: its route types are generated then)
+      - name: Typecheck the engine
+        run: npx tsc --noEmit -p backend
       - name: PIB parser (saved pages)
         run: node --experimental-strip-types --no-warnings backend/test/pib-parse.ts
       - name: Add-a-newspaper extractor finds Capital Kranti's own profile in its 8 August PDF
