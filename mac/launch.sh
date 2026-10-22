@@ -1,6 +1,7 @@
 #!/bin/bash
 # The "Capital Kranti" app (Applications): starts the engine and the newsroom
 # (scripts/launch.mjs) and opens the newsroom. --background: don't open it.
+# (an app bundle launched from Finder: work out of the installed copy)
 APP="$HOME/Library/Application Support/CapitalKranti"
 [ -d "$APP" ] || APP="$(cd "$(dirname "$0")/.." && pwd)" # run from inside the project
 export PATH="/opt/homebrew/bin:/usr/local/bin:/opt/homebrew/opt/node@22/bin:/usr/local/opt/node@22/bin:$PATH"

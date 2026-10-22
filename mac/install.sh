@@ -63,7 +63,8 @@ say "6/8  The newsroom website"
 npm run build --prefix web
 
 say "7/8  Capital Kranti in Applications"
-BUNDLE="$HOME/Applications/Capital Kranti.app"
+# the main Applications folder when this user may write there (an admin), else the home one
+if [ -w /Applications ]; then BUNDLE="/Applications/Capital Kranti.app"; rm -rf "$HOME/Applications/Capital Kranti.app"; else BUNDLE="$HOME/Applications/Capital Kranti.app"; fi
 mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
 cat > "$BUNDLE/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -76,7 +77,6 @@ cat > "$BUNDLE/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>capital-kranti</string>
   <key>CFBundleIconFile</key><string>icon</string>
-  <key>LSUIElement</key><true/>
 </dict></plist>
 PLIST
 cp mac/launch.sh "$BUNDLE/Contents/MacOS/capital-kranti"
@@ -88,6 +88,7 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET" -o "$BUNDLE/Contents/Resources/icon.icns"
 touch "$BUNDLE"
+echo "  $BUNDLE (drag it to the Dock to keep it there)"
 
 say "8/8  Start at log-in, and the 8 PM run"
 AGENT="$HOME/Library/LaunchAgents/in.capitalkranti.newsroom.plist"

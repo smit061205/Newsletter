@@ -77,9 +77,23 @@ async function stop(name) {
   rmSync(file, { force: true });
 }
 
+/** The newsroom in a window of its own, like an app: Chrome's or Edge's app
+ * mode when either is installed, else a tab in the default browser. */
 function openBrowser(url) {
-  if (isWin) spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore", windowsHide: true }).unref();
-  else spawn(process.platform === "darwin" ? "open" : "xdg-open", [url], { detached: true, stdio: "ignore" }).unref();
+  const run = (cmd, a) => { const c = spawn(cmd, a, { detached: true, stdio: "ignore", windowsHide: true }); c.on("error", () => {}); c.unref(); };
+  if (isWin) {
+    const pf = [process.env["ProgramFiles(x86)"], process.env.ProgramFiles, process.env.LOCALAPPDATA].filter(Boolean);
+    const exe = pf.flatMap((d) => [path.join(d, "Microsoft", "Edge", "Application", "msedge.exe"), path.join(d, "Google", "Chrome", "Application", "chrome.exe")]).find((f) => existsSync(f));
+    if (exe) return run(exe, [`--app=${url}`]);
+    return run("cmd", ["/c", "start", "", url]);
+  }
+  if (process.platform === "darwin") {
+    for (const app of ["Google Chrome", "Microsoft Edge", "Brave Browser"]) {
+      if (existsSync(`/Applications/${app}.app`) || existsSync(path.join(process.env.HOME ?? "", "Applications", `${app}.app`))) return run("open", ["-na", app, "--args", `--app=${url}`]);
+    }
+    return run("open", [url]);
+  }
+  run("xdg-open", [url]);
 }
 
 async function startAll() {

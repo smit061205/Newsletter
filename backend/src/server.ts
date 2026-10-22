@@ -137,10 +137,22 @@ function indiaNow(): { day: string; time: string } {
 
 /** Calls `job` once a day at the settings' run time (India time), if it's on. */
 function everyEvening(store: Store, job: (day: string) => Promise<unknown>, log: (s: string) => void) {
+  // a run missed while the computer was off happens when it's back -- but not
+  // on the very first start (a fresh install after the run time waits for tomorrow)
+  if (!store.setting("firstStart", "")) {
+    const { day, time } = indiaNow();
+    store.putSetting("firstStart", day);
+    if (time >= settingsOf(store).runAt) store.putSetting("lastScheduledRun", day);
+  }
   setInterval(() => {
     const { autoRun, runAt } = settingsOf(store);
     const { day, time } = indiaNow();
     if (!autoRun || time < runAt || store.setting("lastScheduledRun", "") === day) return;
+    // no AI key: nothing would be written or translated -- wait for one (Settings)
+    if (!envHas("OPENROUTER_API_KEY")) {
+      if (store.setting("noKeyLogged", "") !== day) { store.putSetting("noKeyLogged", day); log(`evening run for ${day} skipped: no OpenRouter key yet (Settings)`); }
+      return;
+    }
     store.putSetting("lastScheduledRun", day);
     log(`evening run for ${day}`);
     job(day).catch((e) => log(`evening run failed: ${e instanceof Error ? e.message : e}`));
