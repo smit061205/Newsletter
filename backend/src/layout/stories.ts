@@ -68,6 +68,7 @@ export function applyTextEdits(stories: Story[], edits: Edit[]): Story[] {
       if (typeof change.photo === "string" || change.photo === null) out.photo = change.photo as string | null;
       if (typeof change.body === "string") out.bodies = { long: change.body, medium: change.body, short: change.body };
       if (typeof change.priority === "number" && change.priority >= 1 && change.priority <= 5) out.priority = Math.round(change.priority);
+      if (typeof change.fullWidth === "boolean") out.fullWidth = change.fullWidth;
     }
     return out;
   });

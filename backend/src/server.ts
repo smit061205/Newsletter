@@ -161,7 +161,16 @@ function everyEvening(store: Store, job: (day: string) => Promise<unknown>, log:
 
 /** The newsroom's settings, with their defaults. */
 export function settingsOf(store: Store) {
-  return { runAt: store.setting("runAt", "20:00"), autoRun: store.setting("autoRun", true) };
+  return {
+    runAt: store.setting("runAt", "20:00"), autoRun: store.setting("autoRun", true),
+    /** the newsroom's language: Gujarati or English */
+    lang: store.setting<"gu" | "en">("lang", "gu"),
+    /** the first-run welcome is done */
+    onboarded: store.setting("onboarded", false),
+    /** rupees to a US dollar, for showing the AI's cost (reported in USD) */
+    inrPerUsd: store.setting("inrPerUsd", 88),
+    notify: store.setting("notify", true),
+  };
 }
 
 const ENV_FILE = path.join(ROOT, "backend", ".env");
@@ -216,6 +225,16 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         const date = url.searchParams.get("date") ?? store.latestDate();
         const got = date ? store.latestIssue(date) : null;
         return got ? send(res, 200, got.issue) : send(res, 404, { error: `no issue built for ${date ?? "any day"}` });
+      }
+      if (req.method === "GET" && url.pathname === "/api/issues") {
+        // the archive: every day built, newest first, its latest version
+        const rows = store.db.prepare("select date, max(version) v from issues group by date order by date desc limit 120").all() as { date: string; v: number }[];
+        return send(res, 200, rows.map((row) => {
+          const got = store.latestIssue(row.date)!;
+          const rep = got.report as { issueNumber?: number; ready?: boolean; cost?: number; placed?: unknown[]; pages?: number };
+          return { date: row.date, version: got.version, status: got.status, issueNumber: rep.issueNumber, ready: rep.ready,
+                   cost: rep.cost, stories: rep.placed?.length ?? 0, pages: rep.pages };
+        }));
       }
       if (parts[0] === "api" && parts[1] === "issues" && parts[2]) {
         const date = parts[2];
@@ -360,19 +379,33 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
       if (req.method === "GET" && url.pathname === "/api/status") {
         const { day, time } = indiaNow();
         const s = settingsOf(store);
-        const latest = store.latestIssue(day);
+        // the day the newsroom is on (?date=), today by default
+        const asked = url.searchParams.get("date");
+        const latest = store.latestIssue(asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : day);
         return send(res, 200, {
           today: day, now: time, ...s, nextRun: s.autoRun ? `${store.setting("lastScheduledRun", "") === day || time >= s.runAt ? "tomorrow" : "today"} ${s.runAt}` : null,
           running: currentJob(), lastJob: store.jobs(undefined, 1)[0] ?? null,
           openrouterKey: envHas("OPENROUTER_API_KEY"),
-          issue: latest ? { version: latest.version, status: latest.status, ready: (latest.report as { ready?: boolean }).ready } : null,
+          issue: latest ? { version: latest.version, status: latest.status, ready: (latest.report as { ready?: boolean }).ready,
+                            issueNumber: (latest.report as { issueNumber?: number }).issueNumber } : null,
           version: gitVersion(),
         });
       }
       if (parts[0] === "api" && parts[1] === "settings") {
         if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
         if (req.method === "POST") {
-          const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string };
+          const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string; lang?: string;
+                                                   onboarded?: boolean; inrPerUsd?: number; notify?: boolean };
+          if (body.lang !== undefined) {
+            if (body.lang !== "gu" && body.lang !== "en") return send(res, 400, { error: "the language is gu or en" });
+            store.putSetting("lang", body.lang);
+          }
+          if (body.onboarded !== undefined) store.putSetting("onboarded", !!body.onboarded);
+          if (body.notify !== undefined) store.putSetting("notify", !!body.notify);
+          if (body.inrPerUsd !== undefined) {
+            if (!(body.inrPerUsd > 10 && body.inrPerUsd < 1000)) return send(res, 400, { error: "the rupee rate should be about 80-100" });
+            store.putSetting("inrPerUsd", body.inrPerUsd);
+          }
           if (body.runAt !== undefined) {
             if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(body.runAt)) return send(res, 400, { error: "the run time is HH:MM, e.g. 20:00" });
             store.putSetting("runAt", body.runAt);

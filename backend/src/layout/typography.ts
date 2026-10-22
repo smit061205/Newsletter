@@ -12,6 +12,9 @@ const t = profile.type;
 
 export const PAGE = { width: profile.page.width * PT, height: profile.page.height * PT };
 
+/** The widest a front-page story may be without the editor's say-so (columns). */
+export const FRONT_PAGE_MAX_COLS = profile.grid.frontPageMaxCols ?? profile.grid.columns - 1;
+
 export const GRID = {
   left: profile.grid.left * PT,
   pitch: (profile.grid.column + profile.grid.gutter) * PT,

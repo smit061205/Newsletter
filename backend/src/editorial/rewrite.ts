@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { ROOT } from "../config.ts";
 import { profile } from "../profile.ts";
-import { storyIdOf, type Release, type Store, type Story } from "../store.ts";
+import { storyIdOf, type Progress, type Release, type Store, type Story } from "../store.ts";
 
 /** Chosen by backend/test/compare-models.ts on 21 Oct 2026 releases (every
  * candidate kept every number and name). Anthropic models are left out on
@@ -158,9 +158,14 @@ const NUMBER_WORDS: string[][] = [
 ];
 /** The numbers in `out` that aren't in `source` -- written in any digits,
  * with or without commas between them, or (up to 20) spelt out there. */
-export function numbersNotIn(out: string, source: string): string[] {
+export function numbersNotIn(out: string, source: string, date?: string): string[] {
   const plain = (n: string) => n.replace(/,/g, "");
   const known = new Set([...digits(source)].map(plain));
+  // the release's own date (its day, month and year): a story may say "22 October"
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [y, m, d] = date.split("-");
+    for (const n of [y, m, d, String(Number(m)), String(Number(d))]) known.add(n);
+  }
   // "9 हज़ार", "2 લાખ": the same number written out in full
   const latin = source.replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d))).replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d)));
   for (const m of latin.matchAll(/(\d+(?:\.\d+)?)\s*(हज़ार|हजार|હજાર|लाख|લાખ)/g)) {
@@ -234,7 +239,7 @@ export async function rewriteOne(r: Release, model: string, key: string, togethe
   // some models wrap JSON in a ```json fence despite the schema
   const out = JSON.parse(data.choices[0].message.content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, ""));
   // every number the story uses must be in the release
-  const unknown = numbersNotIn(`${out.headline} ${out.deck} ${out.body_long}`, `${r.headline} ${r.subhead} ${r.body}`);
+  const unknown = numbersNotIn(`${out.headline} ${out.deck} ${out.body_long}`, `${r.headline} ${r.subhead} ${r.body}`, r.date);
   const story: Story = {
     id: storyIdOf(r), releaseId: r.id, date: r.date,
     kicker: out.kicker, headline: out.headline, deck: out.deck,
@@ -251,7 +256,8 @@ const SCRIPT: Record<string, RegExp> = { gu: /[\u0A80-\u0AFF]/g, hi: /[\u0900-\u
 const share = (s: string, re: RegExp) => (s.match(re)?.length ?? 0) / Math.max(1, s.replace(/\s/g, "").length);
 export const gujaratiShare = (s: string) => (s.match(/[\u0A80-\u0AFF]/g)?.length ?? 0) / Math.max(1, s.replace(/\s/g, "").length);
 
-export async function rewriteDay(store: Store, date: string, opts: { log: (s: string) => void; model?: string; force?: boolean }) {
+export async function rewriteDay(store: Store, date: string, opts: { log: (s: string) => void; model?: string; force?: boolean;
+                                                                   progress?: (p: Progress) => void }) {
   // The department issues some releases twice, in Gujarati and in English;
   // the English one is the same news -- translating it would print the
   // story twice. Only Gujarati releases become stories.
@@ -300,8 +306,13 @@ export async function rewriteDay(store: Store, date: string, opts: { log: (s: st
       return withIds(asIs(r));
     }
   };
+  let written = 0;
+  opts.progress?.({ done: 0, total: groups.length, label: "writing" });
   for (let i = 0; i < groups.length; i += 5) {
-    for (const story of await Promise.all(groups.slice(i, i + 5).map(one))) store.putStory(story);
+    for (const story of await Promise.all(groups.slice(i, i + 5).map(one))) {
+      store.putStory(story);
+      opts.progress?.({ done: ++written, total: groups.length, label: "writing", item: story.headline });
+    }
   }
   opts.log(`rewrite ${date}: ${groups.length} stories from ${releases.length} releases` +
            (key ? ` (${workhorse}; leads ${lead}), $${spent.toFixed(3)}${failed ? `, ${failed} kept as published` : ""}` : " (as published)"));
@@ -356,7 +367,7 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
     return null;
   }
   body = paragraphs(body).join("\n\n");
-  const unknown = numbersNotIn(body, `${release.headline} ${release.subhead} ${release.body}`);
+  const unknown = numbersNotIn(body, `${release.headline} ${release.subhead} ${release.body}`, release.date);
   const factCheck = unknown.length ? `numbers not in the release: ${unknown.join(", ")}` : undefined;
   store.putFitted(key, { body, model, ...(factCheck ? { factCheck } : {}) });
   return { body, cost: data.usage?.cost ?? 0, ...(factCheck ? { factCheck } : {}) };
@@ -407,7 +418,7 @@ export async function writeDeck(store: Store, story: Story, release: Release,
   } catch {
     return null;
   }
-  if (numbersNotIn(deck, `${release.headline} ${release.subhead} ${release.body}`).length) deck = ""; // a number not in the release: not printed
+  if (numbersNotIn(deck, `${release.headline} ${release.subhead} ${release.body}`, release.date).length) deck = ""; // a number not in the release: not printed
   store.putFitted(key, { body: deck, model });
   return deck ? { deck, cost: data.usage?.cost ?? 0 } : null;
 }

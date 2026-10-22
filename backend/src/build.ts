@@ -23,11 +23,13 @@ import { findGaps } from "./layout/occupancy.ts";
 import { styleChecks } from "./layout/style.ts";
 import { buildFingerprint } from "./fingerprint.ts";
 import { spanWidth } from "./layout/module.ts";
-import { BODY, DPI, FACES, FONTS, GRID, PAGE, PT } from "./layout/typography.ts";
+import { BODY, DPI, FACES, FONTS, FRONT_PAGE_MAX_COLS, GRID, PAGE, PT } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
-import { storyIdOf, type Store, type Story } from "./store.ts";
+import { storyIdOf, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
+              /** how far the build has got: planning the pages, finishing each, checking (pipeline.ts) */
+              progress?: (p: Progress) => void;
               /** page images even when the fonts may be served (tests read them) */
               images?: boolean };
 
@@ -194,6 +196,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const gaps: { page: number; col: number; y0: number; y1: number }[] = [];
     const plans: PagePlan[] = [];
     for (let n = 1; n <= total; n++) {
+      opts.progress?.({ done: n - 1, total: total * 2 + 1, label: "planning", item: String(n) });
       const pageAds = ads.filter((a) => a.page === n);
       // what's left of the copy, over what's left of the room
       const leftRoom = room.slice(n - 1).reduce((a, b) => a + b, 0);
@@ -203,7 +206,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       // fitting grows the stories into the rest)
       const reserve = room.slice(n).reduce((a, b) => a + b, 0) * 0.7;
       const plan = await packer.packPage(n, pool, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, pageAds,
-                                         { leadFirst: true, budget, reserve });
+                                         { leadFirst: true, budget, reserve, ...(n === 1 ? { maxCols: FRONT_PAGE_MAX_COLS } : {}) });
       plans.push(plan);
       pool = pool.filter((s) => !plan.placed.some((p) => p.module.story.id === s.id));
       log(`  page ${n}: ${plan.placed.length} stories, white space ${(plan.waste * 100).toFixed(1)}%: ` +
@@ -214,6 +217,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const fillers: FillerCount = { messages: new Set(), houseAds: 0 };
     for (const plan of plans) {
       const n = plan.page;
+      opts.progress?.({ done: total + n - 1, total: total * 2 + 1, label: "finishing", item: String(n) });
       const pageAds = ads.filter((a) => a.page === n);
       const fit = await closeGaps(plan, { band: { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, ads: pageAds,
                                          store, date, releases, m, leftOut: pool, fillers, say: (l) => log(`  p${n}${l}`) });
@@ -243,6 +247,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
 
   // page images too, for the website: licensed fonts never leave this server
   const restricted = FONTS.some((f) => f.restricted);
+  opts.progress?.({ done: total * 2, total: total * 2 + 1, label: "checking" });
   const { pdf, warnings, images } = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, ...(restricted || opts.images ? { images: 150 } : {}) });
   await mkdir(OUT_DIR, { recursive: true });
   const pdfPath = path.join(OUT_DIR, `${profile.id}-${date}.pdf`);
@@ -329,6 +334,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     { gate: "3 no headline over 30% of its story", pass: headShare.length === 0, detail: headShare.join(", ") || "ok" },
     { gate: "4 the lead on page 1; every story placed or left out with a reason", pass: !!lead,
       detail: `lead ${lead?.story.id ?? "missing"}; left out (no room): ${result.leftOut.map((s) => s.id).join(", ") || "none"}` },
+    { gate: "W no story across the whole front page unless the editor allowed it",
+      pass: !result.placed.some((p) => p.page === 1 && p.cols > FRONT_PAGE_MAX_COLS && !p.story.fullWidth),
+      detail: result.placed.filter((p) => p.page === 1 && p.cols > FRONT_PAGE_MAX_COLS && !p.story.fullWidth).map((p) => `${p.story.id} (${p.cols} columns)`).join(", ") || "ok" },
     { gate: "6 fact checks: every number in the release", pass: allFacts.length === 0, detail: allFacts.map((f) => `${f.story}: ${f.detail}`).join("; ") || "ok" },
     ...style.gates,
     { gate: "7 same inputs, same issue", pass: same !== false,

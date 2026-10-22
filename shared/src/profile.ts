@@ -64,6 +64,9 @@ export const ProfileSchema = z.object({
     columns: z.number().int().positive(),
     column: pt.positive(),
     gutter: pt,
+    /** the widest a story may be on the front page, in columns (default: all but one) --
+     * an editor may let one story run full width */
+    frontPageMaxCols: z.number().int().positive().optional(),
   }),
   ink: z.string().min(1),
   fonts: z.record(z.string(), FontRoleSchema),
