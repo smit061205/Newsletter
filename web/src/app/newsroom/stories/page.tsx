@@ -1,140 +1,143 @@
 "use client";
-// લેખ / Stories: the day's stories as they'll print. Edit any one -- its
-// headline, sub-heading, text, photo or rank -- or leave it out; every
-// change lays the paper out again. A translation shows its Hindi beside it.
-import { useCallback, useEffect, useState } from "react";
-import { call, media, type ReleaseRow, type StoryRow } from "../api";
-import { useDay } from "../Shell";
-import styles from "../newsroom.module.css";
+// સમાચાર / Stories: the day's stories (search, filter, open one to edit),
+// and the press releases they came from (translate a Hindi one).
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { call, type ReleaseRow, type StoryRow } from "../api";
+import { TopBar, useStatus } from "../Shell";
+import s from "../newsroom.module.css";
+import { num } from "../ui/format";
+import { Badge, Button, Empty, Icon, Note, Skeleton, useApp } from "../ui/kit";
+import { StoryPanel } from "../ui/StoryPanel";
 
-type Draft = { kicker: string; headline: string; deck: string; body: string; caption: string; priority: number; photo: string | null };
-const draftOf = (s: StoryRow): Draft => ({ kicker: s.kicker, headline: s.headline, deck: s.deck, body: s.bodies.long, caption: s.caption, priority: s.priority, photo: s.photo });
+type Filter = "all" | "placed" | "out";
 
 export default function Stories() {
-  const { date } = useDay();
+  const { t, lang, date, toast } = useApp();
+  const { refresh } = useStatus();
+  const [tab, setTab] = useState<"stories" | "sources">("stories");
   const [stories, setStories] = useState<StoryRow[] | null>(null);
-  const [releases, setReleases] = useState<ReleaseRow[]>([]);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [note, setNote] = useState("");
+  const [releases, setReleases] = useState<ReleaseRow[] | null>(null);
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [editing, setEditing] = useState<StoryRow | null>(null);
+  const [openRel, setOpenRel] = useState<number | null>(null);
+  const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    try { if (new URLSearchParams(location.search).get("tab") === "sources") setTab("sources"); } catch {}
+  }, []);
   const load = useCallback(() => {
     call<StoryRow[]>(`/api/stories?date=${date}`).then(setStories).catch((e) => setError(e.message));
     call<ReleaseRow[]>(`/api/releases?date=${date}`).then(setReleases).catch(() => {});
   }, [date]);
-  useEffect(() => { setStories(null); setOpenId(null); load(); }, [load]);
-  useEffect(() => {
-    // a story opened from the Pages screen
-    try {
-      const want = sessionStorage.getItem("nr-open-story");
-      if (want) { sessionStorage.removeItem("nr-open-story"); setOpenId(want); }
-    } catch {}
-  }, []);
-  useEffect(() => {
-    const s = stories?.find((x) => x.id === openId);
-    setDraft(s ? draftOf(s) : null);
-  }, [openId, stories]);
+  useEffect(() => { setStories(null); setReleases(null); load(); }, [load]);
 
-  const send = async (storyId: string, change: Record<string, unknown>, done: string) => {
-    setError("");
-    try {
-      await call(`/api/issues/${date}/edits`, { json: { storyId, change } });
-      setNote(done);
-      load();
-    } catch (e) { setError((e as Error).message); }
-  };
-  const save = (s: StoryRow) => {
-    if (!draft) return;
-    const was = draftOf(s);
-    const change = Object.fromEntries(Object.entries(draft).filter(([k, v]) => v !== was[k as keyof Draft]));
-    if (!Object.keys(change).length) return setNote("Nothing changed.");
-    send(s.id, change, "Saved. The pages are being laid out again: see Today or Pages in a few minutes.");
-  };
+  const shown = useMemo(() => (stories ?? [])
+    .filter((x) => filter === "all" || (filter === "placed" ? !!x.page && !x.dropped : x.dropped))
+    .filter((x) => !q || `${x.headline} ${x.deck}`.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => Number(a.dropped) - Number(b.dropped) || (a.page ?? 9) - (b.page ?? 9) || a.priority - b.priority), [stories, filter, q]);
 
-  if (!stories) return <p className={styles.muted}>Loading…</p>;
-  if (!stories.length) return <p className={styles.muted}>No stories for this day yet. Run the day from <b>Today</b>.</p>;
-  const sorted = [...stories].sort((a, b) => Number(a.dropped) - Number(b.dropped) || (a.page ?? 9) - (b.page ?? 9) || a.priority - b.priority);
+  const translate = async (id: number) => {
+    setBusy(id); setError("");
+    try { await call(`/api/releases/${id}/translate`, { json: {} }); toast(t("toast.translated")); load(); }
+    catch (e) { setError((e as Error).message); }
+    setBusy(null);
+  };
 
   return (
-    <div className={styles.stack}>
-      {note && <p className={styles.good}>{note}</p>}
-      {error && <p className={styles.error} role="alert">{error}</p>}
-      <section className={styles.panel}>
-        <h2>લેખ <small>Stories · {stories.length}</small></h2>
-        <ul className={styles.rows}>
-          {sorted.map((s) => {
-            const originals = releases.filter((r) => r.id === s.releaseId || s.mergedFrom?.includes(r.id));
-            return (
-              <li key={s.id} data-dropped={s.dropped}>
-                <button className={styles.rowHead} onClick={() => setOpenId(openId === s.id ? null : s.id)} aria-expanded={openId === s.id}>
-                  <span className={styles.rowTitle}>{s.headline}</span>
-                  <span className={styles.rowMeta}>{s.deck}</span>
-                  <span className={styles.chips}>
-                    {s.dropped ? <span className={styles.pill} data-tone="bad">Left out</span>
-                      : s.page ? <span className={styles.pill} data-tone="good">Page {s.page}, {s.cols} col</span>
-                      : <span className={styles.pill}>Not placed</span>}
-                    {s.translatedFrom && <span className={styles.pill} data-tone="info">From Hindi</span>}
-                    {(s.mergedFrom?.length ?? 0) > 1 && <span className={styles.pill} data-tone="info">Round-up of {s.mergedFrom!.length}</span>}
-                    {s.id.startsWith("f-") && <span className={styles.pill}>Feature</span>}
-                    {s.factCheck && <span className={styles.pill} data-tone="bad">Check the numbers</span>}
-                    {s.edited && <span className={styles.pill}>Edited</span>}
-                  </span>
-                </button>
-                {openId === s.id && draft && (
-                  <div className={styles.editor}>
-                    {s.factCheck && <p className={styles.warn}>{s.factCheck}. Compare with the original below.</p>}
-                    <div className={styles.editGrid}>
-                      <div className={styles.fields}>
-                        <label>ઉપર શીર્ષક <small>Kicker (optional)</small><input value={draft.kicker} onChange={(e) => setDraft({ ...draft, kicker: e.target.value })} /></label>
-                        <label>શીર્ષક <small>Headline</small><textarea rows={2} value={draft.headline} onChange={(e) => setDraft({ ...draft, headline: e.target.value })} /></label>
-                        <label>પેટા શીર્ષક <small>Sub-heading</small><textarea rows={2} value={draft.deck} onChange={(e) => setDraft({ ...draft, deck: e.target.value })} /></label>
-                        <label>લેખ <small>Text (a blank line between paragraphs)</small><textarea rows={14} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} /></label>
-                        <label>મહત્વ <small>Rank: 1 is the day&apos;s lead, 5 a brief</small>
-                          <select value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value) })}>
-                            {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                          </select>
-                        </label>
-                        {(s.photos?.length || originals.some((o) => o.photos.length)) ? (
-                          <fieldset className={styles.photos}>
-                            <legend>ફોટો <small>Photo</small></legend>
-                            <label><input type="radio" checked={draft.photo === null} onChange={() => setDraft({ ...draft, photo: null })} /> None</label>
-                            {[...new Set([...(s.photos ?? []), ...originals.flatMap((o) => o.photos)])].map((p) => (
-                              <label key={p}><input type="radio" checked={draft.photo === p} onChange={() => setDraft({ ...draft, photo: p })} />
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={media(p)} alt="" /></label>
-                            ))}
-                          </fieldset>
-                        ) : null}
-                        {draft.photo && <label>ફોટો નીચે <small>Caption</small><input value={draft.caption} onChange={(e) => setDraft({ ...draft, caption: e.target.value })} /></label>}
-                        <div className={styles.actions}>
-                          <button className={styles.primary} onClick={() => save(s)}>સાચવો · Save</button>
-                          <button onClick={() => setDraft(draftOf(s))}>Undo changes</button>
-                          {s.dropped
-                            ? <button onClick={() => send(s.id, { drop: false }, "Back in the paper: laying the pages out again.")}>Put it back</button>
-                            : <button className={styles.danger} onClick={() => send(s.id, { drop: true }, "Left out: laying the pages out again.")}>Leave it out</button>}
-                        </div>
-                      </div>
-                      {originals.length > 0 && (
-                        <aside className={styles.originalPane}>
-                          <h3>મૂળ પ્રેસ રિલીઝ <small>The original{s.translatedFrom ? " (Hindi)" : ""}</small></h3>
-                          {originals.map((o) => (
-                            <div key={o.id}>
-                              <p className={styles.originalHead} lang={o.lang}>{o.headline}</p>
-                              <p className={styles.original} lang={o.lang}>{o.body}</p>
-                              <a href={o.url} target="_blank" rel="noreferrer">Open on PIB</a>
-                            </div>
-                          ))}
-                        </aside>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+    <div className={s.inner}>
+      <TopBar title={t("stories.title")} />
+      <div className={s.row} style={{ justifyContent: "space-between" }}>
+        <div className={s.segmented} role="tablist">
+          <button role="tab" aria-pressed={tab === "stories"} onClick={() => setTab("stories")}>{t("stories.tab.stories")}</button>
+          <button role="tab" aria-pressed={tab === "sources"} onClick={() => setTab("sources")}>{t("stories.tab.sources")}</button>
+        </div>
+        {tab === "stories" && (
+          <div className={s.row}>
+            <div className={s.segmented}>
+              {(["all", "placed", "out"] as Filter[]).map((f) => <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{t(`stories.filter.${f}`)}</button>)}
+            </div>
+            <input className={s.input} style={{ width: 200 }} placeholder={t("stories.search")} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t("stories.search")} />
+          </div>
+        )}
+      </div>
+      {error && <Note tone="bad">{error}</Note>}
+
+      {tab === "stories" ? (
+        <section className={s.card}>
+          {!stories ? <>{[0, 1, 2, 3].map((i) => <Skeleton key={i} h={44} />)}</>
+            : !shown.length ? <Empty icon={Icon.stories()} title={t("stories.none")} />
+            : (
+              <div className={s.list}>
+                {shown.map((x) => (
+                  <button key={x.id} className={s.listItem} data-dim={x.dropped} onClick={() => setEditing(x)}>
+                    <span className={s.listTitle}>{x.headline}</span>
+                    <span className={s.listMeta}>{x.deck}</span>
+                    <span className={s.listBadges}>
+                      {x.dropped ? <Badge tone="bad">{t("badge.out")}</Badge> : x.page ? <Badge tone="good">{t("badge.page", { n: num(lang, x.page) })}</Badge> : <Badge>{t("badge.notPlaced")}</Badge>}
+                      {x.translatedFrom && <Badge tone="accent">{t("badge.hindi")}</Badge>}
+                      {(x.mergedFrom?.length ?? 0) > 1 && <Badge tone="accent">{t("badge.roundup", { n: num(lang, x.mergedFrom!.length) })}</Badge>}
+                      {x.id.startsWith("f-") && <Badge>{t("badge.feature")}</Badge>}
+                      {x.factCheck && <Badge tone="warn">{t("badge.numbers")}</Badge>}
+                      {x.edited && <Badge>{t("badge.edited")}</Badge>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+        </section>
+      ) : (
+        <Sources releases={releases} open={openRel} setOpen={setOpenRel} busy={busy} translate={translate} />
+      )}
+      {editing && <StoryPanel story={editing} onClose={() => setEditing(null)} onChanged={() => { load(); refresh(); }} />}
     </div>
+  );
+}
+
+function Sources({ releases, open, setOpen, busy, translate }: { releases: ReleaseRow[] | null; open: number | null; setOpen: (n: number | null) => void;
+  busy: number | null; translate: (id: number) => void }) {
+  const { t } = useApp();
+  if (!releases) return <section className={s.card}>{[0, 1, 2].map((i) => <Skeleton key={i} h={44} />)}</section>;
+  if (!releases.length) return <section className={s.card}><Empty icon={Icon.stories()} title={t("sources.none")} /></section>;
+  const groups: [string, (r: ReleaseRow) => boolean][] = [
+    [t("sources.gu"), (r) => r.lang !== "hi"],
+    [t("sources.hiUsed"), (r) => r.lang === "hi" && r.translated],
+    [t("sources.hiUnused"), (r) => r.lang === "hi" && !r.translated],
+  ];
+  return (
+    <>
+      {groups.map(([title, test]) => {
+        const list = releases.filter(test);
+        if (!list.length) return null;
+        return (
+          <section key={title} className={s.card}>
+            <div className={s.cardHead}><h2 className={s.cardTitle}>{title}</h2><span className={s.faint}>{list.length}</span></div>
+            <div className={s.list}>
+              {list.map((r) => (
+                <div key={r.id}>
+                  <button className={s.listItem} onClick={() => setOpen(open === r.id ? null : r.id)} aria-expanded={open === r.id}>
+                    <span className={s.listTitle} lang={r.lang}>{r.headline}</span>
+                    <span className={s.listMeta}>{r.ministry}</span>
+                    <span className={s.listBadges}>{r.inPaper && <Badge tone="good">{t("sources.inPaper")}</Badge>}</span>
+                  </button>
+                  {open === r.id && (
+                    <div className={s.expand}>
+                      <p className={s.original} lang={r.lang}>{r.body}</p>
+                      <div className={s.row}>
+                        <a className={s.btn} href={r.url} target="_blank" rel="noreferrer">{Icon.external()}{t("sources.open")}</a>
+                        {r.lang === "hi" && !r.translated && (
+                          <Button kind="primary" onClick={() => translate(r.id)} disabled={busy === r.id}>{busy === r.id ? t("sources.translating") : t("sources.translate")}</Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </>
   );
 }

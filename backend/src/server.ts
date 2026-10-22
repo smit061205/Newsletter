@@ -33,7 +33,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR } from "./config.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { DATA_DIR, ROOT } from "./config.ts";
+import { DATA_DIR, ENV_FILE, ROOT } from "./config.ts";
 import { currentJob, onJob, runPipeline, settleInterrupted, STEPS } from "./pipeline.ts";
 import type { Ad, Release, StepName, Store } from "./store.ts";
 
@@ -161,10 +161,21 @@ function everyEvening(store: Store, job: (day: string) => Promise<unknown>, log:
 
 /** The newsroom's settings, with their defaults. */
 export function settingsOf(store: Store) {
-  return { runAt: store.setting("runAt", "20:00"), autoRun: store.setting("autoRun", true) };
+  return {
+    runAt: store.setting("runAt", "20:00"), autoRun: store.setting("autoRun", true),
+    /** the newsroom's language: Gujarati or English */
+    lang: store.setting<"gu" | "en">("lang", "gu"),
+    /** the first-run welcome is done */
+    onboarded: store.setting("onboarded", false),
+    /** rupees to a US dollar, for showing the AI's cost (reported in USD) */
+    inrPerUsd: store.setting("inrPerUsd", 88),
+    notify: store.setting("notify", true),
+    /** the public website, for "Open the website" */
+    siteUrl: store.setting("siteUrl", ""),
+  };
 }
 
-const ENV_FILE = path.join(ROOT, "backend", ".env");
+// (backend/.env, or the app-data folder's settings.env: config.ts ENV_FILE)
 /** Is a key set in backend/.env (its value is never sent anywhere)? */
 const envHas = (name: string) => !!process.env[name] || (existsSync(ENV_FILE) && readFileSync(ENV_FILE, "utf8").split("\n").some((l) => l.startsWith(`${name}=`) && l.length > name.length + 1));
 /** Set one key in backend/.env, keeping the rest of the file. */
@@ -211,11 +222,30 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
       const parts = url.pathname.split("/").filter(Boolean);
       if (req.method === "OPTIONS") return send(res, 204, "");
       if (req.method === "GET" && url.pathname === "/healthz") return send(res, 200, "ok", "text/plain");
+      // release photos and ads (the newsroom shows them from here: MEDIA_DIR may be the app's data folder)
+      if (req.method === "GET" && parts[0] === "media" && parts.length > 1 && !parts.includes("..")) {
+        const type = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" }[path.extname(url.pathname).slice(1).toLowerCase()];
+        if (!type) return send(res, 404, { error: "not an image" });
+        const file = path.resolve(MEDIA_DIR, ...parts.slice(1).map(decodeURIComponent));
+        if (!file.startsWith(path.resolve(MEDIA_DIR) + path.sep)) return send(res, 404, { error: "not found" });
+        try { return send(res, 200, new Uint8Array(await readFile(file)), type); }
+        catch { return send(res, 404, { error: `no file ${url.pathname}` }); }
+      }
       if (req.method === "POST" && !authorized(req)) return send(res, 401, { error: "missing or wrong API token" });
       if (req.method === "GET" && url.pathname === "/api/issue") {
         const date = url.searchParams.get("date") ?? store.latestDate();
         const got = date ? store.latestIssue(date) : null;
         return got ? send(res, 200, got.issue) : send(res, 404, { error: `no issue built for ${date ?? "any day"}` });
+      }
+      if (req.method === "GET" && url.pathname === "/api/issues") {
+        // the archive: every day built, newest first, its latest version
+        const rows = store.db.prepare("select date, max(version) v from issues group by date order by date desc limit 120").all() as { date: string; v: number }[];
+        return send(res, 200, rows.map((row) => {
+          const got = store.latestIssue(row.date)!;
+          const rep = got.report as { issueNumber?: number; ready?: boolean; cost?: number; placed?: unknown[]; pages?: number };
+          return { date: row.date, version: got.version, status: got.status, issueNumber: rep.issueNumber, ready: rep.ready,
+                   cost: rep.cost, stories: rep.placed?.length ?? 0, pages: rep.pages };
+        }));
       }
       if (parts[0] === "api" && parts[1] === "issues" && parts[2]) {
         const date = parts[2];
@@ -348,7 +378,10 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         return send(res, 200, { story: got.story, cost: got.cost });
       }
       if (parts[0] === "api" && parts[1] === "ads") {
-        if (req.method === "GET") return send(res, 200, store.ads(url.searchParams.get("date") ?? indiaNow().day));
+        if (req.method === "GET") {
+          const { standInsMovable } = await import("./layout/stories.ts");
+          return send(res, 200, standInsMovable(store.ads(url.searchParams.get("date") ?? indiaNow().day)));
+        }
         if (req.method === "POST") return send(res, 200, await bookAd(store, (await readJson(req)) as AdBooking));
         if (req.method === "DELETE" && parts[2]) {
           // a booking is a row per day it runs ("<id>@<date>")
@@ -360,19 +393,37 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
       if (req.method === "GET" && url.pathname === "/api/status") {
         const { day, time } = indiaNow();
         const s = settingsOf(store);
-        const latest = store.latestIssue(day);
+        // the day the newsroom is on (?date=), today by default
+        const asked = url.searchParams.get("date");
+        const latest = store.latestIssue(asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : day);
         return send(res, 200, {
           today: day, now: time, ...s, nextRun: s.autoRun ? `${store.setting("lastScheduledRun", "") === day || time >= s.runAt ? "tomorrow" : "today"} ${s.runAt}` : null,
           running: currentJob(), lastJob: store.jobs(undefined, 1)[0] ?? null,
           openrouterKey: envHas("OPENROUTER_API_KEY"),
-          issue: latest ? { version: latest.version, status: latest.status, ready: (latest.report as { ready?: boolean }).ready } : null,
+          issue: latest ? { version: latest.version, status: latest.status, ready: (latest.report as { ready?: boolean }).ready,
+                            issueNumber: (latest.report as { issueNumber?: number }).issueNumber } : null,
           version: gitVersion(),
         });
       }
       if (parts[0] === "api" && parts[1] === "settings") {
         if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
         if (req.method === "POST") {
-          const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string };
+          const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string; lang?: string;
+                                                   onboarded?: boolean; inrPerUsd?: number; notify?: boolean; siteUrl?: string };
+          if (body.lang !== undefined) {
+            if (body.lang !== "gu" && body.lang !== "en") return send(res, 400, { error: "the language is gu or en" });
+            store.putSetting("lang", body.lang);
+          }
+          if (body.onboarded !== undefined) store.putSetting("onboarded", !!body.onboarded);
+          if (body.siteUrl !== undefined) {
+            if (body.siteUrl && !/^https:\/\/[^\s]+$/.test(body.siteUrl)) return send(res, 400, { error: "the website address starts with https://" });
+            store.putSetting("siteUrl", body.siteUrl.trim());
+          }
+          if (body.notify !== undefined) store.putSetting("notify", !!body.notify);
+          if (body.inrPerUsd !== undefined) {
+            if (!(body.inrPerUsd > 10 && body.inrPerUsd < 1000)) return send(res, 400, { error: "the rupee rate should be about 80-100" });
+            store.putSetting("inrPerUsd", body.inrPerUsd);
+          }
           if (body.runAt !== undefined) {
             if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(body.runAt)) return send(res, 400, { error: "the run time is HH:MM, e.g. 20:00" });
             store.putSetting("runAt", body.runAt);
@@ -430,7 +481,7 @@ async function bookAd(store: Store, b: AdBooking): Promise<{ booked: string[] }>
     const ads = store.ads(date);
     const { referenceAds } = await import("./layout/stories.ts");
     const standIns = new Set(referenceAds("").map((a) => a.id));
-    for (const a of ads) if (standIns.has(a.id)) store.db.prepare("delete from ads where id = ? and date = ?").run(a.id, date);
+    for (const a of ads) if (standIns.has(a.id) || a.url.startsWith("/chrome/ads/")) store.db.prepare("delete from ads where id = ? and date = ?").run(a.id, date);
     const ad: Ad = { id: `${id}`, date, page: b.page, x: 0, y: 0, width, height, url: `/media/ads/${file}`, pinned: false };
     store.db.prepare("insert or replace into ads (id, date, json) values (?, ?, ?)").run(`${id}@${date}`, date, JSON.stringify(ad));
   }

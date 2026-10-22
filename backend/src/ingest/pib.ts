@@ -13,7 +13,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR } from "../config.ts";
-import type { Release, Store } from "../store.ts";
+import type { Progress, Release, Store } from "../store.ts";
 
 const SITE = "https://www.pib.gov.in";
 // names the paper honestly (PIB's firewall turns away agents with an email address in them)
@@ -195,7 +195,7 @@ export interface PibResult { feed: FeedLang; listed: number; fetched: number; sk
  * with its photos. `only` limits it to those PRIDs (a Hindi top-up fetches
  * just the ones it will translate); `listOnly` returns the list unfetched. */
 export async function ingestPib(store: Store, date: string, feed: FeedLang,
-                                opts: { log?: (s: string) => void; only?: Set<number> } = {}): Promise<PibResult> {
+                                opts: { log?: (s: string) => void; only?: Set<number>; progress?: (p: Progress) => void } = {}): Promise<PibResult> {
   const log = opts.log ?? (() => {});
   pagesToday = 0;
   const items = await listFor(feed, date);
@@ -204,8 +204,9 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
   await mkdir(mediaDir, { recursive: true });
   let fetched = 0;
   let skipped = 0;
-  for (const it of items) {
+  for (const [k, it] of items.entries()) {
     if (opts.only && !opts.only.has(it.prid)) continue;
+    opts.progress?.({ done: k, total: items.length, label: "reading", item: it.headline });
     if (store.hasRelease(it.prid)) { skipped++; continue; }
     const res = await get(`${SITE}/PressReleaseIframePage.aspx?PRID=${it.prid}`).catch((e) => {
       log(`  ${it.prid}: couldn't read it (${e instanceof Error ? e.message : e})`);
@@ -235,6 +236,7 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
     fetched++;
     log(`  ${it.prid}  ${release.ministry!.slice(0, 26).padEnd(26)} ${r.headline.slice(0, 60)}  (${photos.length} photo${photos.length === 1 ? "" : "s"})`);
   }
+  opts.progress?.({ done: items.length, total: items.length, label: "reading" });
   return { feed, listed: items.length, fetched, skipped, releases: store.releases(date).filter((r) => r.source === "pib" && r.lang === feed) };
 }
 

@@ -20,43 +20,45 @@ The rule throughout: **the AI makes the judgement calls, and the code does the m
 
 ## Install the app
 
-The app runs on the paper's own computer. It is two parts, an **engine** that makes the paper and a **newsroom** website you work in, and both run on that computer only. One install sets up everything: Node.js and Git if they're missing, the app, its fonts, a **Capital Kranti** icon, starting at log-in, and waking the computer at 7:55 PM for the 8 PM run.
+The app runs on the paper's own computer. It's a proper desktop app, with its own window, icon, menus and menu-bar / tray status. Inside it run two parts: an **engine** that makes the paper and the **newsroom** you work in, both on that computer only. It carries everything it needs (its own Node, the Chromium it lays pages out with, the fonts), so there's nothing else to install: no Node.js, Git or Terminal.
 
-### Windows
-1. Download the installer: open <https://github.com/smit061205/Newsletter/blob/main/windows/Install%20Capital%20Kranti.cmd>, click **Download raw file** (the download icon, top right of the file), and save it (to Downloads, say).
-2. Double-click **Install Capital Kranti.cmd**. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**.
-3. A window shows each step (a few minutes the first time). If Node.js or Git is missing it installs them with `winget` (the Windows app installer; if it's missing, install **App Installer** from the Microsoft Store and run the installer again). When asked, sign in to GitHub in the browser window that opens: that's for the Publish button.
-4. The newsroom opens in the browser. In **Settings** (સેટિંગ્સ), paste the OpenRouter key once.
-
-From then on, open **Capital Kranti** from the desktop or the Start menu. The app is in `%LOCALAPPDATA%\CapitalKranti`.
-
-Or, instead of steps 1 and 2, in **PowerShell**:
-```powershell
-irm https://raw.githubusercontent.com/smit061205/Newsletter/main/windows/install.ps1 -OutFile $env:TEMP\ck-install.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP\ck-install.ps1
-```
-
-**Updates:** `powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CapitalKranti\windows\launch.ps1" -Update`
-**If the PC sleeps through 8 PM:** turn on *Allow wake timers* (Control Panel → Power Options → Change plan settings → Change advanced power settings → Sleep).
+Download it from the **Releases** page: <https://github.com/smit061205/Newsletter/releases/latest>.
 
 ### macOS
-1. Open **Terminal** (Applications → Utilities → Terminal) and paste:
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/smit061205/Newsletter/main/mac/install.sh -o /tmp/ck-install.sh && bash /tmp/ck-install.sh
-   ```
-   (Or download `mac/Install Capital Kranti.command` from the repository the same way as on Windows, then **right-click it → Open → Open**: macOS asks once for a file from the internet.)
-2. If Node.js 22 is missing it offers to install it with Homebrew, or opens the Node.js download page (install the macOS `.pkg`, then run step 1 again). If Git is missing, macOS offers its command-line tools: accept, then run step 1 again.
-3. It asks for your Mac password once, to wake the Mac at 7:55 PM (you can skip that and keep the Mac awake in the evening instead).
-4. The newsroom opens in the browser. In **Settings**, paste the OpenRouter key once.
+1. Download **Capital-Kranti-…-mac-arm64.dmg** for an Apple-silicon Mac (M1 and later), or **…-mac-x64.dmg** for an Intel Mac (Apple menu → About This Mac shows which).
+2. Open it and drag **Capital Kranti** onto **Applications**.
+3. The first time only: in Applications, **right-click Capital Kranti → Open → Open**. The app isn't notarised by Apple yet, so macOS asks once. On newer macOS, if there's no Open button: System Settings → Privacy & Security → **Open Anyway**.
+4. The welcome screens ask for the language, the OpenRouter key and the time to make the paper. The app adds itself to the Dock and starts at log-in. It also offers to wake the Mac five minutes before the run, which needs the Mac's password once.
 
-From then on, open **Capital Kranti** from your home folder's **Applications** (Finder → Go → Home → Applications). The app is in `~/Library/Application Support/CapitalKranti`.
+### Windows
+1. Download **Capital-Kranti-Setup-….exe** and open it. If Windows shows "Windows protected your PC", click **More info → Run anyway** (the app isn't code-signed yet).
+2. Next → Install → Finish. It installs for this user only, so no administrator password is needed, and adds shortcuts to the desktop and the Start menu.
+3. The welcome screens are the same as on the Mac. To keep it on the taskbar: right-click its icon there → **Pin to taskbar**.
 
-**Updates:** `node "$HOME/Library/Application Support/CapitalKranti/scripts/launch.mjs" --update`
+### Every day
+- At the set time (8 PM by default) the paper makes itself, and a notification says when it's ready. Open **આજે / Today**, look at **છાપું / Paper**, fix anything by clicking a story, then **Publish** and **Print PDF**. The editor's guide, in Gujarati and English, is [`docs/NEWSROOM_GUIDE.md`](docs/NEWSROOM_GUIDE.md).
+- Closing the window keeps the app running in the menu bar / tray, so the evening run still happens. **Quit** (⌘Q, or the tray menu) stops it.
+- **Publish:** connect the website once (**Settings → Connect the website**, a GitHub sign-in in the browser). After that, Publish updates the website.
 
-### After installing (both)
-- The newsroom is at <http://127.0.0.1:3000/newsroom> while the app runs. Every evening at 8 PM the paper makes itself; open **આજે / Today** to see it, fix anything in **પાનાં / Pages** or **લેખ / Stories**, then **Approve & Publish** and **Print PDF**. The editor's guide, in Gujarati and English: [`docs/NEWSROOM_GUIDE.md`](docs/NEWSROOM_GUIDE.md).
-- **Publish** pushes the issue to GitHub, which updates the website, using the GitHub sign-in from setup.
-- A fresh install starts with no past issues: the next run makes its first paper (or press **Run now** on Today).
-- Stop the app: `node scripts/launch.mjs --stop` in the app's folder (it starts again at the next log-in, or from the icon).
+### Updates, uninstalling, moving from the old install
+- **Updates** come by themselves: the app checks the Releases page when it opens and once a day, then offers **Restart to update**. The paper's data (issues, settings, the key) lives outside the app and is never touched: on macOS in `~/Library/Application Support/Capital Kranti`, on Windows in `%APPDATA%\Capital Kranti`.
+- **Uninstall:**
+  - **Mac:** menu **Capital Kranti → Uninstall…**. It removes the log-in start, the Dock entry and the evening wake, moves the app to the Trash, and keeps the archive unless you untick it.
+  - **Windows:** Settings → Apps → Capital Kranti → Uninstall. It asks whether to keep the archive.
+  - Reinstalling picks a kept archive up again.
+- **The earlier script install** (the `Install Capital Kranti` scripts) is moved in automatically the first time the new app opens. Its issues, settings and key come across; its folder, log-in agent / scheduled tasks and old shortcut are removed.
+
+### For the developer: making a release
+- Tag and push: `git tag v1.0.0 && git push origin v1.0.0`. The **release** workflow (`.github/workflows/release.yml`) builds the `.dmg` (both Mac kinds) and the setup `.exe`, then attaches them to a GitHub Release. Running it by hand (Actions → release → Run workflow) makes a test build as a downloadable artifact instead.
+- **Connect the website** needs a GitHub OAuth App, set up once:
+  1. GitHub → Settings → Developer settings → OAuth Apps → New. Use any homepage URL, and the callback URL `http://127.0.0.1`.
+  2. Tick **Enable Device Flow**.
+  3. Copy its **Client ID** into the repository's Actions variables as `CK_GITHUB_CLIENT_ID` (Settings → Secrets and variables → Actions → Variables).
+
+  The client ID isn't a secret. Each user's sign-in token is kept encrypted by the system keychain.
+- Signing: macOS notarisation (an Apple Developer account) and Windows code signing would remove the first-open warnings. electron-builder picks up `CSC_LINK` / `APPLE_ID` secrets when they're added.
+- The desktop app's code is in `desktop/` (`main.js`, `preload.js`, `stage.mjs`, which gathers what it carries, and the icons in `desktop/icon/`). Developing: `npm install --prefix desktop`, `npm run build --prefix web`, then `npm start --prefix desktop` runs it against this checkout.
+- The old script installers (`windows/`, `mac/`, `scripts/launch.mjs`) still work for development.
 
 ---
 

@@ -20,6 +20,8 @@ interface Role {
   bodyTop: number;
   bodyBottom?: number;
   footer?: { url: string; x: number; y: number; width: number; height: number };
+  /** the rule across the foot of the page, under the body (the last page's is in its footer art) */
+  rule?: { x1: number; x2: number; y: number; width: number; color: string };
   fields: Record<string, Field>;
 }
 interface Template {
@@ -95,6 +97,10 @@ export async function chromeFor(n: number, total: number, issueDate: string, iss
   // a one-page paper has no "last page" header; give its last page the footer anyway
   const footer = role.footer ?? (n === total ? template.roles.last.footer : undefined);
   if (footer) els.push({ id: `p${n}-footer`, kind: "image", ...footer, fit: "fill" });
+  else if (role.rule) {
+    const r = role.rule;
+    els.push({ id: `p${n}-foot-rule`, kind: "line", x1: r.x1, y1: r.y, x2: r.x2, y2: r.y, color: r.color, width: r.width });
+  }
   // the template's own foot margin, else the footer's top, else the page's
   const bottom = Math.min(role.bodyBottom ?? template.page.height, footer ? footer.y : template.page.height);
   return { elements: els, bodyTop: role.bodyTop, bodyBottom: bottom };

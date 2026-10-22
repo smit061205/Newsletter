@@ -55,6 +55,14 @@
      "baseline": 1094.92,
      "left": 1126.23
     }
+   },
+   "bodyBottom": 6122.08,
+   "rule": {
+    "x1": 60.0,
+    "x2": 4546.62,
+    "y": 6141.67,
+    "width": 8.5,
+    "color": "#231f20"
    }
   },
   "inner": {
@@ -111,6 +119,14 @@
      "baseline": 136.92,
      "left": 101.23
     }
+   },
+   "bodyBottom": 6122.08,
+   "rule": {
+    "x1": 60.0,
+    "x2": 4546.62,
+    "y": 6139.17,
+    "width": 8.5,
+    "color": "#231f20"
    }
   },
   "last": {
@@ -222,15 +238,6 @@
    "width": 1647.5,
    "height": 2312.08,
    "url": "/chrome/ads/ad-business-mela.png"
-  },
-  {
-   "id": "ad-business-strip",
-   "page": 4,
-   "x": 2334.81,
-   "y": 203.87,
-   "width": 2208.29,
-   "height": 130.31,
-   "url": "/chrome/ads/ad-business-strip.png"
   },
   {
    "id": "ad-chardham",

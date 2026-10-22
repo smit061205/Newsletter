@@ -24,3 +24,7 @@ backups/
 /papers/
 
 publications/*/fonts/*.ttc
+
+# the desktop app: what it carries, and the built installers
+desktop/app-engine/
+desktop/dist/

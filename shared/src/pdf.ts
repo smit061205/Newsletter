@@ -94,14 +94,15 @@ export async function printIssue(issue: IssueRender, options: PrintOptions | str
       });
       const single = await PDFDocument.load(bytes);
       const [copied] = await merged.copyPages(single, [0]);
-      // Chromium quantizes the page size (1105.5pt came out 1105.92pt), so
-      // set the exact size the backend asked for, keeping the top-left corner
-      // fixed -- the sliver trimmed is the page's own blank right/bottom edge.
+      // Chromium quantizes the page size (1105.5 x 1488.2pt came out
+      // 1105.92 x 1488.96pt) and sets the page's content at the bottom-left
+      // corner, the extra sliver at the top and right: keep the bottom-left
+      // corner and the exact size the backend asked for (trimming from the
+      // bottom instead put every page 0.76pt low, its foot cut off).
       const w = (page.width / issue.dpi) * 72;
       const h = (page.height / issue.dpi) * 72;
-      const { height: printedH } = copied.getSize();
-      copied.setMediaBox(0, printedH - h, w, h);
-      copied.setCropBox(0, printedH - h, w, h);
+      copied.setMediaBox(0, 0, w, h);
+      copied.setCropBox(0, 0, w, h);
       merged.addPage(copied);
       await tab.close();
     }

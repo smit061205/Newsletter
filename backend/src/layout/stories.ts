@@ -15,10 +15,12 @@ export function referenceAds(date: string): Ad[] {
   return template.ads.map((a) => ({ ...a, date, pinned: false }));
 }
 
-/** Ads stored as stand-ins before they became movable keep moving. */
+/** Ads stored as stand-ins before they became movable keep moving; a stand-in
+ * since taken out of the reference set (its art in /chrome/ads/) is dropped. */
 export function standInsMovable(ads: Ad[]): Ad[] {
   const ids = new Set(referenceAds("").map((a) => a.id));
-  return ads.map((a) => (a.pinned === undefined && ids.has(a.id) ? { ...a, pinned: false } : a));
+  return ads.filter((a) => ids.has(a.id) || !a.url.startsWith("/chrome/ads/"))
+    .map((a) => (a.pinned === undefined && ids.has(a.id) ? { ...a, pinned: false } : a));
 }
 
 /** Share of words two stories have in common (headline and opening). */
@@ -68,6 +70,7 @@ export function applyTextEdits(stories: Story[], edits: Edit[]): Story[] {
       if (typeof change.photo === "string" || change.photo === null) out.photo = change.photo as string | null;
       if (typeof change.body === "string") out.bodies = { long: change.body, medium: change.body, short: change.body };
       if (typeof change.priority === "number" && change.priority >= 1 && change.priority <= 5) out.priority = Math.round(change.priority);
+      if (typeof change.fullWidth === "boolean") out.fullWidth = change.fullWidth;
     }
     return out;
   });

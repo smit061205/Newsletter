@@ -1,0 +1,65 @@
+{
+  "name": "capital-kranti",
+  "productName": "Capital Kranti",
+  "version": "1.0.0",
+  "description": "Capital Kranti newsroom: the daily paper, made every evening",
+  "author": "Capital Kranti",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "electron-updater": "~6.6.2"
+  },
+  "devDependencies": {
+    "electron": "~38.2.0",
+    "electron-builder": "~26.0.12"
+  },
+  "build": {
+    "appId": "in.capitalkranti.newsroom",
+    "productName": "Capital Kranti",
+    "copyright": "Capital Kranti, Gandhinagar",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "splash.html", "icon/**", "package.json"],
+    "extraResources": [{ "from": "app-engine", "to": "app-engine", "filter": ["**/*"] }],
+    "asarUnpack": ["icon/**"],
+    "publish": [{ "provider": "github", "owner": "smit061205", "repo": "Newsletter", "releaseType": "release" }],
+    "mac": {
+      "icon": "icon/icon.icns",
+      "category": "public.app-category.productivity",
+      "target": [{ "target": "dmg" }, { "target": "zip" }],
+      "artifactName": "Capital-Kranti-${version}-mac-${arch}.${ext}",
+      "identity": null,
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "Capital Kranti",
+      "background": "icon/dmg-background.png",
+      "iconSize": 112,
+      "window": { "width": 600, "height": 380 },
+      "contents": [
+        { "x": 165, "y": 190, "type": "file" },
+        { "x": 435, "y": 190, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "win": {
+      "icon": "icon/icon.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "Capital-Kranti-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Capital Kranti",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "build/uninstall.nsh"
+    }
+  }
+}

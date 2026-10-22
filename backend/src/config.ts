@@ -15,6 +15,9 @@ export const PUBLIC_DIR = path.join(ROOT, "web", "public");
 export const DATA_DIR = process.env.DATA_DIR?.trim() || "";
 export const DB_FILE = DATA_DIR ? path.join(DATA_DIR, "capital-kranti.sqlite") : path.join(ROOT, "backend", "data", "capital-kranti.sqlite");
 export const OUT_DIR = DATA_DIR ? path.join(DATA_DIR, "out") : path.join(ROOT, "out", "backend");
+/** The AI key and other secrets (KEY=value lines): in DATA_DIR when set, so an
+ * app update (which replaces the app's own folder) never loses them. */
+export const ENV_FILE = DATA_DIR ? path.join(DATA_DIR, "settings.env") : path.join(ROOT, "backend", ".env");
 /** Release photos, served as /media/<date>/<file>. */
 export const MEDIA_DIR = DATA_DIR ? path.join(DATA_DIR, "media") : path.join(PUBLIC_DIR, "media");
 

@@ -11,11 +11,16 @@ import { execFileSync } from "node:child_process";
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
-import { PUBLIC_DIR, ROOT } from "./config.ts";
+import { existsSync } from "node:fs";
+import { DATA_DIR, PUBLIC_DIR, ROOT } from "./config.ts";
 import { pageImageDir, type BuildReport } from "./build.ts";
 import type { Store } from "./store.ts";
 
-export const ISSUES_DIR = path.join(PUBLIC_DIR, "issues");
+// the website's issues: its own folder in a checkout; in the desktop app
+// (DATA_DIR, no checkout) a working copy there, sent with GitHub's API
+export const ISSUES_DIR = DATA_DIR ? path.join(DATA_DIR, "site", "issues") : path.join(PUBLIC_DIR, "issues");
+/** Where the website keeps them in the repository. */
+const SITE_PATH = "web/public/issues";
 
 /** What web/src/lib/published.ts reads. */
 export interface PublishedIssue {
@@ -90,7 +95,9 @@ export async function publishIssue(store: Store, date: string, opts: {
   await writeFile(path.join(ISSUES_DIR, "index.json"), JSON.stringify({ latest: dates[0], dates }, null, 1));
   log(`published ${date} v${got.version} (${report.ready ? "READY" : "NOT READY, forced"}) -> ${path.relative(ROOT, dir)}`);
 
-  if (opts.push) {
+  if (opts.push && !existsSync(path.join(ROOT, ".git")) && process.env.GITHUB_TOKEN) {
+    await pushWithApi(date, published.issueNumber, dates, log);
+  } else if (opts.push) {
     const git = (...args: string[]) => execFileSync("git", args, { cwd: ROOT, stdio: "inherit" });
     git("add", "-A", path.relative(ROOT, ISSUES_DIR));
     git("commit", "-m", `Publish issue ${published.issueNumber} (${date})`);
@@ -100,4 +107,43 @@ export async function publishIssue(store: Store, date: string, opts: {
     log(`to put it online: git add web/public/issues && git commit -m "Publish ${date}" && git push`);
   }
   return published;
+}
+
+/** The day's issue to the website's repository as one commit through
+ * GitHub's API (the desktop app has no Git): the day's files in, days the
+ * site no longer keeps out. GITHUB_TOKEN comes from the app's one-time
+ * "Connect the website" sign-in; GITHUB_REPO is owner/name. */
+async function pushWithApi(date: string, issueNumber: number, keep: string[], log: (s: string) => void) {
+  const repo = process.env.GITHUB_REPO?.trim() || "smit061205/Newsletter";
+  const branch = process.env.GITHUB_BRANCH?.trim() || "main";
+  const api = async <T>(p: string, init: RequestInit = {}): Promise<T> => {
+    const res = await fetch(`https://api.github.com/repos/${repo}${p}`, {
+      ...init, headers: { authorization: `Bearer ${process.env.GITHUB_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "CapitalKranti-newsroom",
+                          ...(init.body ? { "content-type": "application/json" } : {}) },
+    });
+    if (!res.ok) throw new Error(`the website's repository answered ${res.status}: ${(await res.text()).slice(0, 160)}`);
+    return (await res.json()) as T;
+  };
+  const ref = await api<{ object: { sha: string } }>(`/git/ref/heads/${branch}`);
+  const head = await api<{ tree: { sha: string } }>(`/git/commits/${ref.object.sha}`);
+  // the day's files, as blobs
+  const entries: { path: string; mode: "100644"; type: "blob"; sha: string | null }[] = [];
+  const upload = async (local: string, remote: string) => {
+    const blob = await api<{ sha: string }>("/git/blobs", { method: "POST", body: JSON.stringify({ content: (await readFile(local)).toString("base64"), encoding: "base64" }) });
+    entries.push({ path: remote, mode: "100644", type: "blob", sha: blob.sha });
+  };
+  for (const f of await readdir(path.join(ISSUES_DIR, date))) await upload(path.join(ISSUES_DIR, date, f), `${SITE_PATH}/${date}/${f}`);
+  await upload(path.join(ISSUES_DIR, "index.json"), `${SITE_PATH}/index.json`);
+  // the days the site no longer keeps, and old files of this day, removed
+  const tree = await api<{ tree: { path: string; type: string }[] }>(`/git/trees/${head.tree.sha}?recursive=1`);
+  const fresh = new Set(entries.map((e) => e.path));
+  for (const t of tree.tree) {
+    const m = t.path.match(new RegExp(`^${SITE_PATH}/(\\d{4}-\\d{2}-\\d{2})/`));
+    if (t.type === "blob" && m && (!keep.includes(m[1]) || (m[1] === date && !fresh.has(t.path)))) entries.push({ path: t.path, mode: "100644", type: "blob", sha: null });
+  }
+  const newTree = await api<{ sha: string }>("/git/trees", { method: "POST", body: JSON.stringify({ base_tree: head.tree.sha, tree: entries }) });
+  const commit = await api<{ sha: string }>("/git/commits", { method: "POST",
+    body: JSON.stringify({ message: `Publish issue ${issueNumber} (${date})`, tree: newTree.sha, parents: [ref.object.sha] }) });
+  await api(`/git/refs/heads/${branch}`, { method: "PATCH", body: JSON.stringify({ sha: commit.sha }) });
+  log(`published to the website (${repo}@${commit.sha.slice(0, 7)}): it redeploys in a minute or so`);
 }

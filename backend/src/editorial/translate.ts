@@ -15,7 +15,7 @@
 import { fillContext } from "../build.ts";
 import { ingestPib, listPib, type ListItem } from "../ingest/pib.ts";
 import { profile } from "../profile.ts";
-import { storyIdOf, type Release, type Store, type Story } from "../store.ts";
+import { storyIdOf, type Progress, type Release, type Store, type Story } from "../store.ts";
 import { devanagariToGujarati } from "../layout/text.ts";
 import { DEFAULT_MODEL, digits, env, numbersNotIn, openRouter, releaseText, SCHEMA, SYSTEM } from "./rewrite.ts";
 
@@ -106,7 +106,7 @@ export async function translateOne(r: Release, key: string, model = env("OPENROU
   if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = (await res.json()) as { choices: { message: { content: string } }[]; usage?: { cost?: number } };
   const out = JSON.parse(unfence(data.choices[0].message.content));
-  const unknown = numbersNotIn(`${out.headline} ${out.deck} ${out.body_long}`, `${r.headline} ${r.subhead} ${r.body}`);
+  const unknown = numbersNotIn(`${out.headline} ${out.deck} ${out.body_long}`, `${r.headline} ${r.subhead} ${r.body}`, r.date);
   const story: Story = {
     id: storyIdOf(r), releaseId: r.id, date: r.date,
     kicker: out.kicker, headline: out.headline, deck: out.deck,
@@ -122,7 +122,7 @@ export async function translateOne(r: Release, key: string, model = env("OPENROU
 
 /** Translate Hindi releases into `date`'s paper until its copy is enough.
  * Returns what it did; never throws for one bad release. */
-export async function topUp(store: Store, date: string, opts: { log: (s: string) => void; force?: boolean }):
+export async function topUp(store: Store, date: string, opts: { log: (s: string) => void; force?: boolean; progress?: (p: Progress) => void }):
   Promise<{ before: number; after: number; translated: number; cost: number }> {
   const { log } = opts;
   const key = env("OPENROUTER_API_KEY");
@@ -159,7 +159,9 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
     let cost = ranked.cost;
     log(`  ranked for Gujarat's readers: ${ranked.order.length} worth printing`);
     let translated = 0;
+    let tried = 0;
     for (const prid of ranked.order) {
+      opts.progress?.({ done: tried++, total: ranked.order.length, label: "translating", item: candidates.find((c) => c.prid === prid)?.headline });
       if (ctx.share() >= target) break;
       if (cost >= profile.editorial.dailyBudgetUsd) { log(`  the day's AI budget ($${profile.editorial.dailyBudgetUsd}) is spent: stopping`); break; }
       if (done.has(prid)) continue;

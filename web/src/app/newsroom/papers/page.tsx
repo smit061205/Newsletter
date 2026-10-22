@@ -100,32 +100,32 @@ export default function Papers() {
 
   const cell = (v: number) => (Math.round(v * 100) / 100).toString();
   return (
-    <div className={styles.stack}>
-      <section className={styles.panel}>
+    <div className={styles.inner}>
+      <section className={styles.card}>
         <h2>છાપાં <small>The papers · each built from the same news, in its own look</small></h2>
-        <ul className={styles.rows}>
+        <ul className={styles.list}>
           {papers.filter((p) => !p.test).map((p) => (
             <li key={p.id} className={styles.paperRow}>
-              <span className={styles.rowTitle}>{p.name}</span>
-              <span className={styles.rowMeta}>{p.id} · {p.lang} · {p.pages} pages{p.issue ? ` · last issue ${p.issue.date} v${p.issue.version}` : ""}</span>
-              <span className={styles.chips}>
-                {p.own && <span className={styles.pill} data-tone="info">This newsroom&apos;s paper</span>}
-                {p.issue && <span className={styles.pill} data-tone={p.issue.ready ? "good" : "bad"}>{p.issue.ready ? "Ready" : "Needs a look"}</span>}
-                {!p.own && <button onClick={() => makeTest(p.id)} disabled={busy.startsWith("test")}>Make a test issue</button>}
-                {!p.own && p.issue && <a className={styles.button} href={media(`/api/papers/${p.id}/pdf`)} target="_blank" rel="noreferrer">PDF</a>}
+              <span className={styles.listTitle}>{p.name}</span>
+              <span className={styles.listMeta}>{p.id} · {p.lang} · {p.pages} pages{p.issue ? ` · last issue ${p.issue.date} v${p.issue.version}` : ""}</span>
+              <span className={styles.listBadges}>
+                {p.own && <span className={styles.badge} data-tone="accent">This newsroom&apos;s paper</span>}
+                {p.issue && <span className={styles.badge} data-tone={p.issue.ready ? "good" : "bad"}>{p.issue.ready ? "Ready" : "Needs a look"}</span>}
+                {!p.own && <button className={styles.btn} onClick={() => makeTest(p.id)} disabled={busy.startsWith("test")}>Make a test issue</button>}
+                {!p.own && p.issue && <a className={styles.btn} href={media(`/api/papers/${p.id}/pdf`)} target="_blank" rel="noreferrer">PDF</a>}
               </span>
             </li>
           ))}
         </ul>
         {test && (
-          <details className={styles.log} open>
+          <details className={styles.details} open>
             <summary>Test issue for {saved} {busy ? "(running…)" : ""}</summary>
-            <div className={styles.logBody}>{test.log.map((l, i) => <div key={i}>{l}</div>)}</div>
+            <div className={styles.logBox}>{test.log.map((l, i) => <div key={i}>{l}</div>)}</div>
           </details>
         )}
       </section>
 
-      <section className={styles.panel}>
+      <section className={styles.card}>
         <h2>નવું છાપું ઉમેરો <small>Add a newspaper</small></h2>
         <ol className={styles.howto}>
           <li>Upload 1 to 3 recent issues as PDF, exported from the paper&apos;s layout software (not scans).</li>
@@ -134,16 +134,16 @@ export default function Papers() {
         </ol>
         <div className={styles.fields}>
           <label>PDF <small>The paper&apos;s issues</small><input type="file" accept="application/pdf" multiple onChange={(e) => setPdfs([...(e.target.files ?? [])])} /></label>
-          <div className={styles.actions}><button className={styles.primary} onClick={read} disabled={!pdfs.length || busy === "read"}>{busy === "read" ? "Reading…" : "છાપું વાંચો · Read the paper"}</button></div>
+          <div className={styles.row}><button className={`${styles.btn} ${styles.primary}`} onClick={read} disabled={!pdfs.length || busy === "read"}>{busy === "read" ? "Reading…" : "છાપું વાંચો · Read the paper"}</button></div>
         </div>
-        {error && <p className={styles.error} role="alert">{error}</p>}
+        {error && <p className={styles.note} data-tone="bad" role="alert">{error}</p>}
       </section>
 
       {draft && (
         <>
-          <section className={styles.panel}>
+          <section className={styles.card}>
             <h2>શું વાંચ્યું <small>What the engine read · check it</small></h2>
-            {draft.notes.map((n) => <p key={n} className={styles.warn}>{n}</p>)}
+            {draft.notes.map((n) => <p key={n} className={styles.note} data-tone="warn">{n}</p>)}
             <dl className={styles.facts}>
               <dt>Page</dt><dd>{cell(draft.page.width)} × {cell(draft.page.height)} pt ({cell(draft.page.width / 72 * 2.54)} × {cell(draft.page.height / 72 * 2.54)} cm), {draft.pages} pages</dd>
               <dt>Columns</dt><dd>{draft.grid.columns} columns of {cell(draft.grid.column)} pt, gutter {cell(draft.grid.gutter)} pt, from {cell(draft.grid.left)} pt</dd>
@@ -157,36 +157,36 @@ export default function Papers() {
               <dt>Fonts in the PDF</dt><dd>{draft.fonts.slice(0, 6).map((f) => `${f.name}${f.roles.length ? ` (${f.roles.join(", ")})` : ""}`).join(" · ")}</dd>
             </dl>
           </section>
-          <section className={styles.panel}>
+          <section className={styles.card}>
             <h2>નામ, ફોન્ટ, મથાળું <small>Name, fonts, masthead</small></h2>
             <div className={styles.fields}>
-              <div className={styles.inline}>
+              <div className={styles.row}>
                 <label>Paper&apos;s name<input value={name} onChange={(e) => { setName(e.target.value); if (!saved) setId(e.target.value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40)); }} /></label>
                 <label>Short id <small>a-z, 0-9, -</small><input value={id} onChange={(e) => setId(e.target.value)} /></label>
               </div>
-              <div className={styles.inline}>
+              <div className={styles.row}>
                 <label>Today&apos;s issue number<input type="number" min={1} value={issueNumber} onChange={(e) => setIssueNumber(Number(e.target.value))} /></label>
                 <label>Pages<input type="number" min={1} max={32} value={pages} onChange={(e) => setPages(Number(e.target.value))} /></label>
                 <label>Type size scale <small>1 = as in the PDF</small><input type="number" min={0.5} max={1.5} step={0.05} value={scale} onChange={(e) => setScale(Number(e.target.value))} /></label>
               </div>
-              <div className={styles.inline}>
+              <div className={styles.row}>
                 {(["body", "headline", "deck", "caption"] as const).map((k) => (
                   <label key={k}>{k} font <small>{k === "body" || k === "headline" ? "needed" : "optional"} (.ttf / .otf)</small>
                     <input type="file" accept=".ttf,.otf" onChange={(e) => setFonts({ ...fonts, [k]: e.target.files?.[0] ?? null })} /></label>
                 ))}
               </div>
-              <div className={styles.inline}>
+              <div className={styles.row}>
                 {(["first", "inner", "last", "footer"] as const).map((k) => (
                   <label key={k}>{k === "first" ? "Masthead (page 1)" : k === "inner" ? "Inner pages' head" : k === "last" ? "Last page's head" : "Footer"} <small>PNG, page width; optional</small>
                     <input type="file" accept="image/png" onChange={(e) => setArt({ ...art, [k]: e.target.files?.[0] ?? null })} /></label>
                 ))}
               </div>
               <p className={styles.muted}>No masthead image? A plain one is made from the paper&apos;s name; replace it later.</p>
-              <div className={styles.actions}>
-                <button className={styles.primary} onClick={save} disabled={!name || !id || !fonts.body || !fonts.headline || busy === "save"}>{busy === "save" ? "Saving…" : "સાચવો · Save the paper"}</button>
-                {saved === id && <button onClick={() => makeTest(id)} disabled={busy.startsWith("test")}>Make a test issue</button>}
+              <div className={styles.row}>
+                <button className={`${styles.btn} ${styles.primary}`} onClick={save} disabled={!name || !id || !fonts.body || !fonts.headline || busy === "save"}>{busy === "save" ? "Saving…" : "સાચવો · Save the paper"}</button>
+                {saved === id && <button className={styles.btn} onClick={() => makeTest(id)} disabled={busy.startsWith("test")}>Make a test issue</button>}
               </div>
-              {saved === id && <p className={styles.good}>Saved as publications/{id}. Make a test issue to see it built from today&apos;s news.</p>}
+              {saved === id && <p className={styles.note} data-tone="good">Saved as publications/{id}. Make a test issue to see it built from today&apos;s news.</p>}
             </div>
           </section>
         </>

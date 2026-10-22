@@ -52,17 +52,22 @@ export interface Story {
   factCheck?: string;
   /** Releases written up together as this one story (a round-up of the same occasion). */
   mergedFrom?: number[];
+  /** The editor let it run the full width of the front page. */
+  fullWidth?: boolean;
   /** Translated from another language (its code, e.g. "hi"): the editor checks it against the original. */
   translatedFrom?: string;
 }
 
 export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build";
+/** How far a step has got: `done` of `total`, in words, with the item in hand (a headline, a page). */
+export interface Progress { done: number; total: number; label: string; item?: string }
 export interface JobStep {
   name: StepName;
   status: "waiting" | "running" | "done" | "failed" | "skipped";
   startedAt?: string; endedAt?: string;
   log: string[];
   error?: string;
+  progress?: Progress;
 }
 export interface Job {
   id: number;

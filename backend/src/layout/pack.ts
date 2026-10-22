@@ -129,6 +129,8 @@ export class Packer {
   /** Pack one page from `pool` (most important first). */
   async packPage(page: number, pool: Story[], band: Band, ads: Ad[],
                  opts: { leadFirst: boolean; beam?: number; budget?: number;
+                         /** the widest a story may be on this page (the front page's rule), unless it's allowed full width */
+                         maxCols?: number;
                          /** copy (natural area) that must stay in the pool for the pages after this one */
                          reserve?: number }): Promise<PagePlan> {
     const gap = GAP.betweenStories;
@@ -209,6 +211,7 @@ export class Packer {
           const modes: PhotoMode[] = !story.photo ? [0] : (story.photos?.length ?? 0) >= 2 ? [0, 1, 2] : [0, 1];
           for (const k of spansFor(rank)) {
             if (k > run) continue;
+            if (opts.maxCols && k > opts.maxCols && !story.fullWidth) continue;
             const limits = Array.from({ length: k }, (_, i) => limitBelow(c0 + i, y));
             const limit = Math.min(...limits);
             if (limit - y < minBody) continue;

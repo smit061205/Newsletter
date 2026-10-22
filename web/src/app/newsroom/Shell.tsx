@@ -1,31 +1,34 @@
 "use client";
-// The newsroom's frame: the paper's name, the day being worked on, the
-// screens, and a warning when the engine on this computer isn't answering.
+// The newsroom's frame: the sidebar (logo, the screens, help), the day being
+// worked on, and a calm notice if the engine on this computer stops
+// answering. A first visit goes to the welcome screens.
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { call, type Status } from "./api";
-import styles from "./newsroom.module.css";
+import s from "./newsroom.module.css";
+import { addDays, longDate } from "./ui/format";
+import { Help } from "./ui/help";
+import { AppProvider, Button, Icon, Mark, useApp } from "./ui/kit";
+import type { StringKey } from "./ui/strings";
 
-const TABS: [string, string, string][] = [
-  ["/newsroom", "આજે", "Today"],
-  ["/newsroom/news", "સમાચાર", "News"],
-  ["/newsroom/stories", "લેખ", "Stories"],
-  ["/newsroom/pages", "પાનાં", "Pages"],
-  ["/newsroom/ads", "જાહેરાત", "Ads"],
-  ["/newsroom/papers", "છાપાં", "Papers"],
-  ["/newsroom/settings", "સેટિંગ્સ", "Settings"],
+interface StatusCtx { status: Status | null; down: boolean; refresh: () => void }
+const StatusContext = createContext<StatusCtx>({ status: null, down: false, refresh: () => {} });
+/** The engine's status (polled), for every screen. */
+export const useStatus = () => useContext(StatusContext);
+
+const NAV: [string, StringKey, () => React.ReactElement][] = [
+  ["/newsroom", "nav.today", Icon.today],
+  ["/newsroom/pages", "nav.paper", Icon.paper],
+  ["/newsroom/stories", "nav.stories", Icon.stories],
+  ["/newsroom/ads", "nav.ads", Icon.ads],
+  ["/newsroom/archive", "nav.archive", Icon.archive],
+  ["/newsroom/settings", "nav.settings", Icon.settings],
 ];
-
-interface Day { date: string; setDate: (d: string) => void; status: Status | null; refreshStatus: () => void }
-const DayContext = createContext<Day>({ date: "", setDate: () => {}, status: null, refreshStatus: () => {} });
-/** The day the newsroom is working on, and the engine's status. */
-export const useDay = () => useContext(DayContext);
 
 const todayInIndia = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 
 export default function Shell({ children }: { children: React.ReactNode }) {
-  const path = usePathname();
   const [date, setDateState] = useState("");
   const [status, setStatus] = useState<Status | null>(null);
   const [down, setDown] = useState(false);
@@ -35,44 +38,99 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     try { saved = sessionStorage.getItem("nr-date"); } catch {}
     setDateState(saved ?? todayInIndia());
   }, []);
-  const setDate = (d: string) => {
+  const setDate = useCallback((d: string) => {
     setDateState(d);
     try { sessionStorage.setItem("nr-date", d); } catch {}
-  };
-  const refreshStatus = useCallback(() => {
-    call<Status>("/api/status").then((s) => { setStatus(s); setDown(false); }).catch(() => setDown(true));
   }, []);
+  const refresh = useCallback(() => {
+    if (!date) return;
+    call<Status>(`/api/status?date=${date}`).then((x) => { setStatus(x); setDown(false); }).catch(() => setDown(true));
+  }, [date]);
   useEffect(() => {
-    refreshStatus();
-    const t = setInterval(refreshStatus, 15_000);
+    refresh();
+    const t = setInterval(refresh, 15_000);
     return () => clearInterval(t);
-  }, [refreshStatus]);
+  }, [refresh]);
 
   return (
-    <DayContext.Provider value={{ date, setDate, status, refreshStatus }}>
-      <header className={styles.bar}>
-        <div className={styles.brand}>
-          <span className={styles.brandName}>કેપિટલ ક્રાંતિ</span>
-          <span className={styles.brandSub}>Newsroom</span>
+    <StatusContext.Provider value={{ status, down, refresh }}>
+      <AppProvider lang={status?.lang ?? "gu"} date={date} setDate={setDate}>
+        <Frame>{date && status ? children : <Loading down={down} />}</Frame>
+      </AppProvider>
+    </StatusContext.Provider>
+  );
+}
+
+function Loading({ down }: { down: boolean }) {
+  const { t } = useApp();
+  return down ? <EngineDown /> : <div className={s.empty}><Mark className={s.welcomeMark} /><p className={s.faint}>{t("common.loading")}</p></div>;
+}
+
+function EngineDown() {
+  const { t } = useApp();
+  const { refresh } = useStatus();
+  return (
+    <div className={s.empty} role="alert">
+      <Mark className={s.welcomeMark} />
+      <p style={{ maxWidth: 420 }}>{t("engine.down")}</p>
+      <Button onClick={refresh} icon={Icon.refresh()}>{t("engine.retry")}</Button>
+    </div>
+  );
+}
+
+function Frame({ children }: { children: React.ReactNode }) {
+  const path = usePathname();
+  const router = useRouter();
+  const { t } = useApp();
+  const { status, down } = useStatus();
+  const [help, setHelp] = useState(false);
+  // a first visit: the welcome screens before anything else
+  useEffect(() => {
+    if (status && !status.onboarded && path !== "/newsroom/welcome") router.replace("/newsroom/welcome");
+  }, [status, path, router]);
+  if (path === "/newsroom/welcome") return <>{children}</>;
+  return (
+    <div className={s.frame}>
+      <nav className={s.side} aria-label={t("app.sub")}>
+        <div className={s.logo}>
+          <Mark className={s.mark} />
+          <div className={s.logoText}><span className={s.logoName}>{t("app.name")}</span><span className={s.logoSub}>{t("app.sub")}</span></div>
         </div>
-        <nav className={styles.tabs} aria-label="Newsroom screens">
-          {TABS.map(([href, gu, en]) => (
-            <Link key={href} href={href} className={styles.tab} aria-current={path === href ? "page" : undefined}>
-              <span>{gu}</span><small>{en}</small>
-            </Link>
-          ))}
-        </nav>
-        <label className={styles.day}>
-          <span>તારીખ <small>Day</small></span>
-          <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
-        </label>
-      </header>
-      {down && (
-        <p className={styles.alert} role="alert">
-          The Capital Kranti engine on this computer isn&apos;t answering. Open the <b>Capital Kranti</b> app from the desktop, or restart the computer.
-        </p>
-      )}
-      <main className={styles.main}>{date ? children : null}</main>
-    </DayContext.Provider>
+        {NAV.map(([href, key, icon]) => (
+          <Link key={href} href={href} className={`${s.navItem} ${href === "/newsroom/archive" ? s.navExtra : ""}`}
+                aria-current={path === href ? "page" : undefined}>{icon()}<span>{t(key)}</span></Link>
+        ))}
+        <div className={s.navSpacer} />
+        <button className={`${s.navItem} ${s.navExtra}`} onClick={() => setHelp(true)}>{Icon.help()}<span>{t("nav.help")}</span></button>
+      </nav>
+      <main className={s.content}>{down && status ? <EngineDown /> : children}</main>
+      {help && <Help onClose={() => setHelp(false)} />}
+    </div>
+  );
+}
+
+/** The day switcher at the top of a screen: ‹ Thursday, 22 October › */
+export function DaySwitch() {
+  const { lang, t, date, setDate } = useApp();
+  const today = todayInIndia();
+  return (
+    <div className={s.dateSwitch}>
+      <button onClick={() => setDate(addDays(date, -1))} aria-label={t("date.prev")}>{Icon.left()}</button>
+      <label className={s.dateLabel}>
+        {date === today ? `${t("date.today")} · ` : ""}{longDate(lang, date)}
+        <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label={longDate(lang, date)} />
+      </label>
+      <button onClick={() => setDate(addDays(date, 1))} disabled={date >= today} aria-label={t("date.next")}>{Icon.right()}</button>
+    </div>
+  );
+}
+
+/** A screen's top line: its title and the day switcher. */
+export function TopBar({ title, children }: { title: string; children?: React.ReactNode }) {
+  return (
+    <div className={s.topbar}>
+      <h1 className={s.pageTitle}>{title}</h1>
+      <div className={s.row}>{children}<DaySwitch /></div>
+    </div>
   );
 }

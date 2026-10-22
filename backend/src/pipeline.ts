@@ -12,7 +12,7 @@
 // what the earlier steps stored stays stored.
 import { spawn } from "node:child_process";
 import { buildIssue } from "./build.ts";
-import type { Job, JobStep, StepName, Store } from "./store.ts";
+import type { Job, JobStep, Progress, StepName, Store } from "./store.ts";
 
 export const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build"];
 
@@ -59,28 +59,44 @@ export function settleInterrupted(store: Store) {
 /** The job running now, if any: one at a time. */
 export const currentJob = () => running;
 
-async function step(store: Store, date: string, name: StepName, say: (s: string) => void) {
+// PIB not answering (its server down, the internet gone): the fetch waits and
+// tries again, every 10 minutes for up to 2 hours, saying so
+const RETRY_EVERY_MS = 10 * 60_000;
+const RETRIES = 12;
+
+async function step(store: Store, date: string, name: StepName, say: (s: string) => void, progress: (p: Progress) => void) {
   switch (name) {
     case "fetch": {
       // the paper's own language from PIB (Gujarati: PIB Ahmedabad)
       const { ingestPib, FEEDS } = await import("./ingest/pib.ts");
       const { profile } = await import("./profile.ts");
       const feed = (profile.language.lang in FEEDS ? profile.language.lang : "en") as keyof typeof FEEDS;
-      const r = await ingestPib(store, date, feed, { log: say });
+      let r: Awaited<ReturnType<typeof ingestPib>> | null = null;
+      for (let attempt = 0; !r; attempt++) {
+        try {
+          r = await ingestPib(store, date, feed, { log: say, progress });
+        } catch (e) {
+          if (attempt >= RETRIES) throw e;
+          const at = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }).format(Date.now() + RETRY_EVERY_MS);
+          say(`PIB isn't answering (${e instanceof Error ? e.message : e}): trying again at ${at}`);
+          progress({ done: 0, total: 0, label: "waiting", item: at });
+          await new Promise((ok) => setTimeout(ok, RETRY_EVERY_MS));
+        }
+      }
       say(`${r.listed} listed, ${r.fetched} new, ${r.skipped} already stored`);
       if (!store.releases(date).length) throw new Error(`PIB has no releases in the paper's language for ${date} yet`);
       return;
     }
     case "rewrite": {
       const { rewriteDay } = await import("./editorial/rewrite.ts");
-      return rewriteDay(store, date, { log: say });
+      return rewriteDay(store, date, { log: say, progress });
     }
     case "topup": {
       // (translating Hindi tops up a Gujarati paper; other papers take their own language whole)
       const { profile } = await import("./profile.ts");
       if (profile.language.lang !== "gu") return say(`a ${profile.language.lang} paper: no translation step`);
       const { topUp } = await import("./editorial/translate.ts");
-      await topUp(store, date, { log: say });
+      await topUp(store, date, { log: say, progress });
       return;
     }
     case "fill": {
@@ -95,7 +111,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       return;
     }
     case "build": {
-      const r = await buildIssue(store, date, { log: say });
+      const r = await buildIssue(store, date, { log: say, progress });
       say(`issue ${r.report.issueNumber} v${(r.report as { version?: number }).version ?? "?"}: ${r.report.ready ? "READY" : "NOT READY"}`);
       return;
     }
@@ -123,8 +139,14 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
         opts.log?.(`  [${s.name}] ${line}`);
         emit(line);
       };
+      // progress as it comes, sent at most twice a second (a story a second is plenty)
+      let lastSent = 0;
+      const progress = (p: Progress) => {
+        s.progress = p;
+        if (Date.now() - lastSent > 500 || p.done === p.total) { lastSent = Date.now(); emit(); }
+      };
       try {
-        await step(store, date, s.name, say);
+        await step(store, date, s.name, say, progress);
         s.status = "done";
       } catch (e) {
         s.status = "failed";
