@@ -2,7 +2,8 @@
 // The browser calls it directly: both run here, on 127.0.0.1.
 
 export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build";
-export interface JobStep { name: StepName; status: "waiting" | "running" | "done" | "failed" | "skipped"; startedAt?: string; endedAt?: string; log: string[]; error?: string }
+export interface Progress { done: number; total: number; label: string; item?: string }
+export interface JobStep { name: StepName; status: "waiting" | "running" | "done" | "failed" | "skipped"; startedAt?: string; endedAt?: string; log: string[]; error?: string; progress?: Progress }
 export interface Job { id: number; date: string; by: string; status: "running" | "done" | "failed"; startedAt: string; endedAt?: string; steps: JobStep[] }
 export interface Gate { gate: string; pass: boolean; detail: string }
 export interface Report {
@@ -11,13 +12,16 @@ export interface Report {
   leftOut: { id: string; headline: string; reason?: string }[];
   /** the AI editorial plan's rank and reason per story */
   plan?: { id: string; rank: number; reason: string }[];
+  whiteSpace?: { page: number; col: number; height: number; y: number }[];
 }
 export interface IssueInfo { date: string; version: number; status: string; report: Report }
 export interface Status {
   today: string; now: string; runAt: string; autoRun: boolean; nextRun: string | null;
   running: Job | null; lastJob: Job | null; openrouterKey: boolean;
-  issue: { version: number; status: string; ready?: boolean } | null; version: string;
+  lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number; notify: boolean; siteUrl: string;
+  issue: { version: number; status: string; ready?: boolean; issueNumber?: number } | null; version: string;
 }
+export interface ArchiveRow { date: string; version: number; status: string; issueNumber?: number; ready?: boolean; cost?: number; stories: number; pages?: number }
 export interface ReleaseRow {
   id: number; source: string; lang: string; ministry: string; headline: string; url: string; photos: string[]; body: string;
   story: string | null; inPaper: boolean; translated: boolean; roundUp: boolean;
@@ -26,10 +30,10 @@ export interface StoryRow {
   id: string; releaseId: number | null; date: string; kicker: string; headline: string; deck: string;
   bodies: { long: string; medium: string; short: string }; priority: number; photo: string | null; photos?: string[];
   caption: string; source: string; model: string; factCheck?: string; translatedFrom?: string; mergedFrom?: number[];
-  dropped: boolean; edited: boolean; page: number | null; cols: number | null;
+  dropped: boolean; edited: boolean; page: number | null; cols: number | null; fullWidth?: boolean;
 }
 export interface AdRow { id: string; date: string; page: number; width: number; height: number; url: string }
-export interface Settings { runAt: string; autoRun: boolean; openrouterKey: boolean }
+export interface Settings { runAt: string; autoRun: boolean; openrouterKey: boolean; lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number; notify: boolean; siteUrl: string }
 
 export const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:4000";
 
@@ -52,23 +56,3 @@ export async function call<T>(path: string, init?: RequestInit & { json?: unknow
 
 /** A file the backend serves (page images, photos, the PDF). */
 export const media = (path: string) => (/^https?:/.test(path) ? path : `${BACKEND}${path}`);
-
-export const STEP_LABEL: Record<StepName, [string, string]> = {
-  fetch: ["ગુજરાતી સમાચાર", "Gujarati news from PIB"],
-  rewrite: ["લેખન", "Written in the paper's style"],
-  topup: ["હિન્દી અનુવાદ", "Hindi news translated"],
-  fill: ["વિશેષ લેખ", "Features, if still short"],
-  build: ["પાનાં", "Pages laid out and checked"],
-};
-
-/** A gate's name in plain words for the editor. */
-export function gateLabel(g: string): string {
-  const k = g.split(" ")[0];
-  if (k === "3") return /tombstone/.test(g) ? "No headlines side by side" : /importance/.test(g) ? "Bigger news, bigger headline" : "No oversized headline";
-  const plain: Record<string, string> = {
-    "1": "Nothing overflows or overlaps", P: "Ready for the printer", F: "Every letter in the paper's fonts", "2": "No empty space on the pages", "4": "Every story placed",
-    "5": "AI page review", "6": "Numbers match the releases", "7": "Same result on a rebuild", S1: "Even word spacing",
-    S2: "Headlines fill their width", S4: "Columns end level", S5: "Enough news for the pages", S6: "Gujarati digits", S7: "Headline, sub-heading, text",
-  };
-  return plain[k] ?? g;
-}

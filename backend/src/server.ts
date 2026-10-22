@@ -170,6 +170,8 @@ export function settingsOf(store: Store) {
     /** rupees to a US dollar, for showing the AI's cost (reported in USD) */
     inrPerUsd: store.setting("inrPerUsd", 88),
     notify: store.setting("notify", true),
+    /** the public website, for "Open the website" */
+    siteUrl: store.setting("siteUrl", ""),
   };
 }
 
@@ -395,12 +397,16 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
         if (req.method === "POST") {
           const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string; lang?: string;
-                                                   onboarded?: boolean; inrPerUsd?: number; notify?: boolean };
+                                                   onboarded?: boolean; inrPerUsd?: number; notify?: boolean; siteUrl?: string };
           if (body.lang !== undefined) {
             if (body.lang !== "gu" && body.lang !== "en") return send(res, 400, { error: "the language is gu or en" });
             store.putSetting("lang", body.lang);
           }
           if (body.onboarded !== undefined) store.putSetting("onboarded", !!body.onboarded);
+          if (body.siteUrl !== undefined) {
+            if (body.siteUrl && !/^https:\/\/[^\s]+$/.test(body.siteUrl)) return send(res, 400, { error: "the website address starts with https://" });
+            store.putSetting("siteUrl", body.siteUrl.trim());
+          }
           if (body.notify !== undefined) store.putSetting("notify", !!body.notify);
           if (body.inrPerUsd !== undefined) {
             if (!(body.inrPerUsd > 10 && body.inrPerUsd < 1000)) return send(res, 400, { error: "the rupee rate should be about 80-100" });

@@ -1,11 +1,14 @@
 "use client";
-// પાનાં / Pages: the issue as it will print. Click a story on a page to edit
-// it; build the pages again after changes; download the PDF.
-import { useRouter } from "next/navigation";
+// છાપું / Paper: the pages as they'll print. Thumbnails down the side, the
+// page large, and any story on it opens its editor right here.
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { call, gateLabel, media, type IssueInfo } from "../api";
-import { useDay } from "../Shell";
-import styles from "../newsroom.module.css";
+import { call, media, type IssueInfo, type StoryRow } from "../api";
+import { TopBar, useStatus } from "../Shell";
+import s from "../newsroom.module.css";
+import { checkName, num, problems } from "../ui/format";
+import { Badge, Button, Empty, Icon, Note, Skeleton, useApp } from "../ui/kit";
+import { StoryPanel } from "../ui/StoryPanel";
 
 interface El { articleId?: string; kind: string; x?: number; y?: number; width?: number; height?: number; x1?: number; y1?: number; x2?: number; y2?: number }
 interface Issue { pages: { number: number; width: number; height: number; elements: El[] }[] }
@@ -24,86 +27,115 @@ function storyBoxes(page: Issue["pages"][number], ids: Set<string>) {
   return boxes;
 }
 
-export default function Pages() {
-  const { date } = useDay();
-  const router = useRouter();
+export default function Paper() {
+  const { t, lang, date, toast, pdf } = useApp();
+  const { status, refresh } = useStatus();
   const [info, setInfo] = useState<IssueInfo | null>(null);
   const [issue, setIssue] = useState<Issue | null>(null);
+  const [stories, setStories] = useState<StoryRow[]>([]);
   const [n, setN] = useState(1);
+  const [editing, setEditing] = useState<StoryRow | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
   const [error, setError] = useState("");
-  const [note, setNote] = useState("");
 
+  const has = !!status?.issue;
+  const version = status?.issue?.version;
   const load = useCallback(() => {
-    call<IssueInfo>(`/api/issues/${date}`).then(setInfo).catch(() => setInfo(null));
-    call<Issue>(`/api/issue?date=${date}`).then(setIssue).catch(() => setIssue(null));
-  }, [date]);
-  useEffect(() => { setN(1); load(); }, [load]);
+    if (!has) return;
+    call<IssueInfo>(`/api/issues/${date}`).then(setInfo).catch((e) => setError(e.message));
+    call<Issue>(`/api/issue?date=${date}`).then(setIssue).catch((e) => setError(e.message));
+    call<StoryRow[]>(`/api/stories?date=${date}`).then(setStories).catch(() => {});
+  }, [date, has]);
+  useEffect(() => { setN(1); setInfo(null); setIssue(null); }, [date]);
+  useEffect(() => { load(); }, [load, version]);
+  useEffect(() => setImgFailed(false), [n, version]);
 
   const placed = useMemo(() => new Map((info?.report.placed ?? []).map((p) => [p.story, p])), [info]);
-  const why = useMemo(() => new Map((info?.report.plan ?? []).map((p) => [p.id, p])), [info]);
   const page = issue?.pages.find((p) => p.number === n);
   const boxes = page ? storyBoxes(page, new Set(placed.keys())) : new Map();
+  const todo = info ? problems(lang, info.report.gates, (id) => stories.find((x) => x.id === id)?.headline) : [];
+  const running = !!status?.running && status.running.date === date;
 
   const rebuild = async () => {
     setError("");
-    try {
-      await call(`/api/issues/${date}/build`, { json: {} });
-      setNote("Laying the pages out again. Follow it on Today; this screen shows the new pages when it's done.");
-    } catch (e) { setError((e as Error).message); }
+    try { await call(`/api/issues/${date}/build`, { json: {} }); toast(t("paper.rebuilding")); refresh(); }
+    catch (e) { setError((e as Error).message); }
   };
-  const edit = (id: string) => {
-    try { sessionStorage.setItem("nr-open-story", id); } catch {}
-    router.push("/newsroom/stories");
-  };
+  const open = (id: string) => setEditing(stories.find((x) => x.id === id) ?? null);
+  const openPdf = () => info && pdf({ url: media(`/api/issues/${date}/pdf`), title: t("pdf.title", { issue: num(lang, info.report.issueNumber) }),
+                                      fileName: `Capital Kranti ${info.report.issueNumber} - ${date.split("-").reverse().join("-")}.pdf` });
 
-  if (!info || !issue) return <p className={styles.muted}>No pages for this day yet. Run the day from <b>Today</b>.</p>;
-  const failing = info.report.gates.filter((g) => !g.pass);
+  if (!has) {
+    return (
+      <div className={s.inner}>
+        <TopBar title={t("paper.title")} />
+        <div className={s.card}><Empty icon={Icon.paper()} title={t("paper.none")}><Link className={`${s.btn} ${s.primary}`} href="/newsroom">{t("today.make")}</Link></Empty></div>
+      </div>
+    );
+  }
   return (
-    <div className={styles.pagesLayout}>
-      <section className={styles.panel}>
-        <div className={styles.panelHead}>
-          <h2>પાનું {n} <small>Page {n} of {issue.pages.length} · version {info.version}</small></h2>
-          <div className={styles.actions}>
-            {issue.pages.map((p) => (
-              <button key={p.number} onClick={() => setN(p.number)} aria-pressed={p.number === n}>{p.number}</button>
-            ))}
-          </div>
-        </div>
-        {page && (
-          <div className={styles.pageView} style={{ aspectRatio: `${page.width} / ${page.height}` }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={media(`/api/pages/${date}/${n}.png?v=${info.version}`)} alt={`Page ${n}`} />
-            {[...boxes].map(([id, b]) => (
-              <button key={id} className={styles.storyBox} title={`${placed.get(id)?.headline} -- click to edit`}
-                      style={{ left: `${(b.x0 / page.width) * 100}%`, top: `${(b.y0 / page.height) * 100}%`,
-                               width: `${((b.x1 - b.x0) / page.width) * 100}%`, height: `${((b.y1 - b.y0) / page.height) * 100}%` }}
-                      onClick={() => edit(id)} aria-label={`Edit: ${placed.get(id)?.headline}`} />
-            ))}
-          </div>
-        )}
-      </section>
-      <aside className={styles.panel}>
-        <h2>તપાસ <small>Checks</small></h2>
-        <p><span className={styles.pill} data-tone={info.report.ready ? "good" : "bad"}>{info.report.ready ? "Ready to print" : `${failing.length} check${failing.length === 1 ? "" : "s"} to look at`}</span></p>
-        <ul className={styles.gates}>
-          {failing.map((g) => <li key={g.gate} data-pass="false"><span aria-hidden>!</span>{gateLabel(g.gate)}<small>{g.detail}</small></li>)}
-        </ul>
-        <div className={styles.actions}>
-          <button onClick={rebuild}>ફરી ગોઠવો · Build again</button>
-          <a className={styles.button} href={media(`/api/issues/${date}/pdf`)} target="_blank" rel="noreferrer">PDF</a>
-        </div>
-        {note && <p className={styles.good}>{note}</p>}
-        {error && <p className={styles.error} role="alert">{error}</p>}
-        <h3>On this page</h3>
-        <ol className={styles.onPage}>
-          {[...placed.values()].filter((p) => p.page === n).map((p) => (
-            <li key={p.story}>
-              <button className={styles.link} onClick={() => edit(p.story)}>{p.headline}</button> <small>{p.cols} col</small>
-              {why.get(p.story) && <small className={styles.why}>Rank {why.get(p.story)!.rank}: {why.get(p.story)!.reason}</small>}
-            </li>
+    <div className={`${s.inner} ${s.wide}`}>
+      <TopBar title={t("paper.title")}>
+        <Button kind="quiet" icon={Icon.refresh()} onClick={rebuild} disabled={running}>{running ? t("paper.rebuilding") : t("paper.rebuild")}</Button>
+        <Button icon={Icon.print()} onClick={openPdf} disabled={!info}>{t("today.print")}</Button>
+        <Link className={`${s.btn} ${s.primary}`} href="/newsroom">{Icon.publish()}{t("today.publish")}</Link>
+      </TopBar>
+      {error && <Note tone="bad">{error}</Note>}
+      <div className={s.paperLayout}>
+        <div className={s.thumbs}>
+          {(issue?.pages ?? [1, 2, 3, 4].map((k) => ({ number: k }))).map((p) => (
+            <button key={p.number} className={s.thumb} aria-pressed={p.number === n} onClick={() => setN(p.number)} aria-label={t("paper.page", { n: num(lang, p.number) })}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {version ? <img src={media(`/api/pages/${date}/${p.number}.png?v=${version}`)} alt="" /> : <Skeleton h={120} />}
+              <span>{num(lang, p.number)}</span>
+            </button>
           ))}
-        </ol>
-      </aside>
+        </div>
+        <div>
+          {page ? (
+            <div className={s.pageView} style={{ aspectRatio: `${page.width} / ${page.height}` }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={media(`/api/pages/${date}/${n}.png?v=${version}`)} alt={t("paper.page", { n: num(lang, n) })} onError={() => setImgFailed(true)} />
+              {[...boxes].map(([id, b]) => (
+                <button key={id} className={s.storyBox} title={placed.get(id)?.headline}
+                        style={{ left: `${(b.x0 / page.width) * 100}%`, top: `${(b.y0 / page.height) * 100}%`,
+                                 width: `${((b.x1 - b.x0) / page.width) * 100}%`, height: `${((b.y1 - b.y0) / page.height) * 100}%` }}
+                        onClick={() => open(id)} aria-label={placed.get(id)?.headline} />
+              ))}
+            </div>
+          ) : <Skeleton h={900} />}
+          {imgFailed && <Note tone="bad">{t("paper.page", { n: num(lang, n) })}: {lang === "gu" ? "ચિત્ર મળ્યું નહીં — ફરી ગોઠવો." : "its picture is missing — lay out again."}</Note>}
+        </div>
+        <aside className={s.paperSide}>
+          <div className={s.card}>
+            <div className={s.cardHead}>
+              <h2 className={s.cardTitle}>{t("paper.page", { n: num(lang, n) })}</h2>
+              {info && <Badge tone={todo.length ? "warn" : "good"} dot>{todo.length ? t("check.problems", { n: num(lang, todo.length) }) : t("check.ok")}</Badge>}
+            </div>
+            <p className={s.faint}>{t("paper.click")}</p>
+            <ul className={s.onPage}>
+              {[...placed.values()].filter((p) => p.page === n).map((p) => (
+                <li key={p.story}><button onClick={() => open(p.story)}>{p.headline}</button></li>
+              ))}
+            </ul>
+          </div>
+          {info && todo.length > 0 && (
+            <div className={s.card}>
+              <ul className={s.problemList}>
+                {todo.map((p, i) => <li key={i}>{Icon.alert()}<span style={{ flex: 1 }}>{p.text}</span>
+                  {p.story && <Button kind="quiet" onClick={() => open(p.story!)}>{t("issue.fix")}</Button>}</li>)}
+              </ul>
+            </div>
+          )}
+          {info && (
+            <details className={`${s.card} ${s.details}`}>
+              <summary>{t("today.details")}</summary>
+              <ul className={s.onPage}>{info.report.gates.map((g) => <li key={g.gate} className={s.faint} style={{ padding: "4px 0" }}>{g.pass ? "✓" : "!"} {checkName(lang, g.gate)}</li>)}</ul>
+            </details>
+          )}
+        </aside>
+      </div>
+      {editing && <StoryPanel story={editing} onClose={() => setEditing(null)} onChanged={() => { refresh(); load(); }} />}
     </div>
   );
 }

@@ -1,65 +1,94 @@
 "use client";
-// સેટિંગ્સ / Settings: when the day runs by itself, the OpenRouter key the
-// writing and translating use, and the app's version.
+// સેટિંગ્સ / Settings: language, the automatic paper, the AI key, costs in
+// rupees, the website, other papers, and what this is.
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { call, type Settings } from "../api";
-import { useDay } from "../Shell";
-import styles from "../newsroom.module.css";
+import { useStatus } from "../Shell";
+import s from "../newsroom.module.css";
+import { num } from "../ui/format";
+import { Button, Note, Skeleton, useApp } from "../ui/kit";
 
 export default function SettingsPage() {
-  const { status } = useDay();
-  const [s, setS] = useState<Settings | null>(null);
-  const [runAt, setRunAt] = useState("20:00");
-  const [autoRun, setAutoRun] = useState(true);
+  const { t, lang, toast } = useApp();
+  const { status, refresh } = useStatus();
+  const [x, setX] = useState<Settings | null>(null);
   const [key, setKey] = useState("");
-  const [note, setNote] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    call<Settings>("/api/settings").then((x) => { setS(x); setRunAt(x.runAt); setAutoRun(x.autoRun); }).catch((e) => setError(e.message));
-  }, []);
-
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(""); setNote("");
+  useEffect(() => { call<Settings>("/api/settings").then(setX).catch((e) => setError(e.message)); }, []);
+  const save = async (change: Omit<Partial<Settings>, "openrouterKey"> & { openrouterKey?: string }) => {
+    setError("");
     try {
-      const x = await call<Settings>("/api/settings", { json: { runAt, autoRun, ...(key ? { openrouterKey: key } : {}) } });
-      setS(x);
-      setKey("");
-      setNote("Saved.");
-    } catch (err) { setError((err as Error).message); }
+      setX(await call<Settings>("/api/settings", { json: change }));
+      toast(t("settings.saved"));
+      refresh();
+    } catch (e) { setError((e as Error).message); }
   };
 
-  if (!s) return error ? <p className={styles.error}>{error}</p> : <p className={styles.muted}>Loading…</p>;
+  if (!x) return <div className={s.inner}><h1 className={s.pageTitle}>{t("settings.title")}</h1>{error ? <Note tone="bad">{error}</Note> : <Skeleton h={200} />}</div>;
   return (
-    <div className={styles.twoCol}>
-      <section className={styles.panel}>
-        <h2>સેટિંગ્સ <small>Settings</small></h2>
-        <form className={styles.fields} onSubmit={save}>
-          <label className={styles.check}>
-            <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} />
-            <span>દરરોજ આપમેળે ચલાવો <small>Make the paper by itself every day</small></span>
-          </label>
-          <label>સમય <small>At (India time; the computer must be on)</small>
-            <input type="time" value={runAt} onChange={(e) => setRunAt(e.target.value)} disabled={!autoRun} />
-          </label>
-          <label>OpenRouter key <small>{s.openrouterKey ? "A key is saved. Paste a new one only to replace it." : "Needed to write and translate the news (sk-or-…)."}</small>
-            <input type="password" autoComplete="off" placeholder={s.openrouterKey ? "••••••••  (saved)" : "sk-or-…"} value={key} onChange={(e) => setKey(e.target.value)} />
-          </label>
-          <button className={styles.primary} type="submit">સાચવો · Save</button>
-          {note && <p className={styles.good}>{note}</p>}
-          {error && <p className={styles.error} role="alert">{error}</p>}
-        </form>
-      </section>
-      <section className={styles.panel}>
-        <h2>વિશે <small>About</small></h2>
-        <dl className={styles.facts}>
-          <dt>News</dt><dd>PIB Ahmedabad (Gujarati); PIB Delhi (Hindi), translated when the Gujarati news doesn&apos;t fill the paper</dd>
-          <dt>Next automatic run</dt><dd>{status?.nextRun ?? "off"}</dd>
-          <dt>Version</dt><dd>{status?.version ?? "—"}</dd>
-        </dl>
-        <p className={styles.muted}>The key is kept only on this computer (in the app&apos;s backend/.env) and never shown again.</p>
-      </section>
+    <div className={s.inner}>
+      <h1 className={s.pageTitle}>{t("settings.title")}</h1>
+      {error && <Note tone="bad">{error}</Note>}
+      <div className={s.grid2}>
+        <section className={s.card}>
+          <h2 className={s.cardTitle}>{t("settings.lang")}</h2>
+          <p className={s.muted}>{t("settings.lang.body")}</p>
+          <div className={s.segmented}>
+            <button aria-pressed={x.lang === "gu"} onClick={() => save({ lang: "gu" })}>ગુજરાતી</button>
+            <button aria-pressed={x.lang === "en"} onClick={() => save({ lang: "en" })}>English</button>
+          </div>
+        </section>
+
+        <section className={s.card}>
+          <h2 className={s.cardTitle}>{t("settings.auto")}</h2>
+          <label className={s.switch}><input type="checkbox" checked={x.autoRun} onChange={(e) => save({ autoRun: e.target.checked })} /><span>{t("settings.auto.on")}</span></label>
+          <label className={s.field}><span className={s.label}>{t("settings.auto.time")}</span>
+            <input className={s.input} type="time" value={x.runAt} disabled={!x.autoRun} onChange={(e) => setX({ ...x, runAt: e.target.value })}
+                   onBlur={(e) => e.target.value && save({ runAt: e.target.value })} style={{ maxWidth: 160 }} /></label>
+          <label className={s.switch}><input type="checkbox" checked={x.notify} onChange={(e) => save({ notify: e.target.checked })} /><span>{t("settings.notify")}</span></label>
+        </section>
+
+        <section className={s.card}>
+          <h2 className={s.cardTitle}>{t("settings.key")}</h2>
+          <p className={s.muted}>{x.openrouterKey ? t("settings.key.set") : t("settings.key.unset")}</p>
+          <form className={s.row} onSubmit={(e) => { e.preventDefault(); if (key) save({ openrouterKey: key }).then(() => setKey("")); }}>
+            <input className={s.input} style={{ flex: 1, minWidth: 200 }} type="password" autoComplete="off" placeholder={x.openrouterKey ? "••••••••" : "sk-or-…"}
+                   value={key} onChange={(e) => setKey(e.target.value)} aria-label={t("settings.key")} />
+            <Button kind="primary" type="submit" disabled={!key}>{t("settings.save")}</Button>
+          </form>
+        </section>
+
+        <section className={s.card}>
+          <h2 className={s.cardTitle}>{t("settings.money")}</h2>
+          <label className={s.field}><span className={s.label}>{t("settings.money.rate")}</span>
+            <input className={s.input} type="number" min={50} max={200} step={0.5} value={x.inrPerUsd} style={{ maxWidth: 160 }}
+                   onChange={(e) => setX({ ...x, inrPerUsd: Number(e.target.value) })} onBlur={(e) => save({ inrPerUsd: Number(e.target.value) })} /></label>
+          <p className={s.faint}>US$1 = ₹{num(lang, x.inrPerUsd)}</p>
+        </section>
+
+        <section className={s.card}>
+          <h2 className={s.cardTitle}>{t("settings.site")}</h2>
+          <p className={s.muted}>{t("settings.site.body")}</p>
+          <input className={s.input} type="url" placeholder="https://…" value={x.siteUrl} onChange={(e) => setX({ ...x, siteUrl: e.target.value })}
+                 onBlur={(e) => e.target.value !== (status?.siteUrl ?? "") && save({ siteUrl: e.target.value })} aria-label={t("settings.site")} />
+        </section>
+
+        <section className={s.card}>
+          <h2 className={s.cardTitle}>{t("settings.papers")}</h2>
+          <p className={s.muted}>{t("settings.papers.body")}</p>
+          <div><Link className={s.btn} href="/newsroom/papers">{t("settings.papers.open")}</Link></div>
+        </section>
+
+        <section className={s.card}>
+          <h2 className={s.cardTitle}>{t("settings.about")}</h2>
+          <dl className={s.facts}>
+            <dt>{t("settings.news")}</dt><dd>{t("settings.newsBody")}</dd>
+            <dt>{t("settings.version")}</dt><dd>{status?.version ?? "—"}</dd>
+          </dl>
+        </section>
+      </div>
     </div>
   );
 }

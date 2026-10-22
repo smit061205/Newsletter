@@ -40,8 +40,23 @@
       ],
       "port": 3100,
       "env": {
-        "NEWSROOM": "1"
+        "NEWSROOM": "1",
+        "NEXT_PUBLIC_BACKEND_URL": "http://127.0.0.1:4100"
       }
+    },
+    {
+      "name": "engine-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--experimental-strip-types",
+        "--experimental-sqlite",
+        "--no-warnings",
+        "backend/src/cli.ts",
+        "serve",
+        "--port",
+        "4100"
+      ],
+      "port": 4100
     }
   ]
 }
