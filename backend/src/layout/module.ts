@@ -10,7 +10,7 @@
 //   - the body is set at the paper's size and line pitch and balanced across
 //     the columns, so they all end on the same line.
 // Every line is measured in Chromium (measure.ts), so the height is exact.
-import type { Element, ImageElement } from "@ck/shared/contract";
+import type { Element, ImageElement, TextElement } from "@ck/shared/contract";
 import { columnElements, DISPLAY_SAFETY, r1, splitParagraphs, stackLines, widowed, type Frame } from "./compose.ts";
 import type { Line, Measurer } from "./measure.ts";
 import { setDisplay, type DisplaySpec } from "./display.ts";
@@ -152,11 +152,14 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   // way: lines at their natural width, sized down to fit
   const display = async (txt: string, idp: string, spec: DisplaySpec, fallbackLines: number, upTo?: number, floor = spec.min) => {
     const at = (sp: DisplaySpec) => setDisplay(m, txt, sp, `${aid}-${idp}`, aid, 0, cursor, w);
-    const got = await at(spec)
+    let got = await at(spec)
       // too short to fill the width at this size: up to `upTo` (one rank up), the size it needs
-      ?? (upTo && upTo > spec.max ? await at({ ...spec, max: upTo, min: spec.max }) : null)
-      // too long: one more line, a little smaller
-      ?? (spec.align === "fit" ? await at({ ...spec, maxLines: spec.maxLines + 1, min: Math.max(floor, spec.min * 0.85) }) : null);
+      ?? (upTo && upTo > spec.max ? await at({ ...spec, max: upTo, min: spec.max }) : null);
+    // too long: a line more, a little smaller -- up to three more in a
+    // narrow story, where a sub-heading takes three or four lines
+    for (let more = 1; !got && spec.align === "fit" && more <= (cols <= 2 ? 3 : 1); more++) {
+      got = await at({ ...spec, maxLines: spec.maxLines + more, min: Math.max(floor, spec.min * 0.85) });
+    }
     if (got) {
       displayFill = Math.min(displayFill, spec.align === "fit" ? got.fill : 1);
       return got;
@@ -202,9 +205,41 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
 
   // ---- body lines, measured once
   const paras = splitParagraphs(text.bodies[variant]);
-  const [lines] = paras.length
-    ? await m.breakLines([{ paras, width: GRID.column, font: BODY.font, size: BODY.size, indent: BODY.indent, optimal: true }])
-    : [[] as Line[]];
+  // each paragraph at its best setting, and a line tighter and looser where
+  // that sets well (linebreak.ts looseness) -- to end the columns level
+  const req = (loose: number) => ({ paras, width: GRID.column, font: BODY.font, size: BODY.size, indent: BODY.indent, optimal: true,
+                                    looseness: paras.map(() => loose) });
+  const [lines, tighter, looser] = paras.length ? await m.breakLines([req(0), req(-1), req(1)]) : [[], [], []] as Line[][];
+  const byPara = (ls: Line[]) => paras.map((_, i) => ls.filter((l) => l.para === i));
+  const base = byPara(lines), minus = byPara(tighter), plus = byPara(looser);
+  // the body `d` lines longer (or shorter): a line from each of the longest
+  // paragraphs that set well that way; null if not enough of them can
+  const withDelta = (d: number): Line[] | null => {
+    const alt = d > 0 ? plus : minus;
+    const can = paras.map((_, i) => i).filter((i) => alt[i].length === base[i].length + Math.sign(d))
+      .sort((a, b) => base[b].length - base[a].length || a - b);
+    if (can.length < Math.abs(d)) return null;
+    const pick = new Set(can.slice(0, Math.abs(d)));
+    return base.flatMap((ls, i) => (pick.has(i) ? alt[i] : ls));
+  };
+  // the body balanced over columns starting at `tops`: when that leaves the
+  // last column(s) short, the body is set a line or two looser (columns end
+  // level at the same foot) or else tighter (level a line higher) -- a short column is white space in the story
+  const capacity = (tops: number[], b: number) => tops.reduce((a, t) => a + Math.max(0, Math.floor((b - t + 0.01) / pitch)), 0);
+  const level = (tops: number[]): { lines: Line[]; bottom: number; caps: number[] } => {
+    const got = { lines, ...balance(tops, lines.length, pitch) };
+    const spare = capacity(tops, got.bottom) - lines.length;
+    if (spare <= 0) return got;
+    const up = capacity(tops, got.bottom - pitch) - lines.length; // negative: lines to lose
+    // looser first: the story keeps the height it was planned at
+    for (const d of [spare, up].filter((d) => d !== 0)) {
+      const ls = withDelta(d);
+      if (!ls) continue;
+      const b = balance(tops, ls.length, pitch);
+      if (capacity(tops, b.bottom) === ls.length) return { lines: ls, ...b };
+    }
+    return got;
+  };
 
   // ---- photo options: natural shape, the print desk's rules
   const photo = story.photo ? await sizeOf(story.photo, m) : null;
@@ -224,11 +259,11 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     const pair = await photoPair(story, cols, cursor, m);
     if (!pair) return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize };
     const tops = Array.from({ length: cols }, () => pair.bottom);
-    const { bottom, caps } = balance(tops, lines.length, pitch);
+    const { lines: body, bottom, caps } = level(tops);
     const out: Element[] = [...pair.elements];
     let li = 0;
     tops.forEach((top, i) => {
-      const take = lines.slice(li, li + caps[i]);
+      const take = body.slice(li, li + caps[i]);
       li += take.length;
       if (!take.length) return;
       out.push(...columnElements(take, `${aid}-c${i}`, aid, { x: i * (GRID.column + GRID.gutter), y: top, w: GRID.column, h: bottom - top },
@@ -239,13 +274,14 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
       return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize };
     }
     return { story, rank, cols, variant, photoMode, width: w, height, elements: [...els, ...out], photoDropped: false,
-             headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill, deckSize };
+             headlineHeight, bodyLines: body.length, pitch, headSize, displayFill, deckSize };
   }
 
-  let best: { elements: Element[]; height: number; k: number } | null = null;
+  let best: { elements: Element[]; height: number; k: number; lines: number } | null = null;
   for (const k of spans) {
     const out: Element[] = [];
-    let photoBottom = cursor;
+    let photoFoot = cursor; // the foot of the photo (and its caption)
+    let photoBottom = cursor; // where the columns under it start
     if (k && photo) {
       const pw = spanWidth(k);
       const ph = pw * photo.height / photo.width; // natural shape: nothing cropped
@@ -255,36 +291,47 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
       const img: ImageElement = { id: `${aid}-photo`, kind: "image", articleId: aid, x: r1(px), y: r1(cursor),
                                   width: r1(pw), height: r1(ph), url: story.photo!, fit: "cover" };
       out.push(img);
-      photoBottom = cursor + ph + GAP.afterPhoto;
+      photoFoot = cursor + ph;
       const caption = text.caption.trim();
+      let captionEls: TextElement[] = [];
       if (caption) {
         const [cl] = await m.breakLines([{ paras: [caption], width: pw, font: CAPTION.font, size: CAPTION.size, safety: DISPLAY_SAFETY }]);
-        const st = await stackLines(m, cl, `${aid}-cap`, aid, px, photoBottom, pw, CAPTION.font, CAPTION.size, CAPTION.pitch);
-        out.push(...st.elements.map((e) => ({ ...e, align: "center" as const })));
-        photoBottom = st.bottom;
+        const st = await stackLines(m, cl, `${aid}-cap`, aid, px, photoFoot + GAP.afterPhoto, pw, CAPTION.font, CAPTION.size, CAPTION.pitch);
+        captionEls = st.elements.map((e) => ({ ...e, align: "center" as const }) as TextElement);
+        photoFoot = st.bottom;
       }
-      photoBottom += GAP.afterCaption;
       // the columns under the photo start a whole number of lines below the
-      // others, so every column's lines share one grid and end level
-      photoBottom = cursor + Math.ceil((photoBottom - cursor) / pitch - 0.001) * pitch;
+      // others, so every column's lines share one grid and end level: the
+      // photo cropped by up to a line to get there (text tight under it),
+      // else -- a crop past the desk's limit -- the columns a line lower
+      const raw = photoFoot + (caption ? GAP.afterCaption : GAP.afterPhoto) - cursor;
+      const down = Math.floor(raw / pitch + 0.001) * pitch;
+      const cut = raw - down;
+      if (cut > 0.01 && down > 0 && ph - cut >= Math.max(PHOTO.minHeight, ph * (1 - PHOTO.maxCrop))) {
+        img.height = r1(ph - cut);
+        captionEls = captionEls.map((e) => ({ ...e, y: r1(e.y - cut) }));
+        photoFoot -= cut;
+        photoBottom = cursor + down;
+      } else photoBottom = cursor + Math.ceil(raw / pitch - 0.001) * pitch;
+      out.push(...captionEls);
     }
     // columns under the photo start below it; the rest right under the header
     const tops = Array.from({ length: cols }, (_, i) => (k && i >= cols - k ? photoBottom : cursor));
-    const { bottom, caps } = balance(tops, lines.length, pitch);
-    const height = Math.max(bottom, k ? photoBottom - GAP.afterCaption : cursor);
+    const { lines: body, bottom, caps } = level(tops);
+    const height = Math.max(bottom, k ? photoFoot : cursor);
     if (k && photo && spanWidth(k) * (spanWidth(k) * photo.height / photo.width) > maxShare * w * height) continue;
     // the text beside a photo must reach (about) its foot: a photo taller
     // than its story's text leaves a hole beside it -- try a smaller one
-    if (k && k < cols && photoBottom - GAP.afterCaption - bottom > 1.5 * pitch) continue;
+    if (k && k < cols && photoFoot - bottom > 1.5 * pitch) continue;
     let li = 0;
     tops.forEach((top, i) => {
-      const take = lines.slice(li, li + caps[i]);
+      const take = body.slice(li, li + caps[i]);
       li += take.length;
       if (!take.length) return;
       const f: Frame = { x: i * (GRID.column + GRID.gutter), y: top, w: GRID.column, h: bottom - top };
       out.push(...columnElements(take, `${aid}-c${i}`, aid, f, BODY.size, pitch, m.isLegacy(BODY.font)));
     });
-    best = { elements: out, height, k };
+    best = { elements: out, height, k, lines: body.length };
     break; // spans are in order of preference
   }
   if (!best) {
@@ -296,6 +343,6 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     story, rank, cols, variant, photoMode, width: w, height: best.height,
     elements: [...els, ...best.elements],
     photoDropped: !!photo && best.k === 0,
-    headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill, deckSize,
+    headlineHeight, bodyLines: best.lines, pitch, headSize, displayFill, deckSize,
   };
 }

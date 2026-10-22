@@ -243,7 +243,7 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
         { role: "user", content: `RELEASE:\n${paragraphs(release.body).join("\n\n")}\n\nCURRENT STORY BODY:\n${current}` },
       ],
     }),
-  });
+  }, 150); // a long story rewritten in full can take over 90s
   if (!res.ok) {
     opts.log?.(`  ${story.id}: length fit failed (OpenRouter ${res.status})`);
     return null;

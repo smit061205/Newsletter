@@ -10,6 +10,7 @@
 //   e. the paper's own house ad (profile.fillers).
 // Every change is re-measured, so every story still fits exactly.
 import type { Element, TextElement } from "@ck/shared/contract";
+import { writeBrief } from "../editorial/features.ts";
 import { fitLength } from "../editorial/rewrite.ts";
 import { setDisplay } from "./display.ts";
 import { profile } from "../profile.ts";
@@ -17,7 +18,7 @@ import type { Ad, Release, Store, Story } from "../store.ts";
 import { stackLines } from "./compose.ts";
 import type { Measurer } from "./measure.ts";
 import { buildModule, spanWidth, type Module, type Variant } from "./module.ts";
-import { colX, outranks, renderPlaced, tombstoned, type Band, type PagePlan, type PlacedModule } from "./pack.ts";
+import { colX, headlineHeavy, outranks, renderPlaced, tombstoned, type Band, type PagePlan, type PlacedModule } from "./pack.ts";
 import { findGaps, type Gap } from "./occupancy.ts";
 import { BODY, DECK, GAP, GRID, HEADLINE, INK, PT } from "./typography.ts";
 
@@ -130,20 +131,23 @@ async function messageFiller(id: string, x: number, y: number, w: number, h: num
   const pad = Math.min(8 * PT, h * 0.15);
   const inner = w - 2 * pad;
   // a panel no taller than its width allows to look like one: a deeper hole takes more than one
-  let boxH = Math.min(h, Math.max(1.6 * w, 120 * PT));
-  if (h - boxH < 70 * PT) boxH = h; // what would be left is too thin for another: take it all
+  const most = Math.min(h, Math.max(1.6 * w, 120 * PT));
   let best: { text: string; size: number; lines: number; height: number } | null = null;
   for (let k = 0; k < messages.length; k++) {
     const text = messages[(n + k) % messages.length];
     for (let lines = 1; lines <= 6; lines++) {
-      const got = await setDisplay(m, text, { font: HEADLINE.font, max: Math.min(64 * PT, boxH * 0.4), min: 12 * PT, maxLines: lines,
+      const got = await setDisplay(m, text, { font: HEADLINE.font, max: Math.min(64 * PT, most * 0.4), min: 12 * PT, maxLines: lines,
                                              leading: 1.2, align: "fit" }, `${id}-t`, id, 0, 0, inner);
-      if (!got || got.lines !== lines || got.bottom > boxH - 2 * pad) continue;
+      if (!got || got.lines !== lines || got.bottom > most - 2 * pad) continue;
       if (!best || got.size > best.size + 0.5) best = { text, size: got.size, lines, height: got.bottom };
     }
     if (best) break; // the first message that fits; the rotation varies them
   }
   if (!best) return null;
+  // the panel fills the hole up to the shape a panel can have, the message
+  // set as large as that allows -- never stretched past it over a deeper
+  // gap (a tall ruled box round two short lines reads as an empty hole)
+  const boxH = most;
   const set = await setDisplay(m, best.text, { font: HEADLINE.font, max: best.size, min: best.size, maxLines: best.lines,
                                               leading: 1.2, align: "fit" }, `${id}-t`, id, x + pad, y + (boxH - best.height) / 2, inner);
   if (!set) return null;
@@ -158,7 +162,7 @@ async function messageFiller(id: string, x: number, y: number, w: number, h: num
 export interface FillerCount { messages: Set<string>; houseAds: number }
 
 export async function closeGaps(plan: PagePlan, ctx: {
-  band: Band; ads: Ad[]; store: Store; releases: Map<string, Release>; m: Measurer; leftOut: Story[]; fillers: FillerCount;
+  band: Band; ads: Ad[]; store: Store; date: string; releases: Map<string, Release>; m: Measurer; leftOut: Story[]; fillers: FillerCount;
   /** each step as it happens (the AI calls take a while) */
   say?: (s: string) => void;
 }): Promise<FitResult> {
@@ -186,7 +190,7 @@ export async function closeGaps(plan: PagePlan, ctx: {
     for (const s of ctx.leftOut.filter((s) => !used.includes(s))) {
       for (const v of ["long", "medium", "short"] as Variant[]) {
         const brief = await buildModule(s, cols >= 3 ? 4 : 5, cols, v, m, 0);
-        if (brief.height <= h) {
+        if (brief.height <= h && brief.displayFill >= 0.97) {
           placed.push({ module: brief, col, x: colX(col), y });
           used.push(s);
           note(`  ${s.id}: placed ${where}`);
@@ -205,13 +209,47 @@ export async function closeGaps(plan: PagePlan, ctx: {
         const briefStory: Story = { ...s, kicker: "", photo: null, photos: [],
                                     bodies: { long: got.body, medium: got.body, short: got.body } };
         const brief = await buildModule(briefStory, 5, cols, "long", m, 0);
-        if (brief.height <= h) {
+        if (brief.height <= h && brief.displayFill >= 0.97) {
           if (got.factCheck) factChecks.push({ story: s.id, detail: got.factCheck });
           placed.push({ module: brief, col, x: colX(col), y });
           used.push(s);
           note(`  ${s.id}: placed as a ${n}-word brief ${where}`);
           return true;
         }
+      }
+    }
+    // no story left for it: a "જાણવા જેવું" item written to its size
+    // (editorial/features.ts) -- copy, not a slogan: the paper runs at most
+    // one of those. Its length from what a first try measured.
+    if (h >= 6 * pitch) {
+      const slot = `${plan.page}-${col}-${cols}`;
+      const avoid = [...placed.map((p) => p.module.story.headline)];
+      let target = Math.max(12, Math.round((h / pitch - 5) * cols * 5));
+      let best: Module | null = null;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const got = await writeBrief(store, ctx.date, `${slot}-${attempt}`, target, avoid, { log: note });
+        if (!got) break;
+        cost += got.cost;
+        let brief = await buildModule(got.story, 5, cols, "long", m, 0);
+        // too long: whole sentences off the end until it fits
+        const sentences = got.story.bodies.long.split(/(?<=[.।!?])\s+/);
+        for (let n = sentences.length - 1; brief.height > h && n >= 1; n--) {
+          const body = sentences.slice(0, n).join(" ");
+          brief = await buildModule({ ...got.story, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", m, 0);
+        }
+        const fitsHere = brief.height <= h && brief.displayFill >= 0.97;
+        note(`  brief try ${attempt + 1}: ${words(brief.story.bodies.long)} words, ${(brief.height / PT).toFixed(0)} of ${(h / PT).toFixed(0)}pt`);
+        if (fitsHere && (!best || brief.height > best.height)) best = brief;
+        if (best && h - best.height < 1.5 * pitch) break;
+        // lines short (or over) times words a line: the next try's length
+        const perLine = words(got.story.bodies.long) / Math.max(1, brief.bodyLines);
+        const lines = Math.floor((h - brief.height) / pitch) * cols;
+        target = Math.max(8, Math.round(words(brief.story.bodies.long) + lines * perLine * 0.9));
+      }
+      if (best && h - best.height < 1.5 * pitch) {
+        placed.push({ module: best, col, x: colX(col), y });
+        note(`  "${best.story.headline}": a ${words(best.story.bodies.long)}-word brief ${where}`);
+        return true;
       }
     }
     // no copy left for it: the paper's own house ad where it's wide and
@@ -284,6 +322,25 @@ export async function closeGaps(plan: PagePlan, ctx: {
     }
   };
   await detombstone();
+
+  // a headline over 30% of its story (pack.ts headlineHeavy): set a step
+  // smaller at a time, never below what its sub-heading needs nor under a
+  // less important story's -- the growing below takes up the height it frees
+  for (const [i, p] of placed.entries()) {
+    let mod = p.module;
+    for (let step = 0; headlineHeavy(mod) && step < 6; step++) {
+      const max = mod.headSize * 0.92;
+      const next = await buildModule(mod.story, mod.rank, mod.cols, mod.variant, m, mod.photoMode, mod.pitch, { max, min: max * 0.85 });
+      const others = placed.filter((q) => q !== p);
+      if (!(next.headSize > 0 && next.headSize < mod.headSize && next.displayFill >= 0.97 && next.height <= p.module.height + 0.5) ||
+          others.some((q) => outranks(q.module, next) || outranks(next, q.module))) break;
+      mod = next;
+    }
+    if (mod !== p.module) {
+      placed[i] = { ...p, module: mod };
+      note(`  ${mod.story.id}: headline ${(p.module.headSize / PT).toFixed(0)}pt -> ${(mod.headSize / PT).toFixed(0)}pt (it was over 30% of the story)`);
+    }
+  }
 
   // briefs go into gaps too, so a few passes until nothing changes
   for (let pass = 0; pass < 3; pass++) {

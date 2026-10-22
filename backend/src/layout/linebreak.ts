@@ -84,16 +84,21 @@ export function spread(line: LineShape, target: number, size: number, spaceW: nu
 /** Lines that would be looser than this get the "very loose" badness. */
 const LOOSE = 1;
 
-interface Node { at: number; first: boolean; fitness: number; demerits: number; prev: Node | null }
+interface Node { at: number; first: boolean; fitness: number; demerits: number; lines: number; prev: Node | null }
 
 const fitnessOf = (r: number) => (r < -0.5 ? 0 : r <= 0.5 ? 1 : r <= 1 ? 2 : 3);
+
+/** What a line spaced past the budget adds to a paragraph's demerits, at least. */
+const OVER_BUDGET = (10 + 2_000) ** 2;
 
 /**
  * Total-fit breaks for one paragraph: the index of the first word of each
  * line. `firstWidth` is the first line's width (less its indent), `width`
- * every other line's.
+ * every other line's. `looseness` (TeX's \looseness) asks for that many
+ * lines more (or fewer) than the best setting: honoured only when it costs
+ * no line spaced past the budget, else the best setting is kept.
  */
-export function breakParagraph(words: Word[], spaceW: number, size: number, firstWidth: number, width: number): number[] {
+export function breakParagraph(words: Word[], spaceW: number, size: number, firstWidth: number, width: number, looseness = 0): number[] {
   const n = words.length;
   if (!n) return [];
   const prefixW = [0];
@@ -110,7 +115,7 @@ export function breakParagraph(words: Word[], spaceW: number, size: number, firs
   });
   // the best way found to start a line at a word, per fitness class (and
   // whether it's the paragraph's first line, which is narrower)
-  let active: Node[] = [{ at: 0, first: true, fitness: 1, demerits: 0, prev: null }];
+  let active: Node[] = [{ at: 0, first: true, fitness: 1, demerits: 0, lines: 0, prev: null }];
   let ends: Node[] = [];
   for (let j = 1; j <= n; j++) {
     const found = new Map<string, Node>();
@@ -140,15 +145,22 @@ export function breakParagraph(words: Word[], spaceW: number, size: number, firs
         if (last && single && !a.first && words[a.at].width < 0.2 * w) demerits += 5_000;
       }
       const fitness = fitnessOf(ratio);
-      const key = String(fitness);
+      // the best per fitness class and line count, so a looser or tighter
+      // setting (looseness) is still there to choose at the end
+      const key = `${fitness}|${a.lines + 1}`;
       const best = found.get(key);
-      if (!best || demerits < best.demerits) found.set(key, { at: j, first: false, fitness, demerits, prev: a });
+      if (!best || demerits < best.demerits) found.set(key, { at: j, first: false, fitness, demerits, lines: a.lines + 1, prev: a });
     }
     active = keep;
     if (j === n) ends = [...found.values()];
     else active.push(...found.values());
   }
-  const best = ends.sort((a, b) => a.demerits - b.demerits)[0];
+  const sorted = ends.sort((a, b) => a.demerits - b.demerits);
+  let best = sorted[0];
+  if (looseness && best) {
+    const alt = sorted.find((e) => e.lines === best.lines + looseness);
+    if (alt && alt.demerits - best.demerits < OVER_BUDGET) best = alt;
+  }
   const starts: number[] = [];
   for (let node: Node | null = best?.prev ?? null; node; node = node.prev) starts.push(node.at);
   return starts.reverse();

@@ -41,11 +41,12 @@ a lopsided page, two stories on the same topic, or anything unreadable. Do not c
 If the page is fine, return an empty list. Be strict about confidence: 0.8+ only when you are sure.`;
 
 /** Review each page image (PNG files, page order). Returns findings and cost. */
-export async function reviewPages(pngFiles: string[], opts: { log?: (s: string) => void } = {}): Promise<{ findings: Finding[]; cost: number } | null> {
+export async function reviewPages(pngFiles: string[], opts: { log?: (s: string) => void } = {}): Promise<{ findings: Finding[]; cost: number; unreviewed: number[] } | null> {
   const key = env("OPENROUTER_API_KEY");
   if (!key) return null;
   const model = env("OPENROUTER_VISION_MODEL") ?? profile.editorial.leadModel;
   const findings: Finding[] = [];
+  const unreviewed: number[] = []; // pages it never saw: the gate can't pass on them
   let cost = 0;
   for (const [i, file] of pngFiles.entries()) {
     const b64 = (await readFile(file)).toString("base64");
@@ -63,6 +64,7 @@ export async function reviewPages(pngFiles: string[], opts: { log?: (s: string) 
     });
     if (!res.ok) {
       opts.log?.(`  review of page ${i + 1} failed (OpenRouter ${res.status}: ${(await res.text()).slice(0, 160)})`);
+      unreviewed.push(i + 1);
       continue;
     }
     const data = (await res.json()) as { choices: { message: { content: string } }[]; usage?: { cost?: number } };
@@ -72,7 +74,8 @@ export async function reviewPages(pngFiles: string[], opts: { log?: (s: string) 
       for (const f of out.findings ?? []) if (ISSUES.includes(f.issue)) findings.push({ page: i + 1, ...f });
     } catch {
       opts.log?.(`  review of page ${path.basename(file)}: unreadable answer`);
+      unreviewed.push(i + 1);
     }
   }
-  return { findings, cost };
+  return { findings, cost, unreviewed };
 }

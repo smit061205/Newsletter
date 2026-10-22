@@ -4,6 +4,8 @@
 //
 //   ingest   fetch the day's Gujarat Information Department releases
 //   rewrite  turn them into newspaper stories (OpenRouter), or use them as-is
+//   features add --count N evergreen feature articles (AI, no news, no
+//            numbers, kicked "વિશેષ લેખ") to a day short of copy
 //   build    plan and lay out the day's issue, check it, save it as a draft, print the PDF
 //   all      ingest + rewrite + build (what the 8 PM job runs)
 //   publish  copy the built issue into web/public/issues for a website with
@@ -39,6 +41,11 @@ async function main() {
     case "rewrite": {
       const { rewriteDay } = await import("./editorial/rewrite.ts");
       await rewriteDay(store, date, { log, model: flag("model"), force: args.includes("--force") });
+      break;
+    }
+    case "features": {
+      const { writeFeatures } = await import("./editorial/features.ts");
+      await writeFeatures(store, date, Number(flag("count") ?? 3), { log, model: flag("model") });
       break;
     }
     case "build": {
@@ -79,7 +86,7 @@ async function main() {
       return;
     }
     default:
-      log("usage: cli.ts ingest|rewrite|build|all|publish|serve|status [--date YYYY-MM-DD]");
+      log("usage: cli.ts ingest|rewrite|features|build|all|publish|serve|status [--date YYYY-MM-DD]");
       process.exitCode = 2;
   }
 }

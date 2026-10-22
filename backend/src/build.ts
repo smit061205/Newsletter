@@ -89,6 +89,13 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const edits = store.edits(date);
     const dropped = new Set(edits.filter((e) => e.change.drop).map((e) => e.storyId));
     const releases = new Map(store.releases(date).map((r) => [`r${r.id}`, r]));
+    // a feature article (editorial/features.ts) is its own source: the gap
+    // closer can lengthen it or brief it from its text, and the number check
+    // against a text with no numbers keeps it free of them
+    for (const s of stories.filter((s) => s.id.startsWith("f-"))) {
+      releases.set(s.id, { id: 0, date, url: s.source, office: s.source, headline: s.headline, subhead: s.deck,
+                           body: s.bodies.long, photos: [], fetchedAt: "" });
+    }
     // every story prints a headline, a sub-heading and its body: a story
     // without a deck gets its release's own sub-heading, else one written for it
     for (const s of stories) {
@@ -146,7 +153,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       const n = plan.page;
       const pageAds = ads.filter((a) => a.page === n);
       const fit = await closeGaps(plan, { band: { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, ads: pageAds,
-                                         store, releases, m, leftOut: pool, fillers, say: (l) => log(`  p${n}${l}`) });
+                                         store, date, releases, m, leftOut: pool, fillers, say: (l) => log(`  p${n}${l}`) });
       spent += fit.cost;
       factChecks.push(...fit.factChecks);
       pool = pool.filter((s) => !fit.used.includes(s));
@@ -241,8 +248,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   ];
   const confident = (review?.findings ?? []).filter((f) => f.confidence >= 0.8);
   gates.splice(6, 0, {
-    gate: "5 the page reviewer sees no clear problem", pass: confident.length === 0,
+    gate: "5 the page reviewer sees no clear problem", pass: confident.length === 0 && !review?.unreviewed.length,
     detail: !review ? "not run (no API key or no page images)"
+      : review.unreviewed.length ? `page(s) ${review.unreviewed.join(", ")} not reviewed (the model didn't answer)`
       : confident.map((f) => `p${f.page} ${f.issue} "${f.where.slice(0, 30)}": ${f.note}`).join("; ") || `ok (${review.findings.length} minor note(s))`,
   });
   const ready = gates.every((g) => g.pass);

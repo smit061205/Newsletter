@@ -38,6 +38,8 @@ export interface BreakRequest {
   /** Total-fit breaking for justified text (linebreak.ts), every line then
    * spread to exactly the width; otherwise greedy, lines at natural width. */
   optimal?: boolean;
+  /** Per paragraph (optimal only): lines more (+) or fewer (-) than its best setting, where that sets well. */
+  looseness?: number[];
 }
 
 export interface Line {
@@ -233,7 +235,7 @@ export class Measurer {
       paras.forEach((words, pi) => {
         let starts: number[];
         if (req.optimal) {
-          starts = breakParagraph(words, space, req.size, width - indent, width);
+          starts = breakParagraph(words, space, req.size, width - indent, width, req.looseness?.[pi] ?? 0);
         } else {
           starts = [0];
           let cur = 0;
