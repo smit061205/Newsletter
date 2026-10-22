@@ -5,7 +5,7 @@
 //   npm ci && npm run build --prefix web
 //   PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium
 // (the release workflow does all of it; electron-builder then packs app-engine).
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync, symlinkSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -64,6 +64,24 @@ copyModules("node_modules");
 copyModules("web/node_modules");
 copyModules("backend/node_modules");
 say("node_modules");
+
+// links that point outside (the newsroom's build links its external packages,
+// such as playwright, by this checkout's full path): to the same place inside,
+// relative, so the app can be signed and moved
+(function fixLinks(dir) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isSymbolicLink()) {
+      const target = path.resolve(path.dirname(p), readlinkSync(p));
+      const inside = target.startsWith(OUT + path.sep) ? target
+        : target.startsWith(ROOT + path.sep) ? path.join(OUT, path.relative(ROOT, target)) : null;
+      rmSync(p, { force: true });
+      if (inside && existsSync(inside)) symlinkSync(path.relative(path.dirname(p), inside), p);
+      else if (existsSync(target)) cpSync(target, p, { recursive: true, dereference: true });
+      say(`link ${path.relative(OUT, p)} -> ${inside ? path.relative(path.dirname(p), inside) : "(copied in)"}`);
+    } else if (e.isDirectory()) fixLinks(p);
+  }
+})(OUT);
 
 const browsers = path.join(OUT, "node_modules", "playwright-core", ".local-browsers");
 if (!existsSync(browsers)) throw new Error("no Chromium inside: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium");
