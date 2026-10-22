@@ -24,6 +24,9 @@ export const FontRoleSchema = z.object({
   restricted: z.boolean().default(false),
   /** For a legacy font: the font (a fonts key) that sets Latin letters and digits. */
   latin: z.string().optional(),
+  /** For a Unicode font: the font (a fonts key) that sets the characters it
+   * lacks (e.g. ₹), instead of whatever face the browser would pick. */
+  fallback: z.string().optional(),
 });
 
 const TextStyleSchema = z.object({
@@ -119,6 +122,12 @@ export const ProfileSchema = z.object({
     workhorseModel: z.string().min(1),
     leadModel: z.string().min(1),
     leadStories: z.number().int().nonnegative(),
+    /** translates Hindi releases into the paper's language when its own don't fill it */
+    translateModel: z.string().min(1).default("google/gemini-3.8-flash"),
+    /** the copy wanted, as a share of the pages at natural size (over 1, so the packer has choices) */
+    fillTarget: z.number().positive().default(1.1),
+    /** at most this much AI spend on a day's top-up (US$) */
+    dailyBudgetUsd: z.number().positive().default(0.3),
   }),
 });
 

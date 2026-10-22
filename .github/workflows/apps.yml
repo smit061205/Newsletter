@@ -1,0 +1,74 @@
+# The Capital Kranti app on Windows and on a Mac: installs the way the
+# installers do, runs the PIB parser and the whole layout engine (free fonts,
+# no AI, no network), builds the newsroom, and starts and stops the app.
+name: apps
+on:
+  push:
+    branches: [main, newsroom]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  app:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install (as the installers do)
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install chromium
+      # (the website is typechecked by its own build below: its route types are generated then)
+      - name: Typecheck the engine
+        run: npx tsc --noEmit -p backend
+      - name: PIB parser (saved pages)
+        run: node --experimental-strip-types --no-warnings backend/test/pib-parse.ts
+      - name: Add-a-newspaper extractor finds Capital Kranti's own profile in its 8 August PDF
+        run: node --experimental-strip-types --no-warnings backend/test/extract-0808.ts
+      - name: Layout engine, the 8 August stories in free fonts (must be READY)
+        shell: bash
+        env:
+          CK_PUBLICATION: dev-test
+        run: |
+          export DATA_DIR="$RUNNER_TEMP/ck-test"
+          node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/pack-0808.ts
+      - name: A second paper with no engine changes (The Sample Herald, must be READY)
+        shell: bash
+        env:
+          CK_PUBLICATION: sample-english
+        run: |
+          export DATA_DIR="$RUNNER_TEMP/ck-en"
+          node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/sample-english.ts
+      - name: Right to left (Sample Urdu Daily; informational -- Nastaliq tuning waits for the paper's own font)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        shell: bash
+        env:
+          CK_PUBLICATION: sample-urdu
+        run: |
+          export DATA_DIR="$RUNNER_TEMP/ck-ur"
+          node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/sample-urdu.ts
+      - name: Newsroom website
+        run: npm run build --prefix web
+      - name: The app starts, answers and stops
+        shell: bash
+        env:
+          CK_PUBLICATION: dev-test
+        run: |
+          node scripts/launch.mjs --background
+          curl -fsS http://127.0.0.1:4000/healthz
+          curl -fsS http://127.0.0.1:4000/api/status
+          curl -fsS -o /dev/null -w "newsroom %{http_code}\n" http://127.0.0.1:3000/newsroom
+          node scripts/launch.mjs --stop
+      - name: Logs
+        if: always()
+        shell: bash
+        run: cat logs/*.log 2>/dev/null || true

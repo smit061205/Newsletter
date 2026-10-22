@@ -29,6 +29,7 @@ export const FONTS: Font[] = Object.entries(profile.fonts).map(([id, f]) => ({
 export const FACES: Faces = {
   encoding: Object.fromEntries(Object.entries(profile.fonts).map(([id, f]) => [id, f.encoding])),
   latin: Object.fromEntries(Object.entries(profile.fonts).flatMap(([id, f]) => (f.latin ? [[id, f.latin]] : []))),
+  fallback: Object.fromEntries(Object.entries(profile.fonts).flatMap(([id, f]) => (f.fallback ? [[id, f.fallback]] : []))),
 };
 
 export const INK = profile.ink;

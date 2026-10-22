@@ -25,6 +25,23 @@
         "4000"
       ],
       "port": 4000
+    },
+    {
+      "name": "newsroom",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "web",
+        "--",
+        "--port",
+        "3100"
+      ],
+      "port": 3100,
+      "env": {
+        "NEWSROOM": "1"
+      }
     }
   ]
 }

@@ -31,7 +31,9 @@ export const MICRO = {
 
 /** A word as measured: its natural width and how many letters letter
  * spacing is added after (contract px). */
-export interface Word { width: number; letters: number }
+/** A word as measured; `glue`: it follows the one before with no space
+ * (a long token broken after a "/", e.g. a URL), so a line may end before it. */
+export interface Word { width: number; letters: number; glue?: boolean }
 
 /** How one line is spread to its width: letter and word spacing (contract
  * px, before the squeeze) and the squeeze itself. `ratio` is how far into
@@ -103,16 +105,23 @@ export function breakParagraph(words: Word[], spaceW: number, size: number, firs
   if (!n) return [];
   const prefixW = [0];
   const prefixL = [0];
-  for (const w of words) {
+  const prefixS = [0]; // spaces before each word (none before a glued one)
+  for (const [k, w] of words.entries()) {
     prefixW.push(prefixW[prefixW.length - 1] + w.width);
     prefixL.push(prefixL[prefixL.length - 1] + w.letters);
+    prefixS.push(prefixS[prefixS.length - 1] + (k > 0 && !w.glue ? 1 : 0));
   }
-  const shapeOf = (i: number, j: number): LineShape => ({
-    natural: prefixW[j] - prefixW[i] + (j - i - 1) * spaceW,
-    spaces: j - i - 1,
-    // every letter and space carries spacing; the line's last letter's trails off unseen
-    letters: prefixL[j] - prefixL[i] + (j - i - 1) - 1,
-  });
+  const shapeOf = (i: number, j: number): LineShape => {
+    const spaces = prefixS[j] - prefixS[i + 1]; // between words i..j-1
+    const letters = prefixL[j] - prefixL[i];
+    return {
+      natural: prefixW[j] - prefixW[i] + spaces * spaceW,
+      spaces,
+      // every letter and space carries spacing; the line's last letter's trails
+      // off unseen -- a line of cursive words (no letters to space) gets none
+      letters: letters ? letters + spaces - 1 : 0,
+    };
+  };
   // the best way found to start a line at a word, per fitness class (and
   // whether it's the paragraph's first line, which is narrower)
   let active: Node[] = [{ at: 0, first: true, fitness: 1, demerits: 0, lines: 0, prev: null }];

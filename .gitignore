@@ -14,6 +14,13 @@ backend/data/
 backend/.env
 web/public/media/
 
-# licensed publication fonts (restricted: never committed or served publicly)
-publications/*/fonts/*.ttf
-publications/*/fonts/*.otf
+# the papers' fonts are committed (the paper confirmed that's fine); fonts
+# copied in from a computer's system folder for a test are not
+publications/sample-urdu/fonts/
+
+# the app on a desk computer: its logs and nightly database backups
+logs/
+backups/
+papers/
+
+publications/*/fonts/*.ttc

@@ -1,0 +1,128 @@
+{
+ "dpi": 300,
+ "page": {
+  "width": 3300,
+  "height": 5100
+ },
+ "fontMap": {},
+ "ads": [],
+ "roles": {
+  "first": {
+   "art": {
+    "url": "/chrome/sample-english/first.png",
+    "x": 0,
+    "y": 0,
+    "width": 3300,
+    "height": 625
+   },
+   "bodyTop": 650,
+   "fields": {
+    "issue": {
+     "x": 150.0,
+     "y": 537.5,
+     "width": 500.0,
+     "height": 58.33,
+     "font": "serif-regular",
+     "size": 41.67,
+     "lineHeight": 58.33,
+     "color": "#182c54",
+     "hScale": 1,
+     "printed": "No. 271"
+    },
+    "date": {
+     "x": 1983.34,
+     "y": 537.5,
+     "width": 833.33,
+     "height": 58.33,
+     "font": "serif-regular",
+     "size": 41.67,
+     "lineHeight": 58.33,
+     "color": "#182c54",
+     "hScale": 1,
+     "printed": "Thursday 22.10.2026"
+    }
+   },
+   "bodyBottom": 4950.0
+  },
+  "inner": {
+   "art": {
+    "url": "/chrome/sample-english/inner.png",
+    "x": 0,
+    "y": 0,
+    "width": 3300,
+    "height": 167
+   },
+   "bodyTop": 192,
+   "fields": {
+    "folio": {
+     "x": 150.0,
+     "y": 54.17,
+     "width": 166.67,
+     "height": 70.0,
+     "font": "tinos-bold",
+     "size": 50.0,
+     "lineHeight": 70.0,
+     "color": "#182c54",
+     "hScale": 1,
+     "printed": "2"
+    },
+    "date": {
+     "x": 2216.66,
+     "y": 58.33,
+     "width": 666.67,
+     "height": 52.5,
+     "font": "serif-regular",
+     "size": 37.5,
+     "lineHeight": 52.5,
+     "color": "#182c54",
+     "hScale": 1,
+     "printed": "Thursday 22.10.2026"
+    }
+   },
+   "bodyBottom": 4950.0
+  },
+  "last": {
+   "art": {
+    "url": "/chrome/sample-english/last.png",
+    "x": 0,
+    "y": 0,
+    "width": 3300,
+    "height": 167
+   },
+   "bodyTop": 192,
+   "footer": {
+    "url": "/chrome/sample-english/footer.png",
+    "x": 0,
+    "y": 4983,
+    "width": 3300,
+    "height": 117
+   },
+   "fields": {
+    "folio": {
+     "x": 150.0,
+     "y": 54.17,
+     "width": 166.67,
+     "height": 70.0,
+     "font": "tinos-bold",
+     "size": 50.0,
+     "lineHeight": 70.0,
+     "color": "#182c54",
+     "hScale": 1,
+     "printed": "4"
+    },
+    "date": {
+     "x": 2216.66,
+     "y": 58.33,
+     "width": 666.67,
+     "height": 52.5,
+     "font": "serif-regular",
+     "size": 37.5,
+     "lineHeight": 52.5,
+     "color": "#182c54",
+     "hScale": 1,
+     "printed": "Thursday 22.10.2026"
+    }
+   }
+  }
+ }
+}

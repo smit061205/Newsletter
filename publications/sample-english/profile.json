@@ -1,0 +1,158 @@
+{
+ "id": "sample-english",
+ "name": "The Sample Herald (a made-up English test paper)",
+ "language": {
+  "lang": "en",
+  "direction": "ltr",
+  "digits": "latin",
+  "weekdays": [
+   "Sunday",
+   "Monday",
+   "Tuesday",
+   "Wednesday",
+   "Thursday",
+   "Friday",
+   "Saturday"
+  ],
+  "dateLine": "{weekday} {dd}.{mm}.{yyyy}",
+  "issueLine": "No. {issue}"
+ },
+ "issue": {
+  "referenceDate": "2026-10-22",
+  "referenceNumber": 271,
+  "pages": 2
+ },
+ "page": {
+  "width": 792,
+  "height": 1224
+ },
+ "grid": {
+  "left": 36,
+  "columns": 6,
+  "column": 110.0,
+  "gutter": 12
+ },
+ "ink": "#1a1a1a",
+ "fonts": {
+  "tinos-bold": {
+   "file": "/fonts/Tinos-Bold.ttf",
+   "weight": 700
+  },
+  "serif-regular": {
+   "file": "/fonts/LiberationSerif-Regular.ttf",
+   "weight": 400,
+   "fallback": "hind-regular"
+  },
+  "hind-regular": {
+   "file": "/fonts/HindVadodara-Regular.ttf",
+   "weight": 400
+  }
+ },
+ "type": {
+  "body": {
+   "font": "serif-regular",
+   "size": 9.5,
+   "pitch": 11.5,
+   "indent": 9,
+   "pitches": [
+    11.5,
+    11.75,
+    12.0,
+    11.25
+   ],
+   "sizes": [
+    9.5,
+    9.2
+   ]
+  },
+  "headline": {
+   "font": "tinos-bold",
+   "leading": 1.1,
+   "capByColumns": [
+    0,
+    16,
+    22,
+    30,
+    38,
+    44,
+    50
+   ],
+   "min": 13,
+   "rankScale": [
+    1.0,
+    0.8,
+    0.66,
+    0.56,
+    0.48
+   ],
+   "maxLines": [
+    2,
+    3,
+    3,
+    3,
+    3
+   ]
+  },
+  "kicker": {
+   "font": "tinos-bold",
+   "ratio": 0.45,
+   "min": 9,
+   "leading": 1.15
+  },
+  "deck": {
+   "font": "serif-regular",
+   "ratio": 0.5,
+   "min": 11,
+   "leading": 1.15
+  },
+  "caption": {
+   "font": "serif-regular",
+   "size": 8,
+   "pitch": 10
+  }
+ },
+ "spacing": {
+  "top": 2,
+  "afterKicker": 2,
+  "afterHeadline": 4,
+  "afterDeck": 4,
+  "afterPhoto": 3,
+  "afterCaption": 4,
+  "betweenStories": 8,
+  "storyRule": 0.5
+ },
+ "photo": {
+  "maxCrop": 0.15,
+  "minHeight": 60,
+  "minCols": 2,
+  "minPpi": 150,
+  "maxShare": 0.45
+ },
+ "fontLicence": "Free fonts (SIL OFL / Apache) -- a made-up paper for testing the engine.",
+ "chrome": "chrome.json",
+ "fillers": {
+  "houseAd": [
+   {
+    "text": "The Sample Herald",
+    "role": "headline",
+    "scale": 1.0
+   },
+   {
+    "text": "A made-up paper that tests the newsroom engine",
+    "role": "deck",
+    "scale": 0.5
+   }
+  ],
+  "messages": [
+   "Wear a helmet, ride safe",
+   "Save water, save life"
+  ],
+  "maxMessages": 1,
+  "maxHouseAds": 1
+ },
+ "editorial": {
+  "workhorseModel": "openai/gpt-6-luna",
+  "leadModel": "google/gemini-3.8-flash",
+  "leadStories": 3
+ }
+}

@@ -9,6 +9,7 @@ import path from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
 import type { Font, TextRun } from "@ck/shared/contract";
 import { assetFile, PLOT_ORIGIN, PUBLIC_DIR } from "../config.ts";
+import { cmapCoverage } from "../fonts/cmap.ts";
 import { BharatiEncoder } from "../fonts/bharati.ts";
 import { breakParagraph, type Word } from "./linebreak.ts";
 
@@ -17,6 +18,8 @@ import { breakParagraph, type Word } from "./linebreak.ts";
 export interface Faces {
   encoding: Record<string, "unicode" | "bharati">;
   latin: Record<string, string>;
+  /** a Unicode font's fallback for the characters it lacks */
+  fallback?: Record<string, string>;
 }
 
 /** A piece of printed text: `text` as it goes to the font, `font` unset for
@@ -107,6 +110,8 @@ export class Measurer {
   private browser: Browser;
   private page: Page;
   private faces: Faces;
+  /** each font's characters (fonts/cmap.ts), for the fallbacks */
+  private coverage = new Map<string, Set<number>>();
   private encoder: BharatiEncoder | null;
   /** Text the encoder couldn't set in the legacy font (reported by the build). */
   unencodable = new Set<string>();
@@ -126,7 +131,20 @@ export class Measurer {
   /** A word (or any text) as printed in `font`: legacy fonts get their glyph
    * codes, with Latin letters and digits in the font's Latin partner. */
   shape(text: string, font: string): Run[] {
-    if (!this.isLegacy(font) || !this.encoder) return [{ text }];
+    if (!this.isLegacy(font) || !this.encoder) {
+      // a character the font lacks, in the first of its fallbacks (and theirs) that has it
+      const has = this.coverage.get(font);
+      if (!this.faces.fallback?.[font] || !has) return [{ text }];
+      const chain: string[] = [];
+      for (let f = this.faces.fallback[font]; f && !chain.includes(f) && chain.length < 4; f = this.faces.fallback?.[f]) chain.push(f);
+      const runs: Run[] = [];
+      for (const ch of text) {
+        const c = ch.codePointAt(0)!;
+        const fb = has.has(c) || /\s/.test(ch) ? undefined : chain.find((f) => this.coverage.get(f)?.has(c));
+        runs.push(fb ? { text: ch, font: fb } : { text: ch });
+      }
+      return mergeRuns(runs);
+    }
     const latin = this.faces.latin[font];
     const runs: Run[] = [];
     for (const tok of text.match(LATIN_TOKEN) ?? []) {
@@ -173,7 +191,14 @@ export class Measurer {
       await browser.close();
       throw new Error(`fonts failed to load for measuring: ${failed.join(", ")}`);
     }
-    return new Measurer(browser, page, faces);
+    const m = new Measurer(browser, page, faces);
+    for (const f of fonts) {
+      try {
+        const file = publicDir === PUBLIC_DIR ? assetFile(f.url) : path.join(publicDir, decodeURIComponent(f.url));
+        m.coverage.set(f.id, cmapCoverage(await readFile(file)));
+      } catch { /* a font that didn't load is reported above */ }
+    }
+    return m;
   }
 
   /** Widths of the words of each request's paragraphs (contract px, after
@@ -219,11 +244,20 @@ export class Measurer {
       size: r.size, hScale: r.hScale ?? 1,
       base: family(r.font),
       space: this.shape(" ", r.font)[0].text,
-      paras: r.paras.map((p) => p.split(/\s+/).filter(Boolean).map((w) => ({
-        word: w, runs: this.shape(w, r.font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? r.font) })),
-      }))),
+      // a long token may break after a "/" (a URL, "PLI/RPLI"): its parts glued, no space between
+      paras: r.paras.map((p) => p.split(/\s+/).filter(Boolean).flatMap((tok) =>
+        (tok.length > 10 && tok.includes("/") ? tok.split(/(?<=\/)(?=[^/])/) : [tok]).map((w, k) => ({
+          word: w, glue: k > 0, runs: this.shape(w, r.font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? r.font) })),
+        })))),
     }));
     const measured = await this.measureWords(reqs);
+    // the glue goes with each measured word; a cursive script (Urdu,
+    // Arabic) is never letter-spaced -- it would break the joins -- so its
+    // lines justify in their word spaces alone
+    measured.forEach((m, ri) => m.paras.forEach((ws, pi) => ws.forEach((w, wi) => {
+      if (reqs[ri].paras[pi][wi].glue) (w as Word).glue = true;
+      if (/[\u0600-\u06FF\u0750-\u077F]/.test(reqs[ri].paras[pi][wi].word)) w.letters = 0;
+    })));
 
     return requests.map((req, ri) => {
       const r = reqs[ri];
@@ -242,23 +276,26 @@ export class Measurer {
           words.forEach((w, i) => {
             if (i === 0) { cur = w.width; return; }
             const avail = (width - (starts.length === 1 ? indent : 0)) * safety;
-            if (cur + space + w.width <= avail) cur += space + w.width;
+            const gap = (w as Word).glue ? 0 : space;
+            if (cur + gap + w.width <= avail) cur += gap + w.width;
             else { starts.push(i); cur = w.width; }
           });
         }
         starts.forEach((i, k) => {
           const j = starts[k + 1] ?? words.length;
           const runs: Run[] = [];
+          let spaces = 0;
           for (let wi = i; wi < j; wi++) {
-            if (wi > i) runs.push({ text: r.space });
+            if (wi > i && !r.paras[pi][wi].glue) { runs.push({ text: r.space }); spaces++; }
             for (const x of r.paras[pi][wi].runs) runs.push(x.font ? { text: x.text, font: x.font } : { text: x.text });
           }
-          const spaces = j - i - 1;
           out.push({
-            text: r.paras[pi].slice(i, j).map((w) => w.word).join(" "), runs: mergeRuns(runs), para: pi,
+            text: r.paras[pi].slice(i, j).map((w, k) => (k > 0 && !w.glue ? " " : "") + w.word).join(""), runs: mergeRuns(runs), para: pi,
             start: k === 0, end: j === words.length,
             width: words.slice(i, j).reduce((a, w) => a + w.width, 0) + spaces * space,
-            spaces, letters: words.slice(i, j).reduce((a, w) => a + w.letters, 0) + spaces - 1, spaceWidth: space,
+            spaces, spaceWidth: space,
+            // (as linebreak.ts counts them: none on a line of cursive words)
+            letters: ((n) => (n ? n + spaces - 1 : 0))(words.slice(i, j).reduce((a, w) => a + w.letters, 0)),
           });
         });
       });

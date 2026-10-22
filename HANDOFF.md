@@ -155,7 +155,7 @@ $B publish --date 2026-10-20 --push
 ## 5. Rules and decisions (don't re-litigate)
 
 - **Don't get around the government site's bot block.** Read pages like a person, through your own browser, or use email or official access.
-- **Never commit the fonts**, `backend/.env` or `backend/data/`. The repo is public.
+- **Never commit** `backend/.env` or `backend/data/`. The repo is public. (The Gopika fonts *are* committed: the paper confirmed it's fine, 22 Oct 2026. Fonts copied from a computer's system folder for a test are not.)
 - **No Anthropic models** for the paper's AI (cost); it uses OpenRouter (GPT-6 Luna, Gemini 3.8 Flash).
 - **At most one slogan panel and one house ad per issue.** Fill space with stories.
 - **Every story is headline, sub-heading, body,** in decreasing sizes. **Kickers are centred.**
@@ -179,3 +179,17 @@ $B publish --date 2026-10-20 --push
    - vowel signs in letter-spaced body lines (Gopika is a legacy font; spacing applies per glyph code);
    - the look of the column rules;
    - the message panel.
+
+
+---
+
+## The newsroom (22 Oct 2026, branch `newsroom`)
+
+What changed, so a later session can carry on:
+- **News is PIB** (`backend/src/ingest/pib.ts`): PIB Ahmedabad's Gujarati releases, topped up with PIB Delhi's Hindi translated into Gujarati (`editorial/translate.ts`) until the pages are full. The state site stays off (PIB only, the user's choice).
+- **One pipeline** (`backend/src/pipeline.ts`) is what the 8 PM run, the newsroom's Run now and `cli.ts all` do; every run is a job with a live log (`/api/events`) and can be retried from a failed step.
+- **The newsroom** (`web/src/app/newsroom/`) runs on the paper's own computer only (`NEWSROOM=1`): Today, News, Stories (edit, rank, photo, drop/restore, Hindi original alongside), Pages (click a story to edit), Ads (book with size and days), Papers (add a newspaper from its PDFs), Settings (run time, OpenRouter key into `backend/.env`).
+- **Apps:** `windows/` and `mac/` installers, both over `scripts/launch.mjs`; CI builds and runs them on Windows and macOS (`.github/workflows/apps.yml`).
+- **New gates:** F (every printed letter in its own font, `fonts/cmap.ts`) and P (print preflight, `export/preflight.ts`). The 8 August test, `sample-english` and the extractor test (`test/extract-0808.ts`) must stay green.
+- **Other papers:** profiles in `publications/<id>/` (from the Papers screen: `onboard/extract.ts`, `onboard/save.ts`), each built in its own process and data folder `papers/<id>/`. `sample-urdu` proves right to left.
+- **Keep:** never two engines on one database (stop with `launch.mjs --stop`, which forces a stuck one); `publish` pushes the current branch, so publish from `main`.

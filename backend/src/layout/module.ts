@@ -155,9 +155,9 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     let got = await at(spec)
       // too short to fill the width at this size: up to `upTo` (one rank up), the size it needs
       ?? (upTo && upTo > spec.max ? await at({ ...spec, max: upTo, min: spec.max }) : null);
-    // too long: a line more, a little smaller -- up to three more in a
-    // narrow story, where a sub-heading takes three or four lines
-    for (let more = 1; !got && spec.align === "fit" && more <= (cols <= 2 ? 3 : 1); more++) {
+    // too long: a line more, a little smaller -- up to two more (a long
+    // headline), three in a narrow story, where a sub-heading takes three or four
+    for (let more = 1; !got && spec.align === "fit" && more <= (cols <= 2 ? 3 : 2); more++) {
       got = await at({ ...spec, maxLines: spec.maxLines + more, min: Math.max(floor, spec.min * 0.85) });
     }
     if (got) {
@@ -167,7 +167,10 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     const lines = await fitLines(m, txt, w, spec.font, spec.max, spec.min, fallbackLines);
     const st = await stackLines(m, lines.lines, `${aid}-${idp}`, aid, 0, cursor, w, spec.font, lines.size, lines.size * spec.leading);
     displayFill = 0;
-    return { elements: st.elements, bottom: st.bottom, size: lines.size, lines: lines.lines.length, fill: 0 };
+    // a one-column brief's short headline is centred, as the paper prints it
+    const centred = rank === 5 && cols === 1;
+    return { elements: centred ? st.elements.map((e) => (e.kind === "text" ? { ...e, align: "center" as const } : e)) : st.elements,
+             bottom: st.bottom, size: lines.size, lines: lines.lines.length, fill: 0 };
   };
   const kicker = text.kicker.trim();
   if (kicker) {

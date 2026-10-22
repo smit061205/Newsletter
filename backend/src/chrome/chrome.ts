@@ -65,10 +65,12 @@ async function field(f: Field, id: string, text: string, m?: Measurer): Promise<
     };
   }
   // left-aligned from the printed start, with room to spare: today's text
-  // (other digits, another weekday) is not the printed width
+  // (other digits, another weekday) is not the printed width; in a legacy
+  // font, in its own glyph codes like the rest of the paper
+  const legacy = m && m.isLegacy(f.font) ? elementText((await m.breakLines([{ paras: [text], width: 1e6, font: f.font, size: f.size }]))[0], true) : { text };
   return {
     id, kind: "text", x: f.x, y: f.y, width: Math.round(f.width * 1.4), height: f.height,
-    text, font: f.font, size: f.size, lineHeight: f.lineHeight, color: f.color, align: "left",
+    ...legacy, font: f.font, size: f.size, lineHeight: f.lineHeight, color: f.color, align: "left",
     ...(f.hScale !== 1 ? { hScale: f.hScale } : {}),
   };
 }
@@ -93,6 +95,7 @@ export async function chromeFor(n: number, total: number, issueDate: string, iss
   // a one-page paper has no "last page" header; give its last page the footer anyway
   const footer = role.footer ?? (n === total ? template.roles.last.footer : undefined);
   if (footer) els.push({ id: `p${n}-footer`, kind: "image", ...footer, fit: "fill" });
-  const bottom = footer ? footer.y : template.page.height;
+  // the template's own foot margin, else the footer's top, else the page's
+  const bottom = Math.min(role.bodyBottom ?? template.page.height, footer ? footer.y : template.page.height);
   return { elements: els, bodyTop: role.bodyTop, bodyBottom: bottom };
 }

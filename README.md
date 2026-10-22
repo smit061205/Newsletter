@@ -42,31 +42,34 @@ The rule throughout: **the AI makes the judgement calls, and the code does the m
 
 ## 1. Current status
 
-**Last verified build:** 21 October 2026 (issue 270), 4 pages, 22 stories. **Every release gate passes** and the issue is marked READY.
+**Last verified build:** 22 October 2026 (issue 271), 4 pages, 29 stories from PIB (Gujarati, plus Hindi translated), **every release gate passing (READY)**, made by the 8 PM run and finished from the newsroom.
 
 | Area | State |
 |---|---|
-| Render contract and plotter (JSON → website and PDF) | Done |
-| Exact baseline placement (measured Chromium rule) | Done |
-| Publication profile (all paper settings as data) | Done (Capital Kranti) |
-| Bharati Gopika encoder (Unicode → legacy glyph codes) | Done; round-trips 100% of the 8 August text and all of a day's news |
-| Content-sized story modules | Done (`backend/src/layout/module.ts`) |
-| Page packer (skyline + beam search) | Done (`backend/src/layout/pack.ts`) |
-| Gap closing (AI length fit, trims, briefs, house ad) | Done (`backend/src/layout/fit.ts`) |
-| Release gates, including the AI page reviewer | Done (`backend/src/build.ts`, `editorial/review.ts`) |
-| AI rewriting (OpenRouter: GPT-6 Luna and Gemini 3.8 Flash) | Done (`editorial/rewrite.ts`) |
-| Backend API, SQLite storage, 8 PM nightly job | Done, but the nightly job has no automatic news source yet (see 11) |
-| Website showing the live issue, with PDF download | Done |
-| AI editorial plan (which story leads, page assignment) | **To do** (15.1) |
-| Email-inbox ingest (the automatic news source) | **To do** (15.2) |
-| Editor screen (edit, approve) | **To do** (15.3); the API already exists |
-| Second paper / "Add a newspaper" screen / Urdu | **To do** (15.4–15.6) |
-| CorelDRAW (SVG) export and print preflight | **To do** (15.7–15.8) |
-| Clean-up: type errors, dead code, docs, tests | **To do** (15.9) |
+| Render contract and plotter (JSON → website and PDF) | Done, with right-to-left text (`direction`, `lang`) |
+| Publication profile (all paper settings as data) | Done: Capital Kranti, `dev-test`, `sample-english`, `sample-urdu` |
+| Bharati Gopika encoder | Done |
+| Layout engine: modules, packer, gap closing, level columns, tight photos | Done |
+| Release gates (1–7, S1–S7, **F** every letter in its font, **P** print preflight) | Done |
+| **News: PIB** (Gujarati from PIB Ahmedabad; Hindi from PIB Delhi, translated when short) | Done (`ingest/pib.ts`, `editorial/translate.ts`) |
+| AI: rewrite, round-ups, length fitting, **editorial plan**, page review | Done (`editorial/`) |
+| **One pipeline as jobs** (fetch → rewrite → top-up → features → build), 8 PM, live log, retry | Done (`pipeline.ts`) |
+| **Newsroom website** (Today, News, Stories, Pages, Ads, Papers, Settings) | Done (`web/src/app/newsroom/`, only where `NEWSROOM=1`) |
+| **Apps: Windows installer and Mac app** (one launcher, log-in start, evening wake) | Done (`windows/`, `mac/`, `scripts/launch.mjs`) |
+| **CorelDRAW SVG export** | Done (`export/svg.ts`, `/api/export/:date.svg?page=N`) |
+| **Add a newspaper** (profile drafted from PDFs, saved as a paper, test issue) | Done (`onboard/`, Papers screen) |
+| Urdu (right to left) | Works (`sample-urdu`); Nastaliq tuning waits for the paper's chosen font |
+| State news (Gujarat Info Dept) | Off (PIB only, by choice): the `/reader` bookmark remains; email ingest not built |
 
 ---
 
 ## 2. Quick start
+
+### The app (what the paper's computer runs)
+- **Windows:** double-click `windows\Install Capital Kranti.cmd`. **Mac:** `mac/Install Capital Kranti.command`. They install Node and Git if needed, copy the app, its Chromium and the Gopika fonts (from a folder you pick), sign in to GitHub for Publish, build the newsroom, put **Capital Kranti** on the desktop / in Applications, start it at log-in and wake the computer at 7:55 PM.
+- **The newsroom** opens at `http://127.0.0.1:3000/newsroom`; the engine at `http://127.0.0.1:4000` (both local only). One launcher behind both apps: `node scripts/launch.mjs [--background | --stop | --update | --status]`.
+- **Every evening** the engine runs the day (PIB → rewrite → Hindi top-up → features if short → build) at the Settings' time; the editor reviews it on **Today / Pages / Stories**, then **Approve & Publish** (website) and **Print PDF**. The editor's guide: `docs/NEWSROOM_GUIDE.md` (Gujarati and English).
+- By hand: `cli.ts all --date D [--from fetch|rewrite|topup|fill|build]`, `cli.ts pib --date D --lang gu|hi`, `cli.ts topup --date D`.
 
 ### Requirements
 - **Node 22+** (the backend runs TypeScript directly with `--experimental-strip-types`, and uses the built-in SQLite with `--experimental-sqlite`).
@@ -80,7 +83,7 @@ npx playwright install chromium
 pip install pymupdf pillow fonttools numpy
 ```
 
-### Secrets and licensed files (not in git; you must supply them)
+### Secrets (not in git; you supply them) and the fonts (in git)
 1. **`backend/.env`**:
    ```
    OPENROUTER_API_KEY=sk-or-...
@@ -89,7 +92,7 @@ pip install pymupdf pillow fonttools numpy
    # OPENROUTER_LEAD_MODEL=google/gemini-3.8-flash
    # OPENROUTER_VISION_MODEL=google/gemini-3.8-flash
    ```
-2. **The Gopika fonts**, commercial, from the paper's DTP machine, copied to `publications/capital-kranti/fonts/` with exactly these names:
+2. **The Gopika fonts** are in git (the paper confirmed that's fine), in `publications/capital-kranti/fonts/` under these names (`scripts/install-fonts.mjs <folder>` copies new copies in from the paper's own names):
    - `gopika-two-regular.ttf` (B Bharati GopikaTwo Normal)
    - `gopika-two-bold.ttf` (B Bharati GopikaTwo Bold)
    - `gopika-two-bolditalic.ttf` (B Bharati GopikaTwo BoldItalic)
@@ -126,7 +129,7 @@ The backend runs on your own computer (where the licensed fonts are); the websit
 - Each day adds about 12 MB to the repository (4 page JPEGs of about 1.5 MB, plus the PDF). Older days leave the site but stay in git history. If the repository grows too large, move the files to cheaper storage.
 
 ### Deploy with a hosted backend (website on Vercel, backend on Render, paid)
-- **Backend:** a Render web service built from the root `Dockerfile` (Node 22 + Playwright Chromium), on a paid instance with a **persistent disk mounted at `/var/data`** (`DATA_DIR`). The disk holds the SQLite database, PDFs, page images and release photos; copy the licensed fonts to `/var/data/publications/capital-kranti/fonts/` (never into git). Environment: `OPENROUTER_API_KEY`, `BACKEND_API_TOKEN` (required on every POST). Health check: `/healthz`.
+- **Backend:** a Render web service built from the root `Dockerfile` (Node 22 + Playwright Chromium), on a paid instance with a **persistent disk mounted at `/var/data`** (`DATA_DIR`). The disk holds the SQLite database, PDFs, page images and release photos; the fonts come with the repository. Environment: `OPENROUTER_API_KEY`, `BACKEND_API_TOKEN` (required on every POST). Health check: `/healthz`.
 - **Website:** a Vercel project with root directory `web`, and `BACKEND_API_MODE=live`, `BACKEND_API_URL=<the Render URL>`, `BACKEND_API_TOKEN=<same token>`.
 - The browser hand-off page needs the token too: `/ingest?token=<token>#<json>`.
 
@@ -192,7 +195,7 @@ publications/capital-kranti/
   profile.json              everything that makes Capital Kranti look like itself
   chrome.json               masthead/header/footer art + field positions + stand-in ads
   fonts/bharati.json        learned syllable spellings + glyph table (for the encoder)
-  fonts/*.ttf               LICENSED -- not in git, supply yourself
+  fonts/*.ttf               the Gopika fonts (in git, with the paper's go-ahead)
 web/                        Next.js 16 website (see web/AGENTS.md: this Next differs
                             from older versions -- read node_modules/next/dist/docs)
   src/app/page.tsx          issue viewer (one scaled iframe per page; static mode: published images)
@@ -444,18 +447,14 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 
 ## 11. Ingest: where the news comes from
 
-- **Source:** the Gujarat government's Information Department, **gujaratinformation.gujarat.gov.in**, which publishes press releases in Gujarati, free to use. Releases are at `/PressReleaseDetails/?id=<n>&LanguageId=2`; ids are sequential across departments and districts. On a release page:
-  - headline: `.ttm-service-single-content-area .title h4`
-  - subheading: `h5.subtitle`
-  - date and office: `.ReleaseDateSubHeaddateTime` ("OCT 21 2026 6:00 PM BY …")
-  - body: `.ttm-service-description p`
-  - photos: `.ttm-service-description img` (served by `ViewFile?fileName=…`)
-- **Problem: the site blocks automated (headless) browsers.** The home page returns "The URL you requested has been blocked", and PIB is unreachable from the server too. **Do not try to get around this block** (no disguised user agents or the like). That was decided, and it's the right call.
-- **For the 21 October test issue,** the releases were read by hand in a normal browser tab and passed to the backend through `GET /ingest#<json>` (a hand-off page in `server.ts`). The release page's Content Security Policy blocks direct calls to a local server, so the hand-off uses a page navigation instead.
-- **The chosen automatic source is the paper's email inbox** (district information offices email releases and photos to newspapers every day). Building it is 15.2.
-- `backend/src/ingest/gujaratInfo.ts` (Playwright) is kept for when access is allowed, for example if the department allow-lists the server.
-- **Manual upload works today:** `POST /api/releases` with `{id, url, dateLine|date, office?, headline, subhead?, paras[], photos?[{name, base64}]}`.
-- **The release reader** (`http://localhost:4000/reader` while the server runs): a bookmark for your own browser. On a press release page it reads the headline, sub-heading, date line, paragraphs and photos (scaled to at most 1800px wide), sends them through the `/ingest` hand-off, and offers to open the previous release (ids run in order). One page at a time, read by you: the site's block on automated readers is respected. `cli.ts status` lists every day in the database with its releases, stories and latest build.
+- **PIB, the Press Information Bureau** (`backend/src/ingest/pib.ts`): the central government's releases, issued for the press, plain HTML that answers ordinary requests. Read politely (one page at a time, 1.5 s apart, the user agent `CapitalKranti-news-ingest/1.0`, only the day's releases, each once by its PRID, at most 300 pages a run).
+  - **Gujarati:** PIB Ahmedabad, `allRel.aspx?reg=22&lang=13` (its own releases and the national ones it translates during the day).
+  - **Hindi:** PIB Delhi, `allRel.aspx?reg=3&lang=2`; **English:** `reg=3&lang=1`.
+  - A past day: the list page's own ASP.NET date form posted back.
+  - A release: `PressReleaseIframePage.aspx?PRID=n` (ministry, headline, date line, paragraphs, photos, and the PRIDs of its other language versions).
+- **Round-ups:** near-identical releases from one office (the PM's congratulations to each medal winner) become one story (`groupSimilar` in `rewrite.ts`).
+- **The Hindi top-up** (`editorial/translate.ts`): when the Gujarati copy fills less than the profile's `fillTarget` (110%), the Hindi list (less what PIB also issued in Gujarati, by language links or by the same names and figures, and less greetings) is ranked by the AI for Gujarat's readers, then translated one by one until the pages are full or the day's AI budget (`dailyBudgetUsd`) is spent. Numbers are checked against the Hindi (Devanagari digits, "9 हज़ार", "2 लाख" understood).
+- **The state's Information Department** (gujaratinformation.gujarat.gov.in) blocks automated browsers; **don't get around that.** The `/reader` bookmark (one page at a time, read by a person) and `POST /api/releases` still work; `ingest/gujaratInfo.ts` is kept for if access is ever allowed.
 
 ---
 
@@ -527,116 +526,14 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 
 ---
 
-## 15. Remaining work, in detail (do these in order)
+## 15. Remaining work
 
-Each item says what to build, where, and how to know it's done. **After every step, build 2026-10-21 (and 8 August, once 15.9's test exists) and read every page image at full size.** Gates passing is necessary but not sufficient.
-
-### 15.1 AI editorial plan (`backend/src/editorial/plan.ts`)
-- **Why:** story order and rank now come from simple rules (`priority` from the rewrite, plus `rankOf()` in `pack.ts`). An editor would choose the lead and the page for each story by news value.
-- **What:** one Gemini 3.8 Flash call per day.
-  - **Input:** for each story, its id, headline, a 40-word summary, its word counts per variant, whether it has a photo (and whether it's landscape), and how many photos; plus the ads per page, the page count and sections. Sections are not in the profile yet: add `sections: [{page, name, wants: [...] }]`, e.g. page 1 front, 2–3 state and districts, 4 business and misc.
-  - **Output** (strict JSON schema, validated with Zod): `[{storyId, page, rank 1..5, sizeClass lead|major|standard|brief, usePhoto, kicker?}]`, plus `leadId`.
-- **Engine:** in `build.ts`, order each page's pool by the plan, and add an optional `rankOverride` to `packPage`, so `rankOf()` uses the plan's rank. If a story can't fit as planned, move it down a rank, try the next page, and log the reason in the report (`planDeviations`).
-- **Cache** in SQLite by date plus a hash of the story ids.
-- **Done when:** the plan validates, gates 1–7 still pass on 21 October, and the report lists the plan and any deviations.
-
-### 15.2 Email-inbox ingest (`backend/src/ingest/inbox.ts`), the deployable source
-- **What:** IMAP over TLS, with the `imapflow` and `mailparser` npm packages. Credentials go in `backend/.env` (`INBOX_HOST, INBOX_PORT, INBOX_USER, INBOX_PASSWORD, INBOX_FOLDER`), filled in by the user. Never ask for or print them.
-- Read the day's unseen mail from the information-office senders (an allow-list in the profile: `editorial.sources.inbox.from[]`).
-- Each mail becomes a release:
-  - subject → headline;
-  - first bold line or second line → subhead;
-  - body paragraphs → body;
-  - JPG and PNG attachments → photos, saved under `web/public/media/<date>/`;
-  - `.docx` attachments → text (with `mammoth`);
-  - PDF attachments → text (with `pdf-parse`).
-- **Legacy-font text:** some offices send Word files typed in legacy Gujarati fonts. Detect them with `is_legacy` rules, port `bharati_decode` to TypeScript, and convert to Unicode.
-- **De-duplicate** by Message-ID and by headline similarity; mark mails seen.
-- **`runDay()` already calls `ingestInbox(store, date, {log})`**, so implement exactly that signature, returning `{fetched}`.
-- **Done when:** a test inbox with 3 sample releases produces 3 releases with photos, and `cli.ts all` builds a READY issue.
-
-### 15.3 Editor screen (`web/src/app/edit/`)
-- **Shows:** the page images; the gate table and reviewer findings (from `GET /api/issues/:date`); a list of the stories on each page with headline, rank, span, variant and source link.
-- **Lets the editor:**
-  - edit the headline, kicker, deck, body or caption;
-  - change the photo;
-  - set a rank (add `rank` to edits and honour it in `pack.ts`);
-  - drop a story;
-  - swap two stories;
-  - press **Approve**.
-
-  Every change goes to `POST /api/issues/:date/edits`, which rebuilds; then the images refresh.
-- **Implement edit handling in the new engine.** Text edits already work through `applyTextEdits()`. `drop` works. `swapWith` and `box` were implemented in the retired planner only, so re-implement: swap ranks and order in the pool, and replace `box` with a `rank` or `cols` hint.
-- **Auth:** at least a shared editor password from env, with the API checking a bearer token (`BACKEND_API_TOKEN` already exists in `web/.env.local`).
-- **Done when:** editing a headline, rebuilding, approving and downloading the PDF all work in the browser.
-
-### 15.4 Second paper, written by hand (`publications/sample-english/`)
-- **Profile:** an English broadsheet, e.g. 6 columns, 12 pt Liberation Serif body, Tinos Bold headlines, a typographic masthead drawn as text and rect elements (make `chrome.json` able to express a typographic masthead without art), and its own colours.
-- **Engine needs:**
-  - `lang` (and `direction`) on text elements, in the contract and the plotter;
-  - hyphenation for English: `hyphens: auto` plus `lang` in the plotter, and the same hyphenation in the measurer (e.g. the `hyphen` npm package with en-US patterns, inserting soft hyphens before measuring so both agree);
-  - `inPaperLanguage` already handles `en`.
-- **Content:** English releases. PIB English releases can be uploaded through `POST /api/releases`.
-- **Done when:** `CK_PUBLICATION=sample-english cli.ts build` passes gates 1–4, 6 and 7 with **no engine code changes** beyond the generic features above.
-
-### 15.5 "Add a newspaper" screen (`web/src/app/publications/new/` and `backend/src/onboard/extract.ts`)
-1. **Upload:** 1–3 recent issue PDFs (exported from the layout software, not scans), font files and masthead art.
-2. **Extract**, generalising `from_source.py`, `chrome_assets.py` and `extract_source.py`:
-   - page size;
-   - column grid, from histograms of text column left and right edges;
-   - fonts by role: the most-used small face is body; the largest bold at the top of a text block is headline; and so on;
-   - type ladder: headline size against column span, body size and pitch (the median baseline delta);
-   - spacing: median gaps between headline, deck, body, photo, caption and the next story;
-   - colours, rules and boxes;
-   - chrome: the top and bottom bands repeated on every page. Parts that change between issues or pages become fields (dates, numbers, page numbers, found by regex or by comparing issues); parts that don't become art (redact the fields, then render);
-   - photo habits;
-   - language and direction.
-3. **Review screen:** the extracted profile drawn over a sample page, with editable fields.
-4. **Test build** from that day's news, plus a self-check: re-set one uploaded issue's own text and run `line_diff` and `compare`.
-5. **Save** as `publications/<id>/`, and add it to the nightly job, which needs to loop over all publications. Make `PROFILE` a parameter instead of a module-level constant: `backend/src/profile.ts` currently loads one profile per process.
-- **Legacy fonts can't be decoded automatically:** ask for Unicode fonts, or a mapping table.
-- **Acceptance:** feeding in the 8 August PDF reproduces Capital Kranti's profile (grid, type ladder, spacing within 0.5 pt, the chrome fields).
-
-### 15.6 Urdu (after a Nastaliq font is chosen, e.g. Noto Nastaliq Urdu)
-- `direction: "rtl"` throughout:
-  - the plotter sets `dir`;
-  - the measurer shapes Arabic script (canvas handles it), with `direction="rtl"` on the context;
-  - `module.ts` puts photos on the left and runs columns right to left;
-  - `pack.ts` mirrors: the skyline fills from the right, so `colX` is mirrored;
-  - justification uses kashida if needed (check what Chromium supports).
-- Nastaliq's very tall ascenders and descenders are handled by the baseline rule from the font's own metrics. Check that the `overlap` probe still behaves.
-
-### 15.7 CorelDRAW export (`backend/src/export/svg.ts`)
-- `server.ts` already routes `/api/export/:date.svg?page=n` to `pageSvg(issue, page)`; implement it.
-- One SVG per page:
-  - `<text>` elements per line, `x` at the line start, `y` at the baseline (from `topFor`'s inverse);
-  - font-family names matching the installed fonts;
-  - for legacy fonts, keep the glyph-code text, since that's what CorelDRAW expects with Bharati fonts installed;
-  - images linked or embedded; rects, lines and paths as is.
-- Justified lines: emit per-word `x` positions so the spacing matches.
-- Also a zip export of all pages plus the fonts list. Fonts aren't included, because of the licence: CorelDRAW users have them installed.
-
-### 15.8 Print preflight
-After the build:
-- trim size equals the profile;
-- every font embedded (check with PyMuPDF from a script, or pdf-lib in Node);
-- no image under 200 ppi at its placed size;
-- nothing outside the trim box;
-- optionally bleed and crop marks, and CMYK or PDF/X, once the printer's specs are known (ask the user; Ghostscript isn't installed, so ask before installing anything).
-
-Add this as gate 8.
-
-### 15.9 Clean-up
-- **Type errors:**
-  - `ingest/gujaratInfo.ts` NodeList iteration (`Array.from`);
-  - `server.ts` (`runDay` returns an issue, but the scheduler type expects void; `export/svg.ts` missing);
-  - `build.ts` (the dynamic `./ingest/inbox.ts` import).
-- **Dead code:** the box-filling parts of `compose.ts` (`compose()` and its candidate loop), once nothing imports them; the old `planner` references in comments.
-- **Tests:** replace `backend/test/recompose-0808.ts` with `backend/test/pack-0808.ts`, which feeds the 8 August stories (from `archive/.../article-level-issue-2026-08-08.json`, with its `mend()` paragraph repair) through `Packer` and `closeGaps` using the cut ads from `chrome.json`, and asserts gates 1–4. Add a `npm test` script that runs it, the encoder round trip and the stress fixture.
-- **Docs:** update `docs/RENDER_CONTRACT.md` (`plainText`, `restricted`, `path`, `lang`, `direction`, the baseline rule), `docs/FRONTEND_ROADMAP.md`, and this README.
-- **`scripts/replica/extract_source.py`:** its `main()` still writes to an archived path; fix it or remove it.
-
----
+1. **Install on the father's Windows PC** with the user: `windows\Install Capital Kranti.cmd` (after this branch is merged: the installer clones `main`), paste the OpenRouter key in Settings, set the run time, and watch one 8 PM run.
+2. **The other five papers** (1 Urdu, 1 Hindi, 3 Gujarati): each through the Papers screen with its PDFs, fonts and masthead art. Then a paper switcher in the newsroom and every paper in the 8 PM run (today each extra paper is built by "Make a test issue" in its own process and data folder, `papers/<id>/`).
+3. **Urdu polish** once the paper's Nastaliq font is known: line spacing, display fitting and the overlap tolerance for tall Nastaliq letters (`sample-urdu` shows where).
+4. **Print specs** from the printer: bleed, crop marks, CMYK/PDF-X (the preflight gate has the hook).
+5. **Needed from the user:** BBharatiMaruti (condensed headlines), confirmation that the Bharati licence covers this PC, the printer's specs, the other papers' PDFs and fonts.
+6. **English hyphenation**, only if an English paper is ever added (none of the six is English).
 
 ## 16. Known issues and gotchas
 

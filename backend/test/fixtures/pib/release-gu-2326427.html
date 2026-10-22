@@ -1,0 +1,923 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="hi">
+<head id="Head1"><title>
+	Press Release:Press Information Bureau
+</title><link href="css/style.css?v=1" rel="stylesheet" type="text/css" /><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><link rel="alternate stylesheet" href="css/change.css?v=1" media="screen" title="change" /><link rel="alternate stylesheet" href="css/green.css?v=1" media="screen" title="green" /><link rel="alternate stylesheet" href="css/yellow.css" media="screen" title="yellow" /><link rel="stylesheet" type="text/css" href="css/prtint.css" media="print" /><link rel="stylesheet" href="css/style3.1.css" type="text/css" />
+
+
+      <script src="js/jquery.min.js" type="text/javascript"></script>
+
+      <script type="text/javascript">
+            $(document).ready(function () {
+                  function getParameterByName(name) {
+                        var url = window.location.href;
+                        name = name.replace(/[\[\]]/g, '\\$&');
+                        var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+                              results = regex.exec(url);
+                        if (!results) return null;
+                        if (!results[2]) return '';
+                        return decodeURIComponent(results[2].replace(/\+/g, ' '));
+                  }
+                  // Get the IDs from the current page's URL
+                  let prid = parseInt(getParameterByName('PRID'), 10);
+
+                  if (!isNaN(prid) && prid > 0) {
+                        $.ajax({
+                              type: "POST",
+                              url: "AjaxMethod.aspx/UpdatePRHitCount",
+                              async: false,
+                              data: JSON.stringify({ 'PermId': prid }),
+                              contentType: "application/json; charset=utf-8",
+                              dataType: "json",
+                              success: function (response) {
+                                    console.log(response);
+                              },
+                              error: function (error) {
+                                    console.log("Error in AJAX request", error);
+                              }
+                        });
+                  } else {
+                        console.log("Invalid parameters:", prid);
+                  }
+
+            });
+      </script>
+      <style type="text/css">
+            .table-responsive {
+                  width: 100%;
+                  overflow-x: auto;
+            }
+
+            .banner {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  background-color: #000;
+                  color: #fff;
+                  padding: 20px;
+            }
+
+            full-width {
+                  width: 100%;
+            }
+
+            .logo-left, .logo-center, .countdown {
+                  display: flex;
+                  align-items: center;
+            }
+
+                  .logo-left img, .logo-center img {
+                        height: 70px;
+                  }
+
+            .countdown {
+                  text-align: center;
+                  background-color: var(--dbim-text, #150202);
+                  border-radius: 10px;
+                  padding: 10px;
+                  border: 2px solid grey;
+            }
+
+            .firstnumber {
+                  color: #000000;
+                  position: absolute;
+                  top: 50px;
+                  right: 90px;
+                  font-size: 30px;
+            }
+
+            .secondnumber {
+                  position: absolute;
+                  color: #000000;
+                  right: 45px;
+                  top: 50px;
+                  font-size: 30px;
+            }
+
+            .countdown .days {
+                  font-size: 35px;
+                  color: gold;
+            }
+
+            .countdown p {
+                  margin: 0;
+            }
+
+            .countdown .text {
+                  font-size: 16px;
+            }
+
+            a {
+                  word-break: break-all;
+            }
+
+            iframe, img {
+                  max-width: 100%;
+            }
+
+            @media(max-width:1199px) {
+                  .firstnumber {
+                        top: 40px;
+                        right: 72px;
+                        font-size: 30px;
+                  }
+
+                  .secondnumber {
+                        right: 35px;
+                        top: 40px;
+                        font-size: 30px;
+                  }
+            }
+
+            @media(max-width:990px) {
+                  .firstnumber {
+                        top: 25px;
+                        right: 54px;
+                        font-size: 30px;
+                  }
+
+                  .secondnumber {
+                        right: 25px;
+                        top: 25px;
+                        font-size: 30px;
+                  }
+            }
+
+            @media(max-width:768px) {
+                  .countdown, .days {
+                        font-size: 12px !important;
+                  }
+
+
+                  .firstnumber {
+                        top: 25%;
+                        right: 8%;
+                        font-size: 30px;
+                  }
+
+                  .secondnumber {
+                        right: 4.5%;
+                        top: 25%;
+                        font-size: 30px;
+                  }
+            }
+
+            @media(max-width:475px) {
+                  .countdown, .days {
+                        font-size: 10px !important;
+                        top: 20%;
+                  }
+
+                  .bannerimgdiv {
+                        padding: 0 !important;
+                  }
+
+                  .bannerimg {
+                        width: 108% !important;
+                  }
+            }
+      </style>
+      <script type="text/javascript">
+            $(function () {
+                  $("[id*=printPDF]").click(function () {
+                        $("[id*=hfGridHtml]").val($("#PdfDiv").html());
+                  });
+            });
+            $(function () {
+                  $("[id*=printPDFEvent]").click(function () {
+                        $("[id*=hfGridHtml]").val($("#PdfDiv").html());
+                  });
+            });
+      </script>
+
+      
+
+      <link id="pibConsentCss" href="/css/consent.css?v=8" rel="stylesheet" type="text/css" /><link id="pibFontsCss" href="/css/fonts-noto.css?v=6" rel="stylesheet" type="text/css" /><link id="pibDbimCss" href="/css/dbim.css?v=1120" rel="stylesheet" type="text/css" /><meta property="og:title" content="ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે &#39;પેન્શન અદાલત&#39;" /><meta property="og:url" content="www.pib.gov.in/Pressreleaseshare.aspx?PRID=2326427" /><meta property="og:description" content="ટપાલ વિભાગ દ્વારા પેન્શન સંબંધિત ફરિયાદોના નિરાકરણ માટે પેન્શન અદાલત&#39;નું આયોજન કરવામાં આવી રહ્યું છે" /><meta property="og:image" content="https:/pib.gov.in/images/indian-emblem.png" />
+                                <script>!function(e){var n="https://s.go-mpulse.net/boomerang/";if("False"=="True")e.BOOMR_config=e.BOOMR_config||{},e.BOOMR_config.PageParams=e.BOOMR_config.PageParams||{},e.BOOMR_config.PageParams.pci=!0,n="https://s2.go-mpulse.net/boomerang/";if(window.BOOMR_API_key="C4E7H-KSCMC-422L4-W3EM5-U36MF",function(){function e(){if(!i){var e=document.createElement("script");e.id="boomr-scr-as",e.src=window.BOOMR.url,e.async=!0,o.parentNode.appendChild(e),i=!0}}function t(e){i=!0;var n,t,a,r,d=document,O=window;if(window.BOOMR.snippetMethod=e?"if":"i",t=function(e,n){var t=d.createElement("script");t.id=n||"boomr-if-as",t.src=window.BOOMR.url,BOOMR_lstart=(new Date).getTime(),e=e||d.body,e.appendChild(t)},!window.addEventListener&&window.attachEvent&&navigator.userAgent.match(/MSIE [67]\./))return window.BOOMR.snippetMethod="s",void t(o.parentNode,"boomr-async");a=document.createElement("IFRAME"),a.src="about:blank",a.title="",a.role="presentation",a.loading="eager",r=(a.frameElement||a).style,r.width=0,r.height=0,r.border=0,r.display="none",o.parentNode.appendChild(a);try{O=a.contentWindow,d=O.document.open()}catch(_){n=document.domain,a.src="javascript:var d=document.open();d.domain='"+n+"';void(0);",O=a.contentWindow,d=O.document.open()}if(n)d._boomrl=function(){this.domain=n,t()},d.write("<bo"+"dy onload='document._boomrl();'>");else if(O._boomrl=function(){t()},O.addEventListener)O.addEventListener("load",O._boomrl,!1);else if(O.attachEvent)O.attachEvent("onload",O._boomrl);d.close()}function a(e){window.BOOMR_onload=e&&e.timeStamp||(new Date).getTime()}if(!window.BOOMR||!window.BOOMR.version&&!window.BOOMR.snippetExecuted){window.BOOMR=window.BOOMR||{},window.BOOMR.snippetStart=(new Date).getTime(),window.BOOMR.snippetExecuted=!0,window.BOOMR.snippetVersion=12,window.BOOMR.url=n+"C4E7H-KSCMC-422L4-W3EM5-U36MF";var o=document.currentScript||document.getElementsByTagName("script")[0],i=!1,r=document.createElement("link");if(r.relList&&"function"==typeof r.relList.supports&&r.relList.supports("preload")&&"as"in r)window.BOOMR.snippetMethod="p",r.href=window.BOOMR.url,r.rel="preload",r.as="script",r.addEventListener("load",e),r.addEventListener("error",function(){t(!0)}),setTimeout(function(){if(!i)t(!0)},3e3),BOOMR_lstart=(new Date).getTime(),o.parentNode.appendChild(r);else t(!1);if(window.addEventListener)window.addEventListener("load",a,!1);else if(window.attachEvent)window.attachEvent("onload",a)}}(),"".length>0)if(e&&"performance"in e&&e.performance&&"function"==typeof e.performance.setResourceTimingBufferSize)e.performance.setResourceTimingBufferSize();!function(){if(BOOMR=e.BOOMR||{},BOOMR.plugins=BOOMR.plugins||{},!BOOMR.plugins.AK){var n=""=="true"?1:0,t="",a="fpy4edzl7kteq2wzx7ta-f-8a04256a2-clientnsv4-s.akamaihd.net",o="false"=="true"?2:1,i={"ak.v":"41","ak.cp":"1825201","ak.ai":parseInt("1215205",10),"ak.ol":"0","ak.cr":4,"ak.ipv":4,"ak.proto":"http/1.1","ak.rid":"a89827d","ak.r":39517,"ak.a2":n,"ak.m":"dscb","ak.n":"ff","ak.cport":58618,"ak.gh":"43.250.166.100","ak.quicv":"","ak.tlsv":"tls1.3","ak.0rtt":"","ak.0rtt.ed":"","ak.csrc":"-","ak.acc":"bbr","ak.t":"1792655334","ak.ak":"hOBiQwZUYzCg5VSAfCLimQ==806QOVGkL911G21IheVhr9GoKq7lFjto7NVIfQLz/HqqRCE8M6gWWJzzZt6Or27PiCbWqYsmp2B5U7FEjLzw1q7q0MgS5h+fZxpbsMIxQsCj/XMDiE2MZu+s3gg2zd+z5DOEC3WpGzeKyeQ7BpJHLjfBnySuWj8BoAG15WHrfKNY2Bi8+rkYQnAxSHQEea4uJ0SGSWCmGrnzzJ4Hrp0Z277xQx6vIaZwDAF7Pr2VsDh3fFUmXCU0uocXxXsEZzLwMfQnU+p1vVCScyQwNJusGH7Iuunos+bQHzsU6bOr01ZcQRcg9WUg+IErDYHwtmYkoKfLqNbDT7U5rKpHpEDM8O/l8B6savt1FRDZrFtZqWJG+hHxpvBHX7gDWiHA4vT1mM0xSoD7XbQXaqkgNzdb1JUQVF5XzQqF9SH5XwULHvg=","ak.pv":"9","ak.dpoabenc":"","ak.tf":o};if(""!==t)i["ak.ruds"]=t;var r={i:!1,av:function(n){var t="http.initiator";if(n&&(!n[t]||"spa_hard"===n[t]))i["ak.feo"]=void 0!==e.aFeoApplied?1:0,BOOMR.addVar(i)},rv:function(){var e=["ak.cport","ak.cr","ak.csrc","ak.gh","ak.ipv","ak.m","ak.n","ak.ol","ak.proto","ak.quicv","ak.tlsv","ak.0rtt","ak.0rtt.ed","ak.r","ak.acc","ak.t","ak.tf"];BOOMR.removeVar(e)}};BOOMR.plugins.AK={akVars:i,akDNSPreFetchDomain:a,init:function(){if(!r.i){var e=BOOMR.subscribe;e("before_beacon",r.av,null,null),e("onbeacon",r.rv,null,null),r.i=!0}return this},is_complete:function(){return!0}}}}()}(window);</script></head>
+<body>
+    
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"
+     style="position:absolute;width:0;height:0;overflow:hidden" id="dbim-icon-sprite">
+    <defs>
+        <symbol id="icon-angle-double-left" viewBox="0 0 24 24"><path d="M11.6 4.6 4.2 12l7.4 7.4 2.2-2.2L8.6 12l5.2-5.2z"/><path d="M19 4.6 11.6 12 19 19.4l2.2-2.2L16 12l5.2-5.2z"/></symbol>
+        <symbol id="icon-angle-double-right" viewBox="0 0 24 24"><path d="M12.4 4.6 10.2 6.8 15.4 12l-5.2 5.2 2.2 2.2L19.8 12z"/><path d="M5 4.6 2.8 6.8 8 12l-5.2 5.2L5 19.4 12.4 12z"/></symbol>
+        <symbol id="icon-arrow-left" viewBox="0 0 24 24"><path d="M20.8 10.6H9.6v2.8h11.2z"/><path d="M10.8 5.6 3.2 12l7.6 6.4z"/></symbol>
+        <symbol id="icon-arrow-right" viewBox="0 0 24 24"><path d="M3.2 10.6h11.2v2.8H3.2z"/><path d="M13.2 5.6 20.8 12l-7.6 6.4z"/></symbol>
+        <symbol id="icon-blogger" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M6.4 2.4h11.2a4 4 0 0 1 4 4v11.2a4 4 0 0 1-4 4H6.4a4 4 0 0 1-4-4V6.4a4 4 0 0 1 4-4zm2.8 5.2a2 2 0 0 0 0 4h2.4a2 2 0 0 0 0-4zm0 5.6a2 2 0 0 0 0 4h5.6a2 2 0 0 0 0-4z"/></symbol>
+        <symbol id="icon-calendar" viewBox="0 0 24 24"><path d="M7.6 2.4H10v2.4H7.6z"/><path d="M14 2.4h2.4v2.4H14z"/><path fill-rule="evenodd" d="M4 4.8h16a1.6 1.6 0 0 1 1.6 1.6v13.2a1.6 1.6 0 0 1-1.6 1.6H4a1.6 1.6 0 0 1-1.6-1.6V6.4A1.6 1.6 0 0 1 4 4.8zm.4 5.6v8.4h15.2v-8.4z"/><path d="M6.4 12.4h3.2v3.2H6.4z"/></symbol>
+        <symbol id="icon-chevron-left" viewBox="0 0 24 24"><path d="M15.4 4.6 8 12l7.4 7.4 2.2-2.2L12.4 12l5.2-5.2z"/></symbol>
+        <symbol id="icon-chevron-right" viewBox="0 0 24 24"><path d="M8.6 4.6 6.4 6.8 11.6 12l-5.2 5.2 2.2 2.2L16 12z"/></symbol>
+        <symbol id="icon-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></symbol>
+        <symbol id="icon-download" viewBox="0 0 24 24"><path d="M10.8 3h2.4v7.6h3.4L12 16.6l-4.6-6h3.4z"/><path d="M4 17.2h2.4v2.4h11.2v-2.4H20v3.2a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 20.4z"/></symbol>
+        <symbol id="icon-facebook" viewBox="0 0 24 24"><path d="M13.6 21.6v-8.4h2.8l.42-3.3h-3.22V7.8c0-.95.27-1.6 1.64-1.6h1.74V3.26a23 23 0 0 0-2.54-.13c-2.5 0-4.22 1.53-4.22 4.34v2.43H7.4v3.3h2.82v8.4z"/></symbol>
+        <symbol id="icon-fact-check" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.4 3.6 5.6v6.2c0 4.6 3.4 8.6 8.4 9.8 5-1.2 8.4-5.2 8.4-9.8V5.6zm-1 13.2-3.6-3.6 1.7-1.7 1.9 1.9 4.5-4.5 1.7 1.7z"/></symbol>
+        <symbol id="icon-hashtag" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M8.8 3h2.4l-1 6h3.2l1-6h2.4l-1 6h3.4v2.4h-3.8l-.6 3.2h3.6V17h-4l-1 5h-2.4l1-5h-3.2l-1 5H5.4l1-5H3V14.6h3.8l.6-3.2H3.8V9h4zm.6 8.4-.6 3.2h3.2l.6-3.2z"/></symbol>
+        <symbol id="icon-home" viewBox="0 0 24 24"><path d="M12 3.4 2.8 11.6h2.4v8.4a1 1 0 0 0 1 1h3.3v-5.4h5v5.4h3.3a1 1 0 0 0 1-1v-8.4h2.4z"/></symbol>
+        <symbol id="icon-instagram" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7.6 2.4h8.8a5.2 5.2 0 0 1 5.2 5.2v8.8a5.2 5.2 0 0 1-5.2 5.2H7.6a5.2 5.2 0 0 1-5.2-5.2V7.6a5.2 5.2 0 0 1 5.2-5.2zm0 2.4a2.8 2.8 0 0 0-2.8 2.8v8.8a2.8 2.8 0 0 0 2.8 2.8h8.8a2.8 2.8 0 0 0 2.8-2.8V7.6a2.8 2.8 0 0 0-2.8-2.8z"/><path fill-rule="evenodd" d="M12 6.8a5.2 5.2 0 1 0 0 10.4 5.2 5.2 0 0 0 0-10.4zm0 2.4a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/><circle cx="17.3" cy="6.7" r="1.3"/></symbol>
+        <symbol id="icon-linkedin" viewBox="0 0 24 24"><path d="M4.8 8.8h3.6v12H4.8z"/><circle cx="6.6" cy="5.4" r="2.1"/><path d="M10.8 8.8h3.45v1.65h.05c.48-.9 1.65-1.85 3.4-1.85 3.63 0 4.3 2.35 4.3 5.4v6.6h-3.6v-5.85c0-1.4-.03-3.2-1.95-3.2-1.95 0-2.25 1.52-2.25 3.1v5.95h-3.6z"/></symbol>
+        <symbol id="icon-mail" viewBox="0 0 24 24"><path d="M2.4 7.6v9.2a1.6 1.6 0 0 0 1.6 1.6h16a1.6 1.6 0 0 0 1.6-1.6V7.6L12 14z"/><path d="M21.2 5.4H2.8L12 11.8z"/></symbol>
+        <symbol id="icon-mail-open" viewBox="0 0 24 24"><path d="M2.4 9.8h19.2v9.6A1.6 1.6 0 0 1 20 21H4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M12 2.6 21.6 9.2h-3.8L12 5.3 6.2 9.2H2.4z"/><path d="m3.9 11.2 8.1 5.4 8.1-5.4 1.5 1.3-9.6 6.4-9.6-6.4z"/></symbol>
+        <symbol id="icon-map-marker" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.4a7 7 0 0 0-7 7c0 5.2 7 12.2 7 12.2s7-7 7-12.2a7 7 0 0 0-7-7zm0 9.6a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2z"/></symbol>
+        <symbol id="icon-newspaper" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2.8 4.4h14.8v15.2H2.8zm2 2v11.2h10.8V6.4z"/><path d="M6 7.6h8.4v1.6H6z"/><path d="M6 10.8h8.4v1.6H6z"/><path d="M6 14h5.2v1.6H6z"/><path d="M18.4 8.4h2.8v9.6a1.4 1.4 0 0 1-2.8 0z"/></symbol>
+        <symbol id="icon-pause" viewBox="0 0 24 24"><rect x="7.4" y="4" width="3.6" height="16" rx="0.9"/><rect x="13" y="4" width="3.6" height="16" rx="0.9"/></symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 4.5v15l12-7.5z"/></symbol>
+        <symbol id="icon-picture" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2.4 5.2h19.2v13.6H2.4zm2 2v9.6h15.2V7.2z"/><path d="M5.6 16.4 10 11l2.6 3 2-2.2 4 4.6z"/><circle cx="8" cy="10.4" r="1.5"/></symbol>
+        <symbol id="icon-press-conference" viewBox="0 0 24 24"><circle cx="12" cy="5.2" r="2.6"/><path d="M7.6 12.2a4.4 4.4 0 0 1 8.8 0z"/><circle cx="4.9" cy="9.6" r="2.2"/><path d="M1.8 15.2a3.1 3.1 0 0 1 6.2 0z"/><circle cx="19.1" cy="9.6" r="2.2"/><path d="M16 15.2a3.1 3.1 0 0 1 6.2 0z"/><path d="M6.6 13.6h10.8l2.2 7.8H4.4z"/></symbol>
+        <symbol id="icon-print" viewBox="0 0 24 24"><path d="M6.4 2.8h11.2v4.4H6.4z"/><path d="M4 8.4h16a1.6 1.6 0 0 1 1.6 1.6v5.6a1.6 1.6 0 0 1-1.6 1.6h-1.6v-2.8H6v2.8H4a1.6 1.6 0 0 1-1.6-1.6V10A1.6 1.6 0 0 1 4 8.4z"/><path d="M7.2 15.6h9.6v5.6H7.2z"/></symbol>
+        <symbol id="icon-rss" viewBox="0 0 24 24"><circle cx="4.8" cy="19.2" r="2.4"/><path d="M2.4 11.2v3.2a6.4 6.4 0 0 1 6.4 6.4H12A9.6 9.6 0 0 0 2.4 11.2z"/><path d="M2.4 4.8V8A13.6 13.6 0 0 1 16 21.6h3.2A16.8 16.8 0 0 0 2.4 4.8z"/></symbol>
+        <symbol id="icon-search-plus" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M10 2.8a7.2 7.2 0 1 0 0 14.4 7.2 7.2 0 0 0 0-14.4zm0 2.4a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6z"/><path d="M15.3 14.6 21.2 20.5l-1.5 1.5-5.9-5.9z"/><path d="M9.2 6.8h1.6v2.4h2.4v1.6h-2.4v2.4H9.2v-2.4H6.8V9.2h2.4z"/></symbol>
+        <symbol id="icon-share" viewBox="0 0 24 24"><circle cx="18" cy="5.6" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="18.4" r="3"/><path d="M8.3 10.9 15.7 7.2l.9 1.8-7.4 3.7z"/><path d="M9.2 13.1 16.6 16.8l-.9 1.8-7.4-3.7z"/></symbol>
+        <symbol id="icon-twitter" viewBox="0 0 24 24"><path d="M4.2 3h4.3l11.3 18h-4.3z"/><path d="M19.3 3h-2.6L4.2 21h2.6z"/></symbol>
+        <symbol id="icon-university" viewBox="0 0 24 24"><path d="M12 2.4 21.6 7.2v1.6H2.4V7.2z"/><path d="M4.8 10.4h2.4v8H4.8z"/><path d="M9.2 10.4h2.4v8H9.2z"/><path d="M13.4 10.4h2.4v8h-2.4z"/><path d="M17.6 10.4H20v8h-2.4z"/><path d="M3.2 19.8h17.6v1.8H3.2z"/></symbol>
+        <symbol id="icon-volume-up" viewBox="0 0 24 24"><path d="M3.2 9.2h3.3l5-4.2v14l-5-4.2H3.2z"/><path d="M14.6 8.4a5 5 0 0 1 0 7.2l1.6 1.6a7.2 7.2 0 0 0 0-10.4z"/><path d="M17.4 5.6a8.8 8.8 0 0 1 0 12.8l1.5 1.5a10.9 10.9 0 0 0 0-15.8z"/></symbol>
+        <symbol id="icon-whatsapp" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.4a9.5 9.5 0 0 0-8.1 14.5L2.4 21.6l4.8-1.4A9.5 9.5 0 1 0 12 2.4zm0 2.2a7.3 7.3 0 1 1-3.8 13.5l-.4-.2-2.6.7.7-2.5-.3-.4A7.3 7.3 0 0 1 12 4.6z"/><path d="M9.4 7.8c-.2-.5-.4-.5-.6-.5h-.5a1 1 0 0 0-.7.3c-.3.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.7 2.8 4.3 3.8 2.1.8 2.6.7 3 .6.5 0 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.5-.3-1.6-.8c-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6 6 0 0 1-1.8-1.1 6.6 6.6 0 0 1-1.2-1.6c-.1-.2 0-.4.1-.5l.4-.5.3-.5v-.5z"/></symbol>
+        <symbol id="icon-youtube" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M21.6 7.2a2.8 2.8 0 0 0-2-2C17.9 4.8 12 4.8 12 4.8s-5.9 0-7.6.4a2.8 2.8 0 0 0-2 2A29 29 0 0 0 2 12a29 29 0 0 0 .4 4.8 2.8 2.8 0 0 0 2 2c1.7.4 7.6.4 7.6.4s5.9 0 7.6-.4a2.8 2.8 0 0 0 2-2A29 29 0 0 0 22 12a29 29 0 0 0-.4-4.8zM10.2 15.1V8.9l5.1 3.1z"/></symbol>
+    </defs>
+</svg>
+
+      <form method="post" action="./PressReleaseIframePage.aspx?PRID=2326427&amp;reg=48&amp;lang=2" id="form1">
+<input type="hidden" name="sc_HiddenField" id="sc_HiddenField" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="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" />
+
+
+<script src="/ScriptResource.axd?d=x6wALODbMJK5e0eRC_p1LdIxBJXt0U_WW5GWfJqHAqo6frgCmGRfEywglicTersO2OKrFhK1gAIp0Wk2al2YrpdR3uWqH6f4nfjBsCyRUfTUUVmb0&amp;t=ffffffffecf8d3f2" type="text/javascript"></script>
+<script src="/PressReleaseIframePage.aspx?_TSM_HiddenField_=sc_HiddenField&amp;_TSM_CombinedScripts_=%3b%3bAjaxControlToolkit%2c+Version%3d3.5.7.123%2c+Culture%3dneutral%2c+PublicKeyToken%3d28f01b0e84b6d53e%3aen-US%3a5a4df314-b4a2-4da2-a207-9284f1b1e96c%3ade1feab2%3af2c8e708%3a8613aea7%3af9cec9bc%3a3202a5a2%3aab09e3fe%3a87104b7c%3a720a52bf%3a589eaa30%3aa67c2700%3abe6fb298" type="text/javascript"></script>
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="8166A38A" />
+<input type="hidden" name="__VIEWSTATEENCRYPTED" id="__VIEWSTATEENCRYPTED" value="" />
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="OK1I4oIS9SUIhit+Gp2maNGEBALOP/5RVb61XEIUvcelgkdyaU0AJ1IA6B2hWYFguT78FEtl99P9P9Dq2xy5FBWr++dewzKM/rZf1WWa3wRLX1UgCh7pxmUXf7W6Fm1xNtznOXk+U1D89yUaFHbdDQpi1Y+q3i+1pHyyQezWZpZCnZnZZOvLT0gjgLuy/t+KcOZap+mX7SjXMc95r0LSsM80cCv+Lxt1CA1qu3sasQHsbFjDorzdvOieDRUqZPQC09jAjsVEu0ggeXWkmx1VnkQX9zQ=" />
+                              
+            <div id="templateCss"></div>
+            
+            <input type="hidden" name="hfGridHtml" id="hfGridHtml" />
+            <div class="container" style='margin-bottom: 50px;'>
+                  <div id="accessories">
+
+                        
+                        <div class="pull-right" style="display: flex">
+                              <div id="voll"></div>
+                              <div id="vollDT"></div>
+                              
+                              
+
+<span class="print-icons">
+<input type="image" name="Print1$print" id="Print1_print" aria-label="Print" src="images/printer_icon.png" alt="print page button" style="padding: 5px 10px 5px 10px;" />
+</span>
+                        </div>
+                  </div>
+                  <input type="hidden" name="hydpermid" id="hydpermid" value="2326427" />
+                  
+
+
+
+                  <div class="innner-page-main-about-us-content-right-part">
+
+                        <div id="MinistryName" class="MinistryNameSubhead text-center">
+                              સંચાર અને સુચના પ્રૌદ્યોગિકી મંત્રાલય
+                        </div>
+                        
+                        <div id="lg_g"><div class='log_oo'>  <img src='https://static.pib.gov.in/WriteReadData/specificdocs/photo/2021/aug/ph202183101.png' alt='azadi ka amrit mahotsav' /> </div></div>
+
+
+
+
+
+                        <div class="text-center event-heading-background">
+                              
+                              <h1 id="Titleh2">
+                                    ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે 'પેન્શન અદાલત'
+                              </h1>
+                              <h3 id="Subtitleh3">
+                                    <span id="ltrSubtitle"></span>
+                              </h3>
+                        </div>
+
+                        <div id="PrDateTime" class="ReleaseDateSubHeaddateTime text-center pt20">
+                              प्रविष्टि तिथि:
+                22 OCT 2026 11:38AM by PIB Ahmedabad
+                        </div>
+                        
+                        <div class='pt20'>
+                        </div>
+                        <input type="hidden" name="hydphotoUrl" id="hydphotoUrl" />
+                        
+                        <p style="text-align:justify"><span style="font-family:Shruti">ટપાલ વિભાગ</span> <span style="font-family:Shruti">દ્વારા પેન્શન સંબંધિત ફરિયાદોના નિરાકરણ માટે પેન્શન અદાલત</span>&#39;<span style="font-family:Shruti">નું આયોજન કરવામાં આવી રહ્યું છે. આ પેન્શન અદાલત તારીખ </span>30-10-2026, <span style="font-family:Shruti">શુક્રવારના રોજ સવારે </span>11.00<span style="font-family:Shruti"> વાગ્યાથી</span>, <span style="font-family:Shruti">પોસ્ટમાસ્ટર જનરલની કચેરી</span>, <span style="font-family:Shruti">હેડ ક્વાર્ટર રીજન</span>, <span style="font-family:Shruti">સ્પીડ પોસ્ટ ભવન</span>, <span style="font-family:Shruti">શાહીબાગ</span>, <span style="font-family:Shruti">અમદાવાદ-</span>380004 <span style="font-family:Shruti">ખાતે યોજાશે.</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">પોસ્ટમાસ્ટર જનરલ દરેક પેન્શનરને વ્યક્તિગત રીતે સાંભળશે અને તેમની ફરિયાદોનું સ્થળ પર જ નિરાકરણ લાવશે. આ અદાલતનો મુખ્ય ઉદ્દેશ્ય પેન્શનરોને વ્યક્તિગત સુનાવણી પૂરી પાડવાનો અને તેમની સમસ્યાઓનું સ્થળ પર જ નિરાકરણ કરવાનો છે.</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">ટપાલ વિભાગના પેન્શનને લગતી ફરિયાદો </span>&#39;<span style="font-family:Shruti">વરિષ્ઠ હિસાબ અધિકારી</span>&rsquo;, <span style="font-family:Shruti">પેન્શન વિભાગ</span>, <span style="font-family:Shruti">પોસ્ટમાસ્ટર જનરલની કચેરી</span>, <span style="font-family:Shruti">હેડ ક્વાર્ટર રીજન</span>, <span style="font-family:Shruti">સ્પીડ પોસ્ટ ભવન</span>, <span style="font-family:Shruti">શાહીબાગ</span>, <span style="font-family:Shruti">અમદાવાદ-</span>380004&#39;<span style="font-family:Shruti">ના સરનામે મોકલવી. આ ફરિયાદો </span>26-10-2026<span style="font-family:Shruti"> (સોમવાર) સુધીમાં પહોંચી જવી જોઈએ. નિયત તારીખ પછી મળેલી ફરિયાદો સ્વીકારવામાં આવશે નહીં.</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">ફરિયાદો નક્કર અને સંક્ષિપ્ત હોવી જોઈએ. સામાન્ય સ્વરૂપની કે નીતિવિષયક બાબતોને લગતી ફરિયાદો સ્વીકારવામાં આવશે નહીં. વધુમાં</span>, <span style="font-family:Shruti">એક અરજીમાં એકથી વધુ મુદ્દા કે વિષય હોવા જોઈએ નહીં</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">ફરિયાદો ફરિયાદી દ્વારા વ્યક્તિગત રીતે અથવા પેન્શનરના પરિવારના સભ્ય દ્વારા રજૂ કરવામાં આવશે.</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">વધુમાં</span>, <span style="font-family:Shruti">ડાયરેક્ટોરેટના પત્ર ક્રમાંક </span>44013<span style="font-family:Shruti">/</span>2<span style="font-family:Shruti">/</span>2010<span style="font-family:Shruti">-</span>Coord <span style="font-family:Shruti">તારીખ </span>25-03-2011<span style="font-family:Shruti">ના મુદ્દા ક્રમાંક </span>6.3<span style="font-family:Shruti"> મુજબ</span>, &lsquo;<span style="font-family:Shruti">સ્ટેન્ડિંગ કમિટી ઓફ વોલન્ટરી એજન્સીઝ</span>&#39; (SCOVA) <span style="font-family:Shruti">ના અધિકૃત પ્રતિનિધિઓ અને માન્ય ટ્રેડ યુનિયનો/પેન્શનર એસોસિએશનોને પણ પેન્શન અદાલતમાં હાજર રહેવા માટે આમંત્રિત કરી શકાય છે</span>; <span style="font-family:Shruti">પરંતુ તેમને પેન્શનરોની ફરિયાદો રજૂ કરવાની પરવાનગી આપવામાં આવશે નહીં.</span></p>
+
+<p style="text-align:center"><span style="font-family:Shruti">*****</span></p>
+
+<p style="text-align:center">સોશિયલ મીડિયા પર અમને ફોલો કરો : &nbsp;<img src="http://static.pib.gov.in/WriteReadData/userfiles/image/Twitter-iconI0HR.jpg" style="height:20px; width:20px" /><a href="https://twitter.com/PIBAhmedabad" target="_blank">@PIBAhmedabad</a>&nbsp;&nbsp;&nbsp;<img alt="Image result for facebook icon" src="http://static.pib.gov.in/WriteReadData/userfiles/image/fbO3SQ.jpg" style="height:20px; width:20px" />&nbsp;/pibahmedabad1964&nbsp; &nbsp;<img alt="" src="http://static.pib.gov.in/WriteReadData/userfiles/image/Instagram-IconX9CA.png" style="height:20px; width:20px" />&nbsp;<a href="https://www.instagram.com/pibahmedabad" target="_blank">/pibahmedabad</a>&nbsp;&nbsp;<a style='color:black;text-decoration:none;pointer-events:none;' href=pibahmedabad1964[at]gmail[dot]com"><img alt="" src="http://static.pib.gov.in/WriteReadData/userfiles/image/emailXG3L.jpg" style="height:22px; width:20px" />pibahmedabad1964[at]gmail[dot]com</a></p>
+
+
+                        
+                        <div id="reel_pic">
+                        </div>
+
+
+
+                        
+                        <br />
+                        <span id="ReleaseId">(रिलीज़ आईडी: 2326427)</span>
+                        <span id="lblViews">	आगंतुक पटल  : 14</span>
+                        <div>
+                              
+                        </div>
+                        
+
+                        <span id="lblRefPhoto"></span>
+
+                        <div class="BackgroundRelease">
+                              
+                        </div>
+                        <div>
+                              
+                        </div>
+                        <div class="ReleaseLang">इस विज्ञप्ति को इन भाषाओं में पढ़ें: 
+                        
+                                    
+                                    <a href='https://pib.gov.in/PressReleasePage.aspx?PRID=2326426' target="_blank">
+                                          English </a>
+                              
+                        </div>
+
+                        <div class="RelTag">
+                              <ul>
+                                    
+                              </ul>
+                        </div>
+                        <div class="clear">
+                        </div>
+                        <div id="RelLink" class="RelLink">
+                              <ul>
+                                    
+                                    
+                              </ul>
+                        </div>
+                        <center>
+                              
+                        </center>
+                  </div>
+
+                  <div id="update12">
+	
+                              
+                              <input type="hidden" name="Hidden" id="Hidden" />
+                              <div id="P_CategoryManagement" class="ModalWindow" style="display: none">
+		
+                                    <div>
+                                          <input type="image" name="btnClose" id="btnClose" src="images/close_flat_icon.png" />
+                                    </div>
+                                    <div id="description">
+                                    </div>
+                                    <div class="text-center">
+                                          <h2>
+                                                
+                                                <br>
+                                                
+                                          </h2>
+                                    </div>
+                                    <br />
+                                    <div class="clear">
+                                    </div>
+                                    
+                              
+	</div>
+                        
+</div>
+            </div>
+            
+            <div id="PdfDiv" style="display: none;">
+                  <table width="100%">
+                        <tr>
+                              <td style="font-weight: 200; text-align: center">
+                                    સંચાર અને સુચના પ્રૌદ્યોગિકી મંત્રાલય
+                                    <div style="height: 30px; width: 100%;">
+                                    </div>
+                                    <div style="font-weight: 200; text-align: center; font-size: 30px;">
+                                          ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે 'પેન્શન અદાલત'
+                                    </div>
+                                    <div style="height: 30px; width: 100%;">
+                                    </div>
+                                    <div style="font-weight: 200; text-align: center; font-size: 30px;">
+                                          
+                                    </div>
+                                    <div style="height: 30px; width: 100%;">
+                                    </div>
+                                    <div style="text-align: center; font-size: 14px;">
+                                          प्रविष्टि तिथि:
+                        22 OCT 2026 11:38AM by PIB Ahmedabad
+                                    </div>
+                                    <div style="height: 30px; width: 100%;">
+                                    </div>
+                                    <div style="font-weight: 200; text-align: left; font-size: 16px;">
+                                          <p style="text-align:justify"><span style="font-family:Shruti">ટપાલ વિભાગ</span> <span style="font-family:Shruti">દ્વારા પેન્શન સંબંધિત ફરિયાદોના નિરાકરણ માટે પેન્શન અદાલત</span>&#39;<span style="font-family:Shruti">નું આયોજન કરવામાં આવી રહ્યું છે. આ પેન્શન અદાલત તારીખ </span>30-10-2026, <span style="font-family:Shruti">શુક્રવારના રોજ સવારે </span>11.00<span style="font-family:Shruti"> વાગ્યાથી</span>, <span style="font-family:Shruti">પોસ્ટમાસ્ટર જનરલની કચેરી</span>, <span style="font-family:Shruti">હેડ ક્વાર્ટર રીજન</span>, <span style="font-family:Shruti">સ્પીડ પોસ્ટ ભવન</span>, <span style="font-family:Shruti">શાહીબાગ</span>, <span style="font-family:Shruti">અમદાવાદ-</span>380004 <span style="font-family:Shruti">ખાતે યોજાશે.</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">પોસ્ટમાસ્ટર જનરલ દરેક પેન્શનરને વ્યક્તિગત રીતે સાંભળશે અને તેમની ફરિયાદોનું સ્થળ પર જ નિરાકરણ લાવશે. આ અદાલતનો મુખ્ય ઉદ્દેશ્ય પેન્શનરોને વ્યક્તિગત સુનાવણી પૂરી પાડવાનો અને તેમની સમસ્યાઓનું સ્થળ પર જ નિરાકરણ કરવાનો છે.</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">ટપાલ વિભાગના પેન્શનને લગતી ફરિયાદો </span>&#39;<span style="font-family:Shruti">વરિષ્ઠ હિસાબ અધિકારી</span>&rsquo;, <span style="font-family:Shruti">પેન્શન વિભાગ</span>, <span style="font-family:Shruti">પોસ્ટમાસ્ટર જનરલની કચેરી</span>, <span style="font-family:Shruti">હેડ ક્વાર્ટર રીજન</span>, <span style="font-family:Shruti">સ્પીડ પોસ્ટ ભવન</span>, <span style="font-family:Shruti">શાહીબાગ</span>, <span style="font-family:Shruti">અમદાવાદ-</span>380004&#39;<span style="font-family:Shruti">ના સરનામે મોકલવી. આ ફરિયાદો </span>26-10-2026<span style="font-family:Shruti"> (સોમવાર) સુધીમાં પહોંચી જવી જોઈએ. નિયત તારીખ પછી મળેલી ફરિયાદો સ્વીકારવામાં આવશે નહીં.</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">ફરિયાદો નક્કર અને સંક્ષિપ્ત હોવી જોઈએ. સામાન્ય સ્વરૂપની કે નીતિવિષયક બાબતોને લગતી ફરિયાદો સ્વીકારવામાં આવશે નહીં. વધુમાં</span>, <span style="font-family:Shruti">એક અરજીમાં એકથી વધુ મુદ્દા કે વિષય હોવા જોઈએ નહીં</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">ફરિયાદો ફરિયાદી દ્વારા વ્યક્તિગત રીતે અથવા પેન્શનરના પરિવારના સભ્ય દ્વારા રજૂ કરવામાં આવશે.</span></p>
+
+<p style="text-align:justify"><span style="font-family:Shruti">વધુમાં</span>, <span style="font-family:Shruti">ડાયરેક્ટોરેટના પત્ર ક્રમાંક </span>44013<span style="font-family:Shruti">/</span>2<span style="font-family:Shruti">/</span>2010<span style="font-family:Shruti">-</span>Coord <span style="font-family:Shruti">તારીખ </span>25-03-2011<span style="font-family:Shruti">ના મુદ્દા ક્રમાંક </span>6.3<span style="font-family:Shruti"> મુજબ</span>, &lsquo;<span style="font-family:Shruti">સ્ટેન્ડિંગ કમિટી ઓફ વોલન્ટરી એજન્સીઝ</span>&#39; (SCOVA) <span style="font-family:Shruti">ના અધિકૃત પ્રતિનિધિઓ અને માન્ય ટ્રેડ યુનિયનો/પેન્શનર એસોસિએશનોને પણ પેન્શન અદાલતમાં હાજર રહેવા માટે આમંત્રિત કરી શકાય છે</span>; <span style="font-family:Shruti">પરંતુ તેમને પેન્શનરોની ફરિયાદો રજૂ કરવાની પરવાનગી આપવામાં આવશે નહીં.</span></p>
+
+<p style="text-align:center"><span style="font-family:Shruti">*****</span></p>
+
+<p style="text-align:center">સોશિયલ મીડિયા પર અમને ફોલો કરો : &nbsp;<img src="http://static.pib.gov.in/WriteReadData/userfiles/image/Twitter-iconI0HR.jpg" style="height:20px; width:20px" /><a href="https://twitter.com/PIBAhmedabad" target="_blank">@PIBAhmedabad</a>&nbsp;&nbsp;&nbsp;<img alt="Image result for facebook icon" src="http://static.pib.gov.in/WriteReadData/userfiles/image/fbO3SQ.jpg" style="height:20px; width:20px" />&nbsp;/pibahmedabad1964&nbsp; &nbsp;<img alt="" src="http://static.pib.gov.in/WriteReadData/userfiles/image/Instagram-IconX9CA.png" style="height:20px; width:20px" />&nbsp;<a href="https://www.instagram.com/pibahmedabad" target="_blank">/pibahmedabad</a>&nbsp;&nbsp;<a style='color:black;text-decoration:none;pointer-events:none;' href=pibahmedabad1964[at]gmail[dot]com"><img alt="" src="http://static.pib.gov.in/WriteReadData/userfiles/image/emailXG3L.jpg" style="height:22px; width:20px" />pibahmedabad1964[at]gmail[dot]com</a></p>
+
+                                    </div>
+                                    <div style="height: 30px; width: 100%;">
+                                    </div>
+                                    <div style="height: 30px; width: 100%;">
+                                    </div>
+                                    <div style="font-weight: 100; text-align: left; font-size: 16px;">
+                                          (रिलीज़ आईडी: 2326427)
+                                    </div>
+                                    <div style="height: 30px; width: 100%;">
+                                    </div>
+                              </td>
+                        </tr>
+                        <tr>
+                              <td style="font-weight: 200; text-align: center; font-size: 24px;"></td>
+                        </tr>
+                  </table>
+            </div>
+            <div class="clearfix">
+            </div>
+
+            
+
+            <div class="section1">
+                  <div id="frst_t">
+                        <div id="arr_rm"><div class='sticky-social_mb'><ul class='social_mb'><a href='http://www.facebook.com/share.php?u=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427' target='_blank'><li class='fb_b'   ></li></a><a href='https://twitter.com/intent/tweet?url=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427&text=ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે 'પેન્શન અદાલત'' target='_blank'><li class='twitter_r'  > </li></a><a href='https://api.whatsapp.com/send?text=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427' target='_blank'><li class='whatsapp_r'  ></li></a><a href='https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=&su=ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે 'પેન્શન અદાલત'&body=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427&ui=2&tf=1&pli=1' title='Share by Email' target='_blank'><li class='fa-envelope_r' ></li></a><a href='https://www.linkedin.com/shareArticle?mini=true&url=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427&title=ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે 'પેન્શન અદાલત'&summary=My%20favorite%20developer%20program&source=LinkedIn' target='_blank'><li class='fa-linkedin_r'  ></li></a></ul></div></div>
+                  </div>
+                  <div id="second_t">
+                        <div id="sndr_rm"><div class='sticky-social'><ul class='social'><a href='http://www.facebook.com/share.php?u=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427' target='_blank'><li class='fb_b'   ></li></a><a href='https://twitter.com/intent/tweet?url=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427&text=ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે 'પેન્શન અદાલત'' target='_blank'><li class='twitter_r'  > </li></a><a href='https://api.whatsapp.com/send?text=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427' target='_blank'><li class='whatsapp_r'  ></li></a><a href='https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=&su=ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે 'પેન્શન અદાલત'&body=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427&ui=2&tf=1&pli=1' title='Share by Email' target='_blank'><li class='fa-envelope_r' ></li></a><a href='https://www.linkedin.com/shareArticle?mini=true&url=https://pib.gov.in/PressReleasePage.aspx?PRID=2326427&title=ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે 'પેન્શન અદાલત'&summary=My%20favorite%20developer%20program&source=LinkedIn' target='_blank'><li class='fa-linkedin_r'  ></li></a></ul></div></div>
+                  </div>
+            </div>
+            <input type="hidden" name="ltrTitlee" id="ltrTitlee" value="ટપાલ વિભાગની પેન્શન સંબંધિત સમસ્યાઓના નિરાકરણ માટે &#39;પેન્શન અદાલત&#39;" />
+            <input type="hidden" name="ltrSubtitlee" id="ltrSubtitlee" />
+            <input type="hidden" name="ltrDescriptionn" id="ltrDescriptionn" value="&lt;p style=&quot;text-align:justify&quot;>&lt;span style=&quot;font-family:Shruti&quot;>ટપાલ વિભાગ&lt;/span> &lt;span style=&quot;font-family:Shruti&quot;>દ્વારા પેન્શન સંબંધિત ફરિયાદોના નિરાકરણ માટે પેન્શન અદાલત&lt;/span>&amp;#39;&lt;span style=&quot;font-family:Shruti&quot;>નું આયોજન કરવામાં આવી રહ્યું છે. આ પેન્શન અદાલત તારીખ &lt;/span>30-10-2026, &lt;span style=&quot;font-family:Shruti&quot;>શુક્રવારના રોજ સવારે &lt;/span>11.00&lt;span style=&quot;font-family:Shruti&quot;> વાગ્યાથી&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>પોસ્ટમાસ્ટર જનરલની કચેરી&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>હેડ ક્વાર્ટર રીજન&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>સ્પીડ પોસ્ટ ભવન&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>શાહીબાગ&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>અમદાવાદ-&lt;/span>380004 &lt;span style=&quot;font-family:Shruti&quot;>ખાતે યોજાશે.&lt;/span>&lt;/p>
+
+&lt;p style=&quot;text-align:justify&quot;>&lt;span style=&quot;font-family:Shruti&quot;>પોસ્ટમાસ્ટર જનરલ દરેક પેન્શનરને વ્યક્તિગત રીતે સાંભળશે અને તેમની ફરિયાદોનું સ્થળ પર જ નિરાકરણ લાવશે. આ અદાલતનો મુખ્ય ઉદ્દેશ્ય પેન્શનરોને વ્યક્તિગત સુનાવણી પૂરી પાડવાનો અને તેમની સમસ્યાઓનું સ્થળ પર જ નિરાકરણ કરવાનો છે.&lt;/span>&lt;/p>
+
+&lt;p style=&quot;text-align:justify&quot;>&lt;span style=&quot;font-family:Shruti&quot;>ટપાલ વિભાગના પેન્શનને લગતી ફરિયાદો &lt;/span>&amp;#39;&lt;span style=&quot;font-family:Shruti&quot;>વરિષ્ઠ હિસાબ અધિકારી&lt;/span>&amp;rsquo;, &lt;span style=&quot;font-family:Shruti&quot;>પેન્શન વિભાગ&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>પોસ્ટમાસ્ટર જનરલની કચેરી&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>હેડ ક્વાર્ટર રીજન&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>સ્પીડ પોસ્ટ ભવન&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>શાહીબાગ&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>અમદાવાદ-&lt;/span>380004&amp;#39;&lt;span style=&quot;font-family:Shruti&quot;>ના સરનામે મોકલવી. આ ફરિયાદો &lt;/span>26-10-2026&lt;span style=&quot;font-family:Shruti&quot;> (સોમવાર) સુધીમાં પહોંચી જવી જોઈએ. નિયત તારીખ પછી મળેલી ફરિયાદો સ્વીકારવામાં આવશે નહીં.&lt;/span>&lt;/p>
+
+&lt;p style=&quot;text-align:justify&quot;>&lt;span style=&quot;font-family:Shruti&quot;>ફરિયાદો નક્કર અને સંક્ષિપ્ત હોવી જોઈએ. સામાન્ય સ્વરૂપની કે નીતિવિષયક બાબતોને લગતી ફરિયાદો સ્વીકારવામાં આવશે નહીં. વધુમાં&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>એક અરજીમાં એકથી વધુ મુદ્દા કે વિષય હોવા જોઈએ નહીં&lt;/span>&lt;/p>
+
+&lt;p style=&quot;text-align:justify&quot;>&lt;span style=&quot;font-family:Shruti&quot;>ફરિયાદો ફરિયાદી દ્વારા વ્યક્તિગત રીતે અથવા પેન્શનરના પરિવારના સભ્ય દ્વારા રજૂ કરવામાં આવશે.&lt;/span>&lt;/p>
+
+&lt;p style=&quot;text-align:justify&quot;>&lt;span style=&quot;font-family:Shruti&quot;>વધુમાં&lt;/span>, &lt;span style=&quot;font-family:Shruti&quot;>ડાયરેક્ટોરેટના પત્ર ક્રમાંક &lt;/span>44013&lt;span style=&quot;font-family:Shruti&quot;>/&lt;/span>2&lt;span style=&quot;font-family:Shruti&quot;>/&lt;/span>2010&lt;span style=&quot;font-family:Shruti&quot;>-&lt;/span>Coord &lt;span style=&quot;font-family:Shruti&quot;>તારીખ &lt;/span>25-03-2011&lt;span style=&quot;font-family:Shruti&quot;>ના મુદ્દા ક્રમાંક &lt;/span>6.3&lt;span style=&quot;font-family:Shruti&quot;> મુજબ&lt;/span>, &amp;lsquo;&lt;span style=&quot;font-family:Shruti&quot;>સ્ટેન્ડિંગ કમિટી ઓફ વોલન્ટરી એજન્સીઝ&lt;/span>&amp;#39; (SCOVA) &lt;span style=&quot;font-family:Shruti&quot;>ના અધિકૃત પ્રતિનિધિઓ અને માન્ય ટ્રેડ યુનિયનો/પેન્શનર એસોસિએશનોને પણ પેન્શન અદાલતમાં હાજર રહેવા માટે આમંત્રિત કરી શકાય છે&lt;/span>; &lt;span style=&quot;font-family:Shruti&quot;>પરંતુ તેમને પેન્શનરોની ફરિયાદો રજૂ કરવાની પરવાનગી આપવામાં આવશે નહીં.&lt;/span>&lt;/p>
+
+&lt;p style=&quot;text-align:center&quot;>&lt;span style=&quot;font-family:Shruti&quot;>*****&lt;/span>&lt;/p>
+
+&lt;p style=&quot;text-align:center&quot;>સોશિયલ મીડિયા પર અમને ફોલો કરો : &amp;nbsp;&lt;img src=&quot;http://static.pib.gov.in/WriteReadData/userfiles/image/Twitter-iconI0HR.jpg&quot; style=&quot;height:20px; width:20px&quot; />&lt;a href=&quot;https://twitter.com/PIBAhmedabad&quot; target=&quot;_blank&quot;>@PIBAhmedabad&lt;/a>&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;img alt=&quot;Image result for facebook icon&quot; src=&quot;http://static.pib.gov.in/WriteReadData/userfiles/image/fbO3SQ.jpg&quot; style=&quot;height:20px; width:20px&quot; />&amp;nbsp;/pibahmedabad1964&amp;nbsp; &amp;nbsp;&lt;img alt=&quot;&quot; src=&quot;http://static.pib.gov.in/WriteReadData/userfiles/image/Instagram-IconX9CA.png&quot; style=&quot;height:20px; width:20px&quot; />&amp;nbsp;&lt;a href=&quot;https://www.instagram.com/pibahmedabad&quot; target=&quot;_blank&quot;>/pibahmedabad&lt;/a>&amp;nbsp;&amp;nbsp;&lt;a href=&quot;mailto:pibahmedabad1964@gmail.com&quot;>&lt;img alt=&quot;&quot; src=&quot;http://static.pib.gov.in/WriteReadData/userfiles/image/emailXG3L.jpg&quot; style=&quot;height:22px; width:20px&quot; />pibahmedabad1964@gmail.com&lt;/a>&lt;/p>
+" />
+            <script type="text/javascript">
+                  var mPlayer = document.getElementById("background_music");
+                  var mPlayAction = document.getElementById("playbutton");
+
+                  var isPlaying = false;
+
+                  function playAudio() {
+                        mPlayer.play();
+                        isPlaying = true;
+                        document.getElementById('stopA').style.display = "block";
+                        document.getElementById('playA').style.display = "none";
+                  }
+
+                  function pauseAudio() {
+                        mPlayer.pause();
+                        isPlaying = false;
+                        document.getElementById('playA').style.display = "block";
+                        document.getElementById('stopA').style.display = "none";
+                  }
+                  //function HandleAudio() {
+                  //    if (isPlaying == true) {
+                  //        //Playing already Pause it
+                  //        pauseAudio();
+                  //    } else {
+                  //        //Play the music
+                  //        playAudio();
+                  //    }
+                  //}
+            </script>
+            <script type="text/javascript">
+                  var synth = window.speechSynthesis;
+
+            
+                  function CleanHtml(html) {
+
+                        html = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+                        return html;
+                  }
+                  function stripHtml(html) {
+                        let tmp = document.createElement("DIV");
+                        tmp.innerHTML = CleanHtml(html);
+                        return tmp.textContent || tmp.innerText || "";
+                  }
+            </script>
+            <script type="text/javascript">
+                  $(document).ready(function () {
+                        //for responsive tables
+                        $("table").each(function () {
+                              if (!$(this).closest(".table-responsive").length) {
+                                    $(this).wrap("<div class='table-responsive'></div>");
+                              }
+                        });
+
+                        var width = $(window).width();
+                        if (width < 768) {
+
+                              // Extra Small Device
+                              document.getElementById('frst_t').style.display = "block";
+                              document.getElementById('second_t').style.display = "none";
+
+                        } else if (width < 991) {
+                              document.getElementById('frst_t').style.display = "block";
+                              document.getElementById('second_t').style.display = "none";
+                              // Small Device
+
+                        } else if (width < 1199) {
+                              document.getElementById('frst_t').style.display = "none";
+                              document.getElementById('second_t').style.display = "block";
+                              // Medium Device
+
+                        } else {
+                              document.getElementById('frst_t').style.display = "none";
+                              document.getElementById('second_t').style.display = "block";
+                              // Large Device
+
+                        }
+                  });
+            </script>
+            <script type="text/javascript">
+                  $(document).ready(function () {
+                        var width = $(window).width();
+                        if (width < 768) {
+
+                              // Extra Small Device
+                              document.getElementById('frst_t').style.display = "block";
+                              document.getElementById('second_t').style.display = "none";
+
+                        } else if (width < 991) {
+                              document.getElementById('frst_t').style.display = "block";
+                              document.getElementById('second_t').style.display = "none";
+                              // Small Device
+
+                        } else if (width < 1199) {
+                              document.getElementById('frst_t').style.display = "none";
+                              document.getElementById('second_t').style.display = "block";
+                              // Medium Device
+
+                        } else {
+                              document.getElementById('frst_t').style.display = "none";
+                              document.getElementById('second_t').style.display = "block";
+                              // Large Device
+
+                        }
+                  });
+            </script>
+            
+            <style type="text/css">
+                  @media print {
+                        .sticky-social, .sticky-social_mb, .pull-right, #printPDF {
+                              display: none !important;
+                        }
+                  }
+
+                  .f_vl {
+                        padding-right: 30px;
+                        font-size: 17px;
+                        cursor: pointer;
+                  }
+
+                  .log_oo {
+                        // width: 20%;
+                        display: flex;
+                        justify-content: space-between;
+                  }
+
+                        .log_oo img {
+                              width: 150px;
+                              /*width: 100%;
+                    height: auto;*/
+                        }
+
+                  .sticky-social_mb {
+                        position: fixed;
+                        bottom: 0px;
+                        padding: 0px;
+                        margin: 0px;
+                        width: 100%;
+                  }
+
+                  .social_mb {
+                        list-style: none;
+                        display: flex;
+                        width: 100%;
+                        margin-bottom: -8px;
+                  }
+
+                        .social_mb a {
+                              padding: 8px 0px;
+                              font-size: 30px;
+                              transition: all 0.8s ease-in-out;
+                              width: 20% !important;
+                              text-align: center;
+                        }
+            </style>
+            <style type="text/css">
+                  .section1 {
+                        position: relative;
+                        padding: 10px 0px;
+                        width: 100%;
+                  }
+
+
+
+                  .sticky-social {
+                        position: fixed;
+                        top: 20px;
+                        left: 0px;
+                        padding: 0px;
+                        margin: 0px;
+                  }
+
+                  .social {
+                        list-style: none;
+                  }
+
+                        .social a li {
+                              padding: 8px 12px;
+                              font-size: 25px;
+                              transition: all 0.8s ease-in-out;
+                        }
+
+                              .social a li:hover {
+                                    margin-right: -30px;
+                                    box-shadow: 2px 5px 10px grey;
+                              }
+
+                                    .social a li:hover .fa {
+                                          margin-left: 20px;
+                                    }
+
+                  .fb_b {
+                        /* background-color: var(--dbim-key, #0F5757);*/
+                        background-color: var(--dbim-key, #0F5757);
+                  }
+
+                  .twitter_r {
+                        /* background-color: rgb(29, 161, 242);*/
+                        background-color: var(--dbim-key, #0F5757);
+                  }
+
+                  .whatsapp_r {
+                        /* background-color: var(--dbim-key, #0F5757);*/
+                        background-color: var(--dbim-key, #0F5757);
+                  }
+
+                  .fa-envelope_r {
+                        /* background-color: var(--dbim-key, #0F5757);*/
+                        background-color: var(--dbim-key, #0F5757);
+                  }
+
+                  .fa-linkedin_r {
+                        background-color: var(--dbim-key, #0F5757);
+                  }
+            </style>
+            <style type="text/css">
+                  @media only screen and (max-device-width: 767px) {
+                        p span img {
+                              max-width: 90% !important;
+                              height: auto !important;
+                        }
+
+                        p img {
+                              max-width: 90% !important;
+                              height: auto !important;
+                        }
+
+                        h2 {
+                              font-size: var(--dbim-h2, 20px);   /* was 20px !important - the !important blocked A+/A- */
+                              font-weight: 600 !important;
+                        }
+
+                        h3 {
+                              font-size: var(--dbim-h3, 16px);   /* was 16px !important */
+                              font-weight: 600 !important;
+                        }
+                  }
+            </style>
+            <style type="text/css">
+                  /* === Film Roll Badge Styling(IFFI2025 countdown) === */
+                  .film-roll-badge {
+                        position: absolute;
+                        top:82%;
+                        right: 20px;
+                        width: 230px;
+                        height: 70px;
+                        background: repeating-linear-gradient( to right, var(--dbim-green-key, #0F5757) 0px, var(--dbim-green-key, #0F5757) 18px, var(--dbim-text, #150202) 18px, var(--dbim-text, #150202) 36px );
+                        border-top: 8px solid var(--dbim-green-key, #0F5757);
+                        border-bottom: 8px solid var(--dbim-green-key, #0F5757);
+                        border-radius: 8px;
+                        overflow: hidden;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+                        animation: moveFilm 8s linear infinite;
+                        z-index: 10;
+                  }
+
+                        /* film sprocket holes */
+                        .film-roll-badge::before,
+                        .film-roll-badge::after {
+                              content: "";
+                              position: absolute;
+                              width: 100%;
+                              height: 10px;
+                              background: repeating-linear-gradient( to right, var(--dbim-green-key, #0F5757) 0px, var(--dbim-green-key, #0F5757) 10px, #fff 10px, #fff 20px );
+                              left: 0;
+                              z-index: 2;
+                        }
+
+                        .film-roll-badge::before {
+                              top: -4px;
+                        }
+
+                        .film-roll-badge::after {
+                              bottom: -4px;
+                        }
+
+                  .film-roll-inner {
+                        position: relative;
+                        height: 100%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        animation: flicker 2s infinite ease-in-out;
+                  }
+
+                  .countdown-text {
+                        font-size: 1.3rem;
+                        font-weight: 700;
+                        color: #fff;
+                        text-shadow: 0 0 6px rgba(255, 255, 255, 0.4), 0 0 10px #000;
+                        white-space: nowrap;
+                  }
+
+                  /* === Animations === */
+                  @keyframes moveFilm {
+                        0% {
+                              background-position: 0 0;
+                        }
+
+                        100% {
+                              background-position: 120px 0;
+                        }
+                  }
+
+                  @keyframes flicker {
+                        0%, 100% {
+                              opacity: 1;
+                        }
+
+                        50% {
+                              opacity: 0.9;
+                        }
+
+                        25% {
+                              opacity: 0.95;
+                        }
+
+                        75% {
+                              opacity: 0.85;
+                        }
+                  }
+
+                  /* === Responsive Adjustments === */
+                  @media (max-width: 1500px) {
+                        .film-roll-badge {
+                              top: 68%;
+                              right: 18px;
+                              /* width: 220px; */
+                              height: 65px;
+                              font-size: 0.85rem;
+                        }
+
+                        .press-section {
+                              margin-top: 35px;
+                        }
+                  }
+
+                  @media (max-width: 992px) {
+                        .film-roll-badge {
+                              top: 52%;
+                              right: 10px;
+                               width: 200px; 
+                              height: 60px;
+                        }
+                  }
+
+                  @media (max-width: 768px) {
+                        .film-roll-badge {
+                              top: 56%;
+                              right: 10px;
+                               width: 124px; 
+                              height: 55px;
+                        }
+
+                        .countdown-text {
+                              font-size: 0.9rem;
+                        }
+                  }
+
+                  @media (max-width: 576px) {
+                        .film-roll-badge {
+                              top: 59%;
+                              right: 5px;
+                              /* width: 160px; */
+                              height: 50px;
+                        }
+
+                        .countdown-text {
+                              font-size: 0.85rem;
+                        }
+                  }
+            </style>
+                        <script type="text/javascript">
+                  const festivalStart = new Date("2025-11-20T00:00:00").getTime();
+                  const festivalEnd = new Date("2025-11-28T23:59:59").getTime();
+
+                  const countdownElement = document.getElementById("countdown");
+
+                  const interval = setInterval(() => {
+                        const now = new Date().getTime();
+
+                        // BEFORE FESTIVAL — show days + hours left
+                        if (now < festivalStart) {
+                              const diff = festivalStart - now;
+                              const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                              const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+                              countdownElement.innerHTML = `
+                ${days} Day${days !== 1 ? 's' : ''} 
+                ${hours} Hour${hours !== 1 ? 's' : ''} to go
+            `;
+
+                        }
+
+                        // DURING FESTIVAL — show 56th IFFI - Day X
+                        else if (now >= festivalStart && now <= festivalEnd) {
+                              const dayNumber = Math.floor((now - festivalStart) / (1000 * 60 * 60 * 24)) + 1;
+                              countdownElement.innerHTML = `56th IFFI - Day ${dayNumber}`;
+                        }
+
+                        // AFTER FESTIVAL — new message
+                        else {
+                              countdownElement.innerHTML = `✨ IFFI closes but never ends…`;
+
+                              // Width change logic
+                              const elements = document.querySelectorAll('.film-roll-badge');
+                              elements.forEach(el => el.style.width = "350px");
+
+                              clearInterval(interval);
+                        }
+
+                  }, 1000);
+            </script>
+
+      
+
+<script type="text/javascript">
+//<![CDATA[
+(function() {var fn = function() {$get("sc_HiddenField").value = '';Sys.Application.remove_init(fn);};Sys.Application.add_init(fn);})();Sys.Application.add_init(function() {
+    $create(Sys.Extended.UI.ModalPopupBehavior, {"BackgroundCssClass":"modalBackground","PopupControlID":"P_CategoryManagement","dynamicServicePath":"/PressReleaseIframePage.aspx","id":"mpe"}, null, null, $get("Hidden"));
+});
+//]]>
+</script>
+</form>
+      
+      
+
+<script type="application/json" id="pibConsentConfig">{"ga4Id":"G-Q414Y0X6EE,G-QJJ6LZ8LHV","policyUrl":"/CookiePolicy.aspx","text":{"bannerLabel":"कुकी सहमति","title":"इस वेबसाइट पर कुकीज़","body":"इस वेबसाइट को चलाने के लिए हम आवश्यक कुकीज़ का उपयोग करते हैं। आपके आने पर हम विश्लेषण कुकीज़ भी सेट करते हैं, ताकि हम देख सकें कि साइट का उपयोग कैसे हो रहा है और उसे बेहतर बना सकें - आप इन्हें नीचे या कभी भी कुकी नीति पृष्ठ से बंद कर सकते हैं। सोशल मीडिया सामग्री की कुकीज़ केवल आपकी अनुमति से ही सेट की जाती हैं।","policyLink":"हमारी कुकी नीति पढ़ें","accept":"सभी स्वीकार करें","reject":"वैकल्पिक अस्वीकार करें","customize":"अनुकूलित करें","prefsTitle":"कुकी प्राथमिकताएं","prefsIntro":"चुनें कि यह वेबसाइट कौन सी कुकीज़ सेट कर सकती है। आवश्यक कुकीज़ बंद नहीं की जा सकतीं क्योंकि उनके बिना साइट काम नहीं करती। विश्लेषण कुकीज़ तब तक चालू रहती हैं जब तक आप उन्हें बंद न करें। सोशल मीडिया कुकीज़ तब तक बंद रहती हैं जब तक आप अनुमति न दें। आप ये विकल्प कभी भी कुकी नीति पृष्ठ से बदल सकते हैं।","essentialName":"आवश्यक कुकीज़","essentialDesc":"साइट के कार्य करने के लिए आवश्यक। ये आपका सत्र, आपकी भाषा और क्षेत्र, आपके पाठ का आकार और रंग थीम याद रखती हैं, तथा फ़ॉर्म की सुरक्षा जांच सत्यापित करती हैं। ये हमेशा चालू रहती हैं।","analyticsName":"विश्लेषण कुकीज़","analyticsDesc":"ये हमें यह समझने में मदद करती हैं कि आगंतुक साइट का उपयोग कैसे करते हैं - कौन से पृष्ठ पढ़े जाते हैं और लोग कितनी देर रुकते हैं - ताकि इसे बेहतर बनाया जा सके। यह जानकारी ऐसे रूप में एकत्र की जाती है जो सीधे आपकी पहचान नहीं करती। आपके आने पर ये चालू रहती हैं; इन्हें यहां बंद करने पर ये रुक जाती हैं और पहले से सेट कुकीज़ हटा दी जाती हैं।","socialName":"सोशल मीडिया कुकीज़","socialDesc":"ये X, फेसबुक और यूट्यूब से एम्बेड की गई सामग्री, जैसे टाइमलाइन और वीडियो, द्वारा सेट की जाती हैं। ये प्लेटफ़ॉर्म इनका उपयोग विभिन्न वेबसाइटों पर आपको ट्रैक करने के लिए कर सकते हैं। ये तब तक बंद रहती हैं जब तक आप अनुमति न दें।","save":"प्राथमिकताएं सहेजें","cancel":"रद्द करें"}}</script>
+<script type="text/javascript" src='/js/consent.js?v=10'></script>
+
+<script type="text/javascript" src='/js/consent-embeds.js?v=10'></script>
+
+    
+</body>
+</html>

@@ -3,11 +3,13 @@
 //   node --experimental-strip-types --experimental-sqlite --no-warnings backend/src/cli.ts <command> [--date YYYY-MM-DD]
 //
 //   ingest   fetch the day's Gujarat Information Department releases
+//   pib      fetch the day's PIB releases (--lang gu, the default, or hi)
 //   rewrite  turn them into newspaper stories (OpenRouter), or use them as-is
+//   topup    translate PIB Hindi releases until the copy fills the paper (--force: even if it does)
 //   features add --count N evergreen feature articles (AI, no news, no
 //            numbers, kicked "વિશેષ લેખ") to a day short of copy
 //   build    plan and lay out the day's issue, check it, save it as a draft, print the PDF
-//   all      ingest + rewrite + build (what the 8 PM job runs)
+//   all      the whole day: PIB, rewrite, Hindi top-up, features if short, build (what 8 PM runs; --from STEP)
 //   publish  copy the built issue into web/public/issues for a website with
 //            no backend (--push commits and pushes it; --force if NOT READY;
 //            --keep N days on the site, 14 by default)
@@ -38,9 +40,21 @@ async function main() {
       log(`ingest ${date}: ${r.fetched} new, ${r.skipped} already stored, ${r.releases.length} in total`);
       break;
     }
+    case "pib": {
+      const { ingestPib } = await import("./ingest/pib.ts");
+      const lang = (flag("lang") ?? "gu") as "gu" | "hi";
+      const r = await ingestPib(store, date, lang, { log });
+      log(`pib ${lang} ${date}: ${r.listed} listed, ${r.fetched} new, ${r.skipped} already stored`);
+      break;
+    }
     case "rewrite": {
       const { rewriteDay } = await import("./editorial/rewrite.ts");
       await rewriteDay(store, date, { log, model: flag("model"), force: args.includes("--force") });
+      break;
+    }
+    case "topup": {
+      const { topUp } = await import("./editorial/translate.ts");
+      await topUp(store, date, { log, force: args.includes("--force") });
       break;
     }
     case "features": {
@@ -54,8 +68,8 @@ async function main() {
       break;
     }
     case "all": {
-      const { runDay } = await import("./build.ts");
-      await runDay(store, date, { log });
+      const { runPipeline } = await import("./pipeline.ts");
+      await runPipeline(store, date, { by: "cli", from: flag("from") as never, log });
       break;
     }
     case "publish": {
@@ -86,7 +100,7 @@ async function main() {
       return;
     }
     default:
-      log("usage: cli.ts ingest|rewrite|features|build|all|publish|serve|status [--date YYYY-MM-DD]");
+      log("usage: cli.ts ingest|pib|rewrite|topup|features|build|all|publish|serve|status [--date YYYY-MM-DD]");
       process.exitCode = 2;
   }
 }
