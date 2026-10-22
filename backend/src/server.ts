@@ -378,7 +378,10 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         return send(res, 200, { story: got.story, cost: got.cost });
       }
       if (parts[0] === "api" && parts[1] === "ads") {
-        if (req.method === "GET") return send(res, 200, store.ads(url.searchParams.get("date") ?? indiaNow().day));
+        if (req.method === "GET") {
+          const { standInsMovable } = await import("./layout/stories.ts");
+          return send(res, 200, standInsMovable(store.ads(url.searchParams.get("date") ?? indiaNow().day)));
+        }
         if (req.method === "POST") return send(res, 200, await bookAd(store, (await readJson(req)) as AdBooking));
         if (req.method === "DELETE" && parts[2]) {
           // a booking is a row per day it runs ("<id>@<date>")
@@ -478,7 +481,7 @@ async function bookAd(store: Store, b: AdBooking): Promise<{ booked: string[] }>
     const ads = store.ads(date);
     const { referenceAds } = await import("./layout/stories.ts");
     const standIns = new Set(referenceAds("").map((a) => a.id));
-    for (const a of ads) if (standIns.has(a.id)) store.db.prepare("delete from ads where id = ? and date = ?").run(a.id, date);
+    for (const a of ads) if (standIns.has(a.id) || a.url.startsWith("/chrome/ads/")) store.db.prepare("delete from ads where id = ? and date = ?").run(a.id, date);
     const ad: Ad = { id: `${id}`, date, page: b.page, x: 0, y: 0, width, height, url: `/media/ads/${file}`, pinned: false };
     store.db.prepare("insert or replace into ads (id, date, json) values (?, ?, ?)").run(`${id}@${date}`, date, JSON.stringify(ad));
   }
