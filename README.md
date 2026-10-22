@@ -3,18 +3,60 @@
 This software produces a complete, print-ready daily newspaper by itself. The first paper is **કેપિટલ ક્રાંતિ (Capital Kranti)**, a Gujarati daily from Gandhinagar. The engine is built so that other papers (Gujarati, English, Urdu) can be added as data, without code changes.
 
 Every night it:
-1. collects the day's Gujarat government press releases;
+1. collects the day's press releases from PIB (Gujarati, plus Hindi translated into Gujarati when the Gujarati ones don't fill the paper);
 2. has an AI model rewrite them as newspaper stories;
 3. lays out every page (masthead, stories, photos, ads, page headers and footer) with measured precision, in the paper's own Bharati Gopika fonts;
 4. runs a set of release checks;
 5. produces a print-ready PDF, plus page images for the website;
-6. waits for an editor to approve it.
+6. waits for an editor to approve it in the newsroom website, then publishes it.
 
 The rule throughout: **the AI makes the judgement calls, and the code does the measuring.** AI writes, shortens and reviews. Every position on the page is computed by measuring real text in Chromium (the same browser engine that prints the PDF), so the layout is exact, repeatable and costs nothing to compute.
 
 > **New here? Read `HANDOFF.md` first:** what the October 2026 session changed, where things stand, and the daily routine.
 >
 > **This README is the hand-over document.** It is written for someone (or a Claude Code cloud session) starting with no prior context: what exists, how it works, how to run it, and exactly what is left to do.
+
+---
+
+## Install the app
+
+The app runs on the paper's own computer. It is two parts, an **engine** that makes the paper and a **newsroom** website you work in, and both run on that computer only. One install sets up everything: Node.js and Git if they're missing, the app, its fonts, a **Capital Kranti** icon, starting at log-in, and waking the computer at 7:55 PM for the 8 PM run.
+
+### Windows
+1. Download the installer: open <https://github.com/smit061205/Newsletter/blob/main/windows/Install%20Capital%20Kranti.cmd>, click **Download raw file** (the download icon, top right of the file), and save it (to Downloads, say).
+2. Double-click **Install Capital Kranti.cmd**. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**.
+3. A window shows each step (a few minutes the first time). If Node.js or Git is missing it installs them with `winget` (the Windows app installer; if it's missing, install **App Installer** from the Microsoft Store and run the installer again). When asked, sign in to GitHub in the browser window that opens: that's for the Publish button.
+4. The newsroom opens in the browser. In **Settings** (સેટિંગ્સ), paste the OpenRouter key once.
+
+From then on, open **Capital Kranti** from the desktop or the Start menu. The app is in `%LOCALAPPDATA%\CapitalKranti`.
+
+Or, instead of steps 1 and 2, in **PowerShell**:
+```powershell
+irm https://raw.githubusercontent.com/smit061205/Newsletter/main/windows/install.ps1 -OutFile $env:TEMP\ck-install.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP\ck-install.ps1
+```
+
+**Updates:** `powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CapitalKranti\windows\launch.ps1" -Update`
+**If the PC sleeps through 8 PM:** turn on *Allow wake timers* (Control Panel → Power Options → Change plan settings → Change advanced power settings → Sleep).
+
+### macOS
+1. Open **Terminal** (Applications → Utilities → Terminal) and paste:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/smit061205/Newsletter/main/mac/install.sh -o /tmp/ck-install.sh && bash /tmp/ck-install.sh
+   ```
+   (Or download `mac/Install Capital Kranti.command` from the repository the same way as on Windows, then **right-click it → Open → Open**: macOS asks once for a file from the internet.)
+2. If Node.js 22 is missing it offers to install it with Homebrew, or opens the Node.js download page (install the macOS `.pkg`, then run step 1 again). If Git is missing, macOS offers its command-line tools: accept, then run step 1 again.
+3. It asks for your Mac password once, to wake the Mac at 7:55 PM (you can skip that and keep the Mac awake in the evening instead).
+4. The newsroom opens in the browser. In **Settings**, paste the OpenRouter key once.
+
+From then on, open **Capital Kranti** from your home folder's **Applications** (Finder → Go → Home → Applications). The app is in `~/Library/Application Support/CapitalKranti`.
+
+**Updates:** `node "$HOME/Library/Application Support/CapitalKranti/scripts/launch.mjs" --update`
+
+### After installing (both)
+- The newsroom is at <http://127.0.0.1:3000/newsroom> while the app runs. Every evening at 8 PM the paper makes itself; open **આજે / Today** to see it, fix anything in **પાનાં / Pages** or **લેખ / Stories**, then **Approve & Publish** and **Print PDF**. The editor's guide, in Gujarati and English: [`docs/NEWSROOM_GUIDE.md`](docs/NEWSROOM_GUIDE.md).
+- **Publish** pushes the issue to GitHub, which updates the website, using the GitHub sign-in from setup.
+- A fresh install starts with no past issues: the next run makes its first paper (or press **Run now** on Today).
+- Stop the app: `node scripts/launch.mjs --stop` in the app's folder (it starts again at the next log-in, or from the icon).
 
 ---
 
@@ -33,7 +75,7 @@ The rule throughout: **the AI makes the judgement calls, and the code does the m
 12. [Backend API, storage, nightly job](#12-backend-api-storage-nightly-job)
 13. [Website (frontend)](#13-website-frontend)
 14. [Tools, tests and the replica](#14-tools-tests-and-the-8-august-replica)
-15. [Remaining work, in detail](#15-remaining-work-in-detail-do-these-in-order)
+15. [Remaining work](#15-remaining-work)
 16. [Known issues and gotchas](#16-known-issues-and-gotchas)
 17. [Decisions already made (don't re-litigate)](#17-decisions-already-made-dont-re-litigate)
 18. [Glossary](#18-glossary)
