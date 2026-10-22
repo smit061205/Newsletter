@@ -459,24 +459,31 @@ export async function closeGaps(plan: PagePlan, ctx: {
   await detombstone();
 
   // under a line and a half still open under a story -- too little for a
-  // line of copy: taken up inside the story, the way a desk justifies a
-  // column vertically -- up to half a line more under the headline and
-  // under the sub-heading (the leading has had its 2% already)
-  for (const [i, p] of placed.entries()) {
+  // line of copy: a touch more under the headline and the sub-heading (at
+  // most 2.5pt each, so the header stays tight), and the rest above the
+  // story, round the rule under the one above it (pack.ts renderPlaced).
+  // Measured for every story first, so one's move doesn't feed another's.
+  const SPREAD = 2.5 * PT;
+  const open = placed.map((p) => room(p, placed, ads, band, extraBlocks) - p.module.height);
+  for (const [i, p] of [...placed.entries()]) {
     const mod = p.module;
-    const r = room(p, placed, ads, band, extraBlocks) - mod.height;
+    const r = open[i];
     if (r < 2 * PT || r >= 1.5 * pitch || !mod.headSize) continue;
     const id = mod.story.id;
     const isDeck = (e: Element) => e.id.startsWith(`${id}-d`);
     const isHead = (e: Element) => e.id.startsWith(`${id}-h`) || e.id.startsWith(`${id}-k`);
     const hasDeck = mod.elements.some(isDeck);
-    const each = Math.min(pitch / 2, hasDeck ? r / 2 : r);
-    const a = hasDeck ? each : 0; // under the headline (the deck moves down)
-    const b = hasDeck ? Math.min(pitch / 2, r - a) : each; // under the sub-heading (photo and body move down)
+    const a = hasDeck ? Math.min(SPREAD, r / 2) : 0; // under the headline (the deck moves down)
+    const b = Math.min(SPREAD, r - a); // under the sub-heading (photo and body move down)
+    // a story above sharing its columns: the rest goes between the two
+    const under = placed.some((q) => q !== p && Math.min(q.col + q.module.cols, p.col + p.module.cols) > Math.max(q.col, p.col)
+      && Math.abs(q.y + q.module.height + GAP.betweenStories - p.y) < 2);
+    const down = under ? r - a - b : 0;
     const shift = (e: Element, d: number): Element => (d === 0 || e.kind === "path" ? e : e.kind === "line" ? { ...e, y1: e.y1 + d, y2: e.y2 + d } : { ...e, y: e.y + d });
     const elements = mod.elements.map((e) => (isHead(e) ? e : isDeck(e) ? shift(e, a) : shift(e, a + b)));
-    placed[i] = { ...p, module: { ...mod, elements, height: mod.height + a + b } };
-    note(`  ${id}: ${((a + b) / PT).toFixed(1)}pt more under its headline and sub-heading (${(r / PT).toFixed(1)}pt was open under it)`);
+    placed[i] = { ...p, y: p.y + down, module: { ...mod, elements, height: mod.height + a + b } };
+    note(`  ${id}: ${(r / PT).toFixed(1)}pt open under it -- ${((a + b) / PT).toFixed(1)}pt in its header` +
+         (down ? `, ${(down / PT).toFixed(1)}pt above it at the rule` : ""));
   }
 
   // what's still open, for the white-space check
