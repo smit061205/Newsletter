@@ -1,0 +1,92 @@
+# The desktop app's installers: a .dmg for Macs (Apple silicon and Intel) and
+# a setup .exe for Windows, built here and attached to a GitHub Release.
+#   git tag v1.0.0 && git push origin v1.0.0      (or run it by hand: a test build)
+# The app checks the latest Release for updates, so a tagged build reaches the
+# paper's computer by itself.
+name: release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14      # Apple silicon
+            arch: arm64
+          - os: macos-13      # Intel
+            arch: x64
+          - os: windows-latest
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: The engine and the newsroom
+        shell: bash
+        run: |
+          npm ci --no-audit --no-fund
+          npx tsc --noEmit -p backend
+          npm run build --prefix web
+          # Chromium for laying out pages, inside the packages (the app carries it)
+          PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium
+          # nothing the app doesn't need
+          npm prune --omit=dev --no-audit --no-fund
+      - name: The version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        working-directory: desktop
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+      - name: Gather what the app carries
+        run: node desktop/stage.mjs
+      - name: The app starts the engine and the newsroom inside Electron's own Node
+        shell: bash
+        working-directory: desktop
+        env:
+          ELECTRON_RUN_AS_NODE: "1"
+          DATA_DIR: ${{ runner.temp }}/ck-app
+          PLAYWRIGHT_BROWSERS_PATH: "0"
+          CK_PUBLICATION: dev-test
+        run: |
+          npm install --no-audit --no-fund
+          E=$(node -p "require('electron')")
+          cd app-engine
+          "$E" --experimental-strip-types --experimental-sqlite --no-warnings backend/src/cli.ts serve --port 4000 &
+          for i in $(seq 60); do curl -fsS http://127.0.0.1:4000/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:4000/api/status
+          (cd web && NEWSROOM=1 "$E" node_modules/next/dist/bin/next start --port 3000 --hostname 127.0.0.1 2>/dev/null || NEWSROOM=1 "$E" ../node_modules/next/dist/bin/next start --port 3000 --hostname 127.0.0.1) &
+          for i in $(seq 90); do curl -fsS -o /dev/null http://127.0.0.1:3000/newsroom && break; sleep 1; done
+          curl -fsS -o /dev/null -w "newsroom %{http_code}\n" http://127.0.0.1:3000/newsroom
+          kill $(jobs -p) || true
+      - name: Build the installer
+        shell: bash
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # the "Connect the website" sign-in, when the repository has one (README)
+          CK_GITHUB_CLIENT_ID: ${{ vars.CK_GITHUB_CLIENT_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          node -e "const f='main.js',s=require('fs');s.writeFileSync(f,s.readFileSync(f,'utf8').replace('process.env.CK_GITHUB_CLIENT_ID || \"\"',JSON.stringify(process.env.CK_GITHUB_CLIENT_ID||'')))"
+          if [ "${{ runner.os }}" = "macOS" ]; then A="--mac --${{ matrix.arch }}"; else A="--win --x64"; fi
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then P=always; else P=never; fi
+          npx electron-builder $A --publish $P
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capital-kranti-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/*.exe
+            desktop/dist/*.yml
+          if-no-files-found: error

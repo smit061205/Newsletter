@@ -3,46 +3,61 @@
 
 ## એક વખત: સ્થાપના (Once: setting it up)
 
-**Windows:** `windows\Install Capital Kranti.cmd` પર ડબલ-ક્લિક કરો. *(Double-click it.)*
-**Mac:** `mac/Install Capital Kranti.command` પર ડબલ-ક્લિક કરો.
+**Releases** પાના પરથી એપ લો: <https://github.com/smit061205/Newsletter/releases/latest>
+*Get the app from the Releases page.*
 
-સ્થાપના દરમિયાન *(During setup)*:
-1. તે Node.js અને Git લાવે છે (જો ન હોય તો). *It installs Node.js and Git if they're missing.*
-2. **ગોપિકા ફોન્ટવાળું ફોલ્ડર** પસંદ કરવાનું કહે છે. *It asks for the folder with the Gopika fonts.*
-3. GitHub માં એક વખત સાઇન ઇન કરવાનું કહે છે (વેબસાઇટ પર પ્રકાશન માટે). *It asks you to sign in to GitHub once, for the Publish button.*
-4. ડેસ્કટોપ પર **Capital Kranti** બનાવે છે અને ન્યૂઝરૂમ ખોલે છે. *It puts **Capital Kranti** on the desktop and opens the newsroom.*
+- **Mac:** `.dmg` ખોલો, **Capital Kranti** ને **Applications** પર ખેંચો. પહેલી વાર: જમણું-ક્લિક → **Open** → **Open**.
+  *Open the `.dmg` and drag **Capital Kranti** onto **Applications**. The first time: right-click → **Open** → **Open**.*
+- **Windows:** `Capital-Kranti-Setup-….exe` ખોલો → Next → Install → Finish. "Windows protected your PC" દેખાય તો **More info → Run anyway**.
+  *Open the setup, then Next → Install → Finish. If Windows warns, click **More info → Run anyway**.*
 
-પછી ન્યૂઝરૂમમાં **સેટિંગ્સ** માં OpenRouter key એક વખત નાખો. *Then, in the newsroom's **Settings**, paste the OpenRouter key once.*
+પહેલી વાર ખોલતાં ચાર સરળ પગલાં આવે છે: ભાષા, OpenRouter key, છાપું બનાવવાનો સમય, અને "બધું તૈયાર".
+*The first time it opens, four short screens ask for the language, the OpenRouter key and the time to make the paper, then say "All set".*
+
+એપ પોતે Dock માં આવે છે અને કમ્પ્યુટર ચાલુ થતાં શરૂ થાય છે. વેબસાઇટ પર પ્રકાશન માટે: **સેટિંગ્સ → વેબસાઇટ સાથે જોડો** (એક વખત).
+*The app puts itself in the Dock and starts when the computer does. For publishing to the website: **Settings → Connect the website** (once).*
 
 ## દરરોજ (Every day)
 
-કમ્પ્યુટર ચાલુ રાખો: **રાત્રે 8 વાગ્યે** પેપર આપમેળે બને છે. *Leave the computer on: the paper makes itself at **8 PM**.*
+કમ્પ્યુટર ચાલુ રાખો: **રાત્રે 8 વાગ્યે** છાપું આપમેળે બને છે, અને તૈયાર થાય ત્યારે સૂચના આવે છે. બારી બંધ કરો તો પણ એપ ઉપરના મેનુ બાર (Windows માં નીચે જમણે) માં ચાલતી રહે છે.
+*Leave the computer on: the paper makes itself at **8 PM**, and a notification says when it's ready. Closing the window keeps the app running in the menu bar (bottom right on Windows).*
 
-1. **Capital Kranti** ખોલો → **આજે (Today)**. પાંચેય પગલાં "થયું" બતાવે એટલે પેપર તૈયાર.
-   *Open **Capital Kranti** → **Today**. When all five steps say "done", the paper is ready.*
-2. **પાનાં (Pages)** માં ચાર પાનાં જુઓ. કોઈ સમાચાર પર ક્લિક કરો તો તે સુધારી શકાય.
-   *Look over the four pages in **Pages**. Click a story to edit it.*
-3. **લેખ (Stories)**: શીર્ષક, લેખ, ફોટો કે મહત્વ બદલો, અથવા સમાચાર કાઢી નાખો. દરેક ફેરફાર પછી પાનાં ફરી ગોઠવાય છે (થોડી મિનિટ).
-   *In **Stories**, change a headline, the text, the photo or the rank, or leave a story out. The pages are laid out again after each change (a few minutes).*
-   "From Hindi" લખેલા સમાચાર હિન્દીમાંથી અનુવાદિત છે: બાજુમાં મૂળ હિન્દી દેખાય છે. *Stories marked "From Hindi" were translated; the Hindi original is shown beside them.*
-4. **આજે (Today)** → **મંજૂર કરી પ્રકાશિત કરો**: વેબસાઇટ પર પેપર મુકાય છે. **PDF છાપવા માટે**: પ્રિન્ટર માટેની ફાઇલ.
-   *Back in **Today**: **Approve & Publish** puts the paper on the website. **Print PDF** is the file for the printer.*
+1. **આજે (Today)**: છાપું બનતું હોય ત્યારે ટકાવારી અને બાકી મિનિટ દેખાય છે. તૈયાર થાય એટલે "છાપું તૈયાર છે".
+   *While the paper is being made you see the percentage and the minutes left. When it's done: "The paper is ready".*
+2. "જોવા જેવી બાબતો" હોય તો **જોવા જેવી બાબતો જુઓ**: એક પછી એક, દરેકમાં સુધારો કે "બરાબર છે".
+   *If there are "Things to look at", press **Look at them**: one at a time, fix each or mark it fine.*
+3. **છાપું (Paper)**: પાનાં જુઓ. કોઈ સમાચાર પર ક્લિક કરો તો બાજુમાં સુધારવાનું ખૂલે છે: શીર્ષક, લખાણ, ફોટો, મહત્વ. **સાચવો** પછી પાનાં ફરી ગોઠવાય છે. **છાપામાંથી કાઢો** પછી તરત **પાછું** પણ કરી શકાય.
+   *In **Paper**, look over the pages. Click a story to edit it in the side panel (headline, text, photo, importance). After **Save** the pages are laid out again. **Leave out** can be undone straight away.*
+   "હિન્દીમાંથી" લખેલા સમાચાર અનુવાદિત છે: મૂળ હિન્દી રિલીઝ સાથે દેખાય છે. *Stories marked "From Hindi" were translated; the Hindi original is shown with them.*
+4. **આજે** → **પ્રકાશિત કરો**: વેબસાઇટ પર છાપું મુકાય છે. **PDF છાપવા માટે**: એપમાં જ ખૂલે છે, ત્યાંથી છાપો કે નકલ સાચવો, અને **← પાછા** થી ન્યૂઝરૂમમાં.
+   *Back in **Today**, **Publish** puts the paper on the website. **Print PDF** opens inside the app: print it or save a copy there, then **← Back** to the newsroom.*
+
+**પહેલું પાનું:** કોઈ સમાચાર આખી પહોળાઈ નથી લેતા. જરૂર હોય તો એ સમાચારમાં **પહેલા પાને આખી પહોળાઈ આપવા દો** ચાલુ કરો.
+*The front page: no story runs the full width unless you allow it with **Allow full width on the front page** in that story.*
 
 ## જાહેરાત (Ads)
 
-**જાહેરાત (Ads)**: જાહેરાતની છબી, પહોળાઈ (કૉલમ), ઊંચાઈ (સેમી), પાનું અને તારીખો આપી **બુક કરો**.
-*Choose the ad image, its width in columns, height in cm, the page and the dates, then **Book it**.*
+**જાહેરાત (Ads)**: છબી, પહોળાઈ (કૉલમ), ઊંચાઈ (સેમી), પાનું અને તારીખો આપી **જાહેરાત બુક કરો**.
+*Choose the image, its width in columns, height in cm, the page and the dates, then **Book the ad**.*
+
+## જૂના અંક (Past issues)
+
+દરેક દિવસનું છાપું: અંક નંબર, ખર્ચ (રૂપિયામાં), ફરી ખોલો, ફરી છાપો કે ફરી પ્રકાશિત કરો.
+*Every day's paper: its issue number and cost (in rupees). Open it again, print it again or publish it again.*
 
 ## કંઈ ખોટું થાય તો (If something goes wrong)
 
 | જોવા મળે છે *(You see)* | કરો *(Do)* |
 |---|---|
-| "The Capital Kranti engine isn't answering" | ડેસ્કટોપ પરથી **Capital Kranti** ખોલો, કે કમ્પ્યુટર ફરી શરૂ કરો. *Open the app, or restart the computer.* |
-| એક પગલું "અટક્યું" *(a step says "failed")* | **Retry** દબાવો. *Press Retry.* PIB બંધ હોય તો થોડી વાર પછી. *If PIB is down, later.* |
-| "તપાસ બાકી · Needs a look" | **પાનાં** માં જુઓ. ઠીક લાગે તો **તો પણ પ્રકાશિત કરો**. *Look at the pages; if they're fine, Publish anyway.* |
-| 8 વાગ્યે પેપર ન બન્યું *(no paper at 8 PM)* | કમ્પ્યુટર બંધ/સ્લીપમાં હતું: **હમણાં ચલાવો (Run now)**. *The computer was off or asleep: press Run now.* |
+| "એન્જિન જવાબ નથી આપતું" *(the engine isn't answering)* | થોડી સેકંડ રાહ જુઓ: એપ પોતે ફરી શરૂ કરે છે. નહીં તો એપ બંધ કરી ફરી ખોલો. *Wait a few seconds: the app restarts it. If not, quit and open the app again.* |
+| "PIB જવાબ નથી આપતું" *(PIB isn't answering)* | કંઈ ન કરો: દર 10 મિનિટે ફરી પ્રયત્ન થાય છે. *Nothing: it tries again every 10 minutes.* |
+| છાપું બનાવતાં અટક્યું *(making the paper stopped)* | **ફરી પ્રયત્ન કરો**. *Press **Try again**.* |
+| 8 વાગ્યે છાપું ન બન્યું *(no paper at 8 PM)* | કમ્પ્યુટર બંધ કે સ્લીપમાં હતું: **છાપું હમણાં બનાવો**. સેટિંગ્સમાં **સાંજે કમ્પ્યુટર જગાડો** ચાલુ કરો. *The computer was off or asleep: press **Make the paper now**, and turn on **Wake the computer in the evening** in Settings.* |
 
-**નવી આવૃત્તિ (Updates):** Windows: `windows\launch.ps1 -Update`; Mac: `node scripts/launch.mjs --update` (in the app's folder).
-**બેકઅપ (Backups):** દરરોજ આપમેળે, `backups` ફોલ્ડરમાં (છેલ્લા 30 દિવસ). *Every day, automatically, in the `backups` folder (the last 30 days).*
+**નવી આવૃત્તિ (Updates):** આપમેળે. "નવી આવૃત્તિ તૈયાર છે" દેખાય ત્યારે **Restart to update**. તમારાં છાપાં અને સેટિંગ્સ જેમ છે તેમ રહે છે.
+*Automatic: when "A new version is ready" appears, press **Restart to update**. Your issues and settings stay as they are.*
 
-**સમાચાર ક્યાંથી? (Where the news comes from):** PIB અમદાવાદના ગુજરાતી પ્રેસ રિલીઝ; તે ઓછા હોય ત્યારે PIB દિલ્હીના હિન્દી રિલીઝ, ગુજરાતીમાં અનુવાદ કરીને. *PIB Ahmedabad's Gujarati releases; when those don't fill the paper, PIB Delhi's Hindi releases, translated into Gujarati.*
+**કાઢી નાખવું (Uninstall):** Mac: મેનુ **Capital Kranti → Uninstall…**. Windows: Settings → Apps → Capital Kranti → Uninstall. જૂના અંક રાખવા કે નહીં તે પૂછે છે.
+*Mac: menu **Capital Kranti → Uninstall…**. Windows: Settings → Apps → Capital Kranti → Uninstall. It asks whether to keep the past issues.*
+
+**સમાચાર ક્યાંથી? (Where the news comes from):** PIB અમદાવાદની ગુજરાતી પ્રેસ રિલીઝ; તે ઓછી હોય ત્યારે PIB દિલ્હીની હિન્દી રિલીઝ, ગુજરાતીમાં અનુવાદ કરીને. *PIB Ahmedabad's Gujarati releases; when those don't fill the paper, PIB Delhi's Hindi releases, translated into Gujarati.*

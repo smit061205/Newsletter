@@ -9,7 +9,7 @@ import styles from "./newsroom.module.css";
 const gujarati = Anek_Gujarati({ subsets: ["gujarati", "latin"], weight: ["400", "500", "600", "700"], variable: "--nr-gu" });
 const latin = Geist({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--nr-latin" });
 
-export const metadata: Metadata = { title: "Capital Kranti", icons: { icon: "/newsroom-icon.svg" } };
+export const metadata: Metadata = { title: "Capital Kranti", icons: { icon: "/newsroom-icon.png" } };
 
 // The newsroom runs only on the paper's own computer (the Capital Kranti app
 // sets NEWSROOM=1); on the public website it doesn't exist.

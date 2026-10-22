@@ -6,6 +6,7 @@ import { useState } from "react";
 import { call } from "../api";
 import { useStatus } from "../Shell";
 import s from "../newsroom.module.css";
+import { useDesktop } from "../ui/desktop";
 import { Button, Icon, Mark, Note, useApp } from "../ui/kit";
 
 export default function Welcome() {
@@ -17,11 +18,15 @@ export default function Welcome() {
   const [runAt, setRunAt] = useState(status?.runAt ?? "20:00");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [wake, setWake] = useState(true);
+  const { info: desktop } = useDesktop();
 
   const finish = async (makeNow: boolean) => {
     setBusy(true);
     try {
       await call("/api/settings", { json: { onboarded: true, runAt } });
+      // the app wakes the computer before the run (macOS asks for the password once)
+      if (desktop && wake) await (window as unknown as { ck: { scheduleWake(t: string): Promise<string> } }).ck.scheduleWake(runAt).catch(() => {});
       if (makeNow) await call("/api/jobs", { json: { date } }).catch(() => {});
       refresh();
       router.replace("/newsroom");
@@ -66,6 +71,7 @@ export default function Welcome() {
             <h1 className={s.welcomeTitle}>{t("welcome.3.title")}</h1>
             <p className={s.muted}>{t("welcome.3.body")}</p>
             <input className={`${s.input} ${s.headlineInput}`} type="time" value={runAt} onChange={(e) => setRunAt(e.target.value)} style={{ maxWidth: 180 }} aria-label={t("welcome.3.title")} />
+            {desktop && desktop.platform !== "linux" && <label className={s.switch}><input type="checkbox" checked={wake} onChange={(e) => setWake(e.target.checked)} /><span>{t("settings.wake.body")}</span></label>}
             <Button kind="primary" big onClick={() => setStep(3)}>{t("welcome.next")}</Button>
           </>
         )}

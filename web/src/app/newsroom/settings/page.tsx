@@ -7,6 +7,7 @@ import { call, type Settings } from "../api";
 import { useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { num } from "../ui/format";
+import { ConnectCard, WakeCard } from "../ui/desktop";
 import { Button, Note, Skeleton, useApp } from "../ui/kit";
 
 export default function SettingsPage() {
@@ -50,6 +51,8 @@ export default function SettingsPage() {
           <label className={s.switch}><input type="checkbox" checked={x.notify} onChange={(e) => save({ notify: e.target.checked })} /><span>{t("settings.notify")}</span></label>
         </section>
 
+        <WakeCard runAt={x.runAt} />
+
         <section className={s.card}>
           <h2 className={s.cardTitle}>{t("settings.key")}</h2>
           <p className={s.muted}>{x.openrouterKey ? t("settings.key.set") : t("settings.key.unset")}</p>
@@ -74,6 +77,8 @@ export default function SettingsPage() {
           <input className={s.input} type="url" placeholder="https://…" value={x.siteUrl} onChange={(e) => setX({ ...x, siteUrl: e.target.value })}
                  onBlur={(e) => e.target.value !== (status?.siteUrl ?? "") && save({ siteUrl: e.target.value })} aria-label={t("settings.site")} />
         </section>
+
+        <ConnectCard />
 
         <section className={s.card}>
           <h2 className={s.cardTitle}>{t("settings.papers")}</h2>
