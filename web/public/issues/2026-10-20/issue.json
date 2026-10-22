@@ -1,8 +1,8 @@
 {
  "issueDate": "2026-10-20",
  "issueNumber": 269,
- "version": 8,
- "publishedAt": "2026-10-22T02:44:22.869Z",
+ "version": 14,
+ "publishedAt": "2026-10-22T06:51:57.879Z",
  "ready": true,
  "dpi": 300,
  "pdf": "/issues/2026-10-20/issue.pdf",
@@ -61,7 +61,7 @@
   {
    "gate": "4 the lead on page 1; every story placed or left out with a reason",
    "pass": true,
-   "detail": "lead r54962; left out (no room): none"
+   "detail": "lead r54962; left out (no room): f-2026-10-20-1"
   },
   {
    "gate": "5 the page reviewer sees no clear problem",
@@ -76,7 +76,7 @@
   {
    "gate": "S1 body text evenly spaced (no holes between words)",
    "pass": true,
-   "detail": "extra word space p50 0.04em, p95 0.22em; 4 loose line(s) (0.4%, allowed 3%)"
+   "detail": "extra word space p50 0.06em, p95 0.24em; 5 loose line(s) (0.5%, allowed 3%)"
   },
   {
    "gate": "S2 every headline, kicker and deck line fills its width",
@@ -106,7 +106,7 @@
   {
    "gate": "7 same inputs, same issue",
    "pass": true,
-   "detail": "inputs or engine changed since v7: nothing to compare (the next build of the same inputs will be)"
+   "detail": "identical to the last build of the same inputs"
   }
  ],
  "warnings": []
