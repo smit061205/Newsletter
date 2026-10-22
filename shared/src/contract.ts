@@ -66,6 +66,10 @@ export const TextElementSchema = z.object({
   // The text as Unicode, when `text` is in a legacy (pre-Unicode) font's own
   // glyph codes: what readers, search and screen readers get.
   plainText: z.string().optional(),
+  // Right-to-left text (Urdu, Arabic): its words run right to left and a
+  // justified line's last line sits right; and its language (BCP 47).
+  direction: z.enum(["ltr", "rtl"]).optional(),
+  lang: z.string().optional(),
 });
 
 export const ImageElementSchema = z.object({

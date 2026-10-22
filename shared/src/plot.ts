@@ -90,7 +90,9 @@ function textHtml(el: TextElement, px: (v: number) => string): string {
   const label = el.plainText ? ` role="text" aria-label="${esc(el.plainText)}"` : "";
   // a line set to fill its box exactly is checked to fill it
   const fit = el.nowrap && el.align === "justify-all" ? " data-fit" : "";
-  return `<div class="t" data-el="${esc(el.id)}"${fit}${label} style="${styles.join(";")}">${body}</div>`;
+  const dir = el.direction === "rtl" ? ` dir="rtl"` : "";
+  const lang = el.lang ? ` lang="${esc(el.lang)}"` : "";
+  return `<div class="t" data-el="${esc(el.id)}"${fit}${label}${dir}${lang} style="${styles.join(";")}">${body}</div>`;
 }
 
 /** The element's text as styled runs (a plain string is one unstyled run). */

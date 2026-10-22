@@ -83,6 +83,7 @@ export interface ParsedRelease {
 
 // what closes a release (the stars, the social-media line) or is only its furniture
 const END = /^\*{3,}$|^(?:સોશિયલ મીડિયા|सोशल मीडिया|Follow us)|^\(?(?:રિલીઝ|रिलीज़|Release) ID/i;
+const STAFF = /^\(?[A-Z]{1,5}(?:\s*\/\s*[A-Za-z.]{1,6}){1,5}\)?\.?$/;
 const ICON = /twitter|fb|facebook|instagram|email|icon|logo|youtube|whatsapp|koo|threads/i;
 
 /** One release page (PressReleaseIframePage.aspx). */
@@ -106,6 +107,7 @@ export function parseRelease(html: string, prid: number): ParsedRelease | null {
     const p = text(m[1]);
     if (!p) continue;
     if (END.test(p)) break;
+    if (STAFF.test(p)) continue; // the staff's initials ("SM/BS/JD"), not text to print
     paras.push(p);
   }
   const photos = [...body.matchAll(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi)]

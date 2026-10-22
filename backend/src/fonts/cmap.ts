@@ -3,9 +3,11 @@
 // so a letter no font of the paper's has -- set by the browser in some
 // fallback face, or not at all -- stops the issue instead of printing wrong.
 export function cmapCoverage(b: Buffer): Set<number> {
-  const n = b.readUInt16BE(4);
+  // a font collection (.ttc): its first font's directory (table offsets stay from the file's start)
+  const base = b.toString("latin1", 0, 4) === "ttcf" ? b.readUInt32BE(12) : 0;
+  const n = b.readUInt16BE(base + 4);
   let cmap = -1;
-  for (let i = 0; i < n; i++) if (b.toString("latin1", 12 + i * 16, 16 + i * 16) === "cmap") cmap = b.readUInt32BE(12 + i * 16 + 8);
+  for (let i = 0; i < n; i++) if (b.toString("latin1", base + 12 + i * 16, base + 16 + i * 16) === "cmap") cmap = b.readUInt32BE(base + 12 + i * 16 + 8);
   const out = new Set<number>();
   if (cmap < 0) return out;
   const subtables = b.readUInt16BE(cmap + 2);

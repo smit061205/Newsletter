@@ -13,9 +13,11 @@ interface FontInfo { family: string; ascent: number; descent: number; upm: numbe
 
 /** A TrueType/OpenType font's family name and line metrics (hhea), read from its tables. */
 export function fontInfo(b: Buffer): FontInfo {
+  // a font collection (.ttc): its first font's directory (table offsets stay from the file's start)
+  const base = b.toString("latin1", 0, 4) === "ttcf" ? b.readUInt32BE(12) : 0;
   const tables = new Map<string, number>();
-  const n = b.readUInt16BE(4);
-  for (let i = 0; i < n; i++) tables.set(b.toString("latin1", 12 + i * 16, 16 + i * 16), b.readUInt32BE(12 + i * 16 + 8));
+  const n = b.readUInt16BE(base + 4);
+  for (let i = 0; i < n; i++) tables.set(b.toString("latin1", base + 12 + i * 16, base + 16 + i * 16), b.readUInt32BE(base + 12 + i * 16 + 8));
   const head = tables.get("head")!, hhea = tables.get("hhea")!, name = tables.get("name"), os2 = tables.get("OS/2");
   let family = "";
   if (name !== undefined) {

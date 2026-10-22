@@ -22,3 +22,6 @@ publications/*/fonts/*.otf
 logs/
 backups/
 papers/
+
+# a system font copied in for the Urdu test (never committed)
+publications/*/fonts/*.ttc

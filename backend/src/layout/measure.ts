@@ -132,14 +132,16 @@ export class Measurer {
    * codes, with Latin letters and digits in the font's Latin partner. */
   shape(text: string, font: string): Run[] {
     if (!this.isLegacy(font) || !this.encoder) {
-      // a character the font lacks, in the profile's fallback for it
-      const fb = this.faces.fallback?.[font];
-      const has = this.coverage.get(font), fbHas = fb ? this.coverage.get(fb) : undefined;
-      if (!fb || !has || !fbHas) return [{ text }];
+      // a character the font lacks, in the first of its fallbacks (and theirs) that has it
+      const has = this.coverage.get(font);
+      if (!this.faces.fallback?.[font] || !has) return [{ text }];
+      const chain: string[] = [];
+      for (let f = this.faces.fallback[font]; f && !chain.includes(f) && chain.length < 4; f = this.faces.fallback?.[f]) chain.push(f);
       const runs: Run[] = [];
       for (const ch of text) {
         const c = ch.codePointAt(0)!;
-        runs.push(!has.has(c) && fbHas.has(c) && !/\s/.test(ch) ? { text: ch, font: fb } : { text: ch });
+        const fb = has.has(c) || /\s/.test(ch) ? undefined : chain.find((f) => this.coverage.get(f)?.has(c));
+        runs.push(fb ? { text: ch, font: fb } : { text: ch });
       }
       return mergeRuns(runs);
     }
@@ -249,8 +251,13 @@ export class Measurer {
         })))),
     }));
     const measured = await this.measureWords(reqs);
-    // the glue goes with each measured word
-    measured.forEach((m, ri) => m.paras.forEach((ws, pi) => ws.forEach((w, wi) => { if (reqs[ri].paras[pi][wi].glue) (w as Word).glue = true; })));
+    // the glue goes with each measured word; a cursive script (Urdu,
+    // Arabic) is never letter-spaced -- it would break the joins -- so its
+    // lines justify in their word spaces alone
+    measured.forEach((m, ri) => m.paras.forEach((ws, pi) => ws.forEach((w, wi) => {
+      if (reqs[ri].paras[pi][wi].glue) (w as Word).glue = true;
+      if (/[\u0600-\u06FF\u0750-\u077F]/.test(reqs[ri].paras[pi][wi].word)) w.letters = 0;
+    })));
 
     return requests.map((req, ri) => {
       const r = reqs[ri];
@@ -286,7 +293,9 @@ export class Measurer {
             text: r.paras[pi].slice(i, j).map((w, k) => (k > 0 && !w.glue ? " " : "") + w.word).join(""), runs: mergeRuns(runs), para: pi,
             start: k === 0, end: j === words.length,
             width: words.slice(i, j).reduce((a, w) => a + w.width, 0) + spaces * space,
-            spaces, letters: words.slice(i, j).reduce((a, w) => a + w.letters, 0) + spaces - 1, spaceWidth: space,
+            spaces, spaceWidth: space,
+            // (as linebreak.ts counts them: none on a line of cursive words)
+            letters: ((n) => (n ? n + spaces - 1 : 0))(words.slice(i, j).reduce((a, w) => a + w.letters, 0)),
           });
         });
       });

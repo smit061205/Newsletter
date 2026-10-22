@@ -113,11 +113,13 @@ export function breakParagraph(words: Word[], spaceW: number, size: number, firs
   }
   const shapeOf = (i: number, j: number): LineShape => {
     const spaces = prefixS[j] - prefixS[i + 1]; // between words i..j-1
+    const letters = prefixL[j] - prefixL[i];
     return {
       natural: prefixW[j] - prefixW[i] + spaces * spaceW,
       spaces,
-      // every letter and space carries spacing; the line's last letter's trails off unseen
-      letters: prefixL[j] - prefixL[i] + spaces - 1,
+      // every letter and space carries spacing; the line's last letter's trails
+      // off unseen -- a line of cursive words (no letters to space) gets none
+      letters: letters ? letters + spaces - 1 : 0,
     };
   };
   // the best way found to start a line at a word, per fitness class (and

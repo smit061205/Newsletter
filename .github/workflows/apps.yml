@@ -48,6 +48,15 @@ jobs:
         run: |
           export DATA_DIR="$RUNNER_TEMP/ck-en"
           node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/sample-english.ts
+      - name: Right to left (Sample Urdu Daily; informational -- Nastaliq tuning waits for the paper's own font)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        shell: bash
+        env:
+          CK_PUBLICATION: sample-urdu
+        run: |
+          export DATA_DIR="$RUNNER_TEMP/ck-ur"
+          node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/sample-urdu.ts
       - name: Newsroom website
         run: npm run build --prefix web
       - name: The app starts, answers and stops

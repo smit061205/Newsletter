@@ -1,0 +1,151 @@
+{
+ "id": "sample-urdu",
+ "name": "Sample Urdu Daily (a made-up right-to-left test paper)",
+ "language": {
+  "lang": "ur",
+  "direction": "rtl",
+  "digits": "arabic-indic",
+  "weekdays": [
+   "اتوار",
+   "پیر",
+   "منگل",
+   "بدھ",
+   "جمعرات",
+   "جمعہ",
+   "ہفتہ"
+  ],
+  "dateLine": "{weekday}، {dd}-{mm}-{yyyy}",
+  "issueLine": "شمارہ : {issue}"
+ },
+ "issue": {
+  "referenceDate": "2026-10-22",
+  "referenceNumber": 271,
+  "pages": 2
+ },
+ "page": {
+  "width": 792,
+  "height": 1224
+ },
+ "grid": {
+  "left": 36,
+  "columns": 6,
+  "column": 110.0,
+  "gutter": 12
+ },
+ "ink": "#1a1a1a",
+ "fonts": {
+  "urdu": {
+   "file": "/private/sample-urdu/fonts/noto-nastaliq-urdu.ttc",
+   "weight": 400,
+   "fallback": "serif-regular"
+  },
+  "serif-regular": {
+   "file": "/fonts/LiberationSerif-Regular.ttf",
+   "weight": 400,
+   "fallback": "hind-regular"
+  },
+  "hind-regular": {
+   "file": "/fonts/HindVadodara-Regular.ttf",
+   "weight": 400
+  }
+ },
+ "type": {
+  "body": {
+   "font": "urdu",
+   "size": 10,
+   "pitch": 23,
+   "indent": 10,
+   "pitches": [
+    23,
+    23.5,
+    24,
+    22.5
+   ],
+   "sizes": [
+    10,
+    9.6
+   ]
+  },
+  "headline": {
+   "font": "urdu",
+   "leading": 1.65,
+   "capByColumns": [
+    0,
+    16,
+    21,
+    26,
+    32,
+    38,
+    44
+   ],
+   "min": 15.5,
+   "rankScale": [
+    1.0,
+    0.8,
+    0.66,
+    0.56,
+    0.48
+   ],
+   "maxLines": [
+    2,
+    3,
+    3,
+    3,
+    3
+   ]
+  },
+  "kicker": {
+   "font": "urdu",
+   "ratio": 0.45,
+   "min": 9,
+   "leading": 1.7
+  },
+  "deck": {
+   "font": "urdu",
+   "ratio": 0.5,
+   "min": 12,
+   "leading": 1.65
+  },
+  "caption": {
+   "font": "urdu",
+   "size": 8.5,
+   "pitch": 18
+  }
+ },
+ "spacing": {
+  "top": 2,
+  "afterKicker": 2,
+  "afterHeadline": 4,
+  "afterDeck": 4,
+  "afterPhoto": 3,
+  "afterCaption": 4,
+  "betweenStories": 8,
+  "storyRule": 0.5
+ },
+ "photo": {
+  "maxCrop": 0.15,
+  "minHeight": 60,
+  "minCols": 2,
+  "minPpi": 150,
+  "maxShare": 0.45
+ },
+ "fontLicence": "Noto Nastaliq Urdu (SIL OFL), copied in from the system for the test; the paper chooses its own Nastaliq.",
+ "chrome": "chrome.json",
+ "fillers": {
+  "houseAd": [
+   {
+    "text": "Sample Urdu Daily",
+    "role": "headline",
+    "scale": 1.0
+   }
+  ],
+  "messages": [],
+  "maxMessages": 1,
+  "maxHouseAds": 1
+ },
+ "editorial": {
+  "workhorseModel": "openai/gpt-6-luna",
+  "leadModel": "google/gemini-3.8-flash",
+  "leadStories": 3
+ }
+}

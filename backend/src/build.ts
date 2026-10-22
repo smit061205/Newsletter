@@ -4,7 +4,7 @@
 // saved as a draft, and printed to PDF.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { IssueRenderSchema, type Element, type IssueRender } from "@ck/shared/contract";
+import { IssueRenderSchema, type Element, type IssueRender, type TextElement } from "@ck/shared/contract";
 import { printIssue } from "@ck/shared/pdf";
 import { assetFile, OUT_DIR, PLOT_ORIGIN } from "./config.ts";
 import { chromeFor } from "./chrome/chrome.ts";
@@ -220,11 +220,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       spent += fit.cost;
       factChecks.push(...fit.factChecks);
       pool = pool.filter((s) => !fit.used.includes(s));
-      pagesOut.set(n, [
+      const body: Element[] = [
         ...pageAds.map((ad) => ({ id: `ad-${ad.id}`, kind: "image" as const, articleId: `ad-${ad.id}`, x: ad.x, y: ad.y,
                                   width: ad.width, height: ad.height, url: ad.url, fit: "fill" as const })),
         ...fit.elements,
-      ]);
+      ];
+      pagesOut.set(n, profile.language.direction === "rtl" ? mirrored(body, PAGE.width) : body);
       for (const p of fit.plan.placed) placed.push({ page: n, story: p.module.story, variant: p.module.variant, cols: p.module.cols, rank: p.module.rank });
       // what's empty on the finished page, wherever it is (layout/occupancy.ts)
       gaps.push(...findGaps(fit.blocks, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }).map((g) => ({ page: n, ...g })));
@@ -367,4 +368,20 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     if (g.length) log(`  page ${n}: ${g.length} column gap(s) over 1.5 lines, the tallest ${Math.max(...g.map((x) => x.height))}pt`);
   }
   return { issue, report: { ...report, version } };
+}
+
+/** A right-to-left paper's page (Urdu): laid out as usual, then every story
+ * and ad mirrored across the page -- stories, and the columns inside each,
+ * then run right to left -- and its text marked right-to-left, which
+ * the plotter sets as such (the chrome is the paper's own art: unmirrored). */
+function mirrored(els: Element[], pageWidth: number): Element[] {
+  const swap = (a: TextElement["align"]) => (a === "left" || a === undefined ? "right" : a === "right" ? "left" : a);
+  return els.map((e) => {
+    switch (e.kind) {
+      case "line": return { ...e, x1: pageWidth - e.x1, x2: pageWidth - e.x2 };
+      case "path": return { ...e, d: e.d.replace(/(-?\d+(?:\.\d+)?)[ ,](-?\d+(?:\.\d+)?)/g, (_, x, y) => `${pageWidth - Number(x)} ${y}`) };
+      case "text": return { ...e, x: pageWidth - e.x - e.width, align: swap(e.align), direction: "rtl", lang: profile.language.lang };
+      default: return { ...e, x: pageWidth - e.x - e.width };
+    }
+  });
 }
