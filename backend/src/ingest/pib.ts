@@ -141,16 +141,24 @@ export function imageSize(b: Uint8Array): { width: number; height: number } | nu
 
 let lastRequest = 0;
 let pagesToday = 0;
-/** One polite GET: a pause since the last one, three tries with backoff. */
+/** How long to wait on PIB: the day's own news waits (three tries, 45s each);
+ * the Hindi top-up, only extra copy, doesn't hold the paper up (two, 20s). */
+let patience = { tries: 3, seconds: 45 };
+export async function withPatience<T>(p: { tries: number; seconds: number }, job: () => Promise<T>): Promise<T> {
+  const was = patience;
+  patience = p;
+  try { return await job(); } finally { patience = was; }
+}
+/** One polite GET: a pause since the last one, a few tries with backoff. */
 async function get(url: string, init: RequestInit = {}): Promise<Response> {
   if (++pagesToday > MAX_PAGES) throw new Error(`more than ${MAX_PAGES} PIB pages in one run: stopping`);
   let err: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < patience.tries; attempt++) {
     const wait = lastRequest + PAUSE_MS * (attempt + 1) - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     lastRequest = Date.now();
     try {
-      const res = await fetch(url, { ...init, headers: { "user-agent": UA, ...(init.headers ?? {}) }, signal: AbortSignal.timeout(45_000) });
+      const res = await fetch(url, { ...init, headers: { "user-agent": UA, ...(init.headers ?? {}) }, signal: AbortSignal.timeout(patience.seconds * 1000) });
       if (res.ok) return res;
       err = new Error(`PIB answered ${res.status} for ${url}`);
       if (res.status < 500) break;

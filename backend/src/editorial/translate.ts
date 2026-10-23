@@ -7,7 +7,7 @@
 //   2. one cheap AI call ranks the rest for a Gujarat reader;
 //   3. the best are fetched and translated one by one, each measured as it
 //      would print, until the copy reaches the profile's fill target (or the
-//      day's AI budget runs out).
+//      profile sets a daily AI ceiling and it's spent: none by default).
 //
 // A translation adds nothing: every number in it is checked against the
 // Hindi original, and each one is marked "translated from Hindi" for the
@@ -166,7 +166,8 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
     const order = ranked.order.filter((prid) => !done.has(prid));
     let k = 0;
     while (k < order.length && ctx.share() < target) {
-      if (cost >= profile.editorial.dailyBudgetUsd) { log(`  the day's AI budget ($${profile.editorial.dailyBudgetUsd}) is spent: stopping`); break; }
+      const ceiling = profile.editorial.dailyBudgetUsd;
+      if (ceiling !== undefined && cost >= ceiling) { log(`  the day's AI budget ($${ceiling}) is spent: stopping`); break; }
       const perStory = ctx.content / Math.max(1, store.stories(date).length);
       const need = Math.max(1, Math.min(4, Math.ceil(((target - ctx.share()) * ctx.room) / Math.max(1, perStory))));
       const batch: Release[] = [];

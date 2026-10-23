@@ -129,8 +129,10 @@ export const ProfileSchema = z.object({
     translateModel: z.string().min(1).default("google/gemini-3.8-flash"),
     /** the copy wanted, as a share of the pages at natural size (over 1, so the packer has choices) */
     fillTarget: z.number().positive().default(1.1),
-    /** at most this much AI spend on a day's top-up (US$) */
-    dailyBudgetUsd: z.number().positive().default(0.3),
+    /** a ceiling on a day's top-up AI spend (US$), if the paper wants one; none by default: the top-up stops when the pages are full */
+    dailyBudgetUsd: z.number().positive().optional(),
+    /** the layout engine: "v2" (designs solved exactly, layout/engine.ts) or "v1" (packed, then gaps closed) */
+    layoutEngine: z.enum(["v1", "v2"]).default("v2"),
   }),
 });
 

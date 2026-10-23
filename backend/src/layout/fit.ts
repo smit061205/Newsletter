@@ -12,6 +12,7 @@
 import type { Element, TextElement } from "@ck/shared/contract";
 import { writeBrief } from "../editorial/features.ts";
 import { fitLength } from "../editorial/rewrite.ts";
+import { dropLastSentence } from "../editorial/ladder.ts";
 import { setDisplay } from "./display.ts";
 import { profile } from "../profile.ts";
 import type { Ad, Release, Store, Story } from "../store.ts";
@@ -64,18 +65,6 @@ export interface FitResult {
 
 const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
 
-/** The body without its last sentence (a whole paragraph goes if it's one sentence). */
-function dropLastSentence(body: string): string | null {
-  const paras = body.split(/\n\s*\n/);
-  const last = paras[paras.length - 1].trim();
-  // a sentence ends at its stop followed by a space or the paragraph's end
-  // (not at the dots inside "nmba.dosje.gov.in" or "૩.૫")
-  const sentences = last.match(/[\s\S]*?[.!?।]+["'”’)]*(?:\s+|$)|[\s\S]+$/g)?.filter(Boolean) ?? [last];
-  if (sentences.length > 1) paras[paras.length - 1] = sentences.slice(0, -1).join("").trim();
-  else if (paras.length > 1) paras.pop();
-  else return null;
-  return paras.join("\n\n");
-}
 const NEXT: Record<Variant, Variant | null> = { short: "medium", medium: "long", long: null };
 
 /** Space under each placed story: from its foot to the next element below in
@@ -99,7 +88,7 @@ function room(p: PlacedModule, placed: PlacedModule[], ads: Ad[], band: Band, ex
 }
 
 /** The paper's house ad, set to fill a box: a ruled panel, lines centred. */
-async function houseAd(id: string, x: number, y: number, w: number, h: number, m: Measurer): Promise<Element[] | null> {
+export async function houseAd(id: string, x: number, y: number, w: number, h: number, m: Measurer): Promise<Element[] | null> {
   const lines = profile.fillers.houseAd;
   if (!lines.length || h < 60 * PT || w < GRID.column) return null;
   const fontOf = (r: string) => (r === "headline" ? HEADLINE.font : r === "deck" ? DECK.font : BODY.font);
@@ -135,7 +124,7 @@ async function houseAd(id: string, x: number, y: number, w: number, h: number, m
  * box allows in fitted display type, centred in a ruled panel -- the way the
  * paper prints "રક્તદાન મહાદાન ચક્ષુદાન શ્રેષ્ઠદાન". The `n`th message first,
  * so a page's fillers differ. Returns the elements and the height used. */
-async function messageFiller(id: string, x: number, y: number, w: number, h: number, n: number, m: Measurer, skip: Set<string>):
+export async function messageFiller(id: string, x: number, y: number, w: number, h: number, n: number, m: Measurer, skip: Set<string>):
   Promise<{ elements: Element[]; height: number; text: string } | null> {
   // each message once a page while there are others left
   const fresh = profile.fillers.messages.filter((t) => !skip.has(t));
@@ -401,9 +390,15 @@ export async function closeGaps(plan: PagePlan, ctx: {
       // lines the gap holds across the story's columns
       let want = Math.floor((avail - base.height) / pitch) * base.cols;
       let target = baseWords;
+      // never more words than the release has facts for (its own length, a
+      // little over): asked for more, the AI says the same things again in
+      // other words (23 Oct, copy 3: a short release stretched 13 times to
+      // 600 words) -- the space left goes to a brief or another story instead
+      const most = Math.max(baseWords, Math.round(words(`${release.headline} ${release.subhead ?? ""} ${release.body}`) * 1.15));
       let over: Story | null = null; // the shortest version that ran over
       for (let round = 0; round < 3 && want !== 0; round++) {
-        target = Math.max(20, Math.round(target + want * perLine * 0.95));
+        target = Math.min(most, Math.max(20, Math.round(target + want * perLine * 0.95)));
+        if (want > 0 && target <= words(mod.story.bodies.long)) break; // as long as its news allows already
         note(`  ${story.id}: AI length fit to ${target} words (round ${round + 1})`);
         // the space exactly: the lines it must fill and the words a line holds
         const lines = base.bodyLines + want;

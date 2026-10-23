@@ -101,6 +101,8 @@ function balancedCaps(frames: Frame[], pitch: number, n: number): number[] {
   return capsAt(hi);
 }
 
+const KERNED = /[\u0600-\u06FF\u0750-\u077F\u0900-\u097F]/;
+
 /** The body lines of one column as text elements, one per line, each set
  * by the backend to exactly its width (linebreak.ts spread(): word spacing,
  * a little letter spacing and an imperceptible squeeze) -- never left to the
@@ -116,7 +118,8 @@ export function columnElements(lines: Line[], id: string, aid: string, f: Frame,
       ...elementText([l], legacy), font: BODY.font, size: r2(size), lineHeight: r2(pitch), color: INK, nowrap: true,
     };
     if (l.end && l.width <= width) return { ...base, align: "left" as const };
-    const s = spread({ natural: l.width, spaces: l.spaces, letters: l.letters }, width, size, l.spaceWidth);
+    // (a kerned script prints a hair wider than measured: spread to just short of the edge)
+    const s = spread({ natural: l.width, spaces: l.spaces, letters: l.letters }, KERNED.test(l.text) ? width * 0.994 : width, size, l.spaceWidth);
     // one word too short for its line, with no spaces to spread: flush left,
     // as a typesetter would leave it, rather than letters pulled apart
     if (!l.spaces && s.ratio > 1) return { ...base, align: "left" as const };

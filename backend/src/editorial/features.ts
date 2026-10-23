@@ -37,14 +37,16 @@ const SCHEMA = {
   },
 };
 
-const SYSTEM = `તમે ગાંધીનગરના ગુજરાતી દૈનિક "${profile.name.split(" (")[0]}" માટે વિશેષ લેખ લખો છો.
-You write evergreen feature articles in clear, formal newspaper Gujarati for a day with little news.
+// (in the paper's own language: a sister paper's items came out in Gujarati, 24 Oct)
+const LANG_NAME = ({ gu: "Gujarati", hi: "Hindi", ur: "Urdu" } as Record<string, string>)[profile.language.lang] ?? "English";
+const SYSTEM = `${profile.language.lang === "gu" ? `તમે ગાંધીનગરના ગુજરાતી દૈનિક "${profile.name.split(" (")[0]}" માટે વિશેષ લેખ લખો છો.\n` : ""}` +
+`You write evergreen feature articles in clear, formal newspaper ${LANG_NAME} for a day with little news. Write in ${LANG_NAME} only.
 Rules -- these are absolute:
 - General, well-established knowledge only: seasonal health and safety, festivals and their meaning, Gujarat's culture and heritage, household tips, the environment.
 - NOT news: no events, announcements, schemes, prices, dates or "today/recently".
 - No named living people, no quotes, no organisations' claims.
-- No numbers of any kind (no digits, no years, no statistics, no percentages). Write "ઘણા", "સદીઓ જૂનું" and so on instead.
-- No medical claims beyond common advice; say "ડૉક્ટરની સલાહ લેવી" where it fits.
+- No numbers of any kind (no digits, no years, no statistics, no percentages). Write "many", "centuries old" and so on instead, in ${LANG_NAME}.
+- No medical claims beyond common advice; say "consult a doctor" (in ${LANG_NAME}) where it fits.
 - Headline active and plain, no exclamation marks; always a deck.
 - Each article on a different topic, and none on a topic in the "avoid" list.
 Return JSON matching the schema.`;
@@ -126,7 +128,8 @@ export const BRIEF_KICKER = ({ gu: "જાણવા જેવું", hi: "ज�
  * trusted (a digit in it). */
 export async function writeBrief(store: Store, date: string, slot: string, words: number, avoid: string[],
                                  opts: { log?: (s: string) => void } = {}): Promise<{ story: Story; cost: number } | null> {
-  const key = `brief|${date}|${slot}|${words}`;
+  // (each paper's language its own: a Gujarati item once turned up in the Hindi paper)
+  const key = `brief|${profile.language.lang}|${date}|${slot}|${words}`;
   const make = (b: { headline: string; deck: string; body: string }): Story => ({
     id: `b-${date}-${slot}`, releaseId: null, date, kicker: "", headline: b.headline.trim(), deck: b.deck.trim(),
     bodies: { long: b.body.trim(), medium: b.body.trim(), short: b.body.trim() },
@@ -145,7 +148,8 @@ export async function writeBrief(store: Store, date: string, slot: string, words
       model, temperature: 0.5, usage: { include: true },
       response_format: { type: "json_schema", json_schema: BRIEF_SCHEMA },
       messages: [
-        { role: "system", content: SYSTEM + `\nNow write ONE short "${BRIEF_KICKER}" item: a useful fact or tip in one paragraph of exactly about ${words} words.` },
+        { role: "system", content: SYSTEM + `\nNow write ONE short "${BRIEF_KICKER}" item: a useful fact or tip in one paragraph of exactly about ${words} words, written in ${LANG_NAME} ` +
+          "General knowledge only: no news, no named living people, and no numbers or digits at all (write any amount in words)." },
         { role: "user", content: `Avoid these topics (already in the paper): ${avoid.join(" | ") || "none"}` },
       ],
     }),
@@ -163,6 +167,7 @@ export async function writeBrief(store: Store, date: string, slot: string, words
   }
   // no digits, and in the paper's own language
   const ok = !hasDigit(`${b.headline} ${b.deck} ${b.body}`) && inPaperLanguage(make(b));
+  if (!ok) opts.log?.(`  brief not used (${hasDigit(`${b.headline} ${b.deck} ${b.body}`) ? "a number in it" : "not in the paper's language"}): ${b.headline}`);
   store.putFitted(key, { body: ok ? JSON.stringify(b) : "", model });
   return ok ? { story: make(b), cost: data.usage?.cost ?? 0 } : null;
 }

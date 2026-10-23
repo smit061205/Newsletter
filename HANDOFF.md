@@ -85,6 +85,8 @@ Repository: <https://github.com/smit061205/Newsletter> (**public**). Branch `mai
    - **The father's grey/missing text (23 Oct):** the same Mac-made PDF opens fine in his Chrome and phone; it's his other PDF program (a 20 MB file with 3 MB PNG ads drawn in stages). The user chose not to change the PDF.
    - Publish in the app without a GitHub sign-in says so plainly (it tried `git` and failed); an edit made while another day's run went is laid out once that run ends.
 
+3. **The new layout engine (24 Oct, v1.1.0):** the old engine packed stories, then asked the AI to rewrite them one by one to close each gap -- slow (a copy took 41 min), and it stretched short releases until they said things twice and still left holes. The new one (`layout/engine.ts`, README §8.3) makes every length a story may print at first (`editorial/ladder.ts`: its own three, cut by sentences; longer AI versions only on a short day), shares the stories over the pages, then for each page solves hundreds of guillotine designs exactly in whole points (`designs.ts`, `guillotine.ts`) -- no AI in the loop, no hole by construction. Ads go at the foot in their best tidy arrangement; a strip by an ad no story fits takes a written item (`fill.ts`). The old engine lays out any page the new one can't. New gates S8 (says a thing twice) and S9 (a loose story). Measured on 22 Oct (real AI): the day's paper READY in 3.3 min (1.8 of it the page review), its 4 pages solved in ~10 s; 3 copies READY in 1.5 min, $0.006 in all; the Hindi paper READY in 2.9 min (the old engine's had 14-19 gaps, overflows, repeats). Fixed on the way: Hindi headings were letter-spaced (letter spacing applies to every Devanagari character: lines ran 65-127 px over), the brief writer wrote sister papers' items in Gujarati and shared its cache across papers.
+
 **Published so far:** issues 269–271 (20–22 Oct 2026) on the website. Issue numbers come from the date (22 Oct 2026 = 271).
 
 ---
@@ -175,6 +177,12 @@ Then run the engine from *inside the packed app*, as the workflow's "packed app"
 ---
 
 ## 7. What's next
+
+0. **The new layout engine (v1.1.0):**
+   - **PIB photos are dropped** from stories 2 columns or wider: they're ~600 px wide, and the print rule asks 200 ppi (under 3 inches). Ask the user whether 150 ppi is acceptable for the paper (profile `photo.minPpi`).
+   - **Page designs from back issues:** the designs are grown from rules today; 5-10 back-issue PDFs would let `designs.ts` prefer the paper's own (to collect from the user).
+   - **Short days:** a day short of news (no Hindi top-up or features yet) can leave a hole the written items don't hit exactly; the evening run's top-up and features usually prevent it.
+   - The Urdu sample (CI, informational) is still NOT READY on either engine: Nastaliq tuning waits for the paper's own Urdu font.
 
 1. **Get a complete release out** (v1.0.5+). Confirm all three installers are attached, then delete v1.0.0–v1.0.3.
 2. **Install on the father's Windows PC** with the user; it's the real test of the Windows app:

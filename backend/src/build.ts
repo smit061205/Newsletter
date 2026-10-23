@@ -17,7 +17,9 @@ import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
 import { fitCalls, isSpeechText, speechTwin, writeDeck } from "./editorial/rewrite.ts";
 import { closeGaps, type FillerCount } from "./layout/fit.ts";
+import { layOut, type EngineResult } from "./layout/engine.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
+import { removed } from "./layout/text.ts";
 import { applyTextEdits, dedupe, droppedBy, inPaperLanguage, referenceAds, standInsMovable } from "./layout/stories.ts";
 import { arrangeAds } from "./layout/ads.ts";
 import { findGaps } from "./layout/occupancy.ts";
@@ -58,6 +60,9 @@ export interface CopyOpts {
   /** the stories come in another language (`reword` translates them): not filtered by language until then */
   translate?: boolean;
 }
+
+/** The day's own seed for the layout's choices: the same day, the same paper. */
+const seedOf = (date: string) => Number(date.replace(/-/g, "")) % 2 ** 30;
 
 /** Where a day's page images go (served by the API for the website). */
 export const pageImageDir = (date: string) => path.join(OUT_DIR, "pages", profile.id, date);
@@ -250,38 +255,76 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const placed: { page: number; story: Story; variant: string; cols: number; rank: number }[] = [];
     const gaps: { page: number; col: number; y0: number; y1: number }[] = [];
     const plans: PagePlan[] = [];
+    const bands = chrome.map((c) => ({ top: c.bodyTop, bottom: c.bodyBottom }));
+    // the layout engine (layout/engine.ts): every page designed and solved
+    // exactly; a page it can't lay out goes to the old engine below
+    const engine = (process.env.CK_ENGINE ?? profile.editorial.layoutEngine) === "v2" ? "v2" : "v1";
+    let v2: EngineResult | null = null;
+    // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
+    const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
+    if (engine === "v2") {
+      v2 = await layOut({
+        pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy,
+        seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : seedOf(date),
+        ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
+        date, fillers, log,
+        // (the stories' lengths, then each page as it's laid out -- in the newsroom's words)
+        progress: (done, of, what) => opts.progress?.(what === "pages"
+          ? { done: total + done, total: total * 2 + 1, label: "planning", item: String(Math.min(total, done + 1)) }
+          : { done, total: of, label: "lengths" }),
+      });
+      spent += v2.cost;
+      factChecks.push(...v2.factChecks);
+      pool = v2.leftOut as typeof pool;
+    }
     for (let n = 1; n <= total; n++) {
+      if (v2?.pages[n - 1]) continue;
       opts.progress?.({ done: n - 1, total: total * 2 + 1, label: "planning", item: String(n) });
       const pageAds = ads.filter((a) => a.page === n);
+      // (a page the new engine couldn't lay out: the old one, from that page's stories and the ones held back)
+      const fromV2 = v2 ? [...v2.assigned[n - 1], ...pool] as typeof pool : null;
       // what's left of the copy, over what's left of the room
       const leftRoom = room.slice(n - 1).reduce((a, b) => a + b, 0);
       const leftCopy = (await Promise.all(pool.map((s, i) => packer.naturalArea(s, i === 0)))).reduce((a, b) => a + b, 0);
       // a copy that keeps each story on its page packs each page from its own stories
       const samePage = opts.copy?.shuffle === "samePage";
-      const pagePool = samePage ? pool.filter((s) => (opts.copy!.pageOf.get(s.id) ?? total) === n) : pool;
-      const budget = n === total || samePage ? Infinity : room[n - 1] * Math.min(1.05, leftCopy / leftRoom);
+      const pagePool = fromV2 ?? (samePage ? pool.filter((s) => (opts.copy!.pageOf.get(s.id) ?? total) === n) : pool);
+      const budget = n === total || samePage || fromV2 ? Infinity : room[n - 1] * Math.min(1.05, leftCopy / leftRoom);
       // what the later pages need kept for them: most of their room (length
       // fitting grows the stories into the rest)
-      const reserve = samePage ? 0 : room.slice(n).reduce((a, b) => a + b, 0) * 0.7;
-      const plan = await packer.packPage(n, pagePool, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, pageAds,
+      const reserve = samePage || fromV2 ? 0 : room.slice(n).reduce((a, b) => a + b, 0) * 0.7;
+      const plan = await packer.packPage(n, pagePool, bands[n - 1], pageAds,
                                          { leadFirst: true, budget, reserve, maxCols: MAX_STORY_COLS,
                                            ...(opts.copy ? { jitter: opts.copy.rng } : {}) });
       plans.push(plan);
       pool = pool.filter((s) => !plan.placed.some((p) => p.module.story.id === s.id));
-      log(`  page ${n}: ${plan.placed.length} stories, white space ${(plan.waste * 100).toFixed(1)}%: ` +
+      log(`  page ${n}${fromV2 ? " (old engine)" : ""}: ${plan.placed.length} stories, white space ${(plan.waste * 100).toFixed(1)}%: ` +
           plan.placed.map((p) => `${p.module.story.id}(${p.module.cols}col ${p.module.variant}` +
             `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" "));
     }
     timing.planning = Date.now() - timing.start;
     const t1 = Date.now();
     // close the gaps: grow stories into them, then briefs and the house ad (layout/fit.ts)
-    // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
-    const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
-    for (const plan of plans) {
-      const n = plan.page;
+    for (let n = 1; n <= total; n++) {
+      const done = v2?.pages[n - 1];
+      if (done) {
+        const body: Element[] = [
+          ...done.ads.map((ad) => ({ id: `ad-${ad.id}`, kind: "image" as const, articleId: `ad-${ad.id}`, x: ad.x, y: ad.y,
+                                     width: ad.width, height: ad.height, url: ad.url, fit: "fill" as const })),
+          ...done.elements,
+        ];
+        pagesOut.set(n, profile.language.direction === "rtl" ? mirrored(body, PAGE.width) : body);
+        for (const p of done.placed) placed.push({ page: n, story: p.module.story, variant: p.module.variant, cols: p.module.cols, rank: p.module.rank });
+        gaps.push(...findGaps(done.blocks, bands[n - 1]).map((g) => ({ page: n, ...g })));
+        finalPlans.push({ page: n, placed: done.placed, elements: done.elements, waste: 0, gaps: [] });
+        log(`  page ${n}: ${done.placed.map((p) => `${p.module.story.id}(${p.module.cols}col, ${p.module.story.bodies.long.split(/\s+/).length}w` +
+            `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" ")}`);
+        continue;
+      }
+      const plan = plans.find((p) => p.page === n)!;
       opts.progress?.({ done: total + n - 1, total: total * 2 + 1, label: "finishing", item: String(n) });
       const pageAds = ads.filter((a) => a.page === n);
-      const fit = await closeGaps(plan, { band: { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, ads: pageAds,
+      const fit = await closeGaps(plan, { band: bands[n - 1], ads: pageAds,
                                          store: opts.copy?.store ?? store, date, releases, m, leftOut: pool, fillers, say: (l) => log(`  p${n}${l}`) });
       spent += fit.cost;
       factChecks.push(...fit.factChecks);
@@ -294,7 +337,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       pagesOut.set(n, profile.language.direction === "rtl" ? mirrored(body, PAGE.width) : body);
       for (const p of fit.plan.placed) placed.push({ page: n, story: p.module.story, variant: p.module.variant, cols: p.module.cols, rank: p.module.rank });
       // what's empty on the finished page, wherever it is (layout/occupancy.ts)
-      gaps.push(...findGaps(fit.blocks, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }).map((g) => ({ page: n, ...g })));
+      gaps.push(...findGaps(fit.blocks, bands[n - 1]).map((g) => ({ page: n, ...g })));
       finalPlans.push(fit.plan);
     }
     timing.fitting = Date.now() - t1;
@@ -336,6 +379,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   }
   timing.review = Date.now() - t3;
   if (m.unencodable.size) log(`  text the paper's fonts can't set (left as typed): ${[...m.unencodable].join(" ")}`);
+  if (removed.size) log(`  characters the paper's fonts have nothing for, taken out: ${[...removed].join(" ")}`);
 
   const pt = 72 / DPI;
   const whiteSpace = result.gaps.map((g) => ({ page: g.page, col: g.col + 1, height: Math.round((g.y1 - g.y0) * pt * 10) / 10,

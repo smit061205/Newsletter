@@ -238,15 +238,19 @@ backend/
                             (legacy encoding + Latin runs) -- all in Chromium
     typography.ts           profile values in contract px (PT, GRID, BODY, HEADLINE...)
     module.ts               a story at its natural size (k columns)
-    linebreak.ts            total-fit line breaking + spacing of a justified line (8.6)
-    display.ts              headlines, kickers, decks fitted to the full width (8.7)
+    linebreak.ts            total-fit line breaking + spacing of a justified line (8.7)
+    display.ts              headlines, kickers, decks fitted to the full width (8.8)
     text.ts                 printed text: the paper's digits, clean spacing
     ads.ts                  ads as modules at the foot of the page (unless pinned)
     occupancy.ts            the page's whitespace map (gate 2, gap filling)
     style.ts                style gates S1-S6
-    pack.ts                 page packer (skyline + beam search), tombstone/headline rules
-    fit.ts                  gap closing: longer version, AI fit, sentence trim, pitch,
-                            briefs, house ad
+    engine.ts               the layout engine (8.3): lengths, stories to pages, each page designed and solved
+    blocks.ts               every setting of a story: widths x lengths x photo layouts, with heights
+    designs.ts              page designs: the story area cut into one block per story and ad
+    guillotine.ts           a design's heights solved exactly (whole points), then set out
+    fill.ts                 a hole no story fits: a held story as a brief, a written item, a panel
+    pack.ts                 the old packer (skyline + beam search), tombstone/headline rules
+    fit.ts                  the old gap closing (a page the engine can't solve); house ad, message panel
     stories.ts              dedupe, related stories, edits, stand-in ads
     compose.ts              older box-filling composer; its helpers (stackLines,
                             columnElements...) are used by module.ts. Rest is dead code.
@@ -303,8 +307,8 @@ archive/                    retired code, kept for reference (frontend-layout-en
    (page, grid, fonts,        1. chrome (masthead / headers / footer with today's fields)
     type, spacing, photo      2. ads (fixed blocks)
     rules, chrome)            3. story modules at natural size      (module.ts)
-                              4. page packing, beam search          (pack.ts)
-                              5. gap closing: AI length fit, trims  (fit.ts)
+                              4. ladder of lengths, stories to pages (ladder.ts, engine.ts)
+                              5. page designs solved exactly         (designs.ts, guillotine.ts)
                               6. render contract JSON, Zod-validated
                               7. print + PROBE checks + page images (shared/pdf.ts)
                               8. release gates + AI page review     (build.ts, review.ts)
@@ -412,23 +416,35 @@ The profile is `publications/<id>/profile.json`, validated by `shared/src/profil
 
 ### 8.1 Measurement (`layout/measure.ts`)
 - One long-lived headless Chromium loads the issue's fonts.
-- `breakLines()`: Chromium measures every word once with canvas `measureText` (the same HarfBuzz shaping it uses on the page): its width, and how many letters letter spacing applies to. The breaks are then chosen in Node: **total-fit** for body text (`optimal`, see 8.6), greedy otherwise.
-- `words()`: one text's measured words, for display lines (8.7).
+- `breakLines()`: Chromium measures every word once with canvas `measureText` (the same HarfBuzz shaping it uses on the page): its width, and how many letters letter spacing applies to. The breaks are then chosen in Node: **total-fit** for body text (`optimal`, see 8.7), greedy otherwise.
+- `words()`: one text's measured words, for display lines (8.8).
 - `ink()` returns ink extents and font metrics; `widths()` and `imageSize()` are also here.
 
 ### 8.2 Story module (`layout/module.ts`), a story at its natural size
 For a story with a given **rank** (1 = lead … 5 = brief), **column span k**, **variant** (`long|medium|short`) and **photo mode** (0 = beside the text, 1 = across the whole story, 2 = two photos side by side):
-- **Headline, kicker, deck:** set by `display.ts` (8.7): every line fitted to the story's full width, at the largest size the rank allows (`capByColumns[k] × rankScale[rank]`; a short headline may go one rank up to fill). Kicker 0.6× and deck 0.45× the headline size; every kicker centred over its story.
+- **Headline, kicker, deck:** set by `display.ts` (8.8): every line fitted to the story's full width, at the largest size the rank allows (`capByColumns[k] × rankScale[rank]`; a short headline may go one rank up to fill). Kicker 0.6× and deck 0.45× the headline size; every kicker centred over its story.
 - **Text** is normalised first (`text.ts`): numbers in the paper's digits (English ones like "ATM 2026" stay Latin), clean spacing.
 - **Photo:**
   - natural aspect ratio, nothing cropped in mode 0;
   - must meet the photo rules (minimum height, ppi, share of the story);
   - must not be taller than the text beside it, which would leave a hole;
   - modes 1 and 2 need landscape photos (width/height ≥ 1.25).
-- **Body:** 13 pt on 15.6 pt (or a pitch within 2% from the gap closer), one element per line, each spread to exactly the column width (8.6); columns balanced so they end at most one line apart (`balance()`); first-line indent.
+- **Body:** 13 pt on 15.6 pt (or a pitch within 2% from the gap closer), one element per line, each spread to exactly the column width (8.7); columns balanced so they end at most one line apart (`balance()`); first-line indent.
 - **Result:** exact `width`, `height` and `elements`, positioned at (0, 0); `place()` moves them onto the page.
 
-### 8.3 Page packing (`layout/pack.ts`)
+### 8.3 The layout engine (`layout/engine.ts`, the default since Oct 2026)
+The profile's `editorial.layoutEngine` ("v2", the default; "v1" the old packer below), or `CK_ENGINE` for a test. Each page is planned whole and solved exactly; there's no AI in the layout loop.
+1. **Lengths** (`editorial/ladder.ts`): every length a story may print at, before layout starts: its own three (the rewrite's long, medium, short), each cut a sentence at a time from its end (as a desk cuts a story: news runs most important first), down to a brief. On a day short of copy, the AI writes one longer version of each story whose release has more facts (`fitLength`, cached; never over the release's own length). Every length passes `editorial/quality.ts`: it never says a thing twice, every letter prints in the paper's fonts.
+2. **Settings** (`blocks.ts`): each story at every width it may take (a brief 1-3 columns, a lesser story 1-7, a lead 3-7), every length, every photo layout, and a smaller headline where the rank's is too heavy: its exact height and how much it can stretch (header spacing, pitch +2%). Settings that break a desk rule are dropped (a display line under 97%, a headline over 30% of the story, a brief under a headline of over 4 lines, a loose body). Measuring is cached (`measure.ts`), so a story measured once costs nothing more.
+3. **Pages** (`assign()`): the stories shared over the pages by the room each has (its band less its ads), most important first, the front page's lead on it and the front page filled first, related stories apart. A story with no room is held (listed as left out).
+4. **Designs** (`designs.ts`): for each page, hundreds of ways of cutting its story area straight across or down (a guillotine) into one block per story, each block a width its story may take, the ads at the foot in their own blocks. The ads are tried in several tidy arrangements (`adLayouts()`). Where a strip by an ad suits no story, a **filler** block (at most two a page).
+5. **Exact heights** (`guillotine.ts`): each design solved over every story's settings, in whole points: blocks side by side end level, stacked blocks add up (with the 8pt gap and its rule), the whole fills the band to its foot. A design with no exact solution is dropped; the cheapest (copy kept, photos kept, natural spacing) is set out, and judged as a reader sees it (headline sizes follow importance; level neighbours get a column rule).
+6. **Fillers** (`fill.ts`): a held story as a brief; else a "જાણવા જેવું" item written to its size in the paper's language (two stacked where one leaves room); else the paper's message panel or house ad (once each a paper).
+7. **No design fills a page:** more designs, then a story moved in (held, or from a page with copy to spare) or held back, up to four rounds. Still none: the old engine (8.4, 8.5) lays out that page from its stories.
+
+A copy (`editorial/copies.ts`) runs the same engine with its own seed: other page spreads and designs, the lengths already made (the day's longer versions reused, nothing new written), so a copy takes about half a minute and almost no AI.
+
+### 8.4 Page packing, the old engine (`layout/pack.ts`)
 - **Fixed blocks:** chrome and ads. Ads are placed first (`ads.ts`): a booking may pin its position; any other ad (the 8 August stand-ins included) is snapped to whole columns, shape kept, and stacked up from the foot of the page, so stories get one unbroken area. Each column's "free y" skips over ads (`settle`).
 - **Skyline:** take the lowest, leftmost open stretch of columns and try candidate stories × spans (`spansFor(rank)`) × photo modes × variants. Keep the longest variant that fits under the next obstacle.
 - **The lead:** the first story placed on each page is that page's lead (rank 1).
@@ -438,7 +454,7 @@ For a story with a given **rank** (1 = lead … 5 = brief), **column span k**, *
 - **Page budgets** (`build.ts`): the day's copy at natural size, divided between pages in proportion to their free room. That stops page 1 from taking everything. A budget is a preference: when only an over-budget story fits a stretch, it goes in rather than leaving a hole. No headline in one column except briefs.
 - **Rules between stacked stories:** an 8 pt gap and a 0.75 pt rule (`renderPlaced`).
 
-### 8.4 Gap closing (`layout/fit.ts`)
+### 8.5 Gap closing, the old engine (`layout/fit.ts`)
 - For each placed story, `room()` measures the space down to the next element below in its columns: a story, an ad, a house ad, or the foot of the band.
 - If more than one line is free, it tries, in order:
   0. display before copy: a landscape photo across the whole story;
@@ -449,16 +465,16 @@ For a story with a given **rank** (1 = lead … 5 = brief), **column span k**, *
 - Still more than 4 lines free, and then **every empty area found on the finished page** (`occupancy.ts`: all element boxes on a columns × 2pt grid, so holes beside ads or between stories of different widths count too): a left-out story, else a 60- or 40-word AI brief, else a filler -- the **house ad** where the area is wide and shallow, otherwise a **public-service message** (`fillers.messages` in the profile, e.g. "રક્તદાન મહાદાન ચક્ષુદાન શ્રેષ્ઠદાન") set in fitted display type in a ruled panel. At most **one message and one house ad in a whole issue** (`fillers.maxMessages`, `maxHouseAds`): space is filled with stories, not slogans; a day short of copy fails gate 2 instead.
 - What remains is reported as `white-space` (gate 2). More than 2 fillers on a page is logged as "short of copy" (and gate S5 fails past 12% of the page).
 
-### 8.5 Chrome (`chrome/chrome.ts`)
+### 8.6 Chrome (`chrome/chrome.ts`)
 The art is the 8 August masthead and headers with the date, issue number and page number **removed** (PyMuPDF redaction, text only). Today's values are set in Gopika Bold at the printed size, on the printed baseline. Page 1 gets the masthead, inner pages the inner header, and the last page the last-page header plus the legal footer.
 
-### 8.6 Body justification (`layout/linebreak.ts`)
+### 8.7 Body justification (`layout/linebreak.ts`)
 A browser breaks lines greedily and puts all the slack of a justified line into its word gaps: holes and rivers, worst on lines of two or three long Gujarati words. Instead:
 - **Total-fit breaking** (Knuth & Plass, 1981 -- TeX and InDesign's Paragraph Composer): all of a paragraph's breaks chosen at once, so no line is much looser than the rest. Lines past the budget cost more the further past; a lone word mid-paragraph costs most.
 - **Micro-typography** (pdfTeX's font expansion, after Zapf's hz program): a line's slack is shared between word spacing (70-200% of a space), letter spacing (−0.02 to +0.06 em; the 8 August body letter-spaces up to about 0.055 em) and a glyph scale of 97-102%. Past the budget the letters keep spreading to 0.08 em, then the word spaces take the rest. A lone word too short for its line is set flush left.
 - Each line is one text element (`compose.ts` `columnElements`) with its own `letterSpacing`, `wordSpacing` and `hScale`, `nowrap`, `justify-all`: the browser never reflows it. The plotter's probe reports a fitted line that doesn't print at its width (`line-fit`).
 
-### 8.7 Display type (`layout/display.ts`)
+### 8.8 Display type (`layout/display.ts`)
 Headlines, kickers and decks never end ragged: the text is broken into a few balanced lines and each line fitted to the exact measure with horizontal scaling (0.86-1.2) plus letter spacing, at the largest size that allows it (the paper itself scales headlines 0.6-1.4×). A lead's headline prefers two big lines to one long one. Baselines sit on a fixed tight pitch (1.12× the size), opened only where two lines' marks would touch.
 
 ---
@@ -501,6 +517,8 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 - **S4 columns:** a story's columns end within one line of each other.
 - **S5 enough copy:** fillers cover under 12% of each page's story area; otherwise the day is short of news (add releases, or print fewer pages).
 - **S6 digits:** no number left in Latin digits that the paper prints in its own.
+- **S8 repetition:** no story says the same thing twice (two sentences sharing half their words: `editorial/quality.ts`).
+- **S9 a loose story:** no single story's loosest tenth of body lines past 0.6 em (0.9 in Hindi and Urdu) -- S1 is the page's average, which hid a narrow story full of long words.
 - **S7 structure:** every story prints a headline, a smaller sub-heading (deck) and smaller body text: headline ≥ 1.25× the sub-heading, sub-heading ≥ 1.15× the body. A story without a deck gets its release's sub-heading, else one written by the AI (`rewrite.ts` `writeDeck`, cached); the rewrite prompt now always asks for one.
 
 ---
@@ -513,7 +531,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
   - A past day: the list page's own ASP.NET date form posted back.
   - A release: `PressReleaseIframePage.aspx?PRID=n` (ministry, headline, date line, paragraphs, photos, and the PRIDs of its other language versions).
 - **Round-ups:** near-identical releases from one office (the PM's congratulations to each medal winner) become one story (`groupSimilar` in `rewrite.ts`).
-- **The Hindi top-up** (`editorial/translate.ts`): when the Gujarati copy fills less than the profile's `fillTarget` (110%), the Hindi list (less what PIB also issued in Gujarati, by language links or by the same names and figures, and less greetings) is ranked by the AI for Gujarat's readers, then translated one by one until the pages are full or the day's AI budget (`dailyBudgetUsd`) is spent. Numbers are checked against the Hindi (Devanagari digits, "9 हज़ार", "2 लाख" understood).
+- **The Hindi top-up** (`editorial/translate.ts`): when the Gujarati copy fills less than the profile's `fillTarget` (110%), the Hindi list (less what PIB also issued in Gujarati, by language links or by the same names and figures, and less greetings) is ranked by the AI for Gujarat's readers, then translated one by one until the pages are full (no spending ceiling unless the profile sets `dailyBudgetUsd`). Numbers are checked against the Hindi (Devanagari digits, "9 हज़ार", "2 लाख" understood).
 - **The state's Information Department** (gujaratinformation.gujarat.gov.in) blocks automated browsers; **don't get around that.** The `/reader` bookmark (one page at a time, read by a person) and `POST /api/releases` still work; `ingest/gujaratInfo.ts` is kept for if access is ever allowed.
 
 ---

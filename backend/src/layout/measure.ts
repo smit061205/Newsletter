@@ -70,6 +70,8 @@ export interface Line {
 // layout can differ from canvas measurement by a hair, and a line that wraps
 // on the page would overflow by a whole line.
 const SAFETY = 0.995;
+/** The share of the width a justified line of a kerned script (Hindi, Urdu) is broken to. */
+const KERNED_SAFETY = 0.994;
 
 const family = (id: string) => `f-${id.replace(/[^A-Za-z0-9_-]/g, "_")}`;
 
@@ -212,11 +214,61 @@ export class Measurer {
     return m;
   }
 
+  // what's been measured already, for the life of this measurer: a word's
+  // width doesn't depend on the line it's in, so a story set again at
+  // another width or length (layout/blocks.ts) costs no round trip
+  private wordCache = new Map<string, { width: number; letters: number }>();
+  private spaceCache = new Map<string, number>();
+  private inkCache = new Map<string, { ascent: number; descent: number; fontAscent: number; fontDescent: number }>();
+  private widthCache = new Map<string, number>();
+
   /** Widths of the words of each request's paragraphs (contract px, after
    * hScale), how many letters letter spacing applies to in each, and the
-   * width of a space. */
+   * width of a space -- from the cache, the words not measured yet in one
+   * round trip. */
   private async measureWords(reqs: { size: number; hScale: number; base: string; space: string; kern: boolean;
                                      paras: { word: string; runs: { text: string; family: string }[] }[][] }[]) {
+    type Req = (typeof reqs)[number];
+    // (a kerned script's word space is measured between the request's own first
+    // two words, and differs by them: so it's one of the key)
+    const pair = (r: Req) => (r.kern ? (r.paras.find((p) => p.length > 1)?.slice(0, 2).map((w) => w.runs.map((x) => x.text).join("")).join(" ") ?? "") : "");
+    const group = (r: Req) => `${r.base}|${r.size}|${r.hScale}|${r.kern ? 1 : 0}|${r.space}|${pair(r)}`;
+    const wordGroup = (r: Req) => `${r.base}|${r.size}|${r.hScale}|${r.kern ? 1 : 0}`;
+    const wordKey = (r: Req, w: Req["paras"][number][number]) => `${wordGroup(r)}|${w.runs.map((x) => `${x.family}:${x.text}`).join("\u0001")}`;
+    // per group: the words still to measure, and the request its space is measured from
+    const todo = new Map<string, { req: Req; words: Map<string, Req["paras"][number][number]> }>();
+    for (const r of reqs) {
+      const g = group(r);
+      for (const p of r.paras) {
+        for (const w of p) {
+          const k = wordKey(r, w);
+          if (this.wordCache.has(k)) continue;
+          if (!todo.has(g)) todo.set(g, { req: r, words: new Map() });
+          todo.get(g)!.words.set(k, w);
+        }
+      }
+      if (!this.spaceCache.has(g) && !todo.has(g)) todo.set(g, { req: r, words: new Map() });
+    }
+    if (todo.size) {
+      const send = [...todo.values()].map(({ req, words }) => ({
+        ...req,
+        // the request's first two words first: its word space is measured between them
+        paras: [req.paras.find((p) => p.length > 1)?.slice(0, 2) ?? [], [...words.values()]],
+      }));
+      const got = await this.measureRaw(send);
+      [...todo].forEach(([g, { words }], i) => {
+        this.spaceCache.set(g, got[i].space);
+        [...words.keys()].forEach((k, j) => this.wordCache.set(k, got[i].paras[1][j]));
+      });
+    }
+    return reqs.map((r) => {
+      const g = group(r);
+      return { space: this.spaceCache.get(g)!, paras: r.paras.map((p) => p.map((w) => ({ ...this.wordCache.get(wordKey(r, w))! }))) };
+    });
+  }
+
+  private async measureRaw(reqs: { size: number; hScale: number; base: string; space: string; kern: boolean;
+                                   paras: { word: string; runs: { text: string; family: string }[] }[][] }[]) {
     return this.page.evaluate(({ reqs }) => {
       const ctx = document.createElement("canvas").getContext("2d")! as CanvasRenderingContext2D & { letterSpacing: string };
       const TEST = 10;
@@ -270,6 +322,20 @@ export class Measurer {
    * a line to itself (and its width says it overflows). Widths are measured
    * on the text as printed (see shape()). */
   async breakLines(requests: BreakRequest[]): Promise<Line[][]> {
+    // a story's body breaks the same at every width it's set at (its column
+    // is always one grid column): broken once, for every setting of it (layout/blocks.ts)
+    const keys = requests.map((r) => JSON.stringify(r));
+    const missing = requests.filter((_, i) => !this.lineCache.has(keys[i]));
+    if (missing.length) {
+      const got = await this.breakLinesRaw(missing);
+      missing.forEach((r, i) => this.lineCache.set(JSON.stringify(r), got[i]));
+    }
+    return keys.map((k) => this.lineCache.get(k)!);
+  }
+
+  private lineCache = new Map<string, Line[]>();
+
+  private async breakLinesRaw(requests: BreakRequest[]): Promise<Line[][]> {
     const unspaced = /[\u0600-\u06FF\u0750-\u077F\u0900-\u097F]/;
     const reqs = requests.map((r) => ({
       size: r.size, hScale: r.hScale ?? 1, kern: r.paras.some((p) => unspaced.test(p)),
@@ -306,7 +372,10 @@ export class Measurer {
       paras.forEach((words, pi) => {
         let starts: number[];
         if (req.optimal) {
-          starts = breakParagraph(words, space, req.size, width - indent, width, req.looseness?.[pi] ?? 0);
+          // (a kerned script prints a hair wider than the canvas measures it: Hindi
+          // lines ran 5-6 px over (22 Oct): broken to 99.4% of the width, then spread to it)
+          const fit = r.kern ? KERNED_SAFETY : 1;
+          starts = breakParagraph(words, space, req.size, (width - indent) * fit, width * fit, req.looseness?.[pi] ?? 0);
         } else {
           starts = [0];
           let cur = 0;
@@ -363,6 +432,16 @@ export class Measurer {
 
   /** Width of single strings as printed (after hScale), e.g. to size a headline line. */
   async widths(items: { text: string; font: string; size: number; hScale?: number }[]): Promise<number[]> {
+    const key = (i: (typeof items)[number]) => `${i.font}|${i.size}|${i.hScale ?? 1}|${i.text}`;
+    const missing = items.filter((i) => !this.widthCache.has(key(i)));
+    if (missing.length) {
+      const got = await this.widthsRaw(missing);
+      missing.forEach((i, n) => this.widthCache.set(key(i), got[n]));
+    }
+    return items.map((i) => this.widthCache.get(key(i))!);
+  }
+
+  private async widthsRaw(items: { text: string; font: string; size: number; hScale?: number }[]): Promise<number[]> {
     const list = items.map((i) => ({
       size: i.size, hScale: i.hScale ?? 1,
       runs: this.shape(i.text, i.font).map((x) => ({ text: x.text, family: family(x.font ?? i.font) })),
@@ -379,6 +458,16 @@ export class Measurer {
   /** How far each text's letters reach above and below its baseline (its
    * ink), and its font's ascent/descent (what Chromium uses for the line box). */
   async ink(items: { text: string; font: string; size: number }[]): Promise<{ ascent: number; descent: number; fontAscent: number; fontDescent: number }[]> {
+    const key = (i: (typeof items)[number]) => `${i.font}|${i.size}|${i.text}`;
+    const missing = items.filter((i) => !this.inkCache.has(key(i)));
+    if (missing.length) {
+      const got = await this.inkRaw(missing);
+      missing.forEach((i, n) => this.inkCache.set(key(i), got[n]));
+    }
+    return items.map((i) => ({ ...this.inkCache.get(key(i))! }));
+  }
+
+  private async inkRaw(items: { text: string; font: string; size: number }[]): Promise<{ ascent: number; descent: number; fontAscent: number; fontDescent: number }[]> {
     const list = items.map((i) => ({
       size: i.size, family: family(i.font),
       runs: this.shape(i.text, i.font).map((x) => ({ text: x.text, family: family(x.font ?? i.font) })),

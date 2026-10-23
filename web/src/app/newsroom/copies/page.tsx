@@ -83,6 +83,7 @@ export default function Copies() {
     if (again) return `${t("copies.doing.again", { n: num(lang, again[1]) })} · ${whatOf(again[2])}`;
     const m = w.match(/^(planning|finishing) (\d+)$/);
     if (m) return t(m[1] === "planning" ? "progress.planning" : "progress.finishing", { item: num(lang, m[2]) });
+    if (w.startsWith("lengths")) return t("copies.doing.lengths");
     return w === "checking" ? t("progress.checking") : w === "translating" ? t("copies.doing.translating") : w === "rewording" ? t("copies.doing.rewording") : w;
   };
   // a copy's print PDF, or (`corel`) the one whose text stays text in CorelDRAW
