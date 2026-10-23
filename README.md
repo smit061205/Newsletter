@@ -62,7 +62,7 @@ Not sure which Mac? Apple menu → About This Mac: "Chip: Apple M…" is Apple s
 - **The earlier script install** (the `Install Capital Kranti` scripts) is moved in automatically the first time the new app opens. Its issues, settings and key come across; its folder, log-in agent / scheduled tasks and old shortcut are removed.
 
 ### For the developer: making a release
-- On GitHub, no Terminal needed: **Releases → Draft a new release → Choose a tag**, type a new one (`v1.0.0`, then `v1.0.1`, …) and pick **Create new tag on publish**, give it a title, then **Publish release**. The **release** workflow (`.github/workflows/release.yml`) builds the `.dmg` (both Mac kinds) and the setup `.exe` and attaches them to that release in about half an hour. The download links above then serve them, and installed apps offer the update. Running the workflow by hand (Actions → release → Run workflow) makes a test build as a downloadable artifact instead.
+- Push a new version tag from `main`: `git tag v1.0.6 && git push origin v1.0.6` (then `v1.0.7`, …). The **release** workflow (`.github/workflows/release.yml`) creates the release, builds the `.dmg` (both Mac kinds) and the setup `.exe` and attaches them to it in about half an hour. The download links above then serve them, and installed apps offer the update. Running the workflow by hand (Actions → release → Run workflow) makes a test build as a downloadable artifact instead.
 - **Connect the website** needs a GitHub OAuth App, set up once:
   1. GitHub → Settings → Developer settings → OAuth Apps → New. Use any homepage URL, and the callback URL `http://127.0.0.1`.
   2. Tick **Enable Device Flow**.

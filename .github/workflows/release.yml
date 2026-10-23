@@ -1,21 +1,35 @@
 # The desktop app's installers: a .dmg for Macs (Apple silicon and Intel) and
 # a setup .exe for Windows, built here and attached to a GitHub Release.
-# Making one needs no Terminal: on GitHub, Releases -> Draft a new release ->
-# a new tag such as v1.0.1 -> Publish release; the installers appear on it in
-# about half an hour. (Run by hand from Actions: a test build, not released.)
-# The app checks the latest Release for updates, so a release reaches the
-# paper's computer by itself.
+# A release is made by pushing a version tag from main:
+#   git tag v1.0.6 && git push origin v1.0.6
+# The release is created here and the installers appear on it in about half
+# an hour. (Run by hand from Actions: a test build, not released.) The app
+# checks the latest Release for updates, so a release reaches the paper's
+# computer by itself.
 name: release
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  # the release itself, once, before the three builds attach to it
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create the release for the tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Capital Kranti $GITHUB_REF_NAME" --generate-notes --latest
   build:
+    needs: release
+    if: always() && (needs.release.result == 'success' || needs.release.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -105,7 +119,7 @@ jobs:
           curl -fsS http://127.0.0.1:4100/api/status
           kill %1 || true
       - name: Attach to the release
-        if: github.event_name == 'release'
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         working-directory: desktop
         env:

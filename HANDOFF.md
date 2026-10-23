@@ -116,8 +116,8 @@ CK_PUBLICATION=dev-test DATA_DIR=/tmp/ck-test node --experimental-strip-types --
 ## 5. Making a release (the desktop app)
 
 1. Push the code to `main`.
-2. On GitHub, go to **Releases → Draft a new release**, choose a new tag `vX.Y.Z` (Create new tag on publish), keep the label **None** (not pre-release), and click **Publish release**.
-3. The **release** workflow builds three installers and attaches them to that release in about 30 minutes:
+2. Push a new version tag from `main`: `git tag vX.Y.Z && git push origin vX.Y.Z` (from 23 Oct, every finished improvement is released this way; CLAUDE.md).
+3. The **release** workflow creates the release and builds three installers and attaches them to it in about 30 minutes:
    - Mac Apple silicon on `macos-14`;
    - Mac Intel on `macos-15-intel`;
    - Windows on `windows-latest`.
