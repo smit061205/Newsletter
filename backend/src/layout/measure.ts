@@ -6,7 +6,8 @@
 // linearly with font size, so the CSS-px vs 300-DPI-px factor cancels out.
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { chromium, type Browser, type Page } from "playwright";
+import type { BrowserContext, Page } from "playwright";
+import { acquireBrowser, releaseBrowser } from "../browser.ts";
 import type { Font, TextRun } from "@ck/shared/contract";
 import { assetFile, PLOT_ORIGIN, PUBLIC_DIR } from "../config.ts";
 import { cmapCoverage } from "../fonts/cmap.ts";
@@ -107,7 +108,9 @@ export function elementText(pieces: (Line | string)[], legacy: boolean): { text:
 }
 
 export class Measurer {
-  private browser: Browser;
+  /** its own tab in the engine's one browser (browser.ts) */
+  private context: BrowserContext;
+  private closed = false;
   private page: Page;
   private faces: Faces;
   /** each font's characters (fonts/cmap.ts), for the fallbacks */
@@ -116,8 +119,8 @@ export class Measurer {
   /** Text the encoder couldn't set in the legacy font (reported by the build). */
   unencodable = new Set<string>();
 
-  private constructor(browser: Browser, page: Page, faces: Faces) {
-    this.browser = browser;
+  private constructor(context: BrowserContext, page: Page, faces: Faces) {
+    this.context = context;
     this.page = page;
     this.faces = faces;
     this.encoder = Object.values(faces.encoding).includes("bharati") ? new BharatiEncoder() : null;
@@ -160,8 +163,9 @@ export class Measurer {
   }
 
   static async open(fonts: Font[], faces: Faces = { encoding: {}, latin: {} }, publicDir = PUBLIC_DIR): Promise<Measurer> {
-    const browser = await chromium.launch();
-    const context = await browser.newContext();
+    const browser = await acquireBrowser();
+    let context: BrowserContext;
+    try { context = await browser.newContext(); } catch (e) { releaseBrowser(); throw e; }
     const fontFaces = fonts
       .map((f) => `@font-face{font-family:"${family(f.id)}";src:url("${f.url}");font-weight:${f.weight ?? 400};font-display:block}`)
       .join("");
@@ -177,8 +181,14 @@ export class Measurer {
         return route.fulfill({ status: 404, body: "" });
       }
     });
-    const page = await context.newPage();
-    await page.goto(`${PLOT_ORIGIN}/__measure`);
+    // (a tab that fails to open gives its share of the browser back)
+    const opened = async () => {
+      const p = await context.newPage();
+      await p.goto(`${PLOT_ORIGIN}/__measure`);
+      return p;
+    };
+    let page: Page;
+    try { page = await opened(); } catch (e) { await context.close().catch(() => {}); releaseBrowser(); throw e; }
     const failed = await page.evaluate(async (families) => {
       const bad: string[] = [];
       for (const f of families) {
@@ -188,10 +198,11 @@ export class Measurer {
       return bad;
     }, fonts.map((f) => family(f.id)));
     if (failed.length) {
-      await browser.close();
+      await context.close().catch(() => {});
+      releaseBrowser();
       throw new Error(`fonts failed to load for measuring: ${failed.join(", ")}`);
     }
-    const m = new Measurer(browser, page, faces);
+    const m = new Measurer(context, page, faces);
     for (const f of fonts) {
       try {
         const file = publicDir === PUBLIC_DIR ? assetFile(f.url) : path.join(publicDir, decodeURIComponent(f.url));
@@ -404,6 +415,9 @@ export class Measurer {
   }
 
   async close() {
-    await this.browser.close();
+    if (this.closed) return;
+    this.closed = true;
+    await this.context.close().catch(() => {});
+    releaseBrowser();
   }
 }

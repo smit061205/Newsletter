@@ -3,6 +3,7 @@
 // the frontend's own plotter (no text may overflow or run into anything),
 // saved as a draft, and printed to PDF.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { IssueRenderSchema, type Element, type IssueRender, type TextElement } from "@ck/shared/contract";
 import { printIssue } from "@ck/shared/pdf";
@@ -14,7 +15,7 @@ import { planDay } from "./editorial/plan.ts";
 import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
-import { isSpeechText, speechTwin, writeDeck } from "./editorial/rewrite.ts";
+import { fitCalls, isSpeechText, speechTwin, writeDeck } from "./editorial/rewrite.ts";
 import { closeGaps, type FillerCount } from "./layout/fit.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
 import { applyTextEdits, dedupe, droppedBy, inPaperLanguage, referenceAds, standInsMovable } from "./layout/stories.ts";
@@ -22,6 +23,7 @@ import { arrangeAds } from "./layout/ads.ts";
 import { findGaps } from "./layout/occupancy.ts";
 import { styleChecks } from "./layout/style.ts";
 import { buildFingerprint } from "./fingerprint.ts";
+import { acquireBrowser, releaseBrowser } from "./browser.ts";
 import { spanWidth } from "./layout/module.ts";
 import { BODY, DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE, PT } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
@@ -85,6 +87,10 @@ export interface BuildReport {
   cost: number;
   /** the editorial plan's rank and reason for each story (editorial/plan.ts), for the editor */
   plan: { id: string; rank: number; reason: string }[];
+  /** how long each part of the layout took (ms) and the AI length fits it asked
+   * for, and the memory the engine and the computer had (MB) -- for making it faster */
+  timing?: { planning: number; fitting: number; print: number; review: number; checks: number; total: number; fits: number;
+             engineMb: number; freeMb: number };
   /** spacing and fill measures, and the loosest body lines (for the editor) */
   style: ReturnType<typeof styleChecks>["stats"];
 }
@@ -131,6 +137,9 @@ export async function fillContext(store: Store, date: string): Promise<{
 
 export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport }> {
   const { log } = opts;
+  // how long each part takes (report.timing)
+  const timing = { start: Date.now(), planning: 0, fitting: 0, print: 0, review: 0 };
+  let fitsBefore = fitCalls();
   let stories = store.stories(date);
   if (!stories.length && store.releases(date).length) {
     const { rewriteDay } = await import("./editorial/rewrite.ts");
@@ -236,6 +245,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const share = Math.min(1.05, content / room.reduce((a, b) => a + b, 0));
     log(`  the day's copy fills ${(share * 100).toFixed(0)}% of the pages at its natural size`);
     const pagesOut = new Map<number, Element[]>();
+    timing.start = Date.now();
+    fitsBefore = fitCalls();
     const placed: { page: number; story: Story; variant: string; cols: number; rank: number }[] = [];
     const gaps: { page: number; col: number; y0: number; y1: number }[] = [];
     const plans: PagePlan[] = [];
@@ -261,6 +272,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
           plan.placed.map((p) => `${p.module.story.id}(${p.module.cols}col ${p.module.variant}` +
             `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" "));
     }
+    timing.planning = Date.now() - timing.start;
+    const t1 = Date.now();
     // close the gaps: grow stories into them, then briefs and the house ad (layout/fit.ts)
     // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
     const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
@@ -284,6 +297,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       gaps.push(...findGaps(fit.blocks, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }).map((g) => ({ page: n, ...g })));
       finalPlans.push(fit.plan);
     }
+    timing.fitting = Date.now() - t1;
     result = { pages: pagesOut, placed, gaps, leftOut: pool, plans: finalPlans, spent: spent + rewordCost, factChecks };
   } finally {
     await m.close();
@@ -297,8 +311,15 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // page images too, for the website: licensed fonts never leave this server
   const restricted = FONTS.some((f) => f.restricted);
   opts.progress?.({ done: total * 2, total: total * 2 + 1, label: "checking" });
-  const { pdf, warnings, images } = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile,
-                                                              ...((restricted || opts.images) && !opts.copy ? { images: 150 } : {}) });
+  const t2 = Date.now();
+  const browser = await acquireBrowser();
+  let printed: Awaited<ReturnType<typeof printIssue>>;
+  try {
+    printed = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, browser,
+                                        ...((restricted || opts.images) && !opts.copy ? { images: 150 } : {}) });
+  } finally { releaseBrowser(); }
+  const { pdf, warnings, images } = printed;
+  timing.print = Date.now() - t2;
   const pdfPath = opts.copy?.pdfPath ?? path.join(OUT_DIR, `${profile.id}-${date}.pdf`);
   await mkdir(path.dirname(pdfPath), { recursive: true });
   await writeFile(pdfPath, pdf);
@@ -308,10 +329,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     await Promise.all(images.map((png, i) => writeFile(path.join(dir, `${i + 1}.png`), png)));
   }
   // gate 5: a vision model reviews the finished pages (report only)
+  const t3 = Date.now();
   let review: Awaited<ReturnType<typeof reviewPages>> = null;
   if (images && !opts.noReview) {
     review = await reviewPages(images.map((_, i) => path.join(pageImageDir(date), `${i + 1}.png`)), { log });
   }
+  timing.review = Date.now() - t3;
   if (m.unencodable.size) log(`  text the paper's fonts can't set (left as typed): ${[...m.unencodable].join(" ")}`);
 
   const pt = 72 / DPI;
@@ -403,6 +426,15 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       : confident.map((f) => `p${f.page} ${f.issue} "${f.where.slice(0, 30)}": ${f.note}`).join("; ") || `ok (${review.findings.length} minor note(s))`,
   });
   const ready = gates.every((g) => g.pass);
+  const min = (ms: number) => Math.round(ms / 600) / 100;
+  const took = {
+    planning: timing.planning, fitting: timing.fitting, print: timing.print, review: timing.review,
+    checks: Date.now() - timing.start - timing.planning - timing.fitting - timing.print - timing.review,
+    total: Date.now() - timing.start, fits: fitCalls() - fitsBefore,
+    engineMb: Math.round(process.memoryUsage().rss / 2 ** 20), freeMb: Math.round(os.freemem() / 2 ** 20),
+  };
+  log(`timing: planning ${min(took.planning)}m, fitting ${min(took.fitting)}m (${took.fits} AI length fits), printing ${min(took.print)}m, ` +
+      `page review ${min(took.review)}m, checks ${min(took.checks)}m -- ${min(took.total)}m; memory: engine ${took.engineMb} MB, computer free ${took.freeMb} MB`);
 
   const report: Omit<BuildReport, "version"> = {
     date, issueNumber, pages: total,
@@ -415,6 +447,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     gates, ready, cost: Math.round((result.spent + planCost + (review?.cost ?? 0)) * 10000) / 10000,
     review: review?.findings ?? [], plan: planEntries,
     style: style.stats,
+    timing: took,
   };
   // a copy is the day's paper laid out again: not a new version of it
   const version = opts.copy ? 0 : store.saveIssue(date, issue, report);

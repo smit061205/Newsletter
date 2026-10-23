@@ -160,28 +160,39 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
     log(`  ranked for Gujarat's readers: ${ranked.order.length} worth printing`);
     let translated = 0;
     let tried = 0;
-    for (const prid of ranked.order) {
-      opts.progress?.({ done: tried++, total: ranked.order.length, label: "translating", item: candidates.find((c) => c.prid === prid)?.headline });
-      if (ctx.share() >= target) break;
+    // a few at a time: as many as the pages still look short of (from the
+    // day's average story), at most 4 -- read from PIB one by one, translated
+    // together, kept in rank order up to the same point as one at a time
+    const order = ranked.order.filter((prid) => !done.has(prid));
+    let k = 0;
+    while (k < order.length && ctx.share() < target) {
       if (cost >= profile.editorial.dailyBudgetUsd) { log(`  the day's AI budget ($${profile.editorial.dailyBudgetUsd}) is spent: stopping`); break; }
-      if (done.has(prid)) continue;
-      // fetch it; its own page may name a Gujarati version the list didn't
-      await ingestPib(store, date, "hi", { only: new Set([prid]), log: () => {} });
-      const r = store.releases(date).find((x) => x.id === prid && x.lang === "hi");
-      if (!r) { log(`  ${prid}: couldn't read it`); continue; }
-      if ((r.langVersions ?? []).some((v) => have.has(v))) { log(`  ${prid}: already in the paper in Gujarati`); continue; }
-      const twin = sameNewsIn(r, gujarati);
-      if (twin) { log(`  ${prid}: the same news as Gujarati ${twin.id} (${twin.headline.slice(0, 40)}): not translated`); continue; }
-      try {
-        const got = await translateOne(r, key);
-        cost += got.cost;
-        store.putStory(got.story);
+      const perStory = ctx.content / Math.max(1, store.stories(date).length);
+      const need = Math.max(1, Math.min(4, Math.ceil(((target - ctx.share()) * ctx.room) / Math.max(1, perStory))));
+      const batch: Release[] = [];
+      while (batch.length < need && k < order.length) {
+        const prid = order[k++];
+        opts.progress?.({ done: tried++, total: order.length, label: "translating", item: candidates.find((c) => c.prid === prid)?.headline });
+        // fetch it; its own page may name a Gujarati version the list didn't
+        await ingestPib(store, date, "hi", { only: new Set([prid]), log: () => {} });
+        const r = store.releases(date).find((x) => x.id === prid && x.lang === "hi");
+        if (!r) { log(`  ${prid}: couldn't read it`); continue; }
+        if ((r.langVersions ?? []).some((v) => have.has(v))) { log(`  ${prid}: already in the paper in Gujarati`); continue; }
+        const twin = sameNewsIn(r, gujarati);
+        if (twin) { log(`  ${prid}: the same news as Gujarati ${twin.id} (${twin.headline.slice(0, 40)}): not translated`); continue; }
+        batch.push(r);
+      }
+      const results = await Promise.all(batch.map((r) => translateOne(r, key).then((got) => ({ r, got }), (e: unknown) => ({ r, error: e }))));
+      for (const x of results) {
+        if ("error" in x) { log(`  ${x.r.id}: translation failed (${x.error instanceof Error ? x.error.message : x.error})`); continue; }
+        cost += x.got.cost;
+        // the pages filled up with the ones before it: not printed (as one at a time would never have asked)
+        if (ctx.share() >= target) { log(`  ${x.r.id}: translated, but the pages are full: left out`); continue; }
+        store.putStory(x.got.story);
         translated++;
-        ctx.content += await ctx.areaOf(got.story);
-        log(`  ${prid}: translated -- ${got.story.headline.slice(0, 60)}` + (got.story.factCheck ? ` (${got.story.factCheck})` : "") +
+        ctx.content += await ctx.areaOf(x.got.story);
+        log(`  ${x.r.id}: translated -- ${x.got.story.headline.slice(0, 60)}` + (x.got.story.factCheck ? ` (${x.got.story.factCheck})` : "") +
             ` -> ${(ctx.share() * 100).toFixed(0)}%`);
-      } catch (e) {
-        log(`  ${prid}: translation failed (${e instanceof Error ? e.message : e})`);
       }
     }
     log(`top-up ${date}: ${translated} translated from Hindi, the copy now fills ${(ctx.share() * 100).toFixed(0)}%, $${cost.toFixed(3)}`);

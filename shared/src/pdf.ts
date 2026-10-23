@@ -3,7 +3,7 @@
 // engine that draws the website preview, so screen and print can't disagree.
 // Also returns the plotter's warnings (text overflow, failed images/fonts,
 // elements off the page); printing never changes anything to hide them.
-import { chromium } from "playwright";
+import { chromium, type Browser } from "playwright";
 import { PDFDocument } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -28,6 +28,9 @@ export interface PrintOptions {
   /** Map a URL path to a file on disk (wins over publicDir), e.g. a
    * publication's private fonts. */
   resolve?: (pathname: string) => string;
+  /** A browser to print in (its own context, closed after): the backend's
+   * one shared browser. Without it, one is started and closed. */
+  browser?: Browser;
   /** Also render each page to a PNG at this many dots per inch -- for a
    * website that mustn't load the paper's licensed fonts itself. */
   images?: number;
@@ -39,11 +42,11 @@ const TYPES: Record<string, string> = {
 };
 
 export async function printIssue(issue: IssueRender, options: PrintOptions | string): Promise<PrintResult> {
-  const { origin, publicDir, checkOnly, resolve, images } = typeof options === "string" ? { origin: options } as PrintOptions : options;
-  const browser = await chromium.launch();
+  const { origin, publicDir, checkOnly, resolve, images, browser: given } = typeof options === "string" ? { origin: options } as PrintOptions : options;
+  const browser = given ?? await chromium.launch();
+  // the plotted page is laid out in CSS px (96 per inch): this scale gives the asked-for dpi
+  const context = await browser.newContext(images ? { deviceScaleFactor: images / 96 } : {});
   try {
-    // the plotted page is laid out in CSS px (96 per inch): this scale gives the asked-for dpi
-    const context = await browser.newContext(images ? { deviceScaleFactor: images / 96 } : {});
     const merged = await PDFDocument.create();
     const pngs: Uint8Array[] = [];
     const warnings: PlotWarning[] = staticWarnings(issue);
@@ -108,6 +111,8 @@ export async function printIssue(issue: IssueRender, options: PrintOptions | str
     }
     return { pdf: await merged.save(), warnings, ...(images ? { images: pngs } : {}) };
   } finally {
-    await browser.close();
+    // a browser it was given stays open for its owner
+    if (given) await context.close().catch(() => {});
+    else await browser.close();
   }
 }

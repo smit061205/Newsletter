@@ -22,6 +22,18 @@ import { colX, headlineHeavy, outranks, renderPlaced, tombstoned, type Band, typ
 import { findGaps, type Gap } from "./occupancy.ts";
 import { BODY, DECK, GAP, GRID, HEADLINE, INK, MAX_STORY_COLS, PT } from "./typography.ts";
 
+/** How many stories of a page grow at once (their AI length fits in flight together). */
+const FITS_AT_ONCE = 5;
+/** Run `jobs`, at most `limit` at a time; their results in order. */
+async function inParallel<T>(jobs: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const out: T[] = new Array(jobs.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, async () => {
+    while (next < jobs.length) { const i = next++; out[i] = await jobs[i](); }
+  }));
+  return out;
+}
+
 /** Side-by-side column gaps that start and end about level, as areas. */
 function mergeGaps(gaps: Gap[]): { col: number; cols: number; y0: number; y1: number }[] {
   const out: { col: number; cols: number; y0: number; y1: number }[] = [];
@@ -356,84 +368,101 @@ export async function closeGaps(plan: PagePlan, ctx: {
     }
   }
 
+  // a story grown into the space under it, as far as it goes: a wider photo,
+  // a longer version, the AI fitting its body to the lines (up to 3 rounds,
+  // then whole sentences dropped), a hair looser pitch. Each story's space
+  // ends where the next thing below it starts, whatever the others do, so the
+  // page's stories grow side by side (their AI calls at once); what they
+  // grew to is then put on the page one by one, as before.
+  const grow = async (p: PlacedModule, avail: number): Promise<Module> => {
+    let mod = p.module;
+    if (close(mod, avail)) return mod;
+    const story = mod.story;
+    const rebuild = (s: Story, v: Variant, pt = BODY.pitch) => buildModule(s, mod.rank, mod.cols, v, m, mod.photoMode, pt, mod.head);
+
+    // a0. display before copy: a landscape picture across the whole story
+    if (mod.photoMode === 0 && story.photo && !mod.photoDropped) {
+      const wide = await buildModule(story, mod.rank, mod.cols, mod.variant, m, 1, mod.pitch, mod.head);
+      if (fits(wide, avail) && wide.height > mod.height) mod = wide;
+    }
+    // a. the next longer version
+    for (let v = NEXT[mod.variant]; v; v = NEXT[v]) {
+      const next = await rebuild(story, v);
+      if (!fits(next, avail)) break;
+      mod = next;
+      if (close(mod, avail)) break;
+    }
+    // b. the AI fits the body to the lines the gap needs
+    const release = releases.get(story.id);
+    if (!close(mod, avail) && release) {
+      const base = mod;
+      const baseWords = words(base.story.bodies[base.variant]);
+      const perLine = baseWords / Math.max(1, base.bodyLines);
+      // lines the gap holds across the story's columns
+      let want = Math.floor((avail - base.height) / pitch) * base.cols;
+      let target = baseWords;
+      let over: Story | null = null; // the shortest version that ran over
+      for (let round = 0; round < 3 && want !== 0; round++) {
+        target = Math.max(20, Math.round(target + want * perLine * 0.95));
+        note(`  ${story.id}: AI length fit to ${target} words (round ${round + 1})`);
+        // the space exactly: the lines it must fill and the words a line holds
+        const lines = base.bodyLines + want;
+        const got = await fitLength(store, base.story, release, target, { log: (s) => note(s), lines, perLine });
+        if (!got) break;
+        cost += got.cost;
+        const fitted: Story = { ...base.story, bodies: { long: got.body, medium: got.body, short: got.body } };
+        const next = await rebuild(fitted, "long");
+        if (fits(next, avail)) {
+          if (got.factCheck) factChecks.push({ story: story.id, detail: got.factCheck });
+          if (next.height > mod.height) mod = next;
+          if (close(mod, avail)) break;
+          want = Math.floor((avail - next.height) / pitch) * base.cols;
+        } else {
+          // overshot: ask again for fewer words (the lines it ran over)
+          if (!over || words(got.body) < words(over.bodies.long)) over = fitted;
+          want = -Math.ceil((next.height - avail) / pitch) * base.cols;
+        }
+      }
+      // the AI can't count words to a line: the exact last step is ours --
+      // drop whole sentences from the end (news runs most important first)
+      // of the shortest version that ran over, until it fits
+      if (!close(mod, avail) && over) {
+        let body = over.bodies.long;
+        for (let k = 0; k < 12; k++) {
+          const cut = dropLastSentence(body);
+          if (!cut || cut === body) break;
+          body = cut;
+          const s2: Story = { ...over, bodies: { long: body, medium: body, short: body } };
+          const next = await rebuild(s2, "long");
+          if (fits(next, avail)) {
+            if (next.height > mod.height) mod = next;
+            break;
+          }
+        }
+      }
+    }
+    // c. a slightly looser pitch, for the last part of a line (once: from the paper's own pitch)
+    if (!close(mod, avail) && mod.bodyLines && mod.pitch === pitch) {
+      const lines = Math.ceil(mod.bodyLines / mod.cols);
+      const want = Math.min(pitch * 1.02, pitch + (avail - mod.height) / Math.max(1, lines));
+      if (want > pitch * 1.001) {
+        const next = await rebuild(mod.story, mod.variant, want);
+        if (fits(next, avail)) mod = next;
+      }
+    }
+    return mod;
+  };
+
   // briefs go into gaps too, so a few passes until nothing changes
   for (let pass = 0; pass < 3; pass++) {
     let changed = false;
-    for (const [i, p] of placed.entries()) {
-      const avail = room(p, placed, ads, band, extraBlocks);
-      let mod = p.module;
-      if (close(mod, avail)) continue;
+    const rooms = placed.map((p) => room(p, placed, ads, band, extraBlocks));
+    const grown = await inParallel(placed.map((p, i) => () => grow(p, rooms[i])), FITS_AT_ONCE);
+    for (const [i, p] of [...placed.entries()]) {
+      const avail = rooms[i];
+      const mod = grown[i];
+      if (close(p.module, avail)) continue;
       const story = mod.story;
-      const rebuild = (s: Story, v: Variant, pt = BODY.pitch) => buildModule(s, mod.rank, mod.cols, v, m, mod.photoMode, pt, mod.head);
-
-      // a0. display before copy: a landscape picture across the whole story
-      if (mod.photoMode === 0 && story.photo && !mod.photoDropped) {
-        const wide = await buildModule(story, mod.rank, mod.cols, mod.variant, m, 1, mod.pitch, mod.head);
-        if (fits(wide, avail) && wide.height > mod.height) mod = wide;
-      }
-      // a. the next longer version
-      for (let v = NEXT[mod.variant]; v; v = NEXT[v]) {
-        const next = await rebuild(story, v);
-        if (!fits(next, avail)) break;
-        mod = next;
-        if (close(mod, avail)) break;
-      }
-      // b. the AI fits the body to the lines the gap needs
-      const release = releases.get(story.id);
-      if (!close(mod, avail) && release) {
-        const base = mod;
-        const baseWords = words(base.story.bodies[base.variant]);
-        const perLine = baseWords / Math.max(1, base.bodyLines);
-        // lines the gap holds across the story's columns
-        let want = Math.floor((avail - base.height) / pitch) * base.cols;
-        let target = baseWords;
-        let over: Story | null = null; // the shortest version that ran over
-        for (let round = 0; round < 3 && want !== 0; round++) {
-          target = Math.max(20, Math.round(target + want * perLine * 0.95));
-          note(`  ${story.id}: AI length fit to ${target} words (round ${round + 1})`);
-          const got = await fitLength(store, base.story, release, target, { log: (s) => note(s) });
-          if (!got) break;
-          cost += got.cost;
-          const fitted: Story = { ...base.story, bodies: { long: got.body, medium: got.body, short: got.body } };
-          const next = await rebuild(fitted, "long");
-          if (fits(next, avail)) {
-            if (got.factCheck) factChecks.push({ story: story.id, detail: got.factCheck });
-            if (next.height > mod.height) mod = next;
-            if (close(mod, avail)) break;
-            want = Math.floor((avail - next.height) / pitch) * base.cols;
-          } else {
-            // overshot: ask again for fewer words (the lines it ran over)
-            if (!over || words(got.body) < words(over.bodies.long)) over = fitted;
-            want = -Math.ceil((next.height - avail) / pitch) * base.cols;
-          }
-        }
-        // the AI can't count words to a line: the exact last step is ours --
-        // drop whole sentences from the end (news runs most important first)
-        // of the shortest version that ran over, until it fits
-        if (!close(mod, avail) && over) {
-          let body = over.bodies.long;
-          for (let k = 0; k < 12; k++) {
-            const cut = dropLastSentence(body);
-            if (!cut || cut === body) break;
-            body = cut;
-            const s2: Story = { ...over, bodies: { long: body, medium: body, short: body } };
-            const next = await rebuild(s2, "long");
-            if (fits(next, avail)) {
-              if (next.height > mod.height) mod = next;
-              break;
-            }
-          }
-        }
-      }
-      // c. a slightly looser pitch, for the last part of a line (once: from the paper's own pitch)
-      if (!close(mod, avail) && mod.bodyLines && mod.pitch === pitch) {
-        const lines = Math.ceil(mod.bodyLines / mod.cols);
-        const want = Math.min(pitch * 1.02, pitch + (avail - mod.height) / Math.max(1, lines));
-        if (want > pitch * 1.001) {
-          const next = await rebuild(mod.story, mod.variant, want);
-          if (fits(next, avail)) mod = next;
-        }
-      }
       if (mod !== p.module && mod.height > p.module.height + 0.5) {
         placed[i] = { ...p, module: mod };
         changed = true;

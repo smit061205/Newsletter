@@ -10,7 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { chromium } from "playwright";
+import { acquireBrowser, releaseBrowser } from "./browser.ts";
 import { existsSync } from "node:fs";
 import { DATA_DIR, PUBLIC_DIR, ROOT } from "./config.ts";
 import { pageImageDir, type BuildReport } from "./build.ts";
@@ -39,9 +39,10 @@ export interface PublishedIssue {
 /** PNG page images as JPEGs: a fraction of the size, for a repository that
  * keeps every published day. */
 async function toJpegs(pngs: string[], outs: string[], quality: number) {
-  const browser = await chromium.launch();
+  const browser = await acquireBrowser();
+  const context = await browser.newContext();
   try {
-    const page = await browser.newPage();
+    const page = await context.newPage();
     for (const [i, file] of pngs.entries()) {
       const b64 = (await readFile(file)).toString("base64");
       await page.setContent(`<style>html,body{margin:0}img{display:block}</style><img src="data:image/png;base64,${b64}">`);
@@ -50,7 +51,8 @@ async function toJpegs(pngs: string[], outs: string[], quality: number) {
       await writeFile(outs[i], await page.screenshot({ type: "jpeg", quality, clip: { x: 0, y: 0, ...size } }));
     }
   } finally {
-    await browser.close();
+    await context.close().catch(() => {});
+    releaseBrowser();
   }
 }
 

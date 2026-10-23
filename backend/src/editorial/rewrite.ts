@@ -348,8 +348,13 @@ const FIT_SCHEMA = {
 /** The story body rewritten to about `words` words, from the release's own
  * facts only -- to fill (or free) an exact number of lines on the page.
  * Numbers are checked against the release. Cached per story and length. */
+let fits = 0;
+/** AI length fits asked for so far (build.ts times the layout with it). */
+export const fitCalls = () => fits;
 export async function fitLength(store: Store, story: Story, release: Release, words: number,
-                                opts: { log?: (s: string) => void } = {}): Promise<{ body: string; cost: number; factCheck?: string } | null> {
+                                opts: { log?: (s: string) => void;
+                                        /** the space exactly: the body lines it must fill, and the words a line holds */
+                                        lines?: number; perLine?: number } = {}): Promise<{ body: string; cost: number; factCheck?: string } | null> {
   const key = `${story.id}|${words}`;
   const cached = store.fitted(key);
   if (cached) return { body: cached.body, cost: 0, ...(cached.factCheck ? { factCheck: cached.factCheck } : {}) };
@@ -359,6 +364,7 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
   }
   const apiKey = env("OPENROUTER_API_KEY");
   if (!apiKey) return null;
+  fits++;
   const model = env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
   const current = story.bodies.long;
   const now = current.split(/\s+/).filter(Boolean).length;
@@ -370,6 +376,9 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
       response_format: { type: "json_schema", json_schema: FIT_SCHEMA },
       messages: [
         { role: "system", content: SYSTEM + `\nNow you are fitting a story to its space on the page: write the body in about ${words} words (it has ${now}). ` +
+          // the exact space, so the first try fits (it used to take two or three rounds)
+          (opts.lines && opts.perLine ? `The space holds exactly ${opts.lines} lines of about ${opts.perLine.toFixed(1)} words each: aim for ${words} words, ` +
+            `never more than ${Math.round(opts.lines * opts.perLine)}; every paragraph's last line is shorter. ` : "") +
           (words > now ? "Add detail ONLY from the release below -- never invent anything." : "Shorten it, keeping the most important facts first.") +
           " Keep the dateline. Return JSON {body}." },
         { role: "user", content: `RELEASE:\n${paragraphs(release.body).join("\n\n")}\n\nCURRENT STORY BODY:\n${current}` },

@@ -31,6 +31,7 @@ import os from "node:os";
 import path from "node:path";
 import { DB_FILE, ENV_FILE, MEDIA_DIR, OUT_DIR, PAPERS_HOME, ROOT } from "../config.ts";
 import { buildIssue, type CopyOpts } from "../build.ts";
+import { browserServer, closeBrowser } from "../browser.ts";
 import { profile } from "../profile.ts";
 import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
@@ -288,14 +289,15 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
   }
 }
 
-/** How many copies are laid out at once: each worker runs its own browser
- * (about 1 GB at its busiest) beside everything else on the computer -- one
- * on a computer of under 12 GB, two under 24 GB, else three (and never more
- * than half its cores). A Mac of 16 GB with a browser open ran out of memory
- * with three. */
+/** How many copies are laid out at once. The workers share one browser
+ * (browser.ts), a tab each; measured on 23 Oct 2026, two copies at once
+ * peaked at about 2.3 GB (each worker's engine ~0.6 GB, the browser the
+ * rest). So: one on a computer of under 7 GB, two under 24 GB (an 8 GB PC
+ * runs two, beside the app), three above (and never more than half its
+ * cores). (Each with its own browser, three ran a 16 GB Mac out of memory.) */
 function parallelism(n: number): number {
   const gb = os.totalmem() / 2 ** 30;
-  const byMemory = gb < 12 ? 1 : gb < 24 ? 2 : 3;
+  const byMemory = gb < 7 ? 1 : gb < 24 ? 2 : 3;
   return Math.max(1, Math.min(n, byMemory, Math.max(1, Math.floor(os.cpus().length / 2))));
 }
 
@@ -344,6 +346,9 @@ function endProcess(c: ChildProcess) {
 async function runTasks(store: Store, tasks: Task[], say: Say, onFile: (t: Task, f: Parameters<OnFile>[0]) => void) {
   const slots = parallelism(tasks.length);
   if (tasks.length > 1) say(`${tasks.length} at a time: ${slots}`);
+  // one browser for every worker, a tab each
+  const server = await browserServer();
+  ws = server.wsEndpoint();
   const queue = [...tasks];
   const failures: string[] = [];
   await Promise.all(Array.from({ length: slots }, async (_, slot) => {
@@ -353,9 +358,13 @@ async function runTasks(store: Store, tasks: Task[], say: Say, onFile: (t: Task,
       catch (e) { if (!stopping) { failures.push(`${t.label}: ${e instanceof Error ? e.message : e}`); say(`${t.label} stopped: ${e instanceof Error ? e.message : e}`); } }
     }
   }));
+  ws = "";
+  await server.close().catch(() => {});
   if (stopping) throw new Error("stopped by the editor");
   if (failures.length === tasks.length) throw new Error(failures[0]);
 }
+/** The shared browser's address while a batch runs (the workers connect to it). */
+let ws = "";
 
 async function runWorker(store: Store, t: Task, slot: number, say: Say, onFile: OnFile) {
   const paper = t.lang === profile.language.lang ? profile.id : EDITION_OF[t.lang];
@@ -369,7 +378,7 @@ async function runWorker(store: Store, t: Task, slot: number, say: Say, onFile: 
       const child = spawn(process.execPath, [...process.execArgv, path.join(ROOT, "backend", "src", "cli.ts"), "copies-in", "--spec", specFile], {
         cwd: ROOT, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32",
         env: { ...process.env, CK_PUBLICATION: paper, DATA_DIR: dataDir, CK_SOURCE_DB: DB_FILE, CK_MEDIA_DIR: MEDIA_DIR,
-               CK_ENV_FILE: ENV_FILE, CK_PAPERS_HOME: PAPERS_HOME },
+               CK_ENV_FILE: ENV_FILE, CK_PAPERS_HOME: PAPERS_HOME, CK_BROWSER_WS: ws },
       });
       workers.add(child);
       let buf = "", error = "";
@@ -424,6 +433,9 @@ export async function copiesIn(store: Store, specFile: string) {
   } catch (e) {
     console.log(`@@error ${e instanceof Error ? e.message : e}`);
     process.exitCode = 1;
+  } finally {
+    // let go of the shared browser, so this worker can end
+    await closeBrowser();
   }
 }
 
