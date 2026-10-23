@@ -20,7 +20,7 @@ import type { Measurer } from "./measure.ts";
 import { buildModule, spanWidth, type Module, type Variant } from "./module.ts";
 import { colX, headlineHeavy, outranks, renderPlaced, tombstoned, type Band, type PagePlan, type PlacedModule } from "./pack.ts";
 import { findGaps, type Gap } from "./occupancy.ts";
-import { BODY, DECK, GAP, GRID, HEADLINE, INK, PT } from "./typography.ts";
+import { BODY, DECK, GAP, GRID, HEADLINE, INK, MAX_STORY_COLS, PT } from "./typography.ts";
 
 /** Side-by-side column gaps that start and end about level, as areas. */
 function mergeGaps(gaps: Gap[]): { col: number; cols: number; y0: number; y1: number }[] {
@@ -192,6 +192,13 @@ export async function closeGaps(plan: PagePlan, ctx: {
   // one summarised by the AI as a brief, else the paper's house ad.
   const usedMessages = ctx.fillers.messages;
   const fillArea = async (col: number, cols: number, y: number, h: number, where: string): Promise<boolean> => {
+    // an area wider than a story may be (a whole-page strip): two side by side
+    if (cols > MAX_STORY_COLS) {
+      const left = Math.ceil(cols / 2);
+      const a = await fillArea(col, left, y, h, where);
+      const b = await fillArea(col + left, cols - left, y, h, where);
+      return a && b;
+    }
     for (const s of ctx.leftOut.filter((s) => !used.includes(s))) {
       for (const v of ["long", "medium", "short"] as Variant[]) {
         const brief = await buildModule(s, cols >= 3 ? 4 : 5, cols, v, m, 0);

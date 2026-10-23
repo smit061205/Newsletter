@@ -23,7 +23,7 @@ import { findGaps } from "./layout/occupancy.ts";
 import { styleChecks } from "./layout/style.ts";
 import { buildFingerprint } from "./fingerprint.ts";
 import { spanWidth } from "./layout/module.ts";
-import { BODY, DPI, FACES, FONTS, FRONT_PAGE_MAX_COLS, GRID, PAGE, PT } from "./layout/typography.ts";
+import { BODY, DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE, PT } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
 import { storyIdOf, type Progress, type Store, type Story } from "./store.ts";
 
@@ -253,7 +253,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       // fitting grows the stories into the rest)
       const reserve = samePage ? 0 : room.slice(n).reduce((a, b) => a + b, 0) * 0.7;
       const plan = await packer.packPage(n, pagePool, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, pageAds,
-                                         { leadFirst: true, budget, reserve, ...(n === 1 ? { maxCols: FRONT_PAGE_MAX_COLS } : {}),
+                                         { leadFirst: true, budget, reserve, maxCols: MAX_STORY_COLS,
                                            ...(opts.copy ? { jitter: opts.copy.rng } : {}) });
       plans.push(plan);
       pool = pool.filter((s) => !plan.placed.some((p) => p.module.story.id === s.id));
@@ -385,9 +385,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     { gate: "3 no headline over 30% of its story", pass: headShare.length === 0, detail: headShare.join(", ") || "ok" },
     { gate: "4 the lead on page 1; every story placed or left out with a reason", pass: !!lead,
       detail: `lead ${lead?.story.id ?? "missing"}; left out (no room): ${result.leftOut.map((s) => s.id).join(", ") || "none"}` },
-    { gate: "W no story across the whole front page unless the editor allowed it",
-      pass: !result.placed.some((p) => p.page === 1 && p.cols > FRONT_PAGE_MAX_COLS && !p.story.fullWidth),
-      detail: result.placed.filter((p) => p.page === 1 && p.cols > FRONT_PAGE_MAX_COLS && !p.story.fullWidth).map((p) => `${p.story.id} (${p.cols} columns)`).join(", ") || "ok" },
+    { gate: "W no story across the whole page unless the editor allowed it",
+      pass: !result.placed.some((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth),
+      detail: result.placed.filter((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth).map((p) => `p${p.page} ${p.story.id} (${p.cols} columns)`).join(", ") || "ok" },
     { gate: "6 fact checks: every number in the release", pass: allFacts.length === 0, detail: allFacts.map((f) => `${f.story}: ${f.detail}`).join("; ") || "ok" },
     ...style.gates,
     { gate: "7 same inputs, same issue", pass: same !== false,

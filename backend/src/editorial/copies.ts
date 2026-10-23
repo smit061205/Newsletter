@@ -67,6 +67,10 @@ export interface Batch {
   cost: number;
   log: string[];
   error?: string;
+  /** how far it has got, 0-1, counting each copy's pages as they're laid out */
+  share?: number;
+  /** each copy's own progress and what it's doing */
+  parts?: Record<string, { share: number; what: string }>;
 }
 /** Kept for the newsroom (api.ts CopiesRun). */
 export type CopiesRun = Batch;
@@ -218,7 +222,10 @@ type Say = (line: string) => void;
 type OnFile = (f: { n: number; ready: boolean; pages: number; cost: number; sig: string[] }) => void;
 
 /** Lay out each of `spec.items` in this process (this paper's language). */
-async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile) {
+/** How far one copy has got (0-1), and what it's doing: rewording or
+ * translating is the first 15%, each page laid out and finished the rest. */
+type OnProgress = (share: number, what: string) => void;
+async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile, progress: OnProgress = () => {}) {
   const key = env("OPENROUTER_API_KEY");
   if (!key && process.env.CK_FAKE_AI !== "1") throw new Error("no OpenRouter key: add it in Settings");
   const pageOf = new Map(spec.pageOf);
@@ -235,6 +242,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile)
           const i = next++;
           const r = key || process.env.CK_FAKE_AI === "1" ? await rewordStory(store, pool[i], n, spec.reword, key ?? "", spec.translate) : { story: pool[i], cost: 0 };
           out[i] = r.story;
+          progress(0.15 * (out.filter(Boolean).length / pool.length), spec.translate ? "translating" : "rewording");
           cost += r.cost;
           if (r.story.headline !== pool[i].headline) changed++;
         }
@@ -253,6 +261,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile)
       const built = await buildIssue(store, spec.date, {
         log: (l) => { if (/^(built|  FAIL|  page \d+:)/.test(l)) say(`  ${l.trim()}`); },
         noReview: true,
+        progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0), p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()),
         copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, reword, pdfPath: item.pdf,
                 translate: spec.translate, ...(spec.reword === "all" && !spec.translate ? { store: own } : {}) },
       });
@@ -294,6 +303,22 @@ function parallelism(n: number): number {
 interface Task { lang: Lang; label: string; item: SetSpec["items"][number]; spec: Omit<SetSpec, "items" | "seen">; seen: string[] }
 
 const workers = new Set<ChildProcess>();
+/** Where each copy being made has got (set by the batch that's running). */
+let partProgress: ((t: Task, share: number, what: string) => void) | null = null;
+/** A batch's progress from its copies': each one's share, never going back
+ * (a copy laid out again starts its pages over), and the batch's overall. */
+function tracker(batch: Batch, total: number) {
+  batch.parts = {};
+  partProgress = (t, share, what) => {
+    const was = batch.parts![t.label]?.share ?? 0;
+    batch.parts![t.label] = { share: Math.max(was, Math.min(0.99, share)), what };
+    batch.share = Object.values(batch.parts!).reduce((a, p) => a + p.share, 0) / total;
+  };
+  return (t: Task) => {
+    batch.parts![t.label] = { share: 1, what: "ready" };
+    batch.share = Object.values(batch.parts!).reduce((a, p) => a + p.share, 0) / total;
+  };
+}
 let stopping = false;
 /** Stop the copies (or sister papers) being made: their workers end at once. */
 export function stopCopies(): boolean {
@@ -350,6 +375,7 @@ async function runWorker(store: Store, t: Task, slot: number, say: Say, onFile: 
       let buf = "", error = "";
       const line = (l: string) => {
         if (l.startsWith("@@file ")) onFile(JSON.parse(l.slice(7)));
+        else if (l.startsWith("@@progress ")) { const x = JSON.parse(l.slice(11)) as { share: number; what: string }; partProgress?.(t, x.share, x.what); }
         else if (l.startsWith("@@error ")) error = l.slice(8);
         else if (/^\s*\[copies\]/.test(l)) say(`[${t.label}] ${l.replace(/^\s*\[copies\] ?/, "").trim()}`);
       };
@@ -391,7 +417,10 @@ export async function copiesIn(store: Store, specFile: string) {
       // fits, briefs, rewordings and translations: none paid for twice
       store.db.exec("insert or ignore into fitted select * from src.fitted");
     } finally { store.db.exec("detach database src"); }
-    await layOutHere(store, spec, (l) => console.log(`[copies] ${l}`), (f) => console.log(`@@file ${JSON.stringify(f)}`));
+    let last = 0;
+    await layOutHere(store, spec, (l) => console.log(`[copies] ${l}`), (f) => console.log(`@@file ${JSON.stringify(f)}`),
+      // at most twice a second
+      (share, what) => { if (Date.now() - last > 500) { last = Date.now(); console.log(`@@progress ${JSON.stringify({ share, what })}`); } });
   } catch (e) {
     console.log(`@@error ${e instanceof Error ? e.message : e}`);
     process.exitCode = 1;
@@ -427,6 +456,7 @@ async function runBatch(batch: Batch, dir: string, work: (say: Say) => Promise<v
     batch.endedAt = new Date().toISOString();
     running = null;
     stopping = false;
+    partProgress = null;
     try { await mkdir(dir, { recursive: true }); await writeFile(path.join(dir, `${batch.kind}.json`), JSON.stringify(batch, null, 1)); } catch { /* the folder went */ }
   }
   return batch;
@@ -467,7 +497,9 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
       lang, label: `copy ${i + 1}`, spec: base, seen: day.seen,
       item: { n: i + 1, pdf: copyFile(date, i + 1), seed: i + 1 + (translate ? 1000 * LANGS.indexOf(lang) : 0) },
     }));
+    const finished = tracker(batch, tasks.length);
     await layOutUnique(store, tasks, day.seen, say, (t, f) => {
+      finished(t);
       batch.cost += f.cost;
       batch.files = [...batch.files, { n: f.n, lang, ready: f.ready, pages: f.pages }].sort((a, b) => a.n - b.n);
       batch.done = batch.files.length;
@@ -496,7 +528,9 @@ export async function makeEditions(store: Store, date: string, editions: Edition
       spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: day.pageOf, lead: day.lead },
       item: { n: 100 + editions.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + editions.indexOf(e) },
     }));
+    const finished = tracker(batch, tasks.length);
     await layOutUnique(store, tasks, day.seen, say, (t, f) => {
+      finished(t);
       const e = list.find((x) => x.id === t.item.id)!;
       batch.cost += f.cost;
       batch.files = [...batch.files.filter((x) => x.id !== e.id), { n: f.n, id: e.id, name: e.name, lang: e.lang, ready: f.ready, pages: f.pages }];

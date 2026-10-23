@@ -8,7 +8,7 @@
 // engine drafts its profile (page, grid, type, language, the header bands),
 // check it, add its fonts and header images, save, and make a test issue.
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { call, media, type CopiesRun, type Edition, type Settings } from "../api";
+import { batchProgress, call, media, type CopiesRun, type Edition, type Settings } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { ck } from "../ui/desktop";
@@ -316,7 +316,7 @@ function Editions() {
       <div className={s.cardHead}>
         <div><h2 className={s.cardTitle}>{t("eds.title")}</h2><p className={s.muted} style={{ margin: "4px 0 0" }}>{t("eds.body")}</p></div>
         <Button kind="primary" icon={Icon.copies()} onClick={() => make()} disabled={!has || running || !status?.openrouterKey || !!status?.running}>
-          {running ? t("eds.making", { done: num(lang, run!.done), total: num(lang, run!.count) }) : t("eds.makeAll")}</Button>
+          {running ? t("eds.making", { done: num(lang, Math.round(batchProgress(run!, run!.count * 4).share * 100)), total: num(lang, batchProgress(run!, run!.count * 4).minutes) }) : t("eds.makeAll")}</Button>
       </div>
       {!has && <Note tone="warn">{t("copies.none")}</Note>}
       {error && <Note tone="bad">{error}</Note>}
@@ -341,6 +341,7 @@ function Editions() {
               </div>
               <span className={s.listBadges}>
                 {f ? <Badge tone={f.ready ? "good" : "warn"} dot>{f.ready ? t("archive.ready") : t("archive.look")}</Badge>
+                  : running && run?.parts?.[e.name] ? <Badge tone="accent">{num(lang, Math.round(run.parts[e.name].share * 100))}%</Badge>
                   : running ? <Badge>{t("eds.waiting")}</Badge> : has ? <Badge>{t("eds.notMade")}</Badge> : null}
                 {renaming?.id !== e.id && <Button kind="quiet" onClick={() => setRenaming({ id: e.id, name: e.name })}>{t("eds.rename")}</Button>}
                 {f && <Button icon={Icon.print()} onClick={() => open(e)}>{t("copies.open")}</Button>}

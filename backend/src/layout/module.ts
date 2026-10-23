@@ -172,27 +172,42 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     return { elements: centred ? st.elements.map((e) => (e.kind === "text" ? { ...e, align: "center" as const } : e)) : st.elements,
              bottom: st.bottom, size: lines.size, lines: lines.lines.length, fill: 0 };
   };
+  // the kicker, then the headline: a kicker is always clearly smaller than its
+  // headline -- sized from the headline as planned, and set again from the
+  // headline as set when that came out smaller (a long one fitted to its lines:
+  // 23 Oct's copy printed a 43pt kicker over a 40pt headline)
   const kicker = text.kicker.trim();
-  if (kicker) {
-    const ks = Math.max(KICKER.min, hd * KICKER.ratio);
-    const got = await display(kicker, "k", { font: KICKER.font, max: ks, min: KICKER.min, maxLines: 1, leading: KICKER.leading,
-                                             align: "center" }, 2);
-    els.push(...got.elements);
-    cursor = got.bottom + GAP.afterKicker;
-  }
   const title = text.headline.trim();
-  if (title) {
-    // the rank's band, or the one set from outside (never below what the sub-heading needs)
-    const floor = DECK.min * 1.3;
-    const hMax = Math.max(floor, head?.max ?? Math.max(hd, head?.min ?? 0));
-    const hMin = Math.min(hMax, Math.max(floor, head?.min ?? Math.max(HEADLINE.min, hMax * 0.72)));
-    const got = await display(title, "h", { font: HEADLINE.font, max: hMax, min: hMin,
-                                            maxLines: HEADLINE.maxLines(rank), leading: HEADLINE.leading, align: "fit",
-                                            linesBonus: rank === 1 ? 0.25 : 0 }, HEADLINE.maxLines(rank),
-                        head?.max ? undefined : HEADLINE.sizeFor(Math.max(1, rank - 1), cols), floor);
-    els.push(...got.elements);
-    headSize = got.size;
-    cursor = got.bottom + GAP.afterHeadline;
+  let kickerMax = Math.max(KICKER.min, hd * KICKER.ratio);
+  for (let pass = 0; pass < 2; pass++) {
+    els.splice(0);
+    cursor = GAP.top;
+    displayFill = 1;
+    headSize = 0;
+    let kickerSize = 0;
+    if (kicker) {
+      const got = await display(kicker, "k", { font: KICKER.font, max: kickerMax, min: KICKER.min, maxLines: 1, leading: KICKER.leading,
+                                               align: "center" }, 2);
+      els.push(...got.elements);
+      kickerSize = got.size;
+      cursor = got.bottom + GAP.afterKicker;
+    }
+    if (title) {
+      // the rank's band, or the one set from outside (never below what the sub-heading needs)
+      const floor = DECK.min * 1.3;
+      const hMax = Math.max(floor, head?.max ?? Math.max(hd, head?.min ?? 0));
+      const hMin = Math.min(hMax, Math.max(floor, head?.min ?? Math.max(HEADLINE.min, hMax * 0.72)));
+      const got = await display(title, "h", { font: HEADLINE.font, max: hMax, min: hMin,
+                                              maxLines: HEADLINE.maxLines(rank), leading: HEADLINE.leading, align: "fit",
+                                              linesBonus: rank === 1 ? 0.25 : 0 }, HEADLINE.maxLines(rank),
+                          head?.max ? undefined : HEADLINE.sizeFor(Math.max(1, rank - 1), cols), floor);
+      els.push(...got.elements);
+      headSize = got.size;
+      cursor = got.bottom + GAP.afterHeadline;
+    }
+    const most = Math.max(KICKER.min, headSize * KICKER.ratio);
+    if (!kicker || !headSize || kickerSize <= Math.max(KICKER.min, headSize * 0.8) + 0.01) break;
+    kickerMax = most;
   }
   const headlineHeight = cursor;
   const deck = text.deck.trim();

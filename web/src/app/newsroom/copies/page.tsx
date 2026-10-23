@@ -5,7 +5,7 @@
 // (backend/src/editorial/copies.ts).
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { call, media, type CopiesRun, type IssueInfo, type Job, type PaperLang, type Reword, type Shuffle } from "../api";
+import { batchProgress, call, media, type CopiesRun, type IssueInfo, type Job, type PaperLang, type Reword, type Shuffle } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { num, rupees } from "../ui/format";
@@ -76,6 +76,12 @@ export default function Copies() {
   const paperBusy = !!status?.running && status.running.date === date;
   const issueNo = info?.report.issueNumber ?? status?.issue?.issueNumber ?? 0;
   const paperName = status?.paper.name.split(" (")[0] ?? "Capital Kranti";
+  // what a copy is doing, in plain words
+  const whatOf = (w: string) => {
+    const m = w.match(/^(planning|finishing) (\d+)$/);
+    if (m) return t(m[1] === "planning" ? "progress.planning" : "progress.finishing", { item: num(lang, m[2]) });
+    return w === "checking" ? t("progress.checking") : w === "translating" ? t("copies.doing.translating") : w === "rewording" ? t("copies.doing.rewording") : w;
+  };
   const open = (n: number) => pdf({
     url: media(`/api/issues/${date}/copies/${n}.pdf?t=${encodeURIComponent(run?.endedAt ?? "")}`),
     title: t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }),
@@ -144,8 +150,13 @@ export default function Copies() {
           </div>
           {running && (
             <div className={s.ringWrap}>
-              <Ring pct={(run.done / run.count) * 100} />
-              <span className={s.muted}>{t("today.making.left", { min: num(lang, Math.max(1, Math.round((run.count - run.done) * minutesPerCopy))) })}</span>
+              <Ring pct={batchProgress(run, run.count * minutesPerCopy).share * 100} />
+              <div className={s.heroText}>
+                <span className={s.muted}>{t("today.making.left", { min: num(lang, batchProgress(run, run.count * minutesPerCopy).minutes) })}</span>
+                {Object.entries(run.parts ?? {}).filter(([, p]) => p.share < 1).map(([label, p]) => (
+                  <span key={label} className={s.faint}>{label.replace(/^copy (\d+)$/, (_, n) => t("copies.copy", { n: num(lang, n) }))}: {whatOf(p.what)} · {num(lang, Math.round(p.share * 100))}%</span>
+                ))}
+              </div>
             </div>
           )}
           {running && <div className={s.row} style={{ justifyContent: "flex-end" }}>

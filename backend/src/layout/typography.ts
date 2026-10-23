@@ -13,7 +13,10 @@ const t = profile.type;
 export const PAGE = { width: profile.page.width * PT, height: profile.page.height * PT };
 
 /** The widest a front-page story may be without the editor's say-so (columns). */
-export const FRONT_PAGE_MAX_COLS = profile.grid.frontPageMaxCols ?? profile.grid.columns - 1;
+/** The widest a story may be, on any page (7 of 8 columns), unless the editor
+ * allows it the full width ("Allow full width"). (The profile's key keeps its
+ * old name: it once held for the front page only.) */
+export const MAX_STORY_COLS = profile.grid.frontPageMaxCols ?? profile.grid.columns - 1;
 
 export const GRID = {
   left: profile.grid.left * PT,

@@ -52,7 +52,17 @@ export type Reword = "headline" | "headlineDeck" | "all";
 export type Shuffle = "keepLead" | "anywhere" | "samePage";
 export interface CopiesRun { kind: "copies" | "editions"; date: string; count: number; reword: Reword; shuffle: Shuffle; lang: PaperLang;
   status: "running" | "done" | "failed" | "stopped"; startedAt: string; endedAt?: string; done: number;
-  files: { n: number; id?: string; name?: string; lang: PaperLang; ready: boolean; pages: number }[]; cost: number; log: string[]; error?: string }
+  files: { n: number; id?: string; name?: string; lang: PaperLang; ready: boolean; pages: number }[]; cost: number; log: string[]; error?: string;
+  /** how far it has got, 0-1, page by page; and each copy's own progress and what it's doing */
+  share?: number; parts?: Record<string, { share: number; what: string }> }
+
+/** A batch's share done (0-1), and minutes left from how fast it has gone so far (or `guess` before it knows). */
+export function batchProgress(run: CopiesRun, guess: number): { share: number; minutes: number } {
+  const share = run.share ?? run.done / Math.max(1, run.count);
+  const elapsed = (Date.now() - Date.parse(run.startedAt)) / 60_000;
+  const minutes = share > 0.05 ? (elapsed * (1 - share)) / share : Math.max(1, guess - elapsed);
+  return { share, minutes: Math.max(1, Math.round(minutes)) };
+}
 
 export const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:4000";
 
