@@ -51,7 +51,7 @@ export interface PageLayout { widthCm: number; heightCm: number; columns: number
 export type Reword = "headline" | "headlineDeck" | "all";
 export type Shuffle = "keepLead" | "anywhere" | "samePage";
 export interface CopiesRun { kind: "copies" | "editions"; date: string; count: number; reword: Reword; shuffle: Shuffle; lang: PaperLang;
-  status: "running" | "done" | "failed"; startedAt: string; endedAt?: string; done: number;
+  status: "running" | "done" | "failed" | "stopped"; startedAt: string; endedAt?: string; done: number;
   files: { n: number; id?: string; name?: string; lang: PaperLang; ready: boolean; pages: number }[]; cost: number; log: string[]; error?: string }
 
 export const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:4000";

@@ -23,10 +23,11 @@
 //
 // Copies go to out/copies/<date>/copy-N.pdf; the sister papers to
 // out/editions/<date>/<id>.pdf. Neither ever becomes the day's issue.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { copyFile as copyTo, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { DB_FILE, ENV_FILE, MEDIA_DIR, OUT_DIR, PAPERS_HOME, ROOT } from "../config.ts";
 import { buildIssue, type CopyOpts } from "../build.ts";
@@ -55,7 +56,7 @@ export const DEFAULT_EDITIONS: Edition[] = [
 /** One run: the day's copies, or its sister papers. */
 export interface Batch {
   kind: "copies" | "editions";
-  date: string; status: "running" | "done" | "failed"; startedAt: string; endedAt?: string;
+  date: string; status: "running" | "done" | "failed" | "stopped"; startedAt: string; endedAt?: string;
   /** copies: how many, what's reworded, how far stories move, the language */
   count: number; reword: Reword; shuffle: Shuffle; lang: Lang;
   /** made so far, of `count` */
@@ -278,39 +279,100 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile)
   }
 }
 
-/** Lay out `spec.items` in another language: a process of its own for that
- * language's paper, its data folder filled from this day's (see copiesIn). */
-function layOutIn(lang: Lang, spec: SetSpec, say: Say, onFile: OnFile): Promise<void> {
-  const paper = EDITION_OF[lang];
-  const dataDir = path.join(PAPERS_HOME, "papers", paper);
-  return (async () => {
-    await mkdir(dataDir, { recursive: true });
-    const specFile = path.join(dataDir, `copies-${spec.date}.json`);
-    await writeFile(specFile, JSON.stringify(spec));
+/** How many copies are laid out at once: each worker runs its own browser
+ * (about 1 GB at its busiest) beside everything else on the computer -- one
+ * on a computer of under 12 GB, two under 24 GB, else three (and never more
+ * than half its cores). A Mac of 16 GB with a browser open ran out of memory
+ * with three. */
+function parallelism(n: number): number {
+  const gb = os.totalmem() / 2 ** 30;
+  const byMemory = gb < 12 ? 1 : gb < 24 ? 2 : 3;
+  return Math.max(1, Math.min(n, byMemory, Math.max(1, Math.floor(os.cpus().length / 2))));
+}
+
+/** One copy to lay out, in a worker of its own. */
+interface Task { lang: Lang; label: string; item: SetSpec["items"][number]; spec: Omit<SetSpec, "items" | "seen">; seen: string[] }
+
+const workers = new Set<ChildProcess>();
+let stopping = false;
+/** Stop the copies (or sister papers) being made: their workers end at once. */
+export function stopCopies(): boolean {
+  if (!running) return false;
+  stopping = true;
+  for (const w of workers) endProcess(w);
+  return true;
+}
+/** A worker and everything it started (its browser) ended. */
+function endProcess(c: ChildProcess) {
+  if (c.exitCode !== null || !c.pid) return;
+  try {
+    if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(c.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    else process.kill(-c.pid, "SIGKILL");
+  } catch { try { c.kill("SIGKILL"); } catch { /* gone */ } }
+}
+
+/** Lay out `tasks`, a few at a time, each in a worker of its own: a process
+ * for the copy's language's paper (cli.ts copies-in) with a data folder of
+ * its own, filled from this day's stories, ads, edits and the AI's earlier
+ * work. What the AI writes there (rewordings, translations, length fits) comes
+ * back into this paper's database, so the next time costs nothing. */
+async function runTasks(store: Store, tasks: Task[], say: Say, onFile: (t: Task, f: Parameters<OnFile>[0]) => void) {
+  const slots = parallelism(tasks.length);
+  if (tasks.length > 1) say(`${tasks.length} at a time: ${slots}`);
+  const queue = [...tasks];
+  const failures: string[] = [];
+  await Promise.all(Array.from({ length: slots }, async (_, slot) => {
+    while (queue.length && !stopping) {
+      const t = queue.shift()!;
+      try { await runWorker(store, t, slot, say, (f) => onFile(t, f)); }
+      catch (e) { if (!stopping) { failures.push(`${t.label}: ${e instanceof Error ? e.message : e}`); say(`${t.label} stopped: ${e instanceof Error ? e.message : e}`); } }
+    }
+  }));
+  if (stopping) throw new Error("stopped by the editor");
+  if (failures.length === tasks.length) throw new Error(failures[0]);
+}
+
+async function runWorker(store: Store, t: Task, slot: number, say: Say, onFile: OnFile) {
+  const paper = t.lang === profile.language.lang ? profile.id : EDITION_OF[t.lang];
+  const dataDir = path.join(PAPERS_HOME, "papers", paper, `worker-${slot + 1}`);
+  await mkdir(dataDir, { recursive: true });
+  const specFile = path.join(dataDir, "spec.json");
+  await writeFile(specFile, JSON.stringify({ ...t.spec, seen: t.seen, items: [t.item] } satisfies SetSpec));
+  try {
     await new Promise<void>((ok, bad) => {
       // the same Node flags as this engine (inside the app: the hook that finds the shared code)
       const child = spawn(process.execPath, [...process.execArgv, path.join(ROOT, "backend", "src", "cli.ts"), "copies-in", "--spec", specFile], {
-        cwd: ROOT, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+        cwd: ROOT, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32",
         env: { ...process.env, CK_PUBLICATION: paper, DATA_DIR: dataDir, CK_SOURCE_DB: DB_FILE, CK_MEDIA_DIR: MEDIA_DIR,
                CK_ENV_FILE: ENV_FILE, CK_PAPERS_HOME: PAPERS_HOME },
       });
+      workers.add(child);
       let buf = "", error = "";
       const line = (l: string) => {
         if (l.startsWith("@@file ")) onFile(JSON.parse(l.slice(7)));
         else if (l.startsWith("@@error ")) error = l.slice(8);
-        else if (/^\s*\[copies\]/.test(l)) say(l.replace(/^\s*\[copies\] ?/, ""));
+        else if (/^\s*\[copies\]/.test(l)) say(`[${t.label}] ${l.replace(/^\s*\[copies\] ?/, "").trim()}`);
       };
-      child.stdout.on("data", (d) => { buf += d; let i; while ((i = buf.indexOf("\n")) >= 0) { line(buf.slice(0, i)); buf = buf.slice(i + 1); } });
-      child.stderr.on("data", (d) => { error ||= String(d).split("\n").find((l) => /Error/.test(l)) ?? ""; });
+      child.stdout!.on("data", (d) => { buf += d; let i; while ((i = buf.indexOf("\n")) >= 0) { line(buf.slice(0, i)); buf = buf.slice(i + 1); } });
+      child.stderr!.on("data", (d) => { error ||= String(d).split("\n").find((l) => /Error/.test(l)) ?? ""; });
       child.on("error", bad);
-      child.on("exit", (code) => (code === 0 ? ok() : bad(new Error(error || `the ${LANG_NAME[lang]} layout stopped (${code})`))));
+      child.on("exit", (code) => { workers.delete(child); code === 0 ? ok() : bad(new Error(stopping ? "stopped" : error || `the layout stopped (${code})`)); });
     });
-  })();
+  } finally {
+    // the AI's work in the worker, kept for next time
+    const db = path.join(dataDir, "capital-kranti.sqlite");
+    if (existsSync(db)) {
+      try {
+        store.db.exec(`attach database '${db.replace(/'/g, "''")}' as w`);
+        try { store.db.exec("insert or ignore into fitted select * from w.fitted"); } finally { store.db.exec("detach database w"); }
+      } catch { /* the worker's database was left half-written */ }
+    }
+  }
 }
 
-/** Inside the other language's process (cli.ts copies-in): this paper's data
- * folder gets the day's stories, releases, ads, edits and editorial plan from
- * the main paper's database, then the set is laid out here. */
+/** Inside a worker (cli.ts copies-in): this data folder gets the day's
+ * stories, releases, ads, edits and the AI's earlier work from the main
+ * paper's database, then its copy is laid out here. */
 export async function copiesIn(store: Store, specFile: string) {
   const spec = JSON.parse(readFileSync(specFile, "utf8")) as SetSpec;
   const src = process.env.CK_SOURCE_DB;
@@ -325,8 +387,9 @@ export async function copiesIn(store: Store, specFile: string) {
       }
       store.db.prepare("delete from edits where issue_date = ?").run(d);
       store.db.prepare("insert into edits (issue_date, json) select issue_date, json from src.edits where issue_date = ? order by n").run(d);
-      // the day's editorial plan, so the stories rank as in the day's paper (and it isn't paid for twice)
-      store.db.prepare("insert or replace into fitted select * from src.fitted where key like ?").run(`plan|${d}|%`);
+      // the editorial plan (the stories rank as in the day's paper), the length
+      // fits, briefs, rewordings and translations: none paid for twice
+      store.db.exec("insert or ignore into fitted select * from src.fitted");
     } finally { store.db.exec("detach database src"); }
     await layOutHere(store, spec, (l) => console.log(`[copies] ${l}`), (f) => console.log(`@@file ${JSON.stringify(f)}`));
   } catch (e) {
@@ -351,20 +414,41 @@ function dayOf(store: Store, date: string) {
 async function runBatch(batch: Batch, dir: string, work: (say: Say) => Promise<void>, log: Say): Promise<Batch> {
   if (running) throw new Error(`${running.kind === "copies" ? "copies" : "the other papers"} for ${running.date} are still being made`);
   running = batch;
-  const say = (line: string) => { batch.log.push(line); if (batch.log.length > 400) batch.log.splice(0, batch.log.length - 400); log(`  [${batch.kind}] ${line}`); };
+  stopping = false;
+  const say = (line: string) => { batch.log.push(line); if (batch.log.length > 600) batch.log.splice(0, batch.log.length - 600); log(`  [${batch.kind}] ${line}`); };
   try {
     await work(say);
     batch.status = "done";
   } catch (e) {
-    batch.status = "failed";
-    batch.error = e instanceof Error ? e.message : String(e);
-    say(`stopped: ${batch.error}`);
+    batch.status = stopping ? "stopped" : "failed";
+    batch.error = stopping ? undefined : e instanceof Error ? e.message : String(e);
+    say(stopping ? "stopped by the editor" : `stopped: ${batch.error}`);
   } finally {
     batch.endedAt = new Date().toISOString();
     running = null;
+    stopping = false;
     try { await mkdir(dir, { recursive: true }); await writeFile(path.join(dir, `${batch.kind}.json`), JSON.stringify(batch, null, 1)); } catch { /* the folder went */ }
   }
   return batch;
+}
+
+/** Lay `tasks` out, then any that came out placed like another (workers run
+ * side by side, so they can't see each other) once more with another seed. */
+async function layOutUnique(store: Store, tasks: Task[], seen: string[], say: Say, done: (t: Task, f: Parameters<OnFile>[0]) => void) {
+  const results = new Map<Task, Parameters<OnFile>[0]>();
+  await runTasks(store, tasks, say, (t, f) => results.set(t, f));
+  const known = new Set(seen);
+  const again: Task[] = [];
+  for (const t of tasks) {
+    const f = results.get(t);
+    if (!f) continue;
+    if (f.sig.some((x) => known.has(x))) again.push({ ...t, item: { ...t.item, seed: t.item.seed + 5000 }, seen: [...known] });
+    else { f.sig.forEach((x) => known.add(x)); done(t, f); }
+  }
+  if (again.length) {
+    say(`${again.map((t) => t.label).join(", ")}: came out like another: laid out again`);
+    await runTasks(store, again, say, (t, f) => { f.sig.forEach((x) => known.add(x)); done(t, f); });
+  }
 }
 
 /** Make `count` copies of the day's paper, in `lang` (in the background). */
@@ -377,17 +461,18 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
     await rm(copiesDir(date), { recursive: true, force: true });
     await mkdir(copiesDir(date), { recursive: true });
     const translate = lang !== profile.language.lang;
-    const spec: SetSpec = { date, reword: opts.reword, shuffle: opts.shuffle, translate, ...day,
-      items: Array.from({ length: opts.count }, (_, i) => ({ n: i + 1, pdf: copyFile(date, i + 1), seed: i + 1 + (translate ? 1000 * LANGS.indexOf(lang) : 0) })) };
     say(`${opts.count} cop${opts.count === 1 ? "y" : "ies"} in ${LANG_NAME[lang]}`);
-    const onFile: OnFile = (f) => {
+    const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead };
+    const tasks: Task[] = Array.from({ length: opts.count }, (_, i) => ({
+      lang, label: `copy ${i + 1}`, spec: base, seen: day.seen,
+      item: { n: i + 1, pdf: copyFile(date, i + 1), seed: i + 1 + (translate ? 1000 * LANGS.indexOf(lang) : 0) },
+    }));
+    await layOutUnique(store, tasks, day.seen, say, (t, f) => {
       batch.cost += f.cost;
-      batch.files.push({ n: f.n, lang, ready: f.ready, pages: f.pages });
+      batch.files = [...batch.files, { n: f.n, lang, ready: f.ready, pages: f.pages }].sort((a, b) => a.n - b.n);
       batch.done = batch.files.length;
       say(`copy ${f.n} ready${f.ready ? "" : " (some checks need a look)"}`);
-    };
-    if (translate) await layOutIn(lang, spec, say, onFile);
-    else await layOutHere(store, spec, say, onFile);
+    });
   }, opts.log);
 }
 
@@ -404,25 +489,19 @@ export async function makeEditions(store: Store, date: string, editions: Edition
   return runBatch(batch, editionsDir(date), async (say) => {
     if (!opts.only) await rm(editionsDir(date), { recursive: true, force: true });
     await mkdir(editionsDir(date), { recursive: true });
-    const seen = [...day.seen];
-    for (const lang of LANGS) {
-      const mine = list.filter((e) => e.lang === lang);
-      if (!mine.length) continue;
-      const translate = lang !== profile.language.lang;
-      // each paper's own seed, from its place in the full list: the same paper lays out the same way each time it's made
-      const spec: SetSpec = { date, reword: "headlineDeck", shuffle: "keepLead", translate, pageOf: day.pageOf, lead: day.lead, seen,
-        items: mine.map((e) => ({ n: 100 + editions.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + editions.indexOf(e) })) };
-      say(`${mine.map((e) => e.name).join(", ")} (${LANG_NAME[lang]})`);
-      const onFile: OnFile = (f) => {
-        const e = mine.find((x) => 100 + editions.indexOf(x) === f.n)!;
-        batch.cost += f.cost;
-        batch.files = [...batch.files.filter((x) => x.id !== e.id), { n: f.n, id: e.id, name: e.name, lang, ready: f.ready, pages: f.pages }];
-        batch.done++;
-        seen.push(...f.sig);
-        say(`${e.name} ready${f.ready ? "" : " (some checks need a look)"}`);
-      };
-      if (translate) await layOutIn(lang, spec, say, onFile);
-      else await layOutHere(store, spec, say, onFile);
-    }
+    say(list.map((e) => `${e.name} (${LANG_NAME[e.lang]})`).join(", "));
+    // each paper's own seed, from its place in the full list: the same paper lays out the same way each time
+    const tasks: Task[] = list.map((e) => ({
+      lang: e.lang, label: e.name, seen: day.seen,
+      spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: day.pageOf, lead: day.lead },
+      item: { n: 100 + editions.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + editions.indexOf(e) },
+    }));
+    await layOutUnique(store, tasks, day.seen, say, (t, f) => {
+      const e = list.find((x) => x.id === t.item.id)!;
+      batch.cost += f.cost;
+      batch.files = [...batch.files.filter((x) => x.id !== e.id), { n: f.n, id: e.id, name: e.name, lang: e.lang, ready: f.ready, pages: f.pages }];
+      batch.done++;
+      say(`${e.name} ready${f.ready ? "" : " (some checks need a look)"}`);
+    });
   }, opts.log);
 }

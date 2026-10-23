@@ -12,13 +12,18 @@ import type { IssueRender, TextElement } from "@ck/shared/contract";
 import type { PagePlan } from "./pack.ts";
 import { normalizeText } from "./text.ts";
 import { BODY, GRID, PT } from "./typography.ts";
+import { profile } from "../profile.ts";
 
+// Hindi and Urdu lines justify in their word spaces alone (never letter-
+// spaced: layout/measure.ts), so their papers set looser word spacing: their
+// own limits, as such papers print; Gujarati and English keep the strict ones
+const WORD_SPACED = ["hi", "ur"].includes(profile.language.lang);
 /** Body lines whose extra word space (em) is past this count as loose. */
-const LOOSE_EM = 0.6;
+const LOOSE_EM = WORD_SPACED ? 0.9 : 0.6;
 /** At most this share of body lines may be loose ... */
-const LOOSE_SHARE = 0.03;
+const LOOSE_SHARE = WORD_SPACED ? 0.06 : 0.03;
 /** ... and 95% of lines must stay under this. */
-const P95_EM = 0.5;
+const P95_EM = WORD_SPACED ? 0.85 : 0.5;
 /** Every display line must fill at least this share of its width. */
 const FILL = 0.97;
 /** Fillers (house ad, messages) may cover at most this share of a page's story area. */

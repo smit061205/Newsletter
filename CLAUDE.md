@@ -25,7 +25,7 @@ before changing Next code (`web/AGENTS.md`).
 ## How to work here
 - Develop on ports **4100 (engine) / 3100 (newsroom)**; 4000/3000 are the installed app's. Never run two engines on one database.
 - Test layout changes on a **copy** of the database in a scratch `DATA_DIR`, never on published issues.
-- Before saying the desktop app works, **build it and check the packed app** (HANDOFF §5). Don't open the packed app on the user's Mac without asking: it moves their real install into itself.
+- **Don't build the desktop app on the user's Mac** (23 Oct 2026: it ran the Mac out of memory and disk). The release workflow builds and checks the packed app (signature, contents, its engine starting) on all three platforms: read its result before saying a release works. Never open a packed app on the user's Mac: it moves their real install into itself.
 - The CI layout tests must stay READY (`backend/test/pack-0808.ts`, `sample-english.ts`).
 - Work on a branch. **When an improvement is finished and checked** (typechecks, the CI layout tests READY, the newsroom builds, and for desktop changes the packed-app check), merge it to `main`, push, and release it: bump to the next version tag and `git tag vX.Y.Z && git push origin vX.Y.Z` (the release workflow creates the GitHub release and attaches the installers). The user asked for this standing on 23 Oct 2026; tell them the version and what's in it. Publish the paper (`cli.ts publish --push`) from `main`.
 - Commit messages describe the change in plain words.

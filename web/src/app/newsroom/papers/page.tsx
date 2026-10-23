@@ -281,6 +281,13 @@ function Editions() {
     return () => clearInterval(tick);
   }, [running, load]);
 
+  const [stopping, setStopping] = useState(false);
+  useEffect(() => { if (!running) setStopping(false); }, [running]);
+  const stop = async () => {
+    if (!window.confirm(t("stop.confirm"))) return;
+    setStopping(true);
+    try { await call(`/api/issues/${date}/editions/stop`, { json: {} }); load(); } catch (e) { setError((e as Error).message); setStopping(false); }
+  };
   const make = async (only?: string) => {
     setError("");
     try { setData(await call(`/api/issues/${date}/editions`, { json: only ? { only } : {} })); toast(t("eds.started")); }
@@ -313,6 +320,9 @@ function Editions() {
       </div>
       {!has && <Note tone="warn">{t("copies.none")}</Note>}
       {error && <Note tone="bad">{error}</Note>}
+      {running && <div className={s.row} style={{ justifyContent: "flex-end" }}>
+        <Button kind="danger" onClick={stop} disabled={stopping}>{stopping ? t("stop.stopping") : t("stop.papers")}</Button></div>}
+      {run?.status === "stopped" && <Note tone="warn">{t("stop.done")}</Note>}
       {run?.status === "failed" && <Note tone="bad">{t("copies.failed", { error: run.error ?? "" })}</Note>}
       <div className={s.list}>
         {(data?.editions ?? []).map((e) => {

@@ -8,6 +8,7 @@
 import { profile } from "../profile.ts";
 import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, openRouter } from "./rewrite.ts";
+import { inPaperLanguage } from "../layout/stories.ts";
 
 export const FEATURE_KICKER = "વિશેષ લેખ";
 
@@ -115,7 +116,8 @@ const BRIEF_SCHEMA = {
   },
 };
 
-export const BRIEF_KICKER = "જાણવા જેવું";
+/** "Good to know", in the paper's language (a Hindi paper's briefs came out in Gujarati with the Gujarati name). */
+export const BRIEF_KICKER = ({ gu: "જાણવા જેવું", hi: "जानने योग्य", ur: "جاننے کی بات" } as Record<string, string>)[profile.language.lang] ?? "Good to know";
 
 /** A "જાણવા જેવું" item of about `words` words for a hole no story fits:
  * the same rules as a feature (general knowledge, no news, no names, no
@@ -159,7 +161,8 @@ export async function writeBrief(store: Store, date: string, slot: string, words
   } catch {
     return null;
   }
-  const ok = !hasDigit(`${b.headline} ${b.deck} ${b.body}`);
+  // no digits, and in the paper's own language
+  const ok = !hasDigit(`${b.headline} ${b.deck} ${b.body}`) && inPaperLanguage(make(b));
   store.putFitted(key, { body: ok ? JSON.stringify(b) : "", model });
   return ok ? { story: make(b), cost: data.usage?.cost ?? 0 } : null;
 }

@@ -14,7 +14,7 @@ import { planDay } from "./editorial/plan.ts";
 import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
-import { writeDeck } from "./editorial/rewrite.ts";
+import { isSpeechText, speechTwin, writeDeck } from "./editorial/rewrite.ts";
 import { closeGaps, type FillerCount } from "./layout/fit.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
 import { applyTextEdits, dedupe, droppedBy, inPaperLanguage, referenceAds, standInsMovable } from "./layout/stories.ts";
@@ -181,7 +181,13 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         store.putStory(s);
       }
     }
-    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && (opts.copy?.translate || inPaperLanguage(s))))
+    // a speech's full text written up beside the event's own story (stories
+    // written before the rewrite grouped them): the event's story is enough
+    const speechDup = (s: Story) => {
+      const r = releases.get(s.id);
+      return !!r && isSpeechText(r) && stories.some((o) => o.id !== s.id && !dropped.has(o.id) && !!releases.get(o.id) && speechTwin(r, releases.get(o.id)!));
+    };
+    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && !speechDup(s) && (opts.copy?.translate || inPaperLanguage(s))))
       .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
       .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
     // the editorial plan ranks the day's stories (an editor's own rank wins)

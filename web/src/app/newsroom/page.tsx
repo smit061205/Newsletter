@@ -99,6 +99,13 @@ export default function Today() {
     try { setJob(await call<Job>("/api/jobs", { json: { date, ...(from ? { from } : {}) } })); setTicker([]); }
     catch (e) { setError((e as Error).message); }
   };
+  const [stopping, setStopping] = useState(false);
+  useEffect(() => { if (!running) setStopping(false); }, [running]);
+  const stop = async () => {
+    if (!window.confirm(t("stop.confirm"))) return;
+    setStopping(true);
+    try { await call("/api/jobs/current/stop", { json: {} }); } catch (e) { setError((e as Error).message); setStopping(false); }
+  };
   const publish = async () => {
     setPublishing("working");
     try {
@@ -128,7 +135,11 @@ export default function Today() {
 
       <section className={`${s.card} ${s.hero}`}>
         {running && job ? <Making job={job} previous={lastDone} ticker={ticker} />
-          : failed ? (
+          : failed && failed.error === "stopped by the editor" ? (
+            <Hero tone="warn" icon={Icon.alert()} title={t("today.stopped.title")} body={t("today.stopped.body")}>
+              <Button kind="primary" big icon={Icon.refresh()} onClick={() => run(failed.name)}>{t("today.stopped.go")}</Button>
+            </Hero>
+          ) : failed ? (
             <Hero tone="bad" icon={Icon.alert()} title={t("today.failed.title")} body={t("today.failed.body", { step: t(`step.${failed.name}` as StringKey) })}>
               <Button kind="primary" big icon={Icon.refresh()} onClick={() => run(failed.name)}>{t("today.retry")}</Button>
             </Hero>
@@ -162,6 +173,11 @@ export default function Today() {
           </ul>
         )}
 
+        {running && (
+          <div className={s.row} style={{ justifyContent: "flex-end" }}>
+            <Button kind="danger" onClick={stop} disabled={stopping}>{stopping ? t("stop.stopping") : t("stop.paper")}</Button>
+          </div>
+        )}
         {job && <Stepper job={job} />}
         {error && <Note tone="bad">{error}</Note>}
         {otherRunning && <p className={s.faint}>{t("today.otherRunning", { date: status!.running!.date })}</p>}

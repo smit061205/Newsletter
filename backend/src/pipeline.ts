@@ -42,6 +42,20 @@ function keepAwake(): () => void {
 }
 
 let running: Job | null = null;
+let stopping = false;
+/** Stop the run that's going: it ends at its next step of progress (an AI
+ * call already sent finishes first); what it stored so far stays stored. */
+export function stopJob(): boolean {
+  if (!running) return false;
+  stopping = true;
+  return true;
+}
+const STOPPED = "stopped by the editor";
+const checkStop = () => { if (stopping) throw new Error(STOPPED); };
+/** Wait, unless the run is stopped meanwhile. */
+async function waitOrStop(ms: number) {
+  for (let t = 0; t < ms; t += 1000) { checkStop(); await new Promise((ok) => setTimeout(ok, Math.min(1000, ms - t))); }
+}
 
 /** Runs a previous engine left "running" (it was stopped or the computer
  * restarted): marked stopped, so the newsroom offers to run them again. */
@@ -80,7 +94,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           const at = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }).format(Date.now() + RETRY_EVERY_MS);
           say(`PIB isn't answering (${e instanceof Error ? e.message : e}): trying again at ${at}`);
           progress({ done: 0, total: 0, label: "waiting", item: at });
-          await new Promise((ok) => setTimeout(ok, RETRY_EVERY_MS));
+          await waitOrStop(RETRY_EVERY_MS);
         }
       }
       say(`${r.listed} listed, ${r.fetched} new, ${r.skipped} already stored`);
@@ -125,16 +139,19 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
   const steps: JobStep[] = STEPS.map((name, i) => ({ name, status: i < first ? "skipped" : "waiting", log: [] }));
   const job = store.newJob(date, { date, by: opts.by, status: "running", startedAt: new Date().toISOString(), steps });
   running = job;
+  stopping = false;
   const letSleep = keepAwake();
   const emit = (line?: string) => { store.putJob(job); for (const fn of listeners) fn(job, line); };
   emit();
   try {
     for (const s of job.steps) {
       if (s.status === "skipped") continue;
+      checkStop();
       s.status = "running";
       s.startedAt = new Date().toISOString();
       emit();
       const say = (line: string) => {
+        checkStop();
         s.log.push(line);
         opts.log?.(`  [${s.name}] ${line}`);
         emit(line);
@@ -142,6 +159,7 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
       // progress as it comes, sent at most twice a second (a story a second is plenty)
       let lastSent = 0;
       const progress = (p: Progress) => {
+        checkStop();
         s.progress = p;
         if (Date.now() - lastSent > 500 || p.done === p.total) { lastSent = Date.now(); emit(); }
       };
@@ -150,7 +168,7 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
         s.status = "done";
       } catch (e) {
         s.status = "failed";
-        s.error = e instanceof Error ? e.message : String(e);
+        s.error = stopping ? STOPPED : e instanceof Error ? e.message : String(e);
         job.status = "failed";
         throw e;
       } finally {
@@ -163,6 +181,7 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
   } finally {
     job.endedAt = new Date().toISOString();
     running = null;
+    stopping = false;
     letSleep();
     emit();
   }

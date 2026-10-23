@@ -192,7 +192,22 @@ export const releaseText = (r: Release) =>
 // issues one "the Prime Minister congratulates ..." per medal winner -- are
 // written up as one round-up, the way a desk would print them.
 const headWords = (h: string) => new Set(h.replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").split(/\s+/).filter((w) => w.length > 2));
+/** PIB's "full text of the Prime Minister's address" release, published beside the event's own. */
+const SPEECH_TEXT = /મૂળ ?પાઠ|સંબોધનનો પાઠ|मूल ?पाठ|संबोधन का पाठ|text of (the )?(pm|prime minister|president|vice[- ]president)/i;
+// words in every such headline: they don't make two releases one occasion
+const COMMON = new Set(["પ્રધાનમંત્રી", "પ્રધાનમંત્રીના", "પ્રધાનમંત્રીએ", "શ્રી", "નરેન્દ્ર", "મોદી", "મોદીએ", "મોદીના", "સંબોધનનો", "મૂળપાઠ",
+  "प्रधानमंत्री", "श्री", "नरेन्द्र", "नरेंद्र", "मोदी", "संबोधन", "मूल", "पाठ", "the", "and", "text", "address"]);
+/** A speech's text and the release about the same event (their headlines
+ * share the occasion's name: "ચિન્મય અમૃત મહોત્સવ"): one story, not two
+ * (23 Oct 2026 printed both). */
+export function speechTwin(a: Pick<Release, "headline">, b: Pick<Release, "headline">): boolean {
+  if (SPEECH_TEXT.test(a.headline) === SPEECH_TEXT.test(b.headline)) return false;
+  const x = headWords(a.headline), y = headWords(b.headline);
+  return [...x].filter((w) => y.has(w) && !COMMON.has(w)).length >= 3;
+}
+export const isSpeechText = (r: Pick<Release, "headline">) => SPEECH_TEXT.test(r.headline);
 function similar(a: Release, b: Release): boolean {
+  if ((a.source ?? "gujinfo") === (b.source ?? "gujinfo") && speechTwin(a, b)) return true;
   if ((a.source ?? "gujinfo") !== (b.source ?? "gujinfo") || (a.ministry ?? a.office) !== (b.ministry ?? b.office)) return false;
   const x = headWords(a.headline), y = headWords(b.headline);
   const both = [...x].filter((w) => y.has(w)).length;

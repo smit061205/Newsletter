@@ -396,6 +396,15 @@ const gu = {
   "eds.again": "ફરી બનાવો",
   "eds.auto": "સાંજનું છાપું બને પછી આ છાપાં પણ આપમેળે બનાવો",
   "eds.cost": "અંદાજે ખર્ચ: દરેક ગુજરાતી છાપું ₹૫ જેટલું, હિન્દી કે ઉર્દૂ ₹૧૫ જેટલું.",
+  "stop.paper": "છાપું બનાવવાનું રોકો",
+  "stop.copies": "નકલો બનાવવાનું રોકો",
+  "stop.papers": "છાપાં બનાવવાનું રોકો",
+  "stop.stopping": "રોકાય છે…",
+  "stop.confirm": "ખરેખર રોકવું છે? અત્યાર સુધીનું કામ સચવાયેલું રહેશે.",
+  "stop.done": "તમે રોક્યું. જે બની ગયું તે નીચે છે.",
+  "today.stopped.title": "તમે છાપું બનાવવાનું રોક્યું",
+  "today.stopped.body": "અત્યાર સુધીનું કામ સચવાયેલું છે. તૈયાર હો ત્યારે ત્યાંથી આગળ બનાવો.",
+  "today.stopped.go": "આગળ બનાવો",
   "help.title": "મદદ",
 } as const;
 
@@ -793,6 +802,15 @@ const en: Record<StringKey, string> = {
   "eds.again": "Make again",
   "eds.auto": "Make these papers by themselves after the evening paper",
   "eds.cost": "About ₹5 for each Gujarati paper, ₹15 for Hindi or Urdu.",
+  "stop.paper": "Stop making the paper",
+  "stop.copies": "Stop making the copies",
+  "stop.papers": "Stop making the papers",
+  "stop.stopping": "Stopping…",
+  "stop.confirm": "Stop it? Everything done so far is kept.",
+  "stop.done": "You stopped it. What was finished is below.",
+  "today.stopped.title": "You stopped making the paper",
+  "today.stopped.body": "Everything done so far is kept. Carry on from there when you're ready.",
+  "today.stopped.go": "Carry on",
   "help.title": "Help",
 };
 

@@ -56,6 +56,13 @@ export default function Copies() {
     return () => clearInterval(tick);
   }, [running, load]);
 
+  const [stopping, setStopping] = useState(false);
+  useEffect(() => { if (!running) setStopping(false); }, [running]);
+  const stop = async () => {
+    if (!window.confirm(t("stop.confirm"))) return;
+    setStopping(true);
+    try { await call(`/api/issues/${date}/copies/stop`, { json: {} }); load(); } catch (e) { setError((e as Error).message); setStopping(false); }
+  };
   const make = async () => {
     setError("");
     try {
@@ -141,6 +148,9 @@ export default function Copies() {
               <span className={s.muted}>{t("today.making.left", { min: num(lang, Math.max(1, Math.round((run.count - run.done) * minutesPerCopy))) })}</span>
             </div>
           )}
+          {running && <div className={s.row} style={{ justifyContent: "flex-end" }}>
+            <Button kind="danger" onClick={stop} disabled={stopping}>{stopping ? t("stop.stopping") : t("stop.copies")}</Button></div>}
+          {run.status === "stopped" && <Note tone="warn">{t("stop.done")}</Note>}
           {run.status === "failed" && <Note tone="bad">{t("copies.failed", { error: run.error ?? "" })}</Note>}
           <div className={s.copyGrid}>
             {run.files.map((f) => (

@@ -306,6 +306,10 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           }
           return startJob(res, date, "build");
         }
+        if ((parts[3] === "copies" || parts[3] === "editions") && parts[4] === "stop" && req.method === "POST") {
+          const { stopCopies } = await import("./editorial/copies.ts");
+          return stopCopies() ? send(res, 202, { stopping: true }) : send(res, 404, { error: "nothing is being made" });
+        }
         if (parts[3] === "copies") {
           const { copiesOf, copyFile, currentCopies, makeCopies } = await import("./editorial/copies.ts");
           if (req.method === "GET" && parts[4]) {
@@ -425,6 +429,10 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
       }
       if (parts[0] === "api" && parts[1] === "jobs") {
         if (req.method === "GET" && parts[2] === "current") return send(res, 200, currentJob());
+        if (req.method === "POST" && parts[2] === "current" && parts[3] === "stop") {
+          const { stopJob } = await import("./pipeline.ts");
+          return stopJob() ? send(res, 202, { stopping: true }) : send(res, 404, { error: "nothing is being made" });
+        }
         if (req.method === "GET" && !parts[2]) return send(res, 200, store.jobs(url.searchParams.get("date") ?? undefined));
         if (req.method === "POST" && !parts[2]) {
           const body = (await readJson(req)) as { date?: string; from?: StepName };
