@@ -49,6 +49,9 @@ Not sure which Mac? Apple menu → About This Mac: "Chip: Apple M…" is Apple s
 - At the set time (8 PM by default) the paper makes itself, and a notification says when it's ready. Open **આજે / Today**, look at **છાપું / Paper**, fix anything by clicking a story, then **Publish** and **Print PDF**. The editor's guide, in Gujarati and English, is [`docs/NEWSROOM_GUIDE.md`](docs/NEWSROOM_GUIDE.md).
 - Closing the window keeps the app running in the menu bar / tray, so the evening run still happens. **Quit** (⌘Q, or the tray menu) stops it.
 - **Publish:** connect the website once (**Settings → Connect the website**, a GitHub sign-in in the browser). After that, Publish updates the website.
+- **નકલો / Copies:** copies of the day's paper for other titles. Choose how many, what the AI rewords (headline; headline and sub-heading; or the text too) and how far the stories move (anywhere, keeping the lead on the front page; anywhere; or each on its own page). Each copy is a print PDF with the masthead, the page headers and the last page's footer left empty, to be filled in with CorelDRAW. Copies never change the day's own paper.
+- **છાપાં / Papers:** the papers this newsroom can make. Add one from its PDF issues, fonts and header art, make a test issue, and (in the app) **Work on this paper** to switch the whole newsroom to it. Only the chosen paper makes itself in the evening.
+- **Settings:** the rupee rate keeps itself up to date (the day's US dollar rate, from the ECB's reference rates) unless it's typed in by hand; waking the computer is on/off and follows the paper's time.
 
 ### Updates, uninstalling, moving from the old install
 - **Updates** come by themselves: the app checks the Releases page when it opens and once a day, then offers **Restart to update**. The paper's data (issues, settings, the key) lives outside the app and is never touched: on macOS in `~/Library/Application Support/Capital Kranti`, on Windows in `%APPDATA%\Capital Kranti`.
@@ -528,7 +531,12 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 | POST | `/api/releases` | upload one release (see 11) |
 | GET | `/api/pages/:date/:n.png` | page image (150 dpi) |
 | GET | `/ingest#<json>` | browser hand-off page for releases |
-| GET | `/api/export/:date.svg?page=` | **not built yet** (15.7) |
+| GET | `/api/export/:date.svg?page=` | one page as editable SVG (CorelDRAW) |
+| GET/POST | `/api/issues/:date/copies` | the day's copies (`editorial/copies.ts`); POST `{count, reword, shuffle}` makes them in the background |
+| GET | `/api/issues/:date/copies/:n.pdf` | one copy's PDF |
+| GET | `/api/layout` | the page in cm, its columns and each page's room for stories (the Ads screen's preview) |
+| GET/POST/DELETE | `/api/ads` | ad bookings: GET `?date=` (each with every day it runs), POST books one, DELETE `/api/ads/:id` removes it from all its days |
+| GET | `/api/papers`, POST `/api/papers/:id/test` | the papers, a test issue of one (its own process and data folder) |
 
 - **Storage:** `backend/data/capital-kranti.sqlite`, through `node:sqlite`. Tables: `releases`, `stories`, `ads`, `issues` (date, version, status, json, report), `edits`, `fitted`.
 - **Nightly job:** `everyEvening()` runs `runDay()` at 20:00 Asia/Kolkata: inbox ingest (missing, so it logs and skips), then rewrite, then build. It does nothing useful until 15.2 exists.
@@ -583,7 +591,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 ## 15. Remaining work
 
 1. **Install on the father's Windows PC** with the user: `windows\Install Capital Kranti.cmd` (after this branch is merged: the installer clones `main`), paste the OpenRouter key in Settings, set the run time, and watch one 8 PM run.
-2. **The other five papers** (1 Urdu, 1 Hindi, 3 Gujarati): each through the Papers screen with its PDFs, fonts and masthead art. Then a paper switcher in the newsroom and every paper in the 8 PM run (today each extra paper is built by "Make a test issue" in its own process and data folder, `papers/<id>/`).
+2. **The other five papers** (1 Urdu, 1 Hindi, 3 Gujarati): each through the Papers screen with its PDFs, fonts and masthead art. The app switches the newsroom between papers (each in its own data folder, `papers/<id>/`, sharing the AI key); what's left is every paper in the 8 PM run, not only the chosen one. Papers added in the app live in its data folder (`publications/<id>/` there), so updates keep them.
 3. **Urdu polish** once the paper's Nastaliq font is known: line spacing, display fitting and the overlap tolerance for tall Nastaliq letters (`sample-urdu` shows where).
 4. **Print specs** from the printer: bleed, crop marks, CMYK/PDF-X (the preflight gate has the hook).
 5. **Needed from the user:** BBharatiMaruti (condensed headlines), confirmation that the Bharati licence covers this PC, the printer's specs, the other papers' PDFs and fonts.
@@ -595,7 +603,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 - **Playwright** is pinned at 1.62.1. Newer versions want a different Chromium build.
 - **The OpenRouter key** is in `backend/.env`. The account had a $5 limit when it was set up; check it at `https://openrouter.ai/api/v1/key`.
 - **`gate 7`** compares only builds with the same fingerprint (same inputs, same engine code), so a code or input change doesn't fail it.
-- **The 8 August stand-in ads** are used whenever a day has no `ads` rows (`referenceAds`). There is no ad-booking UI yet.
+- **The 8 August stand-in ads** are used whenever a day has no `ads` rows (`referenceAds`). Booking an ad in the newsroom replaces them for its days.
 - **A release with a Punjabi letter** ("ਲિમિટેડના", release 55037) can't be set in Gopika. It's logged, not fixed: it's a typo in the source.
 - **Fonts with `restricted: true`** are never served publicly. Don't move them to `web/public`.
 - **`web/public/replica`, `web/public/chrome` and the reference PDFs** are the paper's own printed content (photos and ads from 8 August), committed for testing.

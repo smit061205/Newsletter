@@ -109,7 +109,7 @@ export default function Today() {
     } catch (e) { setPublishing(null); setError((e as Error).message); }
   };
   const openPdf = () => issue && pdf({ url: media(`/api/issues/${date}/pdf`), title: t("pdf.title", { issue: num(lang, issue.report.issueNumber) }),
-                                       fileName: `Capital Kranti ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")}.pdf` });
+                                       fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")}.pdf` });
   const nextRun = status?.autoRun && status.nextRun
     ? t("today.next", { when: t(status.nextRun.startsWith("today") ? "today.next.today" : "today.next.tomorrow", { time: num(lang, status.runAt) }) })
     : t("today.auto.off");
@@ -166,7 +166,7 @@ export default function Today() {
         {error && <Note tone="bad">{error}</Note>}
         {otherRunning && <p className={s.faint}>{t("today.otherRunning", { date: status!.running!.date })}</p>}
         <div className={s.row} style={{ justifyContent: "space-between" }}>
-          <span className={s.faint}>{nextRun}</span>
+          <span className={s.faint}>{date === status?.today ? nextRun : ""}</span>
           <span className={s.row}>
             {report && <span className={s.faint}>{t("today.cost", { cost: rupees(lang, report.cost, status?.inrPerUsd ?? 88) })}</span>}
             {report && !running && issue!.status !== "approved" && <Button kind="quiet" icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>}

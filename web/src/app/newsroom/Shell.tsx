@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { call, type Status } from "./api";
 import s from "./newsroom.module.css";
+import { Calendar } from "./ui/calendar";
 import { addDays, longDate } from "./ui/format";
 import { Help } from "./ui/help";
 import { AppProvider, Button, Icon, Mark, useApp } from "./ui/kit";
@@ -22,7 +23,9 @@ const NAV: [string, StringKey, () => React.ReactElement][] = [
   ["/newsroom/pages", "nav.paper", Icon.paper],
   ["/newsroom/stories", "nav.stories", Icon.stories],
   ["/newsroom/ads", "nav.ads", Icon.ads],
+  ["/newsroom/copies", "nav.copies", Icon.copies],
   ["/newsroom/archive", "nav.archive", Icon.archive],
+  ["/newsroom/papers", "nav.papers", Icon.papers],
   ["/newsroom/settings", "nav.settings", Icon.settings],
 ];
 
@@ -94,10 +97,10 @@ function Frame({ children }: { children: React.ReactNode }) {
       <nav className={s.side} aria-label={t("app.sub")}>
         <div className={s.logo}>
           <Mark className={s.mark} />
-          <div className={s.logoText}><span className={s.logoName}>{t("app.name")}</span><span className={s.logoSub}>{t("app.sub")}</span></div>
+          <div className={s.logoText}><span className={s.logoName}>{!status || status.paper.id === "capital-kranti" ? t("app.name") : status.paper.name}</span><span className={s.logoSub}>{t("app.sub")}</span></div>
         </div>
         {NAV.map(([href, key, icon]) => (
-          <Link key={href} href={href} className={`${s.navItem} ${href === "/newsroom/archive" ? s.navExtra : ""}`}
+          <Link key={href} href={href} className={`${s.navItem} ${href === "/newsroom/archive" || href === "/newsroom/papers" ? s.navExtra : ""}`}
                 aria-current={path === href ? "page" : undefined}>{icon()}<span>{t(key)}</span></Link>
         ))}
         <div className={s.navSpacer} />
@@ -109,18 +112,21 @@ function Frame({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The day switcher at the top of a screen: ‹ Thursday, 22 October › */
+/** The day switcher at the top of a screen: ‹ Thursday, 22 October ›, the
+ * date itself opening a calendar. */
 export function DaySwitch() {
   const { lang, t, date, setDate } = useApp();
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
   const today = todayInIndia();
   return (
     <div className={s.dateSwitch}>
       <button onClick={() => setDate(addDays(date, -1))} aria-label={t("date.prev")}>{Icon.left()}</button>
-      <label className={s.dateLabel}>
-        {date === today ? `${t("date.today")} · ` : ""}{longDate(lang, date)}
-        <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label={longDate(lang, date)} />
-      </label>
+      <button className={s.dateLabel} onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="dialog" title={t("cal.pick")}>
+        {Icon.calendar()}{date === today ? `${t("date.today")} · ` : ""}{longDate(lang, date)}
+      </button>
       <button onClick={() => setDate(addDays(date, 1))} disabled={date >= today} aria-label={t("date.next")}>{Icon.right()}</button>
+      {open && <Calendar value={date} max={today} onPick={setDate} onClose={close} />}
     </div>
   );
 }

@@ -34,6 +34,10 @@ export const Icon = {
   image: () => P(<><rect x="4" y="5" width="16" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M20 15l-4.5-4.5L6 19" /></>),
   external: () => P(<><path d="M14 4.5h5.5V10M19.5 4.5L11 13" /><path d="M17 13.5v4a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4" /></>),
   wand: () => P(<><path d="M5 19l10-10M13.5 7.5l3 3M17 4v2M20 7h-2M18.5 9.5l1 1M14.5 5.5l-1-1" /></>),
+  calendar: () => P(<><rect x="4" y="5.5" width="16" height="14" rx="2" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></>),
+  copies: () => P(<><rect x="8" y="7.5" width="11" height="13" rx="1.5" /><path d="M5 16.5V5a1.5 1.5 0 0 1 1.5-1.5H15" /><path d="M11 12h5M11 15h5" /></>),
+  papers: () => P(<><path d="M4 6.5h12v12.5a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 19z" /><path d="M16 9.5h4V19a1.5 1.5 0 0 1-3 0" /><path d="M7 10h6M7 13h6M7 16h4" /></>),
+  trash: () => P(<><path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7" /></>),
 };
 
 /** The mark: a folded newspaper with "ક" on its front page (the app icon, in small). */

@@ -16,10 +16,10 @@ export function rupees(lang: Lang, usd: number | undefined, rate: number): strin
 /** "ગુરુવાર, 22 ઑક્ટોબર" / "Thursday, 22 October" */
 export function longDate(lang: Lang, iso: string, withYear = false): string {
   const d = new Date(`${iso}T12:00:00`);
-  return d.toLocaleDateString(lang === "gu" ? "gu-IN" : "en-IN", { weekday: "long", day: "numeric", month: "long", ...(withYear ? { year: "numeric" } : {}) });
+  return num(lang, d.toLocaleDateString(lang === "gu" ? "gu-IN" : "en-IN", { weekday: "long", day: "numeric", month: "long", ...(withYear ? { year: "numeric" } : {}) }));
 }
 export const shortDate = (lang: Lang, iso: string) =>
-  new Date(`${iso}T12:00:00`).toLocaleDateString(lang === "gu" ? "gu-IN" : "en-IN", { day: "numeric", month: "short", year: "numeric" });
+  num(lang, new Date(`${iso}T12:00:00`).toLocaleDateString(lang === "gu" ? "gu-IN" : "en-IN", { day: "numeric", month: "short", year: "numeric" }));
 
 /** The ISO day `n` days from `iso`. */
 export function addDays(iso: string, n: number): string {

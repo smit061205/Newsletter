@@ -132,7 +132,9 @@ export class Packer {
                          /** the widest a story may be on this page (the front page's rule), unless it's allowed full width */
                          maxCols?: number;
                          /** copy (natural area) that must stay in the pool for the pages after this one */
-                         reserve?: number }): Promise<PagePlan> {
+                         reserve?: number;
+                         /** a little chance in each choice (a copy laid out differently: editorial/copies.ts) */
+                         jitter?: () => number }): Promise<PagePlan> {
     const gap = GAP.betweenStories;
     const obstacles: Obstacle[] = ads.map((a) => ({ x0: a.x, x1: a.x + a.width, y0: a.y, y1: a.y + a.height }));
     const inCol = (o: Obstacle, c: number) => Math.min(o.x1, colX(c) + GRID.column) - Math.max(o.x0, colX(c)) > 20;
@@ -247,7 +249,8 @@ export class Packer {
                             // more important story no narrower, nor smaller than a lesser one
                             - (st.placed.some((q) => outranks(q.module, mod) || outranks(mod, q.module)) ? 4 : 0)
                             - (st.placed.some((q) => tombstoned(q, { module: mod, col: c0, x: colX(c0), y })
-                                                  || tombstoned({ module: mod, col: c0, x: colX(c0), y }, q)) ? 4 : 0);
+                                                  || tombstoned({ module: mod, col: c0, x: colX(c0), y }, q)) ? 4 : 0)
+                            + (opts.jitter ? (opts.jitter() - 0.5) * 1.5 : 0);
               const nst: State = {
                 free, placed: [...st.placed, { module: mod, col: c0, x: colX(c0), y }],
                 used: new Set([...st.used, story.id]), waste: st.waste + stranded,

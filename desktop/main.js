@@ -74,12 +74,21 @@ async function waitFor(url, seconds) {
   }
   throw new Error(`${url} didn't answer in ${seconds} seconds`);
 }
+/** The paper the newsroom works on (Papers screen): Capital Kranti in the
+ * app's data folder, any other in its own (papers/<id>/), sharing the AI key
+ * and the papers added here. */
+const MAIN_PAPER = "capital-kranti";
+const paperNow = () => (/^[a-z0-9-]+$/.test(readState().paper || "") ? readState().paper : MAIN_PAPER);
 async function startAll() {
+  const paper = paperNow();
   const engineEnv = {
-    DATA_DIR: DATA, GITHUB_TOKEN: githubToken(), GITHUB_REPO: REPO,
+    DATA_DIR: paper === MAIN_PAPER ? DATA : path.join(DATA, "papers", paper), GITHUB_TOKEN: githubToken(), GITHUB_REPO: REPO,
+    CK_PUBLICATION: paper, CK_PAPERS_HOME: DATA, CK_ENV_FILE: path.join(DATA, "settings.env"),
+    ...(lastStatus?.lang ? { CK_LANG: lastStatus.lang } : {}),
     // Chromium for laying out pages ships inside the app (node_modules/playwright-core/.local-browsers)
     PLAYWRIGHT_BROWSERS_PATH: "0",
   };
+  fs.mkdirSync(engineEnv.DATA_DIR, { recursive: true });
   if (!(await answers(`http://127.0.0.1:${ENGINE}/healthz`))) {
     // inside the app, @ck/shared comes from app-engine/shared (engine-hooks.mjs)
     const hooks = path.join(RES, "engine-hooks.mjs");
@@ -406,12 +415,31 @@ async function uninstall() {
 }
 
 /* ---------------- what the newsroom may ask of the app (preload.js) */
-ipcMain.handle("ck:info", () => ({ desktop: true, platform: process.platform, version: app.getVersion(), github: !!githubToken(), canConnect: !!GITHUB_CLIENT_ID, wake: readState().wakeSet || "" }));
+ipcMain.handle("ck:info", () => ({ desktop: true, platform: process.platform, version: app.getVersion(), github: !!githubToken(), canConnect: !!GITHUB_CLIENT_ID,
+                                   wake: readState().wakeSet || "", paper: paperNow() }));
+/** The engine started again (a new GitHub sign-in, another paper). */
+async function restartEngine() {
+  const engine = children.find((c) => c.name === "engine");
+  if (engine) {
+    engine.stopping = true;
+    const gone = new Promise((ok) => engine.once("exit", ok));
+    engine.kill();
+    await gone;
+  }
+  await startAll();
+}
+ipcMain.handle("ck:switch-paper", async (_e, id) => {
+  if (!/^[a-z0-9-]+$/.test(id)) throw new Error("no such paper");
+  if (id === paperNow()) return;
+  writeState({ paper: id });
+  log(`switching to the paper ${id}`);
+  await restartEngine();
+});
 ipcMain.handle("ck:connect-github", async () => {
-  if (!GITHUB_CLIENT_ID) throw new Error("This copy has no GitHub sign-in set up (see the README).");
+  if (!GITHUB_CLIENT_ID) throw new Error("Connecting the website isn't switched on in this version yet.");
   const form = (o) => new URLSearchParams(o).toString();
   const r = await fetch("https://github.com/login/device/code", { method: "POST", headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
-                                                                body: form({ client_id: GITHUB_CLIENT_ID, scope: "repo" }) });
+                                                                body: form({ client_id: GITHUB_CLIENT_ID, scope: "public_repo" }) });
   const d = await r.json();
   shell.openExternal(d.verification_uri);
   // polled in the background; the newsroom shows the code meanwhile
@@ -424,14 +452,7 @@ ipcMain.handle("ck:connect-github", async () => {
       if (t.access_token) {
         saveToken(t.access_token);
         // the engine picks the token up when it starts again
-        const engine = children.find((c) => c.name === "engine");
-        if (engine) {
-          engine.stopping = true;
-          const gone = new Promise((ok) => engine.once("exit", ok));
-          engine.kill();
-          await gone;
-        }
-        await startAll();
+        await restartEngine();
         win && win.webContents.send("ck:github-connected");
         return;
       }
@@ -451,6 +472,11 @@ ipcMain.handle("ck:schedule-wake", async (_e, time) => {
     `Register-ScheduledTask -TaskName 'Capital Kranti (wake)' -Action $a -Trigger (New-ScheduledTaskTrigger -Daily -At '${at}') -Settings $s -Force | Out-Null`]);
   writeState({ wakeSet: at });
   return at;
+});
+ipcMain.handle("ck:cancel-wake", async () => {
+  if (isMac) execFileSync("osascript", ["-e", 'do shell script "pmset repeat cancel" with administrator privileges']);
+  if (isWin) { try { execFileSync("schtasks", ["/Delete", "/TN", "Capital Kranti (wake)", "/F"], { stdio: "ignore" }); } catch {} }
+  writeState({ wakeSet: "" });
 });
 
 /* ---------------- the menu */

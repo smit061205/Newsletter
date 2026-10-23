@@ -1,10 +1,13 @@
 // A new paper from a reviewed draft (onboard/extract.ts): its profile, its
-// chrome template and its assets, written as publications/<id>/ -- the
-// engine then builds it like any other paper (CK_PUBLICATION=<id>), in its
-// own data folder (papers/<id>/) so papers never share a database.
+// chrome template and its assets (fonts, header art), written as
+// publications/<id>/ in the papers' home (config.ts PAPERS_HOME: the app's
+// data folder, which updates never replace) -- the engine then builds it like
+// any other paper (CK_PUBLICATION=<id>), in its own data folder (papers/<id>/)
+// so papers never share a database.
+import { existsSync } from "node:fs";
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { PUBLIC_DIR, ROOT } from "../config.ts";
+import { PAPERS_HOME, ROOT } from "../config.ts";
 import type { Band, Draft } from "./extract.ts";
 
 export interface NewPaper {
@@ -29,14 +32,15 @@ const LANGS: Record<string, { weekdays: string[]; dateLine: string; issueLine: s
 
 export async function savePaper(p: NewPaper): Promise<{ id: string; dir: string }> {
   if (!/^[a-z0-9-]{2,40}$/.test(p.id)) throw new Error("the paper's id is lower-case letters, digits and dashes (e.g. gujarat-samachar)");
-  if (["capital-kranti", "dev-test", "sample-english"].includes(p.id)) throw new Error(`"${p.id}" is taken`);
+  if (existsSync(path.join(ROOT, "publications", p.id))) throw new Error(`"${p.id}" is taken: choose another short name`);
   for (const role of ["body", "headline"] as const) if (!p.fonts[role]) throw new Error(`the ${role} font file is needed`);
   if (!p.art.first) throw new Error("the first page's masthead image is needed");
   const d = p.draft;
   const scale = p.sizeScale ?? 1;
-  const dir = path.join(ROOT, "publications", p.id);
+  const dir = path.join(PAPERS_HOME, "publications", p.id);
   const fontDir = path.join(dir, "fonts");
-  const artDir = path.join(PUBLIC_DIR, "chrome", p.id);
+  // the header art stays with the paper's other files (read by the engine only)
+  const artDir = path.join(dir, "chrome");
   await mkdir(fontDir, { recursive: true });
   await mkdir(artDir, { recursive: true });
   const legacy = d.language.encoding !== "unicode";
@@ -66,7 +70,7 @@ export async function savePaper(p: NewPaper): Promise<{ id: string; dir: string 
   for (const [k, b64] of Object.entries(p.art)) {
     if (!b64) continue;
     await writeFile(path.join(artDir, `${k}.png`), Buffer.from(b64, "base64"));
-    art[k] = `/chrome/${p.id}/${k}.png`;
+    art[k] = `/private/${p.id}/chrome/${k}.png`;
   }
   const field = (f: Band["fields"][number]) => {
     const size = f.size * scale * PX;

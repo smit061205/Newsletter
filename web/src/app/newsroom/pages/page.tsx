@@ -63,7 +63,7 @@ export default function Paper() {
   };
   const open = (id: string) => setEditing(stories.find((x) => x.id === id) ?? null);
   const openPdf = () => info && pdf({ url: media(`/api/issues/${date}/pdf`), title: t("pdf.title", { issue: num(lang, info.report.issueNumber) }),
-                                      fileName: `Capital Kranti ${info.report.issueNumber} - ${date.split("-").reverse().join("-")}.pdf` });
+                                      fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${info.report.issueNumber} - ${date.split("-").reverse().join("-")}.pdf` });
 
   if (!has) {
     return (

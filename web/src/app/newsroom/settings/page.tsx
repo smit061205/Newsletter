@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 import { call, type Settings } from "../api";
 import { useStatus } from "../Shell";
 import s from "../newsroom.module.css";
-import { num } from "../ui/format";
+import { num, shortDate } from "../ui/format";
 import { ConnectCard, WakeCard } from "../ui/desktop";
-import { Button, Note, Skeleton, useApp } from "../ui/kit";
+import { Button, Icon, Note, Skeleton, useApp } from "../ui/kit";
 
 export default function SettingsPage() {
   const { t, lang, toast } = useApp();
@@ -51,7 +51,7 @@ export default function SettingsPage() {
           <label className={s.switch}><input type="checkbox" checked={x.notify} onChange={(e) => save({ notify: e.target.checked })} /><span>{t("settings.notify")}</span></label>
         </section>
 
-        <WakeCard runAt={x.runAt} />
+        <WakeCard runAt={status?.runAt ?? x.runAt} />
 
         <section className={s.card}>
           <h2 className={s.cardTitle}>{t("settings.key")}</h2>
@@ -65,10 +65,15 @@ export default function SettingsPage() {
 
         <section className={s.card}>
           <h2 className={s.cardTitle}>{t("settings.money")}</h2>
+          <label className={s.switch}><input type="checkbox" checked={x.inrAuto} onChange={(e) => save({ inrAuto: e.target.checked })} />
+            <span>{t("settings.money.auto")}</span></label>
           <label className={s.field}><span className={s.label}>{t("settings.money.rate")}</span>
-            <input className={s.input} type="number" min={50} max={200} step={0.5} value={x.inrPerUsd} style={{ maxWidth: 160 }}
-                   onChange={(e) => setX({ ...x, inrPerUsd: Number(e.target.value) })} onBlur={(e) => save({ inrPerUsd: Number(e.target.value) })} /></label>
-          <p className={s.faint}>US$1 = ₹{num(lang, x.inrPerUsd)}</p>
+            <input className={s.input} type="number" min={50} max={200} step={0.01} value={x.inrPerUsd} style={{ maxWidth: 160 }} disabled={x.inrAuto}
+                   onChange={(e) => setX({ ...x, inrPerUsd: Number(e.target.value) })}
+                   onBlur={(e) => Number(e.target.value) !== status?.inrPerUsd && save({ inrPerUsd: Number(e.target.value) })} /></label>
+          <p className={s.faint}>US$1 = ₹{num(lang, x.inrPerUsd)} · {x.inrAuto
+            ? (x.inrUpdated ? t("settings.money.updated", { when: shortDate(lang, x.inrUpdated.slice(0, 10)) }) : t("settings.money.never"))
+            : t("settings.money.manual")}</p>
         </section>
 
         <section className={s.card}>
@@ -83,7 +88,7 @@ export default function SettingsPage() {
         <section className={s.card}>
           <h2 className={s.cardTitle}>{t("settings.papers")}</h2>
           <p className={s.muted}>{t("settings.papers.body")}</p>
-          <div><Link className={s.btn} href="/newsroom/papers">{t("settings.papers.open")}</Link></div>
+          <div><Link className={s.btn} href="/newsroom/papers">{Icon.papers()}{t("settings.papers.open")}</Link></div>
         </section>
 
         <section className={s.card}>

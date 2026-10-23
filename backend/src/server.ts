@@ -19,6 +19,9 @@
 //   POST  /api/papers/draft            {pdfs: [base64]} -- a new paper's profile, drafted from its PDFs
 //   GET   /api/papers  POST /api/papers   the papers; save a new one from its reviewed draft
 //   GET   /api/papers/:id  POST /api/papers/:id/test  GET /api/papers/:id/pdf   a paper's test issue
+//   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle} makes them
+//   GET   /api/issues/:date/copies/N.pdf  one copy
+//   GET   /api/layout                  the page, its columns and each page's room for stories (the Ads screen's preview)
 //   GET   /healthz                     "ok" (for the host's health check)
 //   GET   /reader                      the release reader: a bookmark that sends the release page you're reading here
 //
@@ -33,16 +36,17 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR } from "./config.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { DATA_DIR, ENV_FILE, ROOT } from "./config.ts";
+import { DATA_DIR, ENV_FILE, PAPERS_HOME, publicationDir, ROOT } from "./config.ts";
 import { currentJob, onJob, runPipeline, settleInterrupted, STEPS } from "./pipeline.ts";
 import type { Ad, Release, StepName, Store } from "./store.ts";
+import { profile, PUBLICATION as PUBLICATION_ID } from "./profile.ts";
 
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json") {
   res.writeHead(status, {
     "content-type": type,
     "access-control-allow-origin": "*",
     "access-control-allow-headers": "content-type, authorization",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
     // Chrome asks before a public page may reach a server on this machine
     // (Private Network Access): the release reader runs on the
     // Information Department's own page and posts here
@@ -164,11 +168,15 @@ export function settingsOf(store: Store) {
   return {
     runAt: store.setting("runAt", "20:00"), autoRun: store.setting("autoRun", true),
     /** the newsroom's language: Gujarati or English */
-    lang: store.setting<"gu" | "en">("lang", "gu"),
-    /** the first-run welcome is done */
-    onboarded: store.setting("onboarded", false),
+    lang: store.setting<"gu" | "en">("lang", process.env.CK_LANG === "en" ? "en" : "gu"),
+    /** the first-run welcome is done (a second paper of the same newsroom needs none) */
+    onboarded: store.setting("onboarded", !!process.env.CK_PAPERS_HOME && PUBLICATION_ID !== "capital-kranti"),
     /** rupees to a US dollar, for showing the AI's cost (reported in USD) */
     inrPerUsd: store.setting("inrPerUsd", 88),
+    /** the rate kept up to date from the day's exchange rate (rupeeRate) */
+    inrAuto: store.setting("inrAuto", true),
+    /** when it was last brought up to date (ISO), "" never */
+    inrUpdated: store.setting("inrUpdated", ""),
     notify: store.setting("notify", true),
     /** the public website, for "Open the website" */
     siteUrl: store.setting("siteUrl", ""),
@@ -210,9 +218,22 @@ function authorized(req: IncomingMessage): boolean {
 export async function serve(store: Store, opts: { port: number; host?: string; log: (s: string) => void }) {
   const { log } = opts;
   settleInterrupted(store);
+  copiesNow = (await import("./editorial/copies.ts")).currentCopies;
+  // days edited while a run went: laid out again, one at a time, when it ends
+  const next = () => {
+    if (currentJob() || copiesNow?.()) return;
+    const day = [...afterRun][0];
+    if (!day) return;
+    afterRun.delete(day);
+    log(`laying out ${day} again for the edits made while a run went`);
+    runPipeline(store, day, { by: "newsroom", from: "build", log }).catch((e) => log(`run for ${day} stopped: ${e instanceof Error ? e.message : e}`));
+  };
+  onJob((job) => { if (job.status !== "running") setTimeout(next, 500); });
+  setInterval(next, 30_000);
   /** Start a run in the background and answer at once with its job. */
   const startJob = (res: ServerResponse, date: string, from?: StepName) => {
     if (currentJob()) return send(res, 409, { error: `a run for ${currentJob()!.date} is still going`, job: currentJob() });
+    if (copiesNow?.()?.date === date) return send(res, 409, { error: "copies of this day are being made: make the paper again when they're done" });
     runPipeline(store, date, { by: "newsroom", from, log }).catch((e) => log(`run for ${date} stopped: ${e instanceof Error ? e.message : e}`));
     return send(res, 202, currentJob());
   };
@@ -271,13 +292,43 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           const body = (await readJson(req)) as { storyId: string; change: Record<string, unknown> };
           if (!body.storyId || !body.change) return send(res, 400, { error: "an edit needs storyId and change" });
           store.addEdit({ issueDate: date, storyId: body.storyId, change: body.change, at: new Date().toISOString() });
-          // laid out again in the background; while another run goes, its own build takes the edit
-          if (currentJob()) return send(res, 202, { saved: true, rebuilding: "after the run that's going" });
+          // laid out again in the background; while a run goes (this day's or
+          // another's), the day is laid out again as soon as it's done
+          if (currentJob() || copiesNow?.()?.date === date) {
+            afterRun.add(date);
+            return send(res, 202, { saved: true, rebuilding: "after the run that's going" });
+          }
           return startJob(res, date, "build");
+        }
+        if (parts[3] === "copies") {
+          const { copiesOf, copyFile, currentCopies, makeCopies } = await import("./editorial/copies.ts");
+          if (req.method === "GET" && parts[4]) {
+            const n = Number(parts[4].replace(/\.pdf$/, ""));
+            const file = copyFile(date, n);
+            if (!Number.isInteger(n) || n < 1 || !existsSync(file)) return send(res, 404, { error: `no copy ${parts[4]} for ${date}` });
+            return send(res, 200, new Uint8Array(await readFile(file)), "application/pdf");
+          }
+          if (req.method === "GET") return send(res, 200, copiesOf(date));
+          if (req.method === "POST") {
+            const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string };
+            const count = Math.round(Number(body.count));
+            if (!(count >= 1 && count <= 20)) return send(res, 400, { error: "make between 1 and 20 copies" });
+            if (!["headline", "headlineDeck", "all"].includes(body.reword ?? "")) return send(res, 400, { error: "what to reword: headline, headlineDeck or all" });
+            if (!["keepLead", "anywhere", "samePage"].includes(body.shuffle ?? "")) return send(res, 400, { error: "how far stories move: keepLead, anywhere or samePage" });
+            if (currentCopies()) return send(res, 409, { error: "copies are already being made: wait for them to finish" });
+            if (currentJob()?.date === date) return send(res, 409, { error: "the day's paper is being made: make copies when it's done" });
+            if (!store.latestIssue(date)) return send(res, 404, { error: `no paper made for ${date} yet` });
+            makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", log }).catch((e) => log(`copies stopped: ${e instanceof Error ? e.message : e}`));
+            return send(res, 202, copiesOf(date));
+          }
         }
         if (req.method === "POST" && parts[3] === "publish") {
           const got = store.latestIssue(date);
           if (!got) return send(res, 404, { error: `no issue built for ${date}` });
+          // the app (no Git) publishes through the one-time GitHub sign-in
+          if (!existsSync(path.join(ROOT, ".git")) && !process.env.GITHUB_TOKEN) {
+            return send(res, 400, { error: "The website isn't connected yet. Open Settings and press Connect (once), then publish again." });
+          }
           const { publishIssue } = await import("./publish.ts");
           const lines: string[] = [];
           const body = (await readJson(req)) as { force?: boolean };
@@ -379,8 +430,12 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
       }
       if (parts[0] === "api" && parts[1] === "ads") {
         if (req.method === "GET") {
-          const { standInsMovable } = await import("./layout/stories.ts");
-          return send(res, 200, standInsMovable(store.ads(url.searchParams.get("date") ?? indiaNow().day)));
+          const { standInsMovable, referenceAds } = await import("./layout/stories.ts");
+          const samples = new Set(referenceAds("").map((a) => a.id));
+          // each booking with every day it runs (a row per day: "<id>@<date>")
+          const days = (id: string) => (store.db.prepare("select date from ads where id like ? order by date").all(`${id}@%`) as { date: string }[]).map((r) => r.date);
+          return send(res, 200, standInsMovable(store.ads(url.searchParams.get("date") ?? indiaNow().day))
+            .map((a) => ({ ...a, sample: samples.has(a.id), days: samples.has(a.id) ? [a.date] : days(a.id) })));
         }
         if (req.method === "POST") return send(res, 200, await bookAd(store, (await readJson(req)) as AdBooking));
         if (req.method === "DELETE" && parts[2]) {
@@ -389,6 +444,20 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           store.db.prepare("delete from ads where id = ? or id like ?").run(id, `${id}@%`);
           return send(res, 200, { deleted: parts[2] });
         }
+      }
+      if (req.method === "GET" && url.pathname === "/api/layout") {
+        // the page in centimetres, its columns, and each page's room for stories
+        const { chromeFor } = await import("./chrome/chrome.ts");
+        const { GRID, PAGE } = await import("./layout/typography.ts");
+        const total = profile.issue.pages;
+        const cm = (px: number) => Math.round((px / PAGE.width) * (profile.page.width / 72 * 2.54) * 100) / 100;
+        const pages = [];
+        for (let n = 1; n <= total; n++) {
+          const c = await chromeFor(n, total, indiaNow().day, 1);
+          pages.push({ page: n, topCm: cm(c.bodyTop), bottomCm: cm(c.bodyBottom) });
+        }
+        return send(res, 200, { widthCm: cm(PAGE.width), heightCm: cm(PAGE.height), columns: GRID.columns,
+                                leftCm: cm(GRID.left), columnCm: cm(GRID.column), gutterCm: cm(GRID.gutter), pages });
       }
       if (req.method === "GET" && url.pathname === "/api/status") {
         const { day, time } = indiaNow();
@@ -403,13 +472,14 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           issue: latest ? { version: latest.version, status: latest.status, ready: (latest.report as { ready?: boolean }).ready,
                             issueNumber: (latest.report as { issueNumber?: number }).issueNumber } : null,
           version: gitVersion(),
+          paper: { id: profile.id, name: profile.name },
         });
       }
       if (parts[0] === "api" && parts[1] === "settings") {
         if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
         if (req.method === "POST") {
           const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string; lang?: string;
-                                                   onboarded?: boolean; inrPerUsd?: number; notify?: boolean; siteUrl?: string };
+                                                   onboarded?: boolean; inrPerUsd?: number; inrAuto?: boolean; notify?: boolean; siteUrl?: string };
           if (body.lang !== undefined) {
             if (body.lang !== "gu" && body.lang !== "en") return send(res, 400, { error: "the language is gu or en" });
             store.putSetting("lang", body.lang);
@@ -422,7 +492,13 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           if (body.notify !== undefined) store.putSetting("notify", !!body.notify);
           if (body.inrPerUsd !== undefined) {
             if (!(body.inrPerUsd > 10 && body.inrPerUsd < 1000)) return send(res, 400, { error: "the rupee rate should be about 80-100" });
-            store.putSetting("inrPerUsd", body.inrPerUsd);
+            store.putSetting("inrPerUsd", Math.round(body.inrPerUsd * 100) / 100);
+            // a rate typed in by hand stays as typed
+            if (body.inrAuto === undefined) store.putSetting("inrAuto", false);
+          }
+          if (body.inrAuto !== undefined) {
+            store.putSetting("inrAuto", !!body.inrAuto);
+            if (body.inrAuto) await rupeeRate(store, log, true);
           }
           if (body.runAt !== undefined) {
             if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(body.runAt)) return send(res, 400, { error: "the run time is HH:MM, e.g. 20:00" });
@@ -449,6 +525,38 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
   log(`backend listening on http://${host}:${opts.port}`);
   everyEvening(store, (day) => runPipeline(store, day, { by: "schedule", log }), log);
   backupDaily(store, log);
+  // the rupee rate, kept up to date (when it's on): now, then every few hours
+  rupeeRate(store, log).catch(() => {});
+  setInterval(() => rupeeRate(store, log).catch(() => {}), 3 * 3600_000);
+}
+
+let copiesNow: (() => { date: string } | null) | undefined;
+/** Days to lay out again once the run that's going ends (edits made meanwhile). */
+const afterRun = new Set<string>();
+
+/** The day's US dollar in rupees, from the European Central Bank's reference
+ * rates (Frankfurter), else open.er-api.com -- once a day, while "keep it up
+ * to date" is on. Nothing is sent but the request for the rate. */
+async function rupeeRate(store: Store, log: (s: string) => void, now = false) {
+  const s = settingsOf(store);
+  if (!s.inrAuto) return;
+  if (!now && s.inrUpdated && Date.now() - Date.parse(s.inrUpdated) < 20 * 3600_000) return;
+  const sources: [string, (j: { rates?: Record<string, number> }) => number | undefined][] = [
+    ["https://api.frankfurter.app/latest?from=USD&to=INR", (j) => j.rates?.INR],
+    ["https://open.er-api.com/v6/latest/USD", (j) => j.rates?.INR],
+  ];
+  for (const [url, pick] of sources) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      if (!r.ok) continue;
+      const rate = pick(await r.json());
+      if (!rate || !(rate > 10 && rate < 1000)) continue;
+      store.putSetting("inrPerUsd", Math.round(rate * 100) / 100);
+      store.putSetting("inrUpdated", new Date().toISOString());
+      log(`rupee rate: US$1 = ₹${rate.toFixed(2)}`);
+      return;
+    } catch { /* offline: the last rate stays */ }
+  }
 }
 
 /** An ad booked in the newsroom: its image, its size on the page, the page and the days it runs. */
@@ -462,6 +570,8 @@ async function bookAd(store: Store, b: AdBooking): Promise<{ booked: string[] }>
   const { GRID, PT } = await import("./layout/typography.ts");
   const { spanWidth } = await import("./layout/module.ts");
   if (!b.base64 || !b.cols || !b.heightCm || !b.page) throw new Error("an ad needs an image, its width in columns, its height in cm and a page");
+  if (!(b.page >= 1 && b.page <= profile.issue.pages)) throw new Error(`the paper has pages 1 to ${profile.issue.pages}`);
+  if (b.from && b.to && b.to < b.from) throw new Error("the last day is before the first day");
   const id = `ad-${b.name.replace(/\.[a-z]+$/i, "").replace(/[^A-Za-z0-9-]+/g, "-").toLowerCase()}-${Date.now().toString(36)}`;
   const dir = path.join(MEDIA_DIR, "ads");
   await mkdir(dir, { recursive: true });
@@ -476,6 +586,13 @@ async function bookAd(store: Store, b: AdBooking): Promise<{ booked: string[] }>
   if (!days.size) throw new Error("an ad needs the days it runs");
   const width = spanWidth(Math.min(GRID.columns, Math.max(1, Math.round(b.cols))));
   const height = (b.heightCm / 2.54) * 72 * PT;
+  // taller than the page's room for stories, it would never be placed
+  const { chromeFor } = await import("./chrome/chrome.ts");
+  const band = await chromeFor(b.page, profile.issue.pages, b.from ?? b.dates?.[0] ?? indiaNow().day, 1);
+  if (height > band.bodyBottom - band.bodyTop) {
+    const max = Math.floor(((band.bodyBottom - band.bodyTop) / PT / 72) * 2.54 * 10) / 10;
+    throw new Error(`that's taller than page ${b.page} has room for: at most ${max} cm`);
+  }
   for (const date of days) {
     // the day's first booking replaces the 8 August stand-ins
     const ads = store.ads(date);
@@ -520,22 +637,33 @@ function backupDaily(store: Store, log: (s: string) => void) {
   setInterval(safe, 60 * 60_000);
 }
 
-/** The papers: publications/<id>/ each; every one but this engine's own is
- * built in its own process and data folder (papers/<id>/). */
+/** The papers: publications/<id>/ each (those that ship with the code, and
+ * those added here, in PAPERS_HOME); every one but the one this engine makes
+ * keeps its own data folder (papers/<id>/), and its test issue is built there
+ * in a process of its own. The desktop app switches which paper the newsroom
+ * works on (it starts this engine again for that paper). */
+let testing: { id: string; done: boolean } | null = null;
 async function papersApi(req: IncomingMessage, res: ServerResponse, parts: string[], url: URL) {
   const { readdir } = await import("node:fs/promises");
-  const pubs = path.join(ROOT, "publications");
-  const dataOf = (id: string) => path.join(ROOT, "papers", id);
+  const homes = [path.join(ROOT, "publications"), path.join(PAPERS_HOME, "publications")];
+  // Capital Kranti keeps its data in the main data folder (a checkout: backend/data); every other paper in papers/<id>/
+  const dataOf = (id: string) => id !== "capital-kranti" ? path.join(PAPERS_HOME, "papers", id)
+    : PAPERS_HOME === ROOT ? path.join(ROOT, "backend", "data") : PAPERS_HOME;
+  const known = async () => [...new Set((await Promise.all(homes.map((h) => readdir(h).catch(() => [] as string[])))).flat())]
+    .filter((d) => /^[a-z0-9-]+$/.test(d) && existsSync(path.join(publicationDir(d), "profile.json")));
+  /** Another paper's latest test issue (from its own data folder). */
   const issueOf = async (id: string) => {
     const file = path.join(dataOf(id), "capital-kranti.sqlite");
-    if (!existsSync(file)) return null;
+    if (id === PUBLICATION_ID || !existsSync(file)) return null;
     const { Store } = await import("./store.ts");
     const st = new Store(file);
-    const day = st.latestDate();
-    const got = day ? st.latestIssue(day) : null;
-    st.db.close();
-    return got ? { date: day, version: got.version, ready: (got.report as { ready?: boolean }).ready, pdf: (got.report as { pdf?: string }).pdf,
-                   gates: (got.report as { gates?: unknown[] }).gates } : null;
+    try {
+      const day = st.latestDate();
+      const got = day ? st.latestIssue(day) : null;
+      if (!got) return null;
+      const rep = got.report as { ready?: boolean; pdf?: string; gates?: unknown[] };
+      return { date: day, version: got.version, ready: rep.ready, pdf: rep.pdf, gates: rep.gates };
+    } finally { st.db.close(); }
   };
   if (req.method === "POST" && parts[2] === "draft") {
     const body = (await readJson(req)) as { pdfs?: string[] };
@@ -545,10 +673,12 @@ async function papersApi(req: IncomingMessage, res: ServerResponse, parts: strin
   }
   if (req.method === "GET" && !parts[2]) {
     const out = [];
-    for (const id of (await readdir(pubs)).filter((d) => existsSync(path.join(pubs, d, "profile.json")))) {
-      const prof = JSON.parse(readFileSync(path.join(pubs, id, "profile.json"), "utf8")) as { name: string; language: { lang: string }; issue: { pages: number } };
-      out.push({ id, name: prof.name, lang: prof.language.lang, pages: prof.issue.pages, own: id === (process.env.CK_PUBLICATION?.trim() || "capital-kranti"),
-                 test: ["dev-test", "sample-english", "sample-urdu"].includes(id), issue: await issueOf(id) });
+    for (const id of (await known()).sort()) {
+      const prof = JSON.parse(readFileSync(path.join(publicationDir(id), "profile.json"), "utf8")) as { name: string; language: { lang: string }; issue: { pages: number } };
+      out.push({ id, name: prof.name, lang: prof.language.lang, pages: prof.issue.pages, own: id === PUBLICATION_ID,
+                 added: publicationDir(id).startsWith(path.join(PAPERS_HOME, "publications")) && PAPERS_HOME !== ROOT,
+                 test: ["dev-test", "sample-english", "sample-urdu"].includes(id), testing: testing?.id === id && !testing.done,
+                 issue: await issueOf(id) });
     }
     return send(res, 200, out);
   }
@@ -562,17 +692,24 @@ async function papersApi(req: IncomingMessage, res: ServerResponse, parts: strin
     return send(res, 200, saved);
   }
   const id = parts[2];
-  if (!id || !/^[a-z0-9-]+$/.test(id) || !existsSync(path.join(pubs, id, "profile.json"))) return send(res, 404, { error: `no paper "${id}"` });
+  if (!id || !/^[a-z0-9-]+$/.test(id) || !(await known()).includes(id)) return send(res, 404, { error: `no paper "${id}"` });
   if (req.method === "POST" && parts[3] === "test") {
+    if (id === PUBLICATION_ID) return send(res, 400, { error: "that's the paper this newsroom makes: make it from Today" });
+    if (testing && !testing.done) return send(res, 409, { error: `a test issue of ${testing.id} is being made` });
     const body = (await readJson(req)) as { date?: string };
     const date = body.date ?? indiaNow().day;
     const { spawn } = await import("node:child_process");
     const { openSync } = await import("node:fs");
     await mkdir(dataOf(id), { recursive: true });
-    const log = openSync(path.join(dataOf(id), "test.log"), "w");
-    const child = spawn(process.execPath, ["--experimental-strip-types", "--experimental-sqlite", "--no-warnings", path.join(ROOT, "backend", "src", "cli.ts"), "all", "--date", date],
-      { cwd: ROOT, env: { ...process.env, CK_PUBLICATION: id, DATA_DIR: dataOf(id) }, stdio: ["ignore", log, log], detached: false });
-    child.on("error", () => {});
+    const logFd = openSync(path.join(dataOf(id), "test.log"), "w");
+    // the same Node flags as this engine (inside the app: the hook that finds the shared code)
+    const child = spawn(process.execPath, [...process.execArgv, path.join(ROOT, "backend", "src", "cli.ts"), "all", "--date", date],
+      { cwd: ROOT, env: { ...process.env, CK_PUBLICATION: id, DATA_DIR: dataOf(id), CK_ENV_FILE: ENV_FILE, CK_PAPERS_HOME: PAPERS_HOME },
+        stdio: ["ignore", logFd, logFd], detached: false, windowsHide: true });
+    const run = { id, done: false };
+    testing = run;
+    child.on("exit", () => { run.done = true; });
+    child.on("error", () => { run.done = true; });
     return send(res, 202, { id, date, started: true });
   }
   if (req.method === "GET" && parts[3] === "pdf") {
@@ -583,7 +720,7 @@ async function papersApi(req: IncomingMessage, res: ServerResponse, parts: strin
   if (req.method === "GET" && !parts[3]) {
     const logFile = path.join(dataOf(id), "test.log");
     const log = existsSync(logFile) ? readFileSync(logFile, "utf8").split("\n").filter((l) => l && !/^  p\d  |fit to/.test(l)).slice(-40) : [];
-    return send(res, 200, { id, issue: await issueOf(id), log });
+    return send(res, 200, { id, issue: await issueOf(id), log, running: testing?.id === id && !testing.done });
   }
   return send(res, 404, { error: "not found" });
 }

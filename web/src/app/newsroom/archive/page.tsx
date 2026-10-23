@@ -37,7 +37,7 @@ export default function Archive() {
                       <td className={s.faint}>{num(lang, r.stories)} · {rupees(lang, r.cost, status?.inrPerUsd ?? 88)}</td>
                       <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                         <Button kind="quiet" icon={Icon.print()} onClick={() => pdf({ url: media(`/api/issues/${r.date}/pdf`), title: t("pdf.title", { issue: num(lang, r.issueNumber ?? "") }),
-                          fileName: `Capital Kranti ${r.issueNumber ?? ""} - ${r.date.split("-").reverse().join("-")}.pdf` })}>PDF</Button>
+                          fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${r.issueNumber ?? ""} - ${r.date.split("-").reverse().join("-")}.pdf` })}>PDF</Button>
                         <Button onClick={() => open(r.date)}>{t("archive.open")}</Button>
                       </td>
                     </tr>

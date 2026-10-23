@@ -1,11 +1,17 @@
 "use client";
-// છાપાં / Papers: the papers this newsroom makes, and "Add a newspaper":
-// upload the paper's PDF issues, the engine drafts its profile (page, grid,
-// type, language, the header bands and their date / issue / page fields),
-// review it, add its fonts and masthead images, save, and make a test issue.
+// છાપાં / Papers: the papers this newsroom makes -- which one it's working on
+// (switch to another; the app starts its engine again for it), a test issue
+// of any other -- and "Add a newspaper": upload the paper's PDF issues, the
+// engine drafts its profile (page, grid, type, language, the header bands),
+// check it, add its fonts and header images, save, and make a test issue.
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { call, media } from "../api";
-import styles from "../newsroom.module.css";
+import { useStatus } from "../Shell";
+import s from "../newsroom.module.css";
+import { ck } from "../ui/desktop";
+import { num, shortDate } from "../ui/format";
+import { Badge, Button, Icon, Note, useApp } from "../ui/kit";
+import type { StringKey } from "../ui/strings";
 
 interface Field { kind: string; x: number; baseline: number; size: number; text: string }
 interface Band { top: number; footerTop: number | null; fields: Field[] }
@@ -16,7 +22,8 @@ interface Draft {
   language: { script: string; lang: string; direction: string; encoding: string; readable: boolean };
   bands: { first: Band; inner: Band | null; last: Band | null }; pages: number; notes: string[];
 }
-interface Paper { id: string; name: string; lang: string; pages: number; own: boolean; test: boolean; issue: { date: string; version: number; ready?: boolean } | null }
+interface Paper { id: string; name: string; lang: string; pages: number; own: boolean; test: boolean; testing: boolean;
+  issue: { date: string; version: number; ready?: boolean } | null }
 
 const b64 = (f: File) => new Promise<string>((ok, bad) => {
   const r = new FileReader();
@@ -38,9 +45,30 @@ function plainMasthead(name: string, page: Draft["page"], heightPt: number, big:
   g.fillRect(c.width * 0.02, c.height - 8, c.width * 0.96, 4);
   return c.toDataURL("image/png").split(",")[1];
 }
+const LANG_NAMES: Record<string, [string, string]> = { gu: ["ગુજરાતી", "Gujarati"], hi: ["હિન્દી", "Hindi"], en: ["અંગ્રેજી", "English"], ur: ["ઉર્દૂ", "Urdu"] };
+const cell = (v: number) => (Math.round(v * 100) / 100).toString();
+const cm = (pt: number) => cell((pt / 72) * 2.54);
+
+/** A file input that shows the chosen file's name. */
+function FilePick({ label, hint, accept, multiple, onFiles, chosen }:
+  { label: string; hint?: string; accept: string; multiple?: boolean; onFiles: (f: File[]) => void; chosen: string }) {
+  const { t } = useApp();
+  return (
+    <label className={s.field} style={{ flex: "1 1 220px" }}>
+      <span className={s.label}>{label}{hint && <span className={s.hint}> · {hint}</span>}</span>
+      <span className={s.filePick}>
+        {Icon.download()}<span>{chosen || t("papers.choose")}</span>
+        <input type="file" accept={accept} multiple={multiple} onChange={(e) => onFiles([...(e.target.files ?? [])])} />
+      </span>
+    </label>
+  );
+}
 
 export default function Papers() {
-  const [papers, setPapers] = useState<Paper[]>([]);
+  const { t, lang, toast, pdf } = useApp();
+  const { status } = useStatus();
+  const [papers, setPapers] = useState<Paper[] | null>(null);
+  const [samples, setSamples] = useState(false);
   const [pdfs, setPdfs] = useState<File[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [name, setName] = useState("");
@@ -53,18 +81,21 @@ export default function Papers() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
-  const [test, setTest] = useState<{ log: string[]; issue: { date: string; version: number; ready?: boolean } | null } | null>(null);
+  const [log, setLog] = useState<{ id: string; lines: string[] } | null>(null);
+  const desktop = !!ck()?.switchPaper;
 
   const load = useCallback(() => { call<Paper[]>("/api/papers").then(setPapers).catch((e) => setError(e.message)); }, []);
   useEffect(load, [load]);
+  // a test issue being made: its log, until it's done
+  const testing = papers?.find((p) => p.testing)?.id ?? (busy.startsWith("test:") ? busy.slice(5) : "");
   useEffect(() => {
-    if (!saved || !busy.startsWith("test")) return;
-    const t = setInterval(() => call<{ log: string[]; issue: Paper["issue"] }>(`/api/papers/${saved}`).then((x) => {
-      setTest(x);
-      if (x.log.some((l) => /^issue \d+ v\d+: |run for .* stopped|Error/.test(l))) { setBusy(""); load(); }
-    }).catch(() => {}), 4000);
-    return () => clearInterval(t);
-  }, [saved, busy, load]);
+    if (!testing) return;
+    const tick = setInterval(() => call<{ log: string[]; running: boolean }>(`/api/papers/${testing}`).then((x) => {
+      setLog({ id: testing, lines: x.log });
+      if (!x.running) { setBusy(""); load(); }
+    }).catch(() => {}), 3000);
+    return () => clearInterval(tick);
+  }, [testing, load]);
 
   const read = async () => {
     setError(""); setBusy("read"); setDraft(null);
@@ -89,105 +120,133 @@ export default function Papers() {
       await call("/api/papers", { json: { id, name, issueNumber, issueDate: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()),
                                           pages, draft, fonts: f, art: a, sizeScale: scale } });
       setSaved(id);
+      toast(t("papers.saved"));
       load();
     } catch (e) { setError((e as Error).message); }
     setBusy("");
   };
   const makeTest = async (pid: string) => {
-    setError(""); setTest(null); setSaved(pid); setBusy(`test:${pid}`);
-    try { await call(`/api/papers/${pid}/test`, { json: {} }); } catch (e) { setError((e as Error).message); setBusy(""); }
+    setError(""); setLog({ id: pid, lines: [] }); setBusy(`test:${pid}`);
+    try { await call(`/api/papers/${pid}/test`, { json: {} }); load(); } catch (e) { setError((e as Error).message); setBusy(""); }
   };
+  const switchTo = async (pid: string) => {
+    setError(""); setBusy(`switch:${pid}`);
+    try {
+      await ck()!.switchPaper!(pid);
+      // the engine is back, working on that paper: start over from Today
+      window.location.href = "/newsroom";
+    } catch (e) { setError((e as Error).message); setBusy(""); }
+  };
+  const langName = (l: string) => (LANG_NAMES[l] ?? [l, l])[lang === "gu" ? 0 : 1];
+  const shown = (papers ?? []).filter((p) => samples || !p.test || p.own);
 
-  const cell = (v: number) => (Math.round(v * 100) / 100).toString();
   return (
-    <div className={styles.inner}>
-      <section className={styles.card}>
-        <h2>છાપાં <small>The papers · each built from the same news, in its own look</small></h2>
-        <ul className={styles.list}>
-          {papers.filter((p) => !p.test).map((p) => (
-            <li key={p.id} className={styles.paperRow}>
-              <span className={styles.listTitle}>{p.name}</span>
-              <span className={styles.listMeta}>{p.id} · {p.lang} · {p.pages} pages{p.issue ? ` · last issue ${p.issue.date} v${p.issue.version}` : ""}</span>
-              <span className={styles.listBadges}>
-                {p.own && <span className={styles.badge} data-tone="accent">This newsroom&apos;s paper</span>}
-                {p.issue && <span className={styles.badge} data-tone={p.issue.ready ? "good" : "bad"}>{p.issue.ready ? "Ready" : "Needs a look"}</span>}
-                {!p.own && <button className={styles.btn} onClick={() => makeTest(p.id)} disabled={busy.startsWith("test")}>Make a test issue</button>}
-                {!p.own && p.issue && <a className={styles.btn} href={media(`/api/papers/${p.id}/pdf`)} target="_blank" rel="noreferrer">PDF</a>}
+    <div className={s.inner}>
+      <h1 className={s.pageTitle}>{t("papers.title")}</h1>
+      {error && <Note tone="bad">{error}</Note>}
+      <section className={s.card}>
+        <p className={s.muted} style={{ margin: 0 }}>{t("papers.body")}</p>
+        <div className={s.list}>
+          {shown.map((p) => (
+            <div key={p.id} className={s.paperRow}>
+              <div className={s.field} style={{ gap: 2 }}>
+                <span className={s.listTitle}>{p.name}</span>
+                <span className={s.listMeta}>{langName(p.lang)} · {t("papers.pagesLang", { pages: num(lang, p.pages) })}
+                  {p.issue ? ` · ${t("papers.lastIssue", { date: shortDate(lang, p.issue.date) })}` : ""}</span>
+              </div>
+              <span className={s.listBadges}>
+                {p.own && <Badge tone="accent" dot>{t("papers.active")}</Badge>}
+                {p.test && <Badge>{t("papers.sample")}</Badge>}
+                {p.issue && !p.own && <Badge tone={p.issue.ready ? "good" : "warn"}>{p.issue.ready ? t("archive.ready") : t("archive.look")}</Badge>}
+                {!p.own && p.issue && (
+                  <Button kind="quiet" icon={Icon.print()} onClick={() => pdf({ url: media(`/api/papers/${p.id}/pdf`), title: p.name, fileName: `${p.name} - ${p.issue!.date}.pdf` })}>PDF</Button>
+                )}
+                {!p.own && <Button onClick={() => makeTest(p.id)} disabled={!!testing}>{testing === p.id ? t("papers.testing") : t("papers.test")}</Button>}
+                {!p.own && desktop && (
+                  <Button kind="primary" onClick={() => switchTo(p.id)} disabled={!!busy || !!testing || !!status?.running}>
+                    {busy === `switch:${p.id}` ? t("papers.switching") : t("papers.switch")}</Button>
+                )}
               </span>
-            </li>
+            </div>
           ))}
-        </ul>
-        {test && (
-          <details className={styles.details} open>
-            <summary>Test issue for {saved} {busy ? "(running…)" : ""}</summary>
-            <div className={styles.logBox}>{test.log.map((l, i) => <div key={i}>{l}</div>)}</div>
+        </div>
+        <label className={s.switch}><input type="checkbox" checked={samples} onChange={(e) => setSamples(e.target.checked)} /><span>{t("papers.showSamples")}</span></label>
+        <p className={s.faint} style={{ margin: 0 }}>{desktop ? t("papers.switchNote") : t("papers.switchApp")}</p>
+        {log && (
+          <details className={s.details} open={!!testing}>
+            <summary>{papers?.find((p) => p.id === log.id)?.name ?? log.id} · {testing ? t("papers.testing") : t("today.details")}</summary>
+            <div className={s.logBox}>{log.lines.map((l, i) => <div key={i}>{l}</div>)}</div>
           </details>
         )}
       </section>
 
-      <section className={styles.card}>
-        <h2>નવું છાપું ઉમેરો <small>Add a newspaper</small></h2>
-        <ol className={styles.howto}>
-          <li>Upload 1 to 3 recent issues as PDF, exported from the paper&apos;s layout software (not scans).</li>
-          <li>Check what the engine read: page, columns, type, language, and where the date and issue number sit.</li>
-          <li>Add the paper&apos;s fonts and, if you have them, its masthead images. Save, then make a test issue.</li>
+      <section className={s.card}>
+        <h2 className={s.cardTitle}>{t("papers.add")}</h2>
+        <ol className={s.howto}>
+          <li>{t("papers.add.1")}</li>
+          <li>{t("papers.add.2")}</li>
+          <li>{t("papers.add.3")}</li>
         </ol>
-        <div className={styles.fields}>
-          <label>PDF <small>The paper&apos;s issues</small><input type="file" accept="application/pdf" multiple onChange={(e) => setPdfs([...(e.target.files ?? [])])} /></label>
-          <div className={styles.row}><button className={`${styles.btn} ${styles.primary}`} onClick={read} disabled={!pdfs.length || busy === "read"}>{busy === "read" ? "Reading…" : "છાપું વાંચો · Read the paper"}</button></div>
+        <div className={s.row} style={{ alignItems: "flex-end" }}>
+          <FilePick label={t("papers.pdfs")} accept="application/pdf" multiple onFiles={setPdfs}
+                    chosen={pdfs.length ? t("papers.pdfsChosen", { n: num(lang, pdfs.length) }) : ""} />
+          <Button kind="primary" onClick={read} disabled={!pdfs.length || busy === "read"}>{busy === "read" ? t("papers.reading") : t("papers.read")}</Button>
         </div>
-        {error && <p className={styles.note} data-tone="bad" role="alert">{error}</p>}
       </section>
 
       {draft && (
         <>
-          <section className={styles.card}>
-            <h2>શું વાંચ્યું <small>What the engine read · check it</small></h2>
-            {draft.notes.map((n) => <p key={n} className={styles.note} data-tone="warn">{n}</p>)}
-            <dl className={styles.facts}>
-              <dt>Page</dt><dd>{cell(draft.page.width)} × {cell(draft.page.height)} pt ({cell(draft.page.width / 72 * 2.54)} × {cell(draft.page.height / 72 * 2.54)} cm), {draft.pages} pages</dd>
-              <dt>Columns</dt><dd>{draft.grid.columns} columns of {cell(draft.grid.column)} pt, gutter {cell(draft.grid.gutter)} pt, from {cell(draft.grid.left)} pt</dd>
-              <dt>Body</dt><dd>{draft.body.font}, {cell(draft.body.size)} pt on {cell(draft.body.pitch)} pt lines</dd>
-              <dt>Headlines</dt><dd>{draft.headline.font}; largest by width: {draft.headline.capByColumns.slice(1).map((c, i) => `${i + 1} col ${cell(c)}`).join(", ")} pt</dd>
-              <dt>Language</dt><dd>{draft.language.lang || "?"} ({draft.language.script}, {draft.language.direction}){draft.language.encoding !== "unicode" ? `, legacy ${draft.language.encoding} fonts` : ""}</dd>
+          <section className={s.card}>
+            <h2 className={s.cardTitle}>{t("papers.found")}</h2>
+            {draft.notes.map((n) => <Note key={n} tone="warn">{n}</Note>)}
+            <dl className={s.facts}>
+              <dt>{t("papers.d.page")}</dt><dd>{cm(draft.page.width)} × {cm(draft.page.height)} cm · {t("papers.pagesLang", { pages: num(lang, draft.pages) })}</dd>
+              <dt>{t("papers.d.columns")}</dt><dd>{num(lang, draft.grid.columns)} × {cm(draft.grid.column)} cm</dd>
+              <dt>{t("papers.d.body")}</dt><dd>{draft.body.font}, {cell(draft.body.size)} pt</dd>
+              <dt>{t("papers.d.headlines")}</dt><dd>{draft.headline.font}</dd>
+              <dt>{t("papers.d.lang")}</dt><dd>{langName(draft.language.lang || "?")}</dd>
               {(["first", "inner", "last"] as const).map((k) => draft.bands[k] && (
-                <Fragment key={k}><dt>{k === "first" ? "Page 1 masthead" : k === "inner" ? "Inner pages' head" : "Last page"}</dt>
-                  <dd>stories from {cell(draft.bands[k]!.top)} pt{draft.bands[k]!.footerTop ? `, footer from ${cell(draft.bands[k]!.footerTop!)} pt` : ""}; fields: {draft.bands[k]!.fields.map((f) => `${f.kind} at ${cell(f.x)}, ${cell(f.baseline)} pt`).join("; ") || "none found"}</dd></Fragment>
+                <Fragment key={k}><dt>{t(`papers.d.${k}` as StringKey)}</dt>
+                  <dd>{draft.bands[k]!.fields.map((f) => f.text).filter(Boolean).join(" · ") || "—"}</dd></Fragment>
               ))}
-              <dt>Fonts in the PDF</dt><dd>{draft.fonts.slice(0, 6).map((f) => `${f.name}${f.roles.length ? ` (${f.roles.join(", ")})` : ""}`).join(" · ")}</dd>
+              <dt>{t("papers.d.fonts")}</dt><dd>{draft.fonts.slice(0, 6).map((f) => f.name).join(" · ")}</dd>
             </dl>
           </section>
-          <section className={styles.card}>
-            <h2>નામ, ફોન્ટ, મથાળું <small>Name, fonts, masthead</small></h2>
-            <div className={styles.fields}>
-              <div className={styles.row}>
-                <label>Paper&apos;s name<input value={name} onChange={(e) => { setName(e.target.value); if (!saved) setId(e.target.value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40)); }} /></label>
-                <label>Short id <small>a-z, 0-9, -</small><input value={id} onChange={(e) => setId(e.target.value)} /></label>
-              </div>
-              <div className={styles.row}>
-                <label>Today&apos;s issue number<input type="number" min={1} value={issueNumber} onChange={(e) => setIssueNumber(Number(e.target.value))} /></label>
-                <label>Pages<input type="number" min={1} max={32} value={pages} onChange={(e) => setPages(Number(e.target.value))} /></label>
-                <label>Type size scale <small>1 = as in the PDF</small><input type="number" min={0.5} max={1.5} step={0.05} value={scale} onChange={(e) => setScale(Number(e.target.value))} /></label>
-              </div>
-              <div className={styles.row}>
-                {(["body", "headline", "deck", "caption"] as const).map((k) => (
-                  <label key={k}>{k} font <small>{k === "body" || k === "headline" ? "needed" : "optional"} (.ttf / .otf)</small>
-                    <input type="file" accept=".ttf,.otf" onChange={(e) => setFonts({ ...fonts, [k]: e.target.files?.[0] ?? null })} /></label>
-                ))}
-              </div>
-              <div className={styles.row}>
-                {(["first", "inner", "last", "footer"] as const).map((k) => (
-                  <label key={k}>{k === "first" ? "Masthead (page 1)" : k === "inner" ? "Inner pages' head" : k === "last" ? "Last page's head" : "Footer"} <small>PNG, page width; optional</small>
-                    <input type="file" accept="image/png" onChange={(e) => setArt({ ...art, [k]: e.target.files?.[0] ?? null })} /></label>
-                ))}
-              </div>
-              <p className={styles.muted}>No masthead image? A plain one is made from the paper&apos;s name; replace it later.</p>
-              <div className={styles.row}>
-                <button className={`${styles.btn} ${styles.primary}`} onClick={save} disabled={!name || !id || !fonts.body || !fonts.headline || busy === "save"}>{busy === "save" ? "Saving…" : "સાચવો · Save the paper"}</button>
-                {saved === id && <button className={styles.btn} onClick={() => makeTest(id)} disabled={busy.startsWith("test")}>Make a test issue</button>}
-              </div>
-              {saved === id && <p className={styles.note} data-tone="good">Saved as publications/{id}. Make a test issue to see it built from today&apos;s news.</p>}
+          <section className={s.card}>
+            <h2 className={s.cardTitle}>{t("papers.details")}</h2>
+            <div className={s.row}>
+              <label className={s.field} style={{ flex: "2 1 240px" }}><span className={s.label}>{t("papers.name")}</span>
+                <input className={s.input} value={name} onChange={(e) => { setName(e.target.value); if (!saved) setId(e.target.value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40)); }} /></label>
+              <label className={s.field} style={{ flex: "1 1 180px" }}><span className={s.label}>{t("papers.id")}</span>
+                <input className={s.input} value={id} onChange={(e) => setId(e.target.value.toLowerCase())} /></label>
             </div>
+            <div className={s.row}>
+              <label className={s.field} style={{ flex: 1 }}><span className={s.label}>{t("papers.issueNo")}</span>
+                <input className={s.input} type="number" min={1} value={issueNumber} onChange={(e) => setIssueNumber(Number(e.target.value))} /></label>
+              <label className={s.field} style={{ flex: 1 }}><span className={s.label}>{t("papers.pages")}</span>
+                <input className={s.input} type="number" min={1} max={32} value={pages} onChange={(e) => setPages(Number(e.target.value))} /></label>
+              <label className={s.field} style={{ flex: 1 }}><span className={s.label}>{t("papers.scale")}</span>
+                <input className={s.input} type="number" min={0.5} max={1.5} step={0.05} value={scale} onChange={(e) => setScale(Number(e.target.value))} /></label>
+            </div>
+            <div className={s.row}>
+              {(["body", "headline", "deck", "caption"] as const).map((k) => (
+                <FilePick key={k} label={t(`papers.font.${k}` as StringKey)} hint=".ttf / .otf" accept=".ttf,.otf"
+                          onFiles={(f) => setFonts({ ...fonts, [k]: f[0] ?? null })} chosen={fonts[k]?.name ?? ""} />
+              ))}
+            </div>
+            <div className={s.row}>
+              {(["first", "inner", "last", "footer"] as const).map((k) => (
+                <FilePick key={k} label={t(`papers.art.${k}` as StringKey)} hint={t("papers.art.hint")} accept="image/png"
+                          onFiles={(f) => setArt({ ...art, [k]: f[0] ?? null })} chosen={art[k]?.name ?? ""} />
+              ))}
+            </div>
+            <p className={s.faint} style={{ margin: 0 }}>{t("papers.art.note")}</p>
+            <div className={s.row}>
+              <Button kind="primary" icon={Icon.check()} onClick={save} disabled={!name || !id || !fonts.body || !fonts.headline || busy === "save"}>
+                {busy === "save" ? t("papers.saving") : t("papers.save")}</Button>
+              {saved === id && <Button onClick={() => makeTest(id)} disabled={!!testing}>{t("papers.test")}</Button>}
+            </div>
+            {saved === id && <Note tone="good">{t("papers.saved")}</Note>}
           </section>
         </>
       )}

@@ -17,7 +17,16 @@ export const DB_FILE = DATA_DIR ? path.join(DATA_DIR, "capital-kranti.sqlite") :
 export const OUT_DIR = DATA_DIR ? path.join(DATA_DIR, "out") : path.join(ROOT, "out", "backend");
 /** The AI key and other secrets (KEY=value lines): in DATA_DIR when set, so an
  * app update (which replaces the app's own folder) never loses them. */
-export const ENV_FILE = DATA_DIR ? path.join(DATA_DIR, "settings.env") : path.join(ROOT, "backend", ".env");
+export const ENV_FILE = process.env.CK_ENV_FILE?.trim() || (DATA_DIR ? path.join(DATA_DIR, "settings.env") : path.join(ROOT, "backend", ".env"));
+/** Papers added in the newsroom ("Add a newspaper"): their profiles, fonts and
+ * art in a folder an app update never replaces (CK_PAPERS_HOME, set by the app;
+ * else beside the data), each paper's own data in papers/<id>/ there. */
+export const PAPERS_HOME = process.env.CK_PAPERS_HOME?.trim() || DATA_DIR || ROOT;
+/** A paper's folder: one added here, else one that ships with the code. */
+export function publicationDir(id: string): string {
+  const added = path.join(PAPERS_HOME, "publications", id);
+  return existsSync(path.join(added, "profile.json")) ? added : path.join(ROOT, "publications", id);
+}
 /** Release photos, served as /media/<date>/<file>. */
 export const MEDIA_DIR = DATA_DIR ? path.join(DATA_DIR, "media") : path.join(PUBLIC_DIR, "media");
 
@@ -34,7 +43,7 @@ export function assetFile(pathname: string): string {
   const m = p.match(/^\/private\/([a-z0-9-]+)\/(.+)$/);
   if (m && !m[2].split("/").includes("..")) {
     const onDisk = DATA_DIR ? path.join(DATA_DIR, "publications", m[1], m[2]) : "";
-    return onDisk && existsSync(onDisk) ? onDisk : path.join(ROOT, "publications", m[1], m[2]);
+    return onDisk && existsSync(onDisk) ? onDisk : path.join(publicationDir(m[1]), m[2]);
   }
   if (p.startsWith("/media/") && !p.split("/").includes("..")) return path.join(MEDIA_DIR, p.slice("/media/".length));
   return path.join(PUBLIC_DIR, p);

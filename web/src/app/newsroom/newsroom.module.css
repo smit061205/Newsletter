@@ -68,8 +68,26 @@
 .dateSwitch > button svg { width: 16px; height: 16px; }
 .dateSwitch > button:hover:not(:disabled) { background: var(--sunken); color: var(--ink); }
 .dateSwitch > button:disabled { opacity: 0.35; cursor: default; }
-.dateLabel { position: relative; padding: 0 10px; font-weight: 500; cursor: pointer; white-space: nowrap; }
-.dateLabel input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.dateSwitch { position: relative; }
+.dateSwitch > button.dateLabel { display: inline-flex; gap: 8px; color: var(--ink); font: inherit; font-weight: 500; white-space: nowrap; }
+.dateLabel svg { width: 16px; height: 16px; color: var(--text-2); }
+.calendar { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: 300px; padding: 14px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r); box-shadow: 0 12px 32px rgba(20, 22, 40, 0.16); display: flex; flex-direction: column; gap: 10px; }
+.calHead { display: flex; align-items: center; justify-content: space-between; }
+.calHead button { border: 0; background: none; width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; cursor: pointer; color: var(--text-2); }
+.calHead button:hover:not(:disabled) { background: var(--sunken); color: var(--ink); }
+.calHead button:disabled { opacity: 0.3; cursor: default; }
+.calHead svg { width: 16px; height: 16px; }
+.calGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.calDow { font-size: 12px; color: var(--text-3); padding: 4px 0; }
+.calGrid button { position: relative; border: 0; background: none; height: 36px; border-radius: 8px; cursor: pointer; color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; }
+.calGrid button:hover:not(:disabled) { background: var(--sunken); }
+.calGrid button:disabled { color: var(--text-3); opacity: 0.45; cursor: default; }
+.calGrid button[data-today="true"] { color: var(--accent); font-weight: 600; }
+.calGrid button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.calGrid button i { position: absolute; left: 50%; bottom: 4px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--good, #2f8f5b); }
+.calGrid button[aria-pressed="true"] i { background: #fff; }
+.calToday { align-self: flex-end; border: 1px solid var(--hairline-strong); background: var(--surface); border-radius: 999px; padding: 5px 14px; cursor: pointer; font: inherit; font-size: 13px; color: var(--ink); }
+.calToday:hover { background: var(--sunken); }
 @media (max-width: 860px) {
   .frame { grid-template-columns: 1fr; }
   .side {
@@ -276,8 +294,14 @@
 
 /* ---- Ads */
 .adPreview { display: flex; gap: 16px; align-items: flex-end; }
-.adPage { width: 88px; aspect-ratio: 1105 / 1488; border: 1px solid var(--hairline-strong); border-radius: 3px; position: relative; background: var(--surface); flex: none; }
-.adPage span { position: absolute; bottom: 4px; left: 4px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 2px; }
+.adPage { width: 120px; aspect-ratio: 1105 / 1488; border: 1px solid var(--hairline-strong); border-radius: 3px; position: relative; background: var(--surface); flex: none; overflow: hidden; }
+.adPage span { position: absolute; }
+.adPage .adHead { left: 0; right: 0; top: 0; background: var(--sunken); border-bottom: 1px solid var(--hairline-strong); }
+.adPage .adCol { background: repeating-linear-gradient(to bottom, var(--hairline) 0 1px, transparent 1px 5px); opacity: 0.8; }
+.adPage .adBox { background: var(--accent-soft) center / 100% 100% no-repeat; border: 1.5px solid var(--accent); border-radius: 1px; }
+.adPage .adBox[data-bad="true"] { border-color: var(--bad, #c0392b); background-color: rgba(192, 57, 43, 0.12); }
+.adMeta { flex-direction: column; align-items: flex-start !important; gap: 2px; }
+.hint[data-tone="bad"] { color: var(--bad, #c0392b); }
 .adGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
 .adCard { border: 1px solid var(--hairline); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column; background: var(--surface); }
 .adCard img { width: 100%; height: 130px; object-fit: contain; background: var(--sunken); }
@@ -285,6 +309,7 @@
 .drop { border: 1.5px dashed var(--hairline-strong); border-radius: var(--r); padding: 22px; text-align: center; color: var(--text-2); cursor: pointer; position: relative; }
 .drop:hover, .drop[data-over="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.drop > svg { width: 40px; height: 40px; margin: 0 auto 8px; display: block; color: var(--text-3); }
 .days { display: flex; flex-wrap: wrap; gap: 6px; }
 .days label { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--hairline-strong); border-radius: 999px; cursor: pointer; font-size: 13px; }
 .days label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
@@ -322,3 +347,18 @@
 .fields label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-2); flex: 1 1 200px; }
 .fields label small { font-weight: 400; color: var(--text-3); }
 .fields input:not([type="checkbox"]) { width: 100%; border: 1px solid var(--hairline-strong); border-radius: var(--r-sm); background: var(--surface); padding: 9px 12px; color: var(--ink); font-size: 15px; }
+
+/* ---------- file pickers (Papers), copies */
+.filePick { position: relative; display: flex; align-items: center; gap: 8px; border: 1px dashed var(--hairline-strong); border-radius: var(--r-sm); padding: 9px 12px; color: var(--text-2); cursor: pointer; overflow: hidden; background: var(--surface); }
+.filePick:hover { border-color: var(--accent); color: var(--accent); }
+.filePick svg { width: 16px; height: 16px; flex: none; transform: rotate(180deg); }
+.filePick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filePick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.choices { display: flex; flex-direction: column; gap: 8px; }
+.choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--hairline-strong); border-radius: var(--r-sm); cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.choice input { margin-top: 3px; accent-color: var(--accent); }
+.copyGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.copyCard { border: 1px solid var(--hairline); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
+.copyCard strong { font-size: 16px; }
+.countInput { max-width: 120px; font-size: 18px; font-variant-numeric: tabular-nums; }

@@ -72,6 +72,13 @@ Repository: <https://github.com/smit061205/Newsletter> (**public**). Branch `mai
    - the PDF no longer sits 0.76pt low (it had trimmed Chromium's rounded page at the wrong corner);
    - the "વ્યવસાયિક સમાચાર" logo strip ad is removed.
 7. **The desktop app** (23 Oct): `desktop/` plus the release workflow. Getting the first installers out took several rounds; the lessons are in §6.
+8. **Fixes and copies** (23 Oct, branch `fixes-and-copies`), from the user's report on the installed app:
+   - the date opens a calendar (Gujarati, days with a paper dotted); the hidden native date input never opened;
+   - Ads: the sample ads' images loaded from the engine (404: they're the newsroom's own `/chrome/ads/`); Remove was blocked (CORS had no DELETE); a page preview to scale, the height following the image, ads too tall for the page refused, each booking's days shown, and "lay out again" offered when the day's paper exists;
+   - Settings: waking the computer is on/off and follows the run time (`ck:cancel-wake`); the rupee rate updates itself daily (Frankfurter/ECB, else open.er-api.com) unless typed in; plain words for an app with no GitHub sign-in yet;
+   - **Copies** (`editorial/copies.ts`, the build's copy mode): N copies of the day's paper, reworded by the AI (headline / + sub-heading / + text, numbers checked), laid out afresh (anywhere keeping the lead / anywhere / same page), the masthead, page headers and footer left empty for CorelDRAW, a copy that comes out like another (or with a layout check failing) laid out again; PDFs in `out/copies/<date>/`;
+   - **Papers** in the sidebar, in Gujarati/English; the app switches the newsroom to another paper (`ck:switch-paper`: the engine restarted with `CK_PUBLICATION`, its own `DATA_DIR`, the shared key `CK_ENV_FILE` and papers home `CK_PAPERS_HOME`); papers added in the app are saved in its data folder, so updates keep them; a test issue's process gets the engine's own Node flags (inside the app it couldn't find the shared code);
+   - Publish in the app without a GitHub sign-in says so plainly (it tried `git` and failed); an edit made while another day's run went is laid out once that run ends.
 
 **Published so far:** issues 269–271 (20–22 Oct 2026) on the website. Issue numbers come from the date (22 Oct 2026 = 271).
 
@@ -173,17 +180,19 @@ Then run the engine from *inside the packed app*, as the workflow's "packed app"
    - Publish and Print.
 3. **Connect the website** (Publish without Git):
    - The user registers a GitHub OAuth App with **Device Flow** enabled.
-   - Its Client ID goes in the repository Actions variable `CK_GITHUB_CLIENT_ID` (README, "making a release").
-   - Until then, Publish from the app can't push.
-4. **Rotate the OpenRouter key.** It appeared in a screenshot on 23 Oct. The user makes a new one at openrouter.ai, pastes it in **Settings → AI key**, and deletes the old one.
-5. **Verify in a real run:**
+   - Its Client ID goes in the repository Actions variable `CK_GITHUB_CLIENT_ID` (README, "making a release"), or straight into `desktop/main.js` as the default (it isn't a secret).
+   - Until then, Publish from the app can't push. The sign-in now asks only for `public_repo`.
+4. **Copies with the real AI on the father's PC:** one real copy was checked on 22 Oct data (26 of 29 headlines reworded, no white space, the lead kept, ~₹4). Check "Headline, sub-heading and text" and "Anywhere" on real data too; each copy takes about as long as the day's layout.
+5. **Every paper in the evening run:** today only the chosen paper makes itself.
+6. **Rotate the OpenRouter key.** It appeared in a screenshot on 23 Oct. The user makes a new one at openrouter.ai, pastes it in **Settings → AI key**, and deletes the old one.
+7. **Verify in a real run:**
    - the live progress loader through all five steps;
    - edit, save, leave out and Undo on real data;
    - Allow full width (the gate catches a full-width story placed without it);
    - the evening wake (`pmset` on Mac, a scheduled task on Windows);
    - Uninstall: once keeping and once removing the archive.
-6. **Rebuild issues 269–271 if they're reprinted.** Their PDFs predate the foot rule, the foot margin and the 0.76pt fix.
-7. **Later:**
+8. **Rebuild issues 269–271 if they're reprinted.** Their PDFs predate the foot rule, the foot margin and the 0.76pt fix.
+9. **Later:**
    - signing (Apple Developer and Windows certificate), to remove the first-open warnings;
    - an Urdu paper's own Nastaliq font;
    - a releases inbox (email ingest, README §15) if PIB ever isn't enough;

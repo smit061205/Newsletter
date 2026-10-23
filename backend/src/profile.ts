@@ -3,10 +3,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { ProfileSchema, type Profile } from "@ck/shared/profile";
-import { ROOT } from "./config.ts";
+import { publicationDir } from "./config.ts";
 
 export const PUBLICATION = process.env.CK_PUBLICATION?.trim() || "capital-kranti";
-export const PROFILE_DIR = path.join(ROOT, "publications", PUBLICATION);
+export const PROFILE_DIR = publicationDir(PUBLICATION);
 
 export const profile: Profile = ProfileSchema.parse(
   JSON.parse(readFileSync(path.join(PROFILE_DIR, "profile.json"), "utf8")),

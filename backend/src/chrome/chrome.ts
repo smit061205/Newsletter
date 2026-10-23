@@ -85,19 +85,22 @@ export interface ChromeResult {
 }
 
 /** Chrome for page `n` of `total`: page 1 carries the masthead, the last page
- * the last-page header and the footer, every other page the inner header. */
-export async function chromeFor(n: number, total: number, issueDate: string, issueNumber: number, m?: Measurer): Promise<ChromeResult> {
+ * the last-page header and the footer, every other page the inner header.
+ * `blank`: the same room kept, left empty -- a copy whose masthead, page
+ * headers and footer are put in by hand afterwards (editorial/copies.ts). */
+export async function chromeFor(n: number, total: number, issueDate: string, issueNumber: number, m?: Measurer,
+                                opts: { blank?: boolean } = {}): Promise<ChromeResult> {
   const roleName = n === 1 ? "first" : n === total ? "last" : "inner";
   const role = template.roles[roleName];
-  const els: Element[] = [{ id: `p${n}-chrome`, kind: "image", ...role.art, fit: "fill" }];
-  const f = role.fields;
+  const els: Element[] = opts.blank ? [] : [{ id: `p${n}-chrome`, kind: "image", ...role.art, fit: "fill" }];
+  const f = opts.blank ? {} as Role["fields"] : role.fields;
   if (f.issue) els.push(await field(f.issue, `p${n}-issue`, profile.language.issueLine.replace("{issue}", localDigits(issueNumber)), m));
   if (f.date) els.push(await field(f.date, `p${n}-date`, dateLine(issueDate), m));
   if (f.folio) els.push(await field(f.folio, `p${n}-folio`, localDigits(n), m));
   // a one-page paper has no "last page" header; give its last page the footer anyway
   const footer = role.footer ?? (n === total ? template.roles.last.footer : undefined);
-  if (footer) els.push({ id: `p${n}-footer`, kind: "image", ...footer, fit: "fill" });
-  else if (role.rule) {
+  if (footer && !opts.blank) els.push({ id: `p${n}-footer`, kind: "image", ...footer, fit: "fill" });
+  else if (role.rule && !footer) {
     const r = role.rule;
     els.push({ id: `p${n}-foot-rule`, kind: "line", x1: r.x1, y1: r.y, x2: r.x2, y2: r.y, color: r.color, width: r.width });
   }

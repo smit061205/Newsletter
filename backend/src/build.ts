@@ -31,7 +31,29 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
               /** how far the build has got: planning the pages, finishing each, checking (pipeline.ts) */
               progress?: (p: Progress) => void;
               /** page images even when the fonts may be served (tests read them) */
-              images?: boolean };
+              images?: boolean;
+              /** one of the day's copies (editorial/copies.ts): laid out afresh, never saved as the day's issue */
+              copy?: CopyOpts };
+
+/** A copy of the day's paper: its stories in other places, reworded, its
+ * masthead, page headers and footer left empty for the paper's own. */
+export interface CopyOpts {
+  /** a random number in [0, 1), the same every time for the same copy */
+  rng: () => number;
+  /** how far the stories move: "keepLead" (anywhere, the day's lead stays the
+   * front page's), "anywhere" (any story anywhere), "samePage" (each on its page) */
+  shuffle: "keepLead" | "anywhere" | "samePage";
+  /** each story's page in the day's paper (for "samePage") */
+  pageOf: Map<string, number>;
+  /** the day's lead story (for "keepLead": the front page's in every copy) */
+  lead?: string;
+  /** the stories as this copy words them */
+  reword: (pool: Story[]) => Promise<{ pool: Story[]; cost: number }>;
+  /** where this copy's PDF goes */
+  pdfPath: string;
+  /** the store the gap closer caches its length fits in (a reworded body has its own) */
+  store?: Store;
+}
 
 /** Where a day's page images go (served by the API for the website). */
 export const pageImageDir = (date: string) => path.join(OUT_DIR, "pages", profile.id, date);
@@ -131,7 +153,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
                  plans: PagePlan[]; spent: number; factChecks: { story: string; detail: string }[] };
   const chrome: Awaited<ReturnType<typeof chromeFor>>[] = [];
   try {
-    for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m));
+    for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m, { blank: !!opts.copy }));
     // the ads the layout may place go to the foot of their page (layout/ads.ts)
     ads = chrome.flatMap((c, i) => arrangeAds(ads.filter((a) => a.page === i + 1), { top: c.bodyTop, bottom: c.bodyBottom }));
     // content-sized pages (layout/pack.ts): every page packed in turn from the
@@ -175,6 +197,18 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // keeps it, the others print without a kicker
     let special = false;
     pool = pool.map((s) => (s.kicker !== FEATURE_KICKER ? s : special ? { ...s, kicker: "" } : ((special = true), s)));
+    let rewordCost = 0;
+    if (opts.copy) {
+      const c = opts.copy;
+      const got = await c.reword(pool);
+      rewordCost = got.cost;
+      // the order the pages are filled in, shuffled: importance still counts,
+      // with enough chance that every copy comes out its own
+      const spread = c.shuffle === "anywhere" ? 4 : 2.5;
+      const lead = c.lead && got.pool.some((s) => s.id === c.lead) ? c.lead : got.pool[0]?.id;
+      const keyed = got.pool.map((s) => ({ s, k: c.shuffle === "keepLead" && s.id === lead ? -Infinity : s.priority + c.rng() * spread }));
+      pool = keyed.sort((a, b) => a.k - b.k).map((x) => x.s) as typeof pool;
+    }
     log(`planning ${date} (issue ${issueNumber}): ${pool.length} stories, ${ads.length} ads, ${total} pages`);
     const packer = new Packer(m);
     let spent = 0;
@@ -201,12 +235,16 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       // what's left of the copy, over what's left of the room
       const leftRoom = room.slice(n - 1).reduce((a, b) => a + b, 0);
       const leftCopy = (await Promise.all(pool.map((s, i) => packer.naturalArea(s, i === 0)))).reduce((a, b) => a + b, 0);
-      const budget = n === total ? Infinity : room[n - 1] * Math.min(1.05, leftCopy / leftRoom);
+      // a copy that keeps each story on its page packs each page from its own stories
+      const samePage = opts.copy?.shuffle === "samePage";
+      const pagePool = samePage ? pool.filter((s) => (opts.copy!.pageOf.get(s.id) ?? total) === n) : pool;
+      const budget = n === total || samePage ? Infinity : room[n - 1] * Math.min(1.05, leftCopy / leftRoom);
       // what the later pages need kept for them: most of their room (length
       // fitting grows the stories into the rest)
-      const reserve = room.slice(n).reduce((a, b) => a + b, 0) * 0.7;
-      const plan = await packer.packPage(n, pool, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, pageAds,
-                                         { leadFirst: true, budget, reserve, ...(n === 1 ? { maxCols: FRONT_PAGE_MAX_COLS } : {}) });
+      const reserve = samePage ? 0 : room.slice(n).reduce((a, b) => a + b, 0) * 0.7;
+      const plan = await packer.packPage(n, pagePool, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, pageAds,
+                                         { leadFirst: true, budget, reserve, ...(n === 1 ? { maxCols: FRONT_PAGE_MAX_COLS } : {}),
+                                           ...(opts.copy ? { jitter: opts.copy.rng } : {}) });
       plans.push(plan);
       pool = pool.filter((s) => !plan.placed.some((p) => p.module.story.id === s.id));
       log(`  page ${n}: ${plan.placed.length} stories, white space ${(plan.waste * 100).toFixed(1)}%: ` +
@@ -220,7 +258,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       opts.progress?.({ done: total + n - 1, total: total * 2 + 1, label: "finishing", item: String(n) });
       const pageAds = ads.filter((a) => a.page === n);
       const fit = await closeGaps(plan, { band: { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }, ads: pageAds,
-                                         store, date, releases, m, leftOut: pool, fillers, say: (l) => log(`  p${n}${l}`) });
+                                         store: opts.copy?.store ?? store, date, releases, m, leftOut: pool, fillers, say: (l) => log(`  p${n}${l}`) });
       spent += fit.cost;
       factChecks.push(...fit.factChecks);
       pool = pool.filter((s) => !fit.used.includes(s));
@@ -235,7 +273,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       gaps.push(...findGaps(fit.blocks, { top: chrome[n - 1].bodyTop, bottom: chrome[n - 1].bodyBottom }).map((g) => ({ page: n, ...g })));
       finalPlans.push(fit.plan);
     }
-    result = { pages: pagesOut, placed, gaps, leftOut: pool, plans: finalPlans, spent, factChecks };
+    result = { pages: pagesOut, placed, gaps, leftOut: pool, plans: finalPlans, spent: spent + rewordCost, factChecks };
   } finally {
     await m.close();
   }
@@ -248,9 +286,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // page images too, for the website: licensed fonts never leave this server
   const restricted = FONTS.some((f) => f.restricted);
   opts.progress?.({ done: total * 2, total: total * 2 + 1, label: "checking" });
-  const { pdf, warnings, images } = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, ...(restricted || opts.images ? { images: 150 } : {}) });
-  await mkdir(OUT_DIR, { recursive: true });
-  const pdfPath = path.join(OUT_DIR, `${profile.id}-${date}.pdf`);
+  const { pdf, warnings, images } = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile,
+                                                              ...((restricted || opts.images) && !opts.copy ? { images: 150 } : {}) });
+  const pdfPath = opts.copy?.pdfPath ?? path.join(OUT_DIR, `${profile.id}-${date}.pdf`);
+  await mkdir(path.dirname(pdfPath), { recursive: true });
   await writeFile(pdfPath, pdf);
   if (images) {
     const dir = pageImageDir(date);
@@ -296,7 +335,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // gate 7 compares only builds made from the same inputs by the same engine:
   // after a change to either, the paper is meant to differ
   const fingerprint = buildFingerprint(store, date);
-  const previous = store.latestIssue(date);
+  // (a copy is meant to differ from the day's paper)
+  const previous = opts.copy ? null : store.latestIssue(date);
   const comparable = previous && (previous.report as { fingerprint?: string }).fingerprint === fingerprint;
   const same = comparable ? JSON.stringify(previous.issue) === JSON.stringify(issue) : null;
   const print = await preflight(pdf, issue);
@@ -365,7 +405,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     review: review?.findings ?? [], plan: planEntries,
     style: style.stats,
   };
-  const version = store.saveIssue(date, issue, report);
+  // a copy is the day's paper laid out again: not a new version of it
+  const version = opts.copy ? 0 : store.saveIssue(date, issue, report);
   log(`built ${date} v${version}: ${report.placed.length} stories placed, ${report.leftOut.length} left out, ` +
       `${warnings.length} plotter warning(s), ${checks.length} white-space gap(s) -> ${pdfPath}`);
   for (const w of report.warnings.filter((w) => w.kind !== "white-space")) log(`  warning p${w.page} ${w.elementId ?? ""}: ${w.kind} ${w.detail}`);

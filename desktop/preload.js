@@ -9,4 +9,7 @@ contextBridge.exposeInMainWorld("ck", {
   onGitHubConnected: (fn) => ipcRenderer.on("ck:github-connected", () => fn()),
   // wake the computer five minutes before the evening run ("HH:MM")
   scheduleWake: (time) => ipcRenderer.invoke("ck:schedule-wake", time),
+  cancelWake: () => ipcRenderer.invoke("ck:cancel-wake"),
+  // work on another paper: the app starts its engine again for it
+  switchPaper: (id) => ipcRenderer.invoke("ck:switch-paper", id),
 });
