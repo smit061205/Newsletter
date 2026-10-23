@@ -77,7 +77,10 @@ export default function Copies() {
   const issueNo = info?.report.issueNumber ?? status?.issue?.issueNumber ?? 0;
   const paperName = status?.paper.name.split(" (")[0] ?? "Capital Kranti";
   // what a copy is doing, in plain words
-  const whatOf = (w: string) => {
+  const whatOf = (w: string): string => {
+    // a copy laid out again: which try, then what it's doing
+    const again = w.match(/^again (\d+): (.*)$/);
+    if (again) return `${t("copies.doing.again", { n: num(lang, again[1]) })} · ${whatOf(again[2])}`;
     const m = w.match(/^(planning|finishing) (\d+)$/);
     if (m) return t(m[1] === "planning" ? "progress.planning" : "progress.finishing", { item: num(lang, m[2]) });
     return w === "checking" ? t("progress.checking") : w === "translating" ? t("copies.doing.translating") : w === "rewording" ? t("copies.doing.rewording") : w;

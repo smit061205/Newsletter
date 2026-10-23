@@ -33,6 +33,7 @@ import { DB_FILE, ENV_FILE, MEDIA_DIR, OUT_DIR, PAPERS_HOME, ROOT } from "../con
 import { buildIssue, type CopyOpts } from "../build.ts";
 import { browserServer, closeBrowser } from "../browser.ts";
 import { profile } from "../profile.ts";
+import { BharatiEncoder } from "../fonts/bharati.ts";
 import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
 
@@ -80,8 +81,12 @@ export const copiesDir = (date: string) => path.join(OUT_DIR, "copies", date);
 export const copyFile = (date: string, n: number) => path.join(copiesDir(date), `copy-${n}.pdf`);
 export const editionsDir = (date: string) => path.join(OUT_DIR, "editions", date);
 export const editionFile = (date: string, id: string) => path.join(editionsDir(date), `${id}.pdf`);
-/** The checks a different arrangement can fix (the others come with the stories themselves). */
-const LAYOUT_GATES = ["1", "2", "3", "S2", "S4", "W"];
+/** The checks a different arrangement can fix: an overflow, empty space, a
+ * full-width story. (A headline that won't fill its width or a heavy one
+ * came back in every arrangement on 23 Oct: retrying them only tripled the time.) */
+const LAYOUT_GATES = ["1", "2", "W"];
+/** Tries per copy when a layout check fails (a copy placed like another is always tried again). */
+const TRIES = 2;
 
 let running: Batch | null = null;
 /** The copies or sister papers being made now, if any. */
@@ -176,6 +181,8 @@ async function rewordStory(store: Store, s: Story, n: number, reword: Reword, ke
   const ok = (f: string) => {
     const v = (got![f] ?? "").trim();
     if (!v) return false;
+    // letters the paper's font can't print (Gopika has no "ૅ", nor some joins): they'd fall back to a system font
+    if (!settable(v)) return false;
     const was = original[f];
     if (numbersNotIn(v, was).length || numbersNotIn(was, v).length) return false;
     if (translate) return true;
@@ -207,6 +214,17 @@ async function rewordStory(store: Store, s: Story, n: number, reword: Reword, ke
     out.bodies = { long: body, medium: upTo(0.66), short: upTo(0.4) };
   }
   return { story: out, cost };
+}
+
+/** Can the paper's own fonts print this text? (A legacy-encoded paper's encoder sets every letter; others, any.) */
+let encoder: BharatiEncoder | null | undefined;
+function settable(text: string): boolean {
+  if (encoder === undefined) {
+    const legacy = Object.values(profile.fonts).some((f) => f.encoding === "bharati");
+    try { encoder = legacy ? new BharatiEncoder() : null; } catch { encoder = null; }
+  }
+  // (English letters and digits are set in the paper's English font, not the legacy one)
+  return !encoder || encoder.encode(text).unknown.every((u) => /^[\x00-\x7F\u2000-\u206F]+$/.test(u));
 }
 
 /** What one layout set needs: where each one goes, how to shuffle and word it. */
@@ -262,7 +280,8 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
       const built = await buildIssue(store, spec.date, {
         log: (l) => { if (/^(built|  FAIL|  page \d+:)/.test(l)) say(`  ${l.trim()}`); },
         noReview: true,
-        progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0), p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()),
+        progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0),
+          `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
         copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, reword, pdfPath: item.pdf,
                 translate: spec.translate, ...(spec.reword === "all" && !spec.translate ? { store: own } : {}) },
       });
@@ -279,7 +298,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
         await copyTo(item.pdf, `${item.pdf}.best`);
       }
       if (!repeat && fails === 0) break;
-      if (!repeat && attempt < 2) say(`  ${item.name ?? `copy ${n}`}: a layout check needs a look: trying another arrangement`);
+      if (!repeat && attempt < TRIES - 1) say(`  ${item.name ?? `copy ${n}`}: a layout check needs a look: trying another arrangement`);
       else if (!repeat) break;
     }
     if (!made) throw new Error(`${item.name ?? `copy ${n}`} couldn't be laid out unlike the others`);
@@ -314,8 +333,8 @@ let partProgress: ((t: Task, share: number, what: string) => void) | null = null
 function tracker(batch: Batch, total: number) {
   batch.parts = {};
   partProgress = (t, share, what) => {
-    const was = batch.parts![t.label]?.share ?? 0;
-    batch.parts![t.label] = { share: Math.max(was, Math.min(0.99, share)), what };
+    // a copy laid out again starts its pages over: shown as it is (with "again"), not held where it was
+    batch.parts![t.label] = { share: Math.min(0.99, share), what };
     batch.share = Object.values(batch.parts!).reduce((a, p) => a + p.share, 0) / total;
   };
   return (t: Task) => {
