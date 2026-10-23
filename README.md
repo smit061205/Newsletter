@@ -51,6 +51,7 @@ Not sure which Mac? Apple menu → About This Mac: "Chip: Apple M…" is Apple s
 - **Publish:** connect the website once (**Settings → Connect the website**, a GitHub sign-in in the browser). After that, Publish updates the website.
 - **નકલો / Copies:** copies of the day's paper for other titles. Choose how many, what the AI rewords (headline; headline and sub-heading; or the text too) and how far the stories move (anywhere, keeping the lead on the front page; anywhere; or each on its own page). Each copy is a print PDF with the masthead, the page headers and the last page's footer left empty, to be filled in with CorelDRAW. Copies never change the day's own paper.
 - **છાપાં / Papers:** the papers this newsroom can make. Add one from its PDF issues, fonts and header art, make a test issue, and (in the app) **Work on this paper** to switch the whole newsroom to it. Only the chosen paper makes itself in the evening.
+- **Updates:** the app looks for a new version when it starts and once a day, and asks to restart into it. **Settings → Updates → Check for updates** looks right away; when the new version is downloaded, **Restart to update** puts it in (the paper's data and settings stay). A note in the sidebar says when one is ready.
 - **Settings:** the rupee rate keeps itself up to date (the day's US dollar rate, from the ECB's reference rates) unless it's typed in by hand; waking the computer is on/off and follows the paper's time.
 
 ### Updates, uninstalling, moving from the old install

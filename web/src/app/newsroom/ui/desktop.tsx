@@ -14,7 +14,13 @@ interface Ck {
   scheduleWake(time: string): Promise<string>;
   cancelWake?(): Promise<void>;
   switchPaper?(id: string): Promise<void>;
+  updateStatus?(): Promise<Update>;
+  checkUpdate?(): Promise<Update>;
+  applyUpdate?(): Promise<void>;
+  onUpdate?(fn: (u: Update) => void): void;
 }
+/** Where updating the app stands (desktop/main.js). */
+export interface Update { state: "idle" | "checking" | "none" | "downloading" | "ready" | "error"; current: string; latest: string; error: string; building?: boolean }
 export const ck = (): Ck | undefined => (typeof window === "undefined" ? undefined : (window as unknown as { ck?: Ck }).ck);
 
 export function useDesktop() {
@@ -98,6 +104,46 @@ export function WakeCard({ runAt }: { runAt: string }) {
         : on ? <Note tone="good">{t("settings.wake.done", { time: info.wake })}</Note>
         : <p className={s.faint}>{t("settings.wake.off")}</p>}
       <p className={s.faint}>{t("settings.wake.follows")}{info.platform === "darwin" ? ` ${t("settings.wake.mac")}` : ""}</p>
+      {error && <Note tone="bad">{error}</Note>}
+    </section>
+  );
+}
+
+/** The app's update, kept current (null outside the app). */
+export function useUpdate() {
+  const [u, setU] = useState<Update | null>(null);
+  useEffect(() => {
+    const c = ck();
+    if (!c?.updateStatus) return;
+    c.updateStatus().then(setU).catch(() => {});
+    c.onUpdate?.(setU);
+  }, []);
+  return u;
+}
+
+/** Settings → Updates: the version, a button to look for a newer one, and
+ * (once it's downloaded) one to restart into it. */
+export function UpdateCard({ busy }: { busy: boolean }) {
+  const { t } = useApp();
+  const u = useUpdate();
+  const [error, setError] = useState("");
+  if (!u) return null;
+  const check = () => { setError(""); ck()!.checkUpdate!().catch((e) => setError(e.message)); };
+  return (
+    <section className={s.card}>
+      <h2 className={s.cardTitle}>{t("update.title")}</h2>
+      <p className={s.muted}>{t("update.current", { v: u.current })}</p>
+      {u.state === "checking" ? <p className={s.faint}>{t("update.checking")}</p>
+        : u.state === "downloading" ? <Note tone="good">{t("update.downloading", { v: u.latest })}</Note>
+        : u.state === "ready" ? <Note tone="good">{t("update.ready", { v: u.latest })}</Note>
+        : u.state === "none" ? <p className={s.faint}>{u.building ? t("update.building", { v: u.latest }) : t("update.none")}</p>
+        : u.state === "error" ? <Note tone="bad">{t("update.error")}</Note> : null}
+      {u.state === "ready"
+        ? <div className={s.row}>
+            <Button kind="primary" onClick={() => ck()!.applyUpdate!()} disabled={busy}>{t("update.restart")}</Button>
+            {busy && <span className={s.faint}>{t("update.wait")}</span>}
+          </div>
+        : <div><Button onClick={check} disabled={u.state === "checking" || u.state === "downloading"}>{t("update.check")}</Button></div>}
       {error && <Note tone="bad">{error}</Note>}
     </section>
   );

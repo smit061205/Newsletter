@@ -8,6 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { call, type Status } from "./api";
 import s from "./newsroom.module.css";
 import { Calendar } from "./ui/calendar";
+import { useUpdate } from "./ui/desktop";
 import { addDays, longDate } from "./ui/format";
 import { Help } from "./ui/help";
 import { AppProvider, Button, Icon, Mark, useApp } from "./ui/kit";
@@ -87,6 +88,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   const { t } = useApp();
   const { status, down } = useStatus();
   const [help, setHelp] = useState(false);
+  const update = useUpdate();
   // a first visit: the welcome screens before anything else
   useEffect(() => {
     if (status && !status.onboarded && path !== "/newsroom/welcome") router.replace("/newsroom/welcome");
@@ -104,6 +106,9 @@ function Frame({ children }: { children: React.ReactNode }) {
                 aria-current={path === href ? "page" : undefined}>{icon()}<span>{t(key)}</span></Link>
         ))}
         <div className={s.navSpacer} />
+        {update?.state === "ready" && (
+          <Link href="/newsroom/settings" className={s.updateNote}>{Icon.download()}<span>{t("update.sidebar")}</span></Link>
+        )}
         <button className={`${s.navItem} ${s.navExtra}`} onClick={() => setHelp(true)}>{Icon.help()}<span>{t("nav.help")}</span></button>
       </nav>
       <main className={s.content}>{down && status ? <EngineDown /> : children}</main>

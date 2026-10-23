@@ -12,4 +12,9 @@ contextBridge.exposeInMainWorld("ck", {
   cancelWake: () => ipcRenderer.invoke("ck:cancel-wake"),
   // work on another paper: the app starts its engine again for it
   switchPaper: (id) => ipcRenderer.invoke("ck:switch-paper", id),
+  // updates: where they stand, look for one now, put a downloaded one in (restarts the app)
+  updateStatus: () => ipcRenderer.invoke("ck:update-status"),
+  checkUpdate: () => ipcRenderer.invoke("ck:check-update"),
+  applyUpdate: () => ipcRenderer.invoke("ck:apply-update"),
+  onUpdate: (fn) => ipcRenderer.on("ck:update", (_e, u) => fn(u)),
 });

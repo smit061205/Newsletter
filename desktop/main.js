@@ -348,25 +348,62 @@ async function migrateOldInstall() {
 }
 
 /* ---------------- updates */
+// The newest release on GitHub: checked at start and once a day, or from
+// Settings → Updates; downloaded in the background, then put in on a restart
+// (asked in a dialog, or from Settings). Windows: electron-updater; macOS
+// (not notarised): the release's zip, swapped in by a small script.
 const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 let pendingUpdate = null;
-async function checkForUpdates(manual = false) {
+/** Where updating stands, for the newsroom: idle | checking | none | downloading | ready | error. */
+let update = { state: "idle", current: app.getVersion(), latest: "", error: "" };
+const setUpdate = (patch) => {
+  update = { ...update, ...patch };
+  if (win && !win.isDestroyed()) win.webContents.send("ck:update", update);
+};
+let winUpdater = null;
+function windowsUpdater() {
+  if (winUpdater) return winUpdater;
+  const { autoUpdater } = require("electron-updater");
+  autoUpdater.autoDownload = true;
+  // registered once (each check used to add another listener: one dialog per day)
+  autoUpdater.on("update-available", (i) => setUpdate({ state: "downloading", latest: i.version }));
+  autoUpdater.on("update-not-available", () => setUpdate({ state: "none" }));
+  autoUpdater.on("error", (e) => setUpdate({ state: "error", error: e.message }));
+  autoUpdater.on("update-downloaded", (i) => {
+    pendingUpdate = { apply: () => { quitting = true; autoUpdater.quitAndInstall(); } };
+    setUpdate({ state: "ready", latest: i.version });
+    if (!update.quiet) offerUpdate();
+  });
+  return (winUpdater = autoUpdater);
+}
+/** Look for a newer release. `from`: "start" (quiet unless one is ready), "menu" (says the outcome), "newsroom" (the newsroom shows it). */
+async function checkForUpdates(from = "start") {
+  if (update.state === "checking" || update.state === "downloading") return update;
+  if (update.state === "ready") { if (from === "menu") offerUpdate(); return update; }
+  setUpdate({ state: "checking", error: "", quiet: from === "newsroom" });
   try {
     if (isWin && app.isPackaged) {
-      const { autoUpdater } = require("electron-updater");
-      autoUpdater.autoDownload = true;
-      autoUpdater.on("update-downloaded", () => { pendingUpdate = { apply: () => autoUpdater.quitAndInstall() }; offerUpdate(); });
-      await autoUpdater.checkForUpdates();
-      return;
+      const r = await windowsUpdater().checkForUpdates();
+      if (!r || !r.updateInfo || !newer(r.updateInfo.version, app.getVersion())) {
+        setUpdate({ state: "none" });
+        if (from === "menu") dialog.showMessageBox({ message: "Capital Kranti is up to date." });
+      }
+      return update;
     }
-    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { "user-agent": "CapitalKranti" } });
-    if (!r.ok) return;
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { "user-agent": "CapitalKranti" }, signal: AbortSignal.timeout(20_000) });
+    if (!r.ok) throw new Error(`GitHub answered ${r.status}`);
     const rel = await r.json();
     const v = String(rel.tag_name || "").replace(/^v/, "");
-    if (!v || !newer(v, app.getVersion())) { if (manual) dialog.showMessageBox({ message: "Capital Kranti is up to date." }); return; }
-    const asset = rel.assets.find((a) => a.name.endsWith(`mac-${process.arch}.zip`));
-    if (!isMac || !asset || !app.isPackaged) return;
+    if (!v || !newer(v, app.getVersion())) {
+      setUpdate({ state: "none", latest: v });
+      if (from === "menu") dialog.showMessageBox({ message: "Capital Kranti is up to date." });
+      return update;
+    }
+    const asset = (rel.assets || []).find((a) => a.name.endsWith(`mac-${process.arch}.zip`));
+    // a release whose installers are still being built: none to fetch yet
+    if (!isMac || !asset || !app.isPackaged) { setUpdate({ state: "none", latest: v, building: true }); return update; }
     // macOS without notarisation: download the new app, check it, swap it in on restart
+    setUpdate({ state: "downloading", latest: v });
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ck-update-"));
     const zip = path.join(tmp, asset.name);
     fs.writeFileSync(zip, Buffer.from(await (await fetch(asset.browser_download_url)).arrayBuffer()));
@@ -380,8 +417,13 @@ async function checkForUpdates(manual = false) {
       quitting = true;
       app.quit();
     } };
-    offerUpdate();
-  } catch (e) { log(`update check: ${e.message}`); }
+    setUpdate({ state: "ready" });
+    if (from !== "newsroom") offerUpdate();
+  } catch (e) {
+    log(`update check: ${e.message}`);
+    setUpdate({ state: "error", error: e.message });
+  }
+  return update;
 }
 function offerUpdate() {
   if (!pendingUpdate) return;
@@ -389,6 +431,9 @@ function offerUpdate() {
     message: "A new version of Capital Kranti is ready.", detail: "The paper's data and settings stay as they are." })
     .then(({ response }) => { if (response === 0) pendingUpdate.apply(); });
 }
+ipcMain.handle("ck:update-status", () => update);
+ipcMain.handle("ck:check-update", () => checkForUpdates("newsroom"));
+ipcMain.handle("ck:apply-update", () => { if (pendingUpdate) pendingUpdate.apply(); });
 
 /* ---------------- uninstall (macOS; Windows has its own uninstaller) */
 async function uninstall() {
@@ -483,11 +528,11 @@ ipcMain.handle("ck:cancel-wake", async () => {
 function buildMenu() {
   const t = [
     ...(isMac ? [{ label: "Capital Kranti", submenu: [
-      { role: "about" }, { label: "Check for Updates…", click: () => checkForUpdates(true) }, { type: "separator" },
+      { role: "about" }, { label: "Check for Updates…", click: () => checkForUpdates("menu") }, { type: "separator" },
       { label: "Uninstall Capital Kranti…", click: uninstall }, { type: "separator" },
       { role: "hide" }, { role: "hideOthers" }, { type: "separator" },
       { label: "Quit Capital Kranti", accelerator: "Cmd+Q", click: () => { quitting = true; app.quit(); } },
-    ] }] : [{ label: "File", submenu: [{ label: "Check for Updates…", click: () => checkForUpdates(true) }, { type: "separator" },
+    ] }] : [{ label: "File", submenu: [{ label: "Check for Updates…", click: () => checkForUpdates("menu") }, { type: "separator" },
       { label: "Quit", accelerator: "Ctrl+Q", click: () => { quitting = true; app.quit(); } }] }]),
     { label: "Edit", submenu: [{ role: "undo" }, { role: "redo" }, { type: "separator" }, { role: "cut" }, { role: "copy" }, { role: "paste" }, { role: "selectAll" }] },
     { label: "View", submenu: [
@@ -530,8 +575,8 @@ if (!app.requestSingleInstanceLock()) {
     setInterval(poll, 10_000);
     poll();
     if (moved && Notification.isSupported()) new Notification({ title: "Capital Kranti", body: moved }).show();
-    setTimeout(() => checkForUpdates(false), 15_000);
-    setInterval(() => checkForUpdates(false), 24 * 3600_000);
+    setTimeout(() => checkForUpdates("start"), 15_000);
+    setInterval(() => checkForUpdates("start"), 24 * 3600_000);
   });
   app.on("activate", () => show(null));
   app.on("window-all-closed", () => { /* stays in the menu bar / tray */ });

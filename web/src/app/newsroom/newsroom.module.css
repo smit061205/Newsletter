@@ -362,3 +362,8 @@
 .copyCard { border: 1px solid var(--hairline); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
 .copyCard strong { font-size: 16px; }
 .countInput { max-width: 120px; font-size: 18px; font-variant-numeric: tabular-nums; }
+
+/* ---------- an update ready (sidebar) */
+.updateNote { display: flex; align-items: center; gap: 8px; margin: 0 4px 8px; padding: 9px 12px; border-radius: var(--r-sm); background: var(--good-bg); color: var(--good); font-size: 13.5px; font-weight: 500; text-decoration: none; }
+.updateNote svg { width: 16px; height: 16px; flex: none; }
+.updateNote:hover { filter: brightness(0.97); }

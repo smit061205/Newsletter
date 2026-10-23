@@ -7,7 +7,7 @@ import { call, type Settings } from "../api";
 import { useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { num, shortDate } from "../ui/format";
-import { ConnectCard, WakeCard } from "../ui/desktop";
+import { ConnectCard, UpdateCard, WakeCard } from "../ui/desktop";
 import { Button, Icon, Note, Skeleton, useApp } from "../ui/kit";
 
 export default function SettingsPage() {
@@ -90,6 +90,8 @@ export default function SettingsPage() {
           <p className={s.muted}>{t("settings.papers.body")}</p>
           <div><Link className={s.btn} href="/newsroom/papers">{Icon.papers()}{t("settings.papers.open")}</Link></div>
         </section>
+
+        <UpdateCard busy={!!status?.running} />
 
         <section className={s.card}>
           <h2 className={s.cardTitle}>{t("settings.about")}</h2>
