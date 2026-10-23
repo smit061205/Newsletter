@@ -132,8 +132,7 @@
   "leadModel": "google/gemini-3.8-flash",
   "leadStories": 3,
   "translateModel": "google/gemini-3.8-flash",
-  "fillTarget": 1.1,
-  "dailyBudgetUsd": 0.3
+  "fillTarget": 1.1
  },
  "fontLicence": "Noto Nastaliq Urdu, from Google Fonts: SIL Open Font License 1.1 (licence file in fonts/).",
  "fillers": {

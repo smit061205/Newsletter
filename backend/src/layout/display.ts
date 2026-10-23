@@ -114,8 +114,24 @@ function fitLine(natural: number, letters: number, spaces: number, size: number,
  * Sets `text` at (x, y), `w` wide: returns its elements, or null if it can't
  * be set within the spec (the caller tries another width or size range).
  */
+const KERNED = /[\u0600-\u06FF\u0750-\u077F\u0900-\u097F]/;
+
+// set blocks, per measurer: a story built again at another length sets the
+// same headline at the same place (layout/blocks.ts)
+const sets = new WeakMap<Measurer, Map<string, DisplayBlock | null>>();
+
 export async function setDisplay(m: Measurer, text: string, spec: DisplaySpec, id: string, aid: string,
                                  x: number, y: number, w: number): Promise<DisplayBlock | null> {
+  if (!sets.has(m)) sets.set(m, new Map());
+  const memo = sets.get(m)!;
+  const key = JSON.stringify([text, spec, id, aid, x, y, w]);
+  if (!memo.has(key)) memo.set(key, await setDisplayOnce(m, text, spec, id, aid, x, y, w));
+  const got = memo.get(key)!;
+  return got && { ...got, elements: got.elements.map((e) => ({ ...e })) };
+}
+
+async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: string, aid: string,
+                              x: number, y: number, w: number): Promise<DisplayBlock | null> {
   const t = text.replace(/\s+/g, " ").trim();
   if (!t) return null;
   const REF = 100;
@@ -135,7 +151,8 @@ export async function setDisplay(m: Measurer, text: string, spec: DisplaySpec, i
     let bestScore = -1;
     for (let n = 1; n <= spec.maxLines; n++) {
       for (let size = spec.max; size >= spec.min - 0.01; size -= PT / 2) {
-        const starts = breaksFor(words, space, size, w, n, spec.lastFree);
+        // (a kerned script, Hindi or Urdu, prints a hair wider than it measures: a margin)
+        const starts = breaksFor(words, space, size, KERNED.test(t) ? w * 0.995 : w, n, spec.lastFree);
         if (!starts) continue;
         const score = size * (1 + (spec.linesBonus ?? 0) * (n - 1));
         if (score > bestScore + 0.01) {
@@ -159,12 +176,18 @@ export async function setDisplay(m: Measurer, text: string, spec: DisplaySpec, i
       runs.push(...x.runs);
     });
     const natural = (ws.reduce((a, x) => a + x.width, 0) + (ws.length - 1) * space) * size;
-    const letters = ws.reduce((a, x) => a + x.letters, 0) + ws.length - 2;
+    // (a script never letter-spaced -- Hindi, Urdu: measure.ts gives its words
+    // no letters -- takes none at its spaces either: letter spacing applies to
+    // every character on the page, and a Hindi heading ran 65-127 px over)
+    const letters = ws.some((x) => x.letters > 0) ? ws.reduce((a, x) => a + x.letters, 0) + ws.length - 2 : 0;
     const line: Line = { text: ws.map((x) => x.word).join(" "), runs, para: 0, start: k === 0, end: k === starts.length - 1,
                          width: natural, spaces: ws.length - 1, letters, spaceWidth: space * size };
     return { line, natural, letters, spaces: ws.length - 1 };
   });
 
+  // the width a line is set to: a kerned script (Hindi, Urdu) prints a hair
+  // wider than measured, so a hair short of the box
+  const room = KERNED.test(t) ? w * 0.995 : w;
   // baselines: a fixed pitch, opened only where marks would touch
   const ink = await m.ink(lines.map((l) => ({ text: l.line.text, font: spec.font, size })));
   const clear = 0.06 * size;
@@ -180,15 +203,15 @@ export async function setDisplay(m: Measurer, text: string, spec: DisplaySpec, i
     };
     if (spec.align !== "fit") {
       // the story's full width, the line centred (or flush left) in it, squeezed only if it must be
-      const hScale = Math.min(1, w / l.natural);
+      const hScale = Math.min(1, room / l.natural);
       return { ...base, x: r1(x), width: r1(w), align: spec.align,
                ...(hScale < 0.9999 ? { hScale: Math.round(hScale * 10000) / 10000 } : {}) };
     }
-    if (spec.lastFree && l.line.end && l.natural <= w) {
+    if (spec.lastFree && l.line.end && l.natural <= room) {
       // the last line of a paragraph-like block: at its natural width
       return { ...base, x: r1(x), width: r1(w), align: "left" as const };
     }
-    const f = fitLine(l.natural, l.letters, l.spaces, size, w);
+    const f = fitLine(l.natural, l.letters, l.spaces, size, room);
     fillMin = Math.min(fillMin, f.fill);
     return {
       ...base, x: r1(x), width: r1(w), align: (f.fill > 0.999 ? "justify-all" : "left") as TextElement["align"],

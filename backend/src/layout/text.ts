@@ -39,12 +39,35 @@ export function devanagariToGujarati(text: string): string {
   });
 }
 
+/** Characters taken out of the printed text because the paper's font has
+ * nothing for them (the build reports them, for the editor). */
+export const removed = new Set<string>();
+
+/** Gujarati text as the paper's fonts can print it -- the one door all
+ * printed text goes through, whoever wrote it (a release, the AI, a
+ * translation, an editor): a letter of a sister script (Punjabi, Hindi) in
+ * its Gujarati twin; the signs Gopika lacks (the candra vowels: "ૅ")
+ * in their nearest form; anything else outside Gujarati, Latin and common
+ * punctuation taken out and reported (24 Oct: a Punjabi "ਲ" in a PIB release
+ * was printed in a system font). */
+function printableGujarati(text: string): string {
+  const CANDRA: Record<string, string> = { "ૅ": "ે", "ૉ": "ો", "ઍ": "એ", "ઑ": "ઓ" };
+  const out = devanagariToGujarati(text)
+    // Gurmukhi lines up with Gujarati letter for letter (U+0A00 -> U+0A80)
+    .replace(/[\u0A00-\u0A7F]/g, (c) => { const g = String.fromCodePoint(c.codePointAt(0)! + 0x80); return /\p{Cn}/u.test(g) ? c : g; })
+    .replace(/[ૅૉઍઑ]/g, (c) => CANDRA[c]);
+  return out.replace(/[^\u0A80-\u0AFF\x09\x0A\x0D\x20-\x7E\u00A0-\u00FF\u2000-\u206F\u20B9\u0964\u0965\u200C\u200D]/gu, (c) => {
+    removed.add(c);
+    return "";
+  });
+}
+
 export function normalizeText(text: string): string {
   const digits = DIGITS[profile.language.digits];
   // no zero-width spaces (no font draws them); in Gujarati, a Devanagari
   // danda (। ॥, a quoted verse) ends the sentence as Gujarati prose does: "."
   let out = text.replace(/\u200b/g, "");
-  if (profile.language.lang === "gu") out = devanagariToGujarati(out).replace(/\s*॥\s*/g, ". ").replace(/\s*।\s*/g, ". ").replace(/\. +$/, ".");
+  if (profile.language.lang === "gu") out = printableGujarati(out).replace(/\s*॥\s*/g, ". ").replace(/\s*।\s*/g, ". ").replace(/\. +$/, ".");
   if (digits && digits !== DIGITS.latin) {
     out = out.replace(/\d+/g, (num, offset: number) => {
       // the whole number, e.g. "1800-233-0222", "2025-26" or "98256 08744"

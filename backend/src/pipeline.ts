@@ -110,7 +110,15 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       const { profile } = await import("./profile.ts");
       if (profile.language.lang !== "gu") return say(`a ${profile.language.lang} paper: no translation step`);
       const { topUp } = await import("./editorial/translate.ts");
-      await topUp(store, date, { log: say, progress });
+      // extra copy, not the paper itself: PIB not answering (24 Oct, a timeout)
+      // mustn't stop the evening's paper -- it's made from what the day has
+      try {
+        const { withPatience } = await import("./ingest/pib.ts");
+        await withPatience({ tries: 2, seconds: 20 }, () => topUp(store, date, { log: say, progress }));
+      } catch (e) {
+        if (stopping) throw e;
+        say(`the Hindi top-up couldn't finish (${e instanceof Error ? e.message : e}): the paper is made from what the day has`);
+      }
       return;
     }
     case "fill": {

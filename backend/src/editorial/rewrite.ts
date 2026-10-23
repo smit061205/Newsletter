@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { ENV_FILE } from "../config.ts";
 import { inPaperLanguage } from "../layout/stories.ts";
+import { repeats } from "./quality.ts";
 import { profile } from "../profile.ts";
 import { storyIdOf, type Progress, type Release, type Store, type Story } from "../store.ts";
 
@@ -345,19 +346,19 @@ const FIT_SCHEMA = {
   },
 };
 
-/** The story body rewritten to about `words` words, from the release's own
- * facts only -- to fill (or free) an exact number of lines on the page.
- * Numbers are checked against the release. Cached per story and length. */
 let fits = 0;
 /** AI length fits asked for so far (build.ts times the layout with it). */
 export const fitCalls = () => fits;
+/** The story body rewritten to about `words` words, from the release's own
+ * facts only -- to fill (or free) an exact number of lines on the page.
+ * Numbers are checked against the release. Cached per story and length. */
 export async function fitLength(store: Store, story: Story, release: Release, words: number,
                                 opts: { log?: (s: string) => void;
                                         /** the space exactly: the body lines it must fill, and the words a line holds */
                                         lines?: number; perLine?: number } = {}): Promise<{ body: string; cost: number; factCheck?: string } | null> {
   const key = `${story.id}|${words}`;
   const cached = store.fitted(key);
-  if (cached) return { body: cached.body, cost: 0, ...(cached.factCheck ? { factCheck: cached.factCheck } : {}) };
+  if (cached) return repeats(cached.body) ? null : { body: cached.body, cost: 0, ...(cached.factCheck ? { factCheck: cached.factCheck } : {}) };
   if (process.env.CK_FAKE_AI === "1") {
     const body = fakeFit(release, words);
     return inPaperLanguage({ ...story, headline: "", bodies: { long: body, medium: body, short: body } }) ? { body, cost: 0 } : null;
@@ -397,6 +398,12 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
     return null;
   }
   body = paragraphs(body).join("\n\n");
+  // a fit that says the same thing twice (stretched past what the release has) isn't printed
+  if (repeats(body)) {
+    opts.log?.(`  ${story.id}: length fit repeats itself: not used`);
+    store.putFitted(key, { body, model });
+    return null;
+  }
   // a fit in another language than the paper's (a translated paper's story fitted from its Gujarati release) can't print
   if (!inPaperLanguage({ ...story, headline: "", bodies: { long: body, medium: body, short: body } })) {
     opts.log?.(`  ${story.id}: length fit not in the paper's language: not used`);
@@ -460,15 +467,16 @@ export async function writeDeck(store: Store, story: Story, release: Release,
 
 /** TESTS ONLY (CK_FAKE_AI=1): a stand-in for the model's length fit, so the
  * layout's AI paths run with no network -- the release's own sentences, in
- * order (from the start again if it's too short), to about `words` words. */
-function fakeFit(release: Release, words: number): string {
-  const paras = paragraphs(release.body);
-  const out: string[][] = [];
+ * order, to about `words` words; never past the release's end (a real fit
+ * isn't allowed to say anything twice either). */
+export function fakeFit(release: Release, words: number): string {
+  const out: string[] = [];
   let n = 0;
-  for (let i = 0; n < words && i < 50 * paras.length; i++) {
-    const p = paras[i % paras.length].split(/\s+/).filter(Boolean).slice(0, words - n);
-    out.push(p);
-    n += p.length;
+  for (const p of paragraphs(release.body)) {
+    if (n >= words) break;
+    const ws = p.split(/\s+/).filter(Boolean).slice(0, words - n);
+    out.push(ws.join(" "));
+    n += ws.length;
   }
-  return out.map((p) => p.join(" ")).join("\n\n").replace(/[^.!?।]$/, (c) => `${c}.`);
+  return out.join("\n\n").replace(/[^.!?।]$/, (c) => `${c}.`);
 }

@@ -33,9 +33,9 @@ import { DB_FILE, ENV_FILE, MEDIA_DIR, OUT_DIR, PAPERS_HOME, ROOT } from "../con
 import { buildIssue, type CopyOpts } from "../build.ts";
 import { browserServer, closeBrowser } from "../browser.ts";
 import { profile } from "../profile.ts";
-import { BharatiEncoder } from "../fonts/bharati.ts";
 import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
+import { settable } from "./quality.ts";
 
 export type Reword = "headline" | "headlineDeck" | "all";
 export type Shuffle = CopyOpts["shuffle"];
@@ -216,17 +216,6 @@ async function rewordStory(store: Store, s: Story, n: number, reword: Reword, ke
   return { story: out, cost };
 }
 
-/** Can the paper's own fonts print this text? (A legacy-encoded paper's encoder sets every letter; others, any.) */
-let encoder: BharatiEncoder | null | undefined;
-function settable(text: string): boolean {
-  if (encoder === undefined) {
-    const legacy = Object.values(profile.fonts).some((f) => f.encoding === "bharati");
-    try { encoder = legacy ? new BharatiEncoder() : null; } catch { encoder = null; }
-  }
-  // (English letters and digits are set in the paper's English font, not the legacy one)
-  return !encoder || encoder.encode(text).unknown.every((u) => /^[\x00-\x7F\u2000-\u206F]+$/.test(u));
-}
-
 /** What one layout set needs: where each one goes, how to shuffle and word it. */
 interface SetSpec {
   date: string;
@@ -278,7 +267,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
     let spent = 0;
     for (let attempt = 0; attempt < 4; attempt++) {
       const built = await buildIssue(store, spec.date, {
-        log: (l) => { if (/^(built|  FAIL|  page \d+:)/.test(l)) say(`  ${l.trim()}`); },
+        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:)/.test(l)) say(`  ${l.trim()}`); },
         noReview: true,
         progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0),
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
