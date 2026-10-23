@@ -19,7 +19,8 @@
 //   POST  /api/papers/draft            {pdfs: [base64]} -- a new paper's profile, drafted from its PDFs
 //   GET   /api/papers  POST /api/papers   the papers; save a new one from its reviewed draft
 //   GET   /api/papers/:id  POST /api/papers/:id/test  GET /api/papers/:id/pdf   a paper's test issue
-//   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle} makes them
+//   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang} makes them
+//   GET   /api/issues/:date/editions   the day's sister papers; POST {only?} makes them (all, or one); GET .../editions/<id>.pdf
 //   GET   /api/issues/:date/copies/N.pdf  one copy
 //   GET   /api/layout                  the page, its columns and each page's room for stories (the Ads screen's preview)
 //   GET   /healthz                     "ok" (for the host's health check)
@@ -40,6 +41,7 @@ import { DATA_DIR, ENV_FILE, PAPERS_HOME, publicationDir, ROOT } from "./config.
 import { currentJob, onJob, runPipeline, settleInterrupted, STEPS } from "./pipeline.ts";
 import type { Ad, Release, StepName, Store } from "./store.ts";
 import { profile, PUBLICATION as PUBLICATION_ID } from "./profile.ts";
+import { DEFAULT_EDITIONS, type Edition } from "./editorial/copies.ts";
 
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json") {
   res.writeHead(status, {
@@ -180,6 +182,10 @@ export function settingsOf(store: Store) {
     notify: store.setting("notify", true),
     /** the public website, for "Open the website" */
     siteUrl: store.setting("siteUrl", ""),
+    /** the sister papers (editorial/copies.ts): their names and languages */
+    editions: store.setting<Edition[]>("editions", DEFAULT_EDITIONS),
+    /** make them by themselves once the evening paper is made */
+    editionsAuto: store.setting("editionsAuto", true),
   };
 }
 
@@ -310,16 +316,38 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           }
           if (req.method === "GET") return send(res, 200, copiesOf(date));
           if (req.method === "POST") {
-            const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string };
+            const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string; lang?: string };
+            if (body.lang !== undefined && !["gu", "hi", "ur"].includes(body.lang)) return send(res, 400, { error: "the language is gu, hi or ur" });
             const count = Math.round(Number(body.count));
             if (!(count >= 1 && count <= 20)) return send(res, 400, { error: "make between 1 and 20 copies" });
             if (!["headline", "headlineDeck", "all"].includes(body.reword ?? "")) return send(res, 400, { error: "what to reword: headline, headlineDeck or all" });
             if (!["keepLead", "anywhere", "samePage"].includes(body.shuffle ?? "")) return send(res, 400, { error: "how far stories move: keepLead, anywhere or samePage" });
-            if (currentCopies()) return send(res, 409, { error: "copies are already being made: wait for them to finish" });
+            if (currentCopies()) return send(res, 409, { error: "copies or the other papers are being made: wait for them to finish" });
             if (currentJob()?.date === date) return send(res, 409, { error: "the day's paper is being made: make copies when it's done" });
             if (!store.latestIssue(date)) return send(res, 404, { error: `no paper made for ${date} yet` });
-            makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", log }).catch((e) => log(`copies stopped: ${e instanceof Error ? e.message : e}`));
+            makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", lang: body.lang as "gu" | undefined, log })
+              .catch((e) => log(`copies stopped: ${e instanceof Error ? e.message : e}`));
             return send(res, 202, copiesOf(date));
+          }
+        }
+        if (parts[3] === "editions") {
+          const { batchOf, currentCopies, editionFile, makeEditions } = await import("./editorial/copies.ts");
+          const editions = settingsOf(store).editions;
+          if (req.method === "GET" && parts[4]) {
+            const id = parts[4].replace(/\.pdf$/, "");
+            const file = editions.some((e) => e.id === id) ? editionFile(date, id) : "";
+            if (!file || !existsSync(file)) return send(res, 404, { error: `no paper ${id} for ${date}` });
+            return send(res, 200, new Uint8Array(await readFile(file)), "application/pdf");
+          }
+          if (req.method === "GET") return send(res, 200, { editions, run: batchOf("editions", date) });
+          if (req.method === "POST") {
+            const body = (await readJson(req)) as { only?: string };
+            if (body.only && !editions.some((e) => e.id === body.only)) return send(res, 404, { error: `no paper ${body.only}` });
+            if (currentCopies()) return send(res, 409, { error: "copies or the other papers are being made: wait for them to finish" });
+            if (currentJob()?.date === date) return send(res, 409, { error: "the day's paper is being made: make the other papers when it's done" });
+            if (!store.latestIssue(date)) return send(res, 404, { error: `no paper made for ${date} yet` });
+            makeEditions(store, date, editions, { log, only: body.only }).catch((e) => log(`other papers stopped: ${e instanceof Error ? e.message : e}`));
+            return send(res, 202, { editions, run: batchOf("editions", date) });
           }
         }
         if (req.method === "POST" && parts[3] === "publish") {
@@ -479,7 +507,15 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
         if (req.method === "POST") {
           const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string; lang?: string;
-                                                   onboarded?: boolean; inrPerUsd?: number; inrAuto?: boolean; notify?: boolean; siteUrl?: string };
+                                                   onboarded?: boolean; inrPerUsd?: number; inrAuto?: boolean; notify?: boolean; siteUrl?: string;
+                                                   editions?: Edition[]; editionsAuto?: boolean };
+          if (body.editions !== undefined) {
+            // only the names change: the papers themselves (their ids and languages) stay
+            const now = settingsOf(store).editions;
+            const named = now.map((e) => ({ ...e, name: (body.editions!.find((x) => x.id === e.id)?.name ?? e.name).trim().slice(0, 60) || e.name }));
+            store.putSetting("editions", named);
+          }
+          if (body.editionsAuto !== undefined) store.putSetting("editionsAuto", !!body.editionsAuto);
           if (body.lang !== undefined) {
             if (body.lang !== "gu" && body.lang !== "en") return send(res, 400, { error: "the language is gu or en" });
             store.putSetting("lang", body.lang);
@@ -523,7 +559,15 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
   const host = opts.host ?? "127.0.0.1";
   await new Promise<void>((resolve) => server.listen(opts.port, host, resolve));
   log(`backend listening on http://${host}:${opts.port}`);
-  everyEvening(store, (day) => runPipeline(store, day, { by: "schedule", log }), log);
+  everyEvening(store, async (day) => {
+    const job = await runPipeline(store, day, { by: "schedule", log });
+    // the evening paper made: the sister papers after it (when that's on)
+    const s = settingsOf(store);
+    if (job.status === "done" && s.editionsAuto && s.editions.length && store.latestIssue(day)) {
+      const { makeEditions } = await import("./editorial/copies.ts");
+      await makeEditions(store, day, s.editions, { log });
+    }
+  }, log);
   backupDaily(store, log);
   // the rupee rate, kept up to date (when it's on): now, then every few hours
   rupeeRate(store, log).catch(() => {});
@@ -678,6 +722,8 @@ async function papersApi(req: IncomingMessage, res: ServerResponse, parts: strin
       out.push({ id, name: prof.name, lang: prof.language.lang, pages: prof.issue.pages, own: id === PUBLICATION_ID,
                  added: publicationDir(id).startsWith(path.join(PAPERS_HOME, "publications")) && PAPERS_HOME !== ROOT,
                  test: ["dev-test", "sample-english", "sample-urdu"].includes(id), testing: testing?.id === id && !testing.done,
+                 // the Hindi and Urdu sister papers' layouts (editorial/copies.ts): made from Capital Kranti, not on their own
+                 hidden: id.startsWith("edition-"),
                  issue: await issueOf(id) });
     }
     return send(res, 200, out);

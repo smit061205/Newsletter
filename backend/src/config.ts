@@ -28,7 +28,7 @@ export function publicationDir(id: string): string {
   return existsSync(path.join(added, "profile.json")) ? added : path.join(ROOT, "publications", id);
 }
 /** Release photos, served as /media/<date>/<file>. */
-export const MEDIA_DIR = DATA_DIR ? path.join(DATA_DIR, "media") : path.join(PUBLIC_DIR, "media");
+export const MEDIA_DIR = process.env.CK_MEDIA_DIR?.trim() || (DATA_DIR ? path.join(DATA_DIR, "media") : path.join(PUBLIC_DIR, "media"));
 
 /** The origin relative font/image URLs resolve against when the backend
  * plots pages itself (never fetched over the network: served from PUBLIC_DIR). */

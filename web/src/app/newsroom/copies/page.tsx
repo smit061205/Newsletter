@@ -5,7 +5,7 @@
 // (backend/src/editorial/copies.ts).
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { call, media, type CopiesRun, type IssueInfo, type Job, type Reword, type Shuffle } from "../api";
+import { call, media, type CopiesRun, type IssueInfo, type Job, type PaperLang, type Reword, type Shuffle } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { num, rupees } from "../ui/format";
@@ -13,6 +13,9 @@ import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
 
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
+const LANGS: PaperLang[] = ["gu", "hi", "ur"];
+// translating a story (once, whatever the number of copies), US$
+const PER_TRANSLATION = 0.004;
 const SHUFFLES: Shuffle[] = ["keepLead", "anywhere", "samePage"];
 // the AI's usual cost per story per copy (US$), and the length fitting per copy
 const PER_STORY: Record<Reword, number> = { headline: 0.0004, headlineDeck: 0.0006, all: 0.004 };
@@ -27,6 +30,8 @@ export default function Copies() {
   const [count, setCount] = useState(3);
   const [reword, setReword] = useState<Reword>("headlineDeck");
   const [shuffle, setShuffle] = useState<Shuffle>("keepLead");
+  const [paperLang, setPaperLang] = useState<PaperLang>("gu");
+  const translated = paperLang !== "gu";
   const [error, setError] = useState("");
   const has = !!status?.issue;
 
@@ -54,20 +59,20 @@ export default function Copies() {
   const make = async () => {
     setError("");
     try {
-      setRun(await call<CopiesRun>(`/api/issues/${date}/copies`, { json: { count, reword, shuffle } }));
+      setRun(await call<CopiesRun>(`/api/issues/${date}/copies`, { json: { count, reword, shuffle, lang: paperLang } }));
       toast(t("copies.making", { done: num(lang, 1), total: num(lang, count) }));
     } catch (e) { setError((e as Error).message); }
   };
   const stories = info?.report.placed.length ?? 25;
-  const estimate = count * (stories * PER_STORY[reword] + PER_COPY[reword]);
-  const minutes = Math.round(count * minutesPerCopy * (reword === "all" ? 1.4 : 1));
+  const estimate = translated ? stories * PER_TRANSLATION + count * PER_COPY.all : count * (stories * PER_STORY[reword] + PER_COPY[reword]);
+  const minutes = Math.round(count * minutesPerCopy * (reword === "all" || translated ? 1.4 : 1) + (translated ? 2 : 0));
   const paperBusy = !!status?.running && status.running.date === date;
   const issueNo = info?.report.issueNumber ?? status?.issue?.issueNumber ?? 0;
   const paperName = status?.paper.name.split(" (")[0] ?? "Capital Kranti";
   const open = (n: number) => pdf({
     url: media(`/api/issues/${date}/copies/${n}.pdf?t=${encodeURIComponent(run?.endedAt ?? "")}`),
     title: t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }),
-    fileName: `${paperName} ${issueNo} - ${lang === "gu" ? "નકલ" : "copy"} ${n} - ${date.split("-").reverse().join("-")}.pdf`,
+    fileName: `${paperName} ${issueNo} - ${lang === "gu" ? "નકલ" : "copy"} ${n}${run && run.lang !== "gu" ? ` (${run.lang})` : ""} - ${date.split("-").reverse().join("-")}.pdf`,
   });
 
   if (!has) {
@@ -97,14 +102,20 @@ export default function Copies() {
             </div>
           </div>
           <div className={s.field}>
-            <span className={s.label}>{t("copies.reword")}</span>
-            <div className={s.choices} role="radiogroup" aria-label={t("copies.reword")}>
-              {REWORDS.map((k) => (
-                <label key={k} className={s.choice}><input type="radio" name="reword" checked={reword === k} disabled={running} onChange={() => setReword(k)} />
-                  <span>{t(`copies.reword.${k}` as StringKey)}</span></label>
-              ))}
+            <span className={s.label}>{t("copies.lang")}</span>
+            <div className={s.segmented} role="radiogroup" aria-label={t("copies.lang")}>
+              {LANGS.map((k) => <button key={k} type="button" aria-pressed={paperLang === k} disabled={running} onClick={() => setPaperLang(k)}>{t(`lang.${k}` as StringKey)}</button>)}
             </div>
-            <span className={s.hint}>{t("copies.reword.note")}</span>
+            {translated ? <Note tone="good">{t("copies.translated")}</Note> : <>
+              <span className={s.label} style={{ marginTop: 12 }}>{t("copies.reword")}</span>
+              <div className={s.choices} role="radiogroup" aria-label={t("copies.reword")}>
+                {REWORDS.map((k) => (
+                  <label key={k} className={s.choice}><input type="radio" name="reword" checked={reword === k} disabled={running} onChange={() => setReword(k)} />
+                    <span>{t(`copies.reword.${k}` as StringKey)}</span></label>
+                ))}
+              </div>
+              <span className={s.hint}>{t("copies.reword.note")}</span>
+            </>}
           </div>
         </div>
         {error && <Note tone="bad">{error}</Note>}
@@ -122,7 +133,7 @@ export default function Copies() {
           <div className={s.cardHead}>
             <h2 className={s.cardTitle}>{running ? t("copies.making", { done: num(lang, Math.min(run.count, run.done + 1)), total: num(lang, run.count) })
               : t("copies.done", { n: num(lang, run.files.length) })}</h2>
-            <span className={s.faint}>{t(`copies.reword.${run.reword}` as StringKey)} · {t(`copies.shuffle.${run.shuffle}` as StringKey)}</span>
+            <span className={s.faint}>{t(`lang.${run.lang ?? "gu"}` as StringKey)} · {run.lang && run.lang !== "gu" ? t("copies.translatedShort") : t(`copies.reword.${run.reword}` as StringKey)} · {t(`copies.shuffle.${run.shuffle}` as StringKey)}</span>
           </div>
           {running && (
             <div className={s.ringWrap}>

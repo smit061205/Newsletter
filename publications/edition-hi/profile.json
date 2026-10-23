@@ -1,0 +1,160 @@
+{
+ "id": "edition-hi",
+ "name": "हिन्दी संस्करण (Hindi paper)",
+ "language": {
+  "lang": "hi",
+  "direction": "ltr",
+  "digits": "latin",
+  "weekdays": [
+   "रविवार",
+   "सोमवार",
+   "मंगलवार",
+   "बुधवार",
+   "गुरुवार",
+   "शुक्रवार",
+   "शनिवार"
+  ],
+  "dateLine": "दिनांक : {dd}-{mm}-{yyyy}, {weekday}",
+  "issueLine": "अंक : {issue}"
+ },
+ "issue": {
+  "referenceDate": "2026-08-08",
+  "referenceNumber": 196,
+  "pages": 4
+ },
+ "page": {
+  "width": 1105.5,
+  "height": 1488.2
+ },
+ "grid": {
+  "left": 14.4,
+  "columns": 8,
+  "column": 124.2,
+  "gutter": 11.884
+ },
+ "ink": "#231f20",
+ "fonts": {
+  "tiro": {
+   "file": "/private/edition-hi/fonts/TiroDevanagariHindi-Regular.ttf",
+   "weight": 400
+  },
+  "hind-bold": {
+   "file": "/private/edition-hi/fonts/Hind-Bold.ttf",
+   "weight": 700
+  },
+  "hind-semibold": {
+   "file": "/private/edition-hi/fonts/Hind-SemiBold.ttf",
+   "weight": 600
+  }
+ },
+ "type": {
+  "body": {
+   "font": "tiro",
+   "size": 11.8,
+   "pitch": 15.6,
+   "indent": 12,
+   "pitches": [
+    15.6,
+    15.9,
+    16.2,
+    16.5,
+    15.3,
+    15.0
+   ],
+   "sizes": [
+    11.8,
+    11.4,
+    11
+   ]
+  },
+  "headline": {
+   "font": "hind-bold",
+   "leading": 1.12,
+   "capByColumns": [
+    0,
+    20,
+    27,
+    36,
+    48,
+    54,
+    58,
+    62,
+    66
+   ],
+   "min": 19,
+   "rankScale": [
+    1.0,
+    0.78,
+    0.62,
+    0.5,
+    0.42
+   ],
+   "maxLines": [
+    2,
+    3,
+    3,
+    3,
+    3
+   ]
+  },
+  "kicker": {
+   "font": "hind-semibold",
+   "ratio": 0.6,
+   "min": 13,
+   "leading": 1.15
+  },
+  "deck": {
+   "font": "hind-semibold",
+   "ratio": 0.45,
+   "min": 14,
+   "leading": 1.15
+  },
+  "caption": {
+   "font": "hind-semibold",
+   "size": 10,
+   "pitch": 13.2
+  }
+ },
+ "spacing": {
+  "top": 2,
+  "afterKicker": 2,
+  "afterHeadline": 5,
+  "afterDeck": 5,
+  "afterPhoto": 3,
+  "afterCaption": 5,
+  "betweenStories": 8,
+  "storyRule": 0.75
+ },
+ "photo": {
+  "maxCrop": 0.15,
+  "minHeight": 80,
+  "minCols": 2,
+  "minPpi": 200,
+  "maxShare": 0.45
+ },
+ "chrome": "chrome.json",
+ "editorial": {
+  "workhorseModel": "openai/gpt-6-luna",
+  "leadModel": "google/gemini-3.8-flash",
+  "leadStories": 3,
+  "translateModel": "google/gemini-3.8-flash",
+  "fillTarget": 1.1,
+  "dailyBudgetUsd": 0.3
+ },
+ "fontLicence": "Tiro Devanagari Hindi and Hind, from Google Fonts: SIL Open Font License 1.1 (licence files in fonts/).",
+ "fillers": {
+  "houseAd": [],
+  "messages": [
+   "रक्तदान महादान, नेत्रदान श्रेष्ठदान",
+   "पेड़ लगाओ, पर्यावरण बचाओ",
+   "पानी बचाओ, जीवन बचाओ",
+   "हेलमेट पहनें, सुरक्षित रहें",
+   "स्वच्छ भारत, स्वस्थ भारत",
+   "बेटी बचाओ, बेटी पढ़ाओ",
+   "मतदान हमारा अधिकार, हमारा कर्तव्य",
+   "नशा छोड़ो, जीवन जोड़ो"
+  ],
+  "maxMessages": 1,
+  "maxHouseAds": 0
+ }
+}

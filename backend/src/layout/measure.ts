@@ -204,7 +204,7 @@ export class Measurer {
   /** Widths of the words of each request's paragraphs (contract px, after
    * hScale), how many letters letter spacing applies to in each, and the
    * width of a space. */
-  private async measureWords(reqs: { size: number; hScale: number; base: string; space: string;
+  private async measureWords(reqs: { size: number; hScale: number; base: string; space: string; kern: boolean;
                                      paras: { word: string; runs: { text: string; family: string }[] }[][] }[]) {
     return this.page.evaluate(({ reqs }) => {
       const ctx = document.createElement("canvas").getContext("2d")! as CanvasRenderingContext2D & { letterSpacing: string };
@@ -223,13 +223,32 @@ export class Measurer {
         ctx.letterSpacing = "0px";
         return { w, letters: Math.round(spaced / TEST) };
       };
-      return reqs.map((r) => ({
-        space: measure([{ text: r.space, family: r.base }], r.size).w * r.hScale,
+      // a word space as it sets between words: some fonts kern their letters
+      // against the space (Tiro Devanagari, by ~2px a space at body size), so
+      // it's measured between two of the text's own words, not on its own
+      const spaceOf = (r: (typeof reqs)[number]) => {
+        const alone = measure([{ text: r.space, family: r.base }], r.size).w;
+        const words = r.paras.find((p) => p.length > 1);
+        if (!r.kern || !words || words[0].runs.length !== 1 || words[1].runs.length !== 1) return alone;
+        const [a, b] = [words[0].runs[0].text, words[1].runs[0].text];
+        const inContext = measure([{ text: a + r.space + b, family: r.base }], r.size).w - measure([{ text: a, family: r.base }], r.size).w
+          - measure([{ text: b, family: r.base }], r.size).w;
+        return inContext > alone * 0.5 && inContext < alone * 2 ? inContext : alone;
+      };
+      return reqs.map((r) => {
+        // text justified in its word spaces alone (Hindi, Urdu) sets kerned, so
+        // it's measured kerned (a canvas leaves kerning out by default: Tiro
+        // Devanagari measured ~2% narrow and overran); letter-spaced text
+        // (Gujarati, English) as it always was
+        ctx.fontKerning = r.kern ? "normal" : "auto";
+        return {
+        space: spaceOf(r) * r.hScale,
         paras: r.paras.map((words) => words.map((w) => {
           const m = measure(w.runs, r.size);
           return { width: m.w * r.hScale, letters: m.letters };
         })),
-      }));
+      };
+      });
     }, { reqs });
   }
 
@@ -240,8 +259,9 @@ export class Measurer {
    * a line to itself (and its width says it overflows). Widths are measured
    * on the text as printed (see shape()). */
   async breakLines(requests: BreakRequest[]): Promise<Line[][]> {
+    const unspaced = /[\u0600-\u06FF\u0750-\u077F\u0900-\u097F]/;
     const reqs = requests.map((r) => ({
-      size: r.size, hScale: r.hScale ?? 1,
+      size: r.size, hScale: r.hScale ?? 1, kern: r.paras.some((p) => unspaced.test(p)),
       base: family(r.font),
       space: this.shape(" ", r.font)[0].text,
       // a long token may break after a "/" (a URL, "PLI/RPLI"): its parts glued, no space between
@@ -252,12 +272,18 @@ export class Measurer {
     }));
     const measured = await this.measureWords(reqs);
     // the glue goes with each measured word; a cursive script (Urdu,
-    // Arabic) is never letter-spaced -- it would break the joins -- so its
-    // lines justify in their word spaces alone
-    measured.forEach((m, ri) => m.paras.forEach((ws, pi) => ws.forEach((w, wi) => {
-      if (reqs[ri].paras[pi][wi].glue) (w as Word).glue = true;
-      if (/[\u0600-\u06FF\u0750-\u077F]/.test(reqs[ri].paras[pi][wi].word)) w.letters = 0;
-    })));
+    // Arabic) is never letter-spaced -- it would break the joins -- nor is
+    // Devanagari (Hindi), whose letters hang from one line along their tops:
+    // their lines justify in their word spaces alone
+    // (the whole paragraph: letter spacing applies to every letter of a line,
+    // so an English word or a number in a Hindi line takes none either)
+    measured.forEach((m, ri) => m.paras.forEach((ws, pi) => {
+      const none = reqs[ri].paras[pi].some((w) => unspaced.test(w.word));
+      ws.forEach((w, wi) => {
+        if (reqs[ri].paras[pi][wi].glue) (w as Word).glue = true;
+        if (none) w.letters = 0;
+      });
+    }));
 
     return requests.map((req, ri) => {
       const r = reqs[ri];
@@ -307,13 +333,16 @@ export class Measurer {
    * width and letter count, and the space between words. For display lines,
    * set and fitted by layout/display.ts. */
   async words(text: string, font: string, size: number): Promise<{ words: (Word & { word: string; runs: Run[] })[]; space: number; spaceText: string }> {
+    // Hindi and Urdu: kerned, and never letter-spaced (see breakLines)
+    const unspaced = /[\u0600-\u06FF\u0750-\u077F\u0900-\u097F]/.test(text);
     const req = {
-      size, hScale: 1, base: family(font), space: this.shape(" ", font)[0].text,
+      size, hScale: 1, base: family(font), space: this.shape(" ", font)[0].text, kern: unspaced,
       paras: [text.split(/\s+/).filter(Boolean).map((w) => ({
         word: w, runs: this.shape(w, font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? font) })),
       }))],
     };
     const [m] = await this.measureWords([req]);
+    if (unspaced) for (const w of m.paras[0]) w.letters = 0;
     return {
       space: m.space, spaceText: req.space,
       words: m.paras[0].map((w, i) => ({ ...w, word: req.paras[0][i].word,

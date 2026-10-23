@@ -14,6 +14,8 @@
 //            no backend (--push commits and pushes it; --force if NOT READY;
 //            --keep N days on the site, 14 by default)
 //   serve    run the API for the website (and the 8 PM job)
+//   copies-in --spec FILE   lay out copies in this paper's language (started by
+//            editorial/copies.ts for a Hindi or Urdu copy; CK_SOURCE_DB is the day's paper)
 //   status   every day in the database: releases, stories, built issues
 import { ingestDay } from "./ingest/gujaratInfo.ts";
 import { Store } from "./store.ts";
@@ -92,6 +94,11 @@ async function main() {
         log(`${d}  ${String(releases.get(d) ?? 0).padStart(8)} ${String(stories.get(d) ?? 0).padStart(7)}  ` +
             (got ? `v${got.version} ${got.status}${ready === undefined ? "" : ready ? ", READY" : ", NOT READY"}` : "-"));
       }
+      break;
+    }
+    case "copies-in": {
+      const { copiesIn } = await import("./editorial/copies.ts");
+      await copiesIn(store, flag("spec") ?? "");
       break;
     }
     case "serve": {

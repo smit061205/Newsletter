@@ -14,6 +14,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { ENV_FILE } from "../config.ts";
+import { inPaperLanguage } from "../layout/stories.ts";
 import { profile } from "../profile.ts";
 import { storyIdOf, type Progress, type Release, type Store, type Story } from "../store.ts";
 
@@ -148,7 +149,9 @@ Return JSON matching the schema.`;
 
 /** Every number in `s`, in Latin digits: Gujarati (૦-૯) and Devanagari (०-९) digits read as theirs. */
 export const digits = (s: string) => new Set((s.replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d)))
-  .replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d))).match(/\d+(?:[.,]\d+)*/g) ?? []));
+  .replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d)))
+  .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+  .match(/\d+(?:[.,]\d+)*/g) ?? []));
 
 // small numbers as the releases often spell them, 1-20 (Gujarati, then Hindi)
 const NUMBER_WORDS: string[][] = [
@@ -335,7 +338,10 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
   const key = `${story.id}|${words}`;
   const cached = store.fitted(key);
   if (cached) return { body: cached.body, cost: 0, ...(cached.factCheck ? { factCheck: cached.factCheck } : {}) };
-  if (process.env.CK_FAKE_AI === "1") return { body: fakeFit(release, words), cost: 0 };
+  if (process.env.CK_FAKE_AI === "1") {
+    const body = fakeFit(release, words);
+    return inPaperLanguage({ ...story, headline: "", bodies: { long: body, medium: body, short: body } }) ? { body, cost: 0 } : null;
+  }
   const apiKey = env("OPENROUTER_API_KEY");
   if (!apiKey) return null;
   const model = env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
@@ -367,6 +373,11 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
     return null;
   }
   body = paragraphs(body).join("\n\n");
+  // a fit in another language than the paper's (a translated paper's story fitted from its Gujarati release) can't print
+  if (!inPaperLanguage({ ...story, headline: "", bodies: { long: body, medium: body, short: body } })) {
+    opts.log?.(`  ${story.id}: length fit not in the paper's language: not used`);
+    return null;
+  }
   const unknown = numbersNotIn(body, `${release.headline} ${release.subhead} ${release.body}`, release.date);
   const factCheck = unknown.length ? `numbers not in the release: ${unknown.join(", ")}` : undefined;
   store.putFitted(key, { body, model, ...(factCheck ? { factCheck } : {}) });

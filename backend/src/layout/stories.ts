@@ -52,6 +52,7 @@ export function inPaperLanguage(s: Story): boolean {
   switch (profile.language.lang) {
     case "gu": return scriptShare(text, /[઀-૿]/g) > 0.5;
     case "ur": return scriptShare(text, /[؀-ۿ]/g) > 0.5;
+    case "hi": return scriptShare(text, /[ऀ-ॿ]/g) > 0.5;
     default: return scriptShare(text, /[A-Za-z]/g) > 0.5;
   }
 }

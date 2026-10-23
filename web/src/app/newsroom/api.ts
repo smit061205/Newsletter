@@ -40,14 +40,19 @@ export interface AdRow { id: string; date: string; page: number; width: number; 
   /** every day the booking runs */
   days: string[] }
 export interface Settings { runAt: string; autoRun: boolean; openrouterKey: boolean; lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number;
-  inrAuto: boolean; inrUpdated: string; notify: boolean; siteUrl: string }
+  inrAuto: boolean; inrUpdated: string; notify: boolean; siteUrl: string; editions: Edition[]; editionsAuto: boolean }
+/** A language the paper's copies and sister papers come in. */
+export type PaperLang = "gu" | "hi" | "ur";
+/** A sister paper: the day's paper under another name, maybe in another language. */
+export interface Edition { id: string; name: string; lang: PaperLang }
 /** The page in centimetres, its columns, each page's room for stories (/api/layout). */
 export interface PageLayout { widthCm: number; heightCm: number; columns: number; leftCm: number; columnCm: number; gutterCm: number;
   pages: { page: number; topCm: number; bottomCm: number }[] }
 export type Reword = "headline" | "headlineDeck" | "all";
 export type Shuffle = "keepLead" | "anywhere" | "samePage";
-export interface CopiesRun { date: string; count: number; reword: Reword; shuffle: Shuffle; status: "running" | "done" | "failed";
-  startedAt: string; endedAt?: string; done: number; files: { n: number; ready: boolean; pages: number }[]; cost: number; log: string[]; error?: string }
+export interface CopiesRun { kind: "copies" | "editions"; date: string; count: number; reword: Reword; shuffle: Shuffle; lang: PaperLang;
+  status: "running" | "done" | "failed"; startedAt: string; endedAt?: string; done: number;
+  files: { n: number; id?: string; name?: string; lang: PaperLang; ready: boolean; pages: number }[]; cost: number; log: string[]; error?: string }
 
 export const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:4000";
 

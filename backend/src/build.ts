@@ -53,6 +53,8 @@ export interface CopyOpts {
   pdfPath: string;
   /** the store the gap closer caches its length fits in (a reworded body has its own) */
   store?: Store;
+  /** the stories come in another language (`reword` translates them): not filtered by language until then */
+  translate?: boolean;
 }
 
 /** Where a day's page images go (served by the API for the website). */
@@ -179,7 +181,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         store.putStory(s);
       }
     }
-    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && inPaperLanguage(s)))
+    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && (opts.copy?.translate || inPaperLanguage(s))))
       .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
       .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
     // the editorial plan ranks the day's stories (an editor's own rank wins)
@@ -202,6 +204,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       const c = opts.copy;
       const got = await c.reword(pool);
       rewordCost = got.cost;
+      // a story that couldn't be put into the paper's language stays out
+      if (c.translate) got.pool = got.pool.filter((s) => inPaperLanguage(s));
       // the order the pages are filled in, shuffled: importance still counts,
       // with enough chance that every copy comes out its own
       const spread = c.shuffle === "anywhere" ? 4 : 2.5;
@@ -252,7 +256,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
             `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" "));
     }
     // close the gaps: grow stories into them, then briefs and the house ad (layout/fit.ts)
-    const fillers: FillerCount = { messages: new Set(), houseAds: 0 };
+    // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
+    const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
     for (const plan of plans) {
       const n = plan.page;
       opts.progress?.({ done: total + n - 1, total: total * 2 + 1, label: "finishing", item: String(n) });

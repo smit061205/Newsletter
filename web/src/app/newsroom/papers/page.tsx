@@ -1,15 +1,18 @@
 "use client";
-// છાપાં / Papers: the papers this newsroom makes -- which one it's working on
+// છાપાં / Papers: first, the sister papers -- the day's paper under other
+// names, in Gujarati, Hindi and Urdu, each laid out its own way with its
+// masthead, page headers and footer left empty (editorial/copies.ts): make
+// them, open them, rename them. Then the papers this newsroom makes -- which one it's working on
 // (switch to another; the app starts its engine again for it), a test issue
 // of any other -- and "Add a newspaper": upload the paper's PDF issues, the
 // engine drafts its profile (page, grid, type, language, the header bands),
 // check it, add its fonts and header images, save, and make a test issue.
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { call, media } from "../api";
-import { useStatus } from "../Shell";
+import { call, media, type CopiesRun, type Edition, type Settings } from "../api";
+import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { ck } from "../ui/desktop";
-import { num, shortDate } from "../ui/format";
+import { num, rupees, shortDate } from "../ui/format";
 import { Badge, Button, Icon, Note, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
 
@@ -22,7 +25,7 @@ interface Draft {
   language: { script: string; lang: string; direction: string; encoding: string; readable: boolean };
   bands: { first: Band; inner: Band | null; last: Band | null }; pages: number; notes: string[];
 }
-interface Paper { id: string; name: string; lang: string; pages: number; own: boolean; test: boolean; testing: boolean;
+interface Paper { id: string; name: string; lang: string; pages: number; own: boolean; test: boolean; testing: boolean; hidden?: boolean;
   issue: { date: string; version: number; ready?: boolean } | null }
 
 const b64 = (f: File) => new Promise<string>((ok, bad) => {
@@ -138,13 +141,15 @@ export default function Papers() {
     } catch (e) { setError((e as Error).message); setBusy(""); }
   };
   const langName = (l: string) => (LANG_NAMES[l] ?? [l, l])[lang === "gu" ? 0 : 1];
-  const shown = (papers ?? []).filter((p) => samples || !p.test || p.own);
+  const shown = (papers ?? []).filter((p) => !p.hidden && (samples || !p.test || p.own));
 
   return (
     <div className={s.inner}>
-      <h1 className={s.pageTitle}>{t("papers.title")}</h1>
+      <TopBar title={t("papers.title")} />
+      <Editions />
       {error && <Note tone="bad">{error}</Note>}
       <section className={s.card}>
+        <h2 className={s.cardTitle}>{t("papers.own")}</h2>
         <p className={s.muted} style={{ margin: 0 }}>{t("papers.body")}</p>
         <div className={s.list}>
           {shown.map((p) => (
@@ -251,5 +256,101 @@ export default function Papers() {
         </>
       )}
     </div>
+  );
+}
+
+/** The day's sister papers: each one's name (renamed here), its language,
+ * whether it's made, and its PDF; make them all, or one again. */
+function Editions() {
+  const { t, lang, date, toast, pdf } = useApp();
+  const { status } = useStatus();
+  const [data, setData] = useState<{ editions: Edition[]; run: CopiesRun | null } | null>(null);
+  const [auto, setAuto] = useState<boolean | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const [error, setError] = useState("");
+  const has = !!status?.issue;
+  const load = useCallback(() => {
+    call<{ editions: Edition[]; run: CopiesRun | null }>(`/api/issues/${date}/editions`).then(setData).catch((e) => setError(e.message));
+  }, [date]);
+  useEffect(() => { setData(null); setError(""); load(); }, [load]);
+  useEffect(() => { call<Settings>("/api/settings").then((x) => setAuto(x.editionsAuto)).catch(() => {}); }, []);
+  const running = data?.run?.status === "running";
+  useEffect(() => {
+    if (!running) return;
+    const tick = setInterval(load, 3000);
+    return () => clearInterval(tick);
+  }, [running, load]);
+
+  const make = async (only?: string) => {
+    setError("");
+    try { setData(await call(`/api/issues/${date}/editions`, { json: only ? { only } : {} })); toast(t("eds.started")); }
+    catch (e) { setError((e as Error).message); }
+  };
+  const rename = async () => {
+    if (!renaming) return;
+    try {
+      const x = await call<Settings>("/api/settings", { json: { editions: [{ id: renaming.id, name: renaming.name }] } });
+      setData((d) => (d ? { ...d, editions: x.editions } : d));
+      setRenaming(null);
+      toast(t("settings.saved"));
+    } catch (e) { setError((e as Error).message); }
+  };
+  const setAutoOn = async (on: boolean) => {
+    try { setAuto((await call<Settings>("/api/settings", { json: { editionsAuto: on } })).editionsAuto); } catch (e) { setError((e as Error).message); }
+  };
+  const run = data?.run;
+  const open = (e: Edition) => pdf({
+    url: media(`/api/issues/${date}/editions/${e.id}.pdf?t=${encodeURIComponent(run?.endedAt ?? run?.done ?? "")}`),
+    title: `${e.name} · ${shortDate(lang, date)}`, fileName: `${e.name} - ${date.split("-").reverse().join("-")}.pdf`,
+  });
+
+  return (
+    <section className={s.card}>
+      <div className={s.cardHead}>
+        <div><h2 className={s.cardTitle}>{t("eds.title")}</h2><p className={s.muted} style={{ margin: "4px 0 0" }}>{t("eds.body")}</p></div>
+        <Button kind="primary" icon={Icon.copies()} onClick={() => make()} disabled={!has || running || !status?.openrouterKey || !!status?.running}>
+          {running ? t("eds.making", { done: num(lang, run!.done), total: num(lang, run!.count) }) : t("eds.makeAll")}</Button>
+      </div>
+      {!has && <Note tone="warn">{t("copies.none")}</Note>}
+      {error && <Note tone="bad">{error}</Note>}
+      {run?.status === "failed" && <Note tone="bad">{t("copies.failed", { error: run.error ?? "" })}</Note>}
+      <div className={s.list}>
+        {(data?.editions ?? []).map((e) => {
+          const f = run?.files.find((x) => x.id === e.id);
+          return (
+            <div key={e.id} className={s.paperRow}>
+              <div className={s.field} style={{ gap: 2 }}>
+                {renaming?.id === e.id ? (
+                  <form className={s.row} onSubmit={(ev) => { ev.preventDefault(); rename(); }}>
+                    <input className={s.input} autoFocus value={renaming.name} maxLength={60} onChange={(ev) => setRenaming({ id: e.id, name: ev.target.value })} aria-label={t("papers.name")} />
+                    <Button kind="primary" type="submit" disabled={!renaming.name.trim()}>{t("settings.save")}</Button>
+                    <Button kind="quiet" onClick={() => setRenaming(null)}>{t("edit.cancel")}</Button>
+                  </form>
+                ) : <span className={s.listTitle}>{e.name}</span>}
+                <span className={s.listMeta}>{t(`lang.${e.lang}` as StringKey)}{e.lang !== "gu" ? ` · ${t("copies.translatedShort")}` : ""}</span>
+              </div>
+              <span className={s.listBadges}>
+                {f ? <Badge tone={f.ready ? "good" : "warn"} dot>{f.ready ? t("archive.ready") : t("archive.look")}</Badge>
+                  : running ? <Badge>{t("eds.waiting")}</Badge> : has ? <Badge>{t("eds.notMade")}</Badge> : null}
+                {renaming?.id !== e.id && <Button kind="quiet" onClick={() => setRenaming({ id: e.id, name: e.name })}>{t("eds.rename")}</Button>}
+                {f && <Button icon={Icon.print()} onClick={() => open(e)}>{t("copies.open")}</Button>}
+                {f && !running && <Button kind="quiet" icon={Icon.refresh()} onClick={() => make(e.id)} disabled={!!status?.running}>{t("eds.again")}</Button>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {auto !== null && <label className={s.switch}><input type="checkbox" checked={auto} onChange={(ev) => setAutoOn(ev.target.checked)} /><span>{t("eds.auto")}</span></label>}
+      <div className={s.row} style={{ justifyContent: "space-between" }}>
+        <span className={s.faint}>{t("eds.cost")}</span>
+        {run && <span className={s.faint}>{t("copies.cost", { cost: rupees(lang, run.cost, status?.inrPerUsd ?? 88) })}</span>}
+      </div>
+      {run && (
+        <details className={s.details}>
+          <summary>{t("today.details")}</summary>
+          <div className={s.logBox}>{run.log.map((l, i) => <div key={i}>{l}</div>)}</div>
+        </details>
+      )}
+    </section>
   );
 }
