@@ -281,6 +281,12 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           return got ? send(res, 200, { date, version: got.version, status: got.status, report: got.report })
                      : send(res, 404, { error: `no issue built for ${date}` });
         }
+        if (req.method === "GET" && parts[3] === "editable.pdf") {
+          // the paper as a PDF whose text stays text in CorelDRAW (export/pdf-editable.ts)
+          const got = store.latestIssue(date);
+          if (!got) return send(res, 404, { error: `no issue built for ${date}` });
+          return sendEditable(res, got.issue);
+        }
         if (req.method === "GET" && parts[3] === "pdf") {
           const got = store.latestIssue(date);
           const file = (got?.report as { pdf?: string } | undefined)?.pdf;
@@ -312,6 +318,11 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         }
         if (parts[3] === "copies") {
           const { copiesOf, copyFile, currentCopies, makeCopies } = await import("./editorial/copies.ts");
+          if (req.method === "GET" && parts[4]?.endsWith(".editable.pdf")) {
+            const json = copyFile(date, Number(parts[4].replace(/\.editable\.pdf$/, ""))).replace(/\.pdf$/, ".json");
+            if (!existsSync(json)) return send(res, 404, { error: "make the copies again for their CorelDRAW PDF" });
+            return sendEditable(res, JSON.parse(await readFile(json, "utf8")));
+          }
           if (req.method === "GET" && parts[4]) {
             const n = Number(parts[4].replace(/\.pdf$/, ""));
             const file = copyFile(date, n);
@@ -337,6 +348,12 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         if (parts[3] === "editions") {
           const { batchOf, currentCopies, editionFile, makeEditions } = await import("./editorial/copies.ts");
           const editions = settingsOf(store).editions;
+          if (req.method === "GET" && parts[4]?.endsWith(".editable.pdf")) {
+            const id = parts[4].replace(/\.editable\.pdf$/, "");
+            const json = editions.some((e) => e.id === id) ? editionFile(date, id).replace(/\.pdf$/, ".json") : "";
+            if (!json || !existsSync(json)) return send(res, 404, { error: "make the papers again for their CorelDRAW PDF" });
+            return sendEditable(res, JSON.parse(await readFile(json, "utf8")));
+          }
           if (req.method === "GET" && parts[4]) {
             const id = parts[4].replace(/\.pdf$/, "");
             const file = editions.some((e) => e.id === id) ? editionFile(date, id) : "";
@@ -583,6 +600,14 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
 }
 
 let copiesNow: (() => { date: string } | null) | undefined;
+
+/** An issue as the CorelDRAW PDF, or why there's none (a Hindi or Urdu paper's text needs shaping). */
+async function sendEditable(res: ServerResponse, issue: import("@ck/shared/contract").IssueRender) {
+  const { editablePdf } = await import("./export/pdf-editable.ts");
+  const pdf = await editablePdf(issue);
+  if (!pdf) return send(res, 400, { error: "a Hindi or Urdu paper has no CorelDRAW PDF: use its print PDF" });
+  return send(res, 200, pdf, "application/pdf");
+}
 /** Days to lay out again once the run that's going ends (edits made meanwhile). */
 const afterRun = new Set<string>();
 

@@ -306,9 +306,10 @@ function Editions() {
     try { setAuto((await call<Settings>("/api/settings", { json: { editionsAuto: on } })).editionsAuto); } catch (e) { setError((e as Error).message); }
   };
   const run = data?.run;
-  const open = (e: Edition) => pdf({
-    url: media(`/api/issues/${date}/editions/${e.id}.pdf?t=${encodeURIComponent(run?.endedAt ?? run?.done ?? "")}`),
-    title: `${e.name} · ${shortDate(lang, date)}`, fileName: `${e.name} - ${date.split("-").reverse().join("-")}.pdf`,
+  const open = (e: Edition, corel = false) => pdf({
+    url: media(`/api/issues/${date}/editions/${e.id}.${corel ? "editable." : ""}pdf?t=${encodeURIComponent(run?.endedAt ?? run?.done ?? "")}`),
+    title: corel ? t("corel.title", { what: `${e.name} · ${shortDate(lang, date)}` }) : `${e.name} · ${shortDate(lang, date)}`,
+    fileName: `${e.name} - ${date.split("-").reverse().join("-")}${corel ? " - CorelDRAW" : ""}.pdf`,
   });
 
   return (
@@ -345,6 +346,7 @@ function Editions() {
                   : running ? <Badge>{t("eds.waiting")}</Badge> : has ? <Badge>{t("eds.notMade")}</Badge> : null}
                 {renaming?.id !== e.id && <Button kind="quiet" onClick={() => setRenaming({ id: e.id, name: e.name })}>{t("eds.rename")}</Button>}
                 {f && <Button icon={Icon.print()} onClick={() => open(e)}>{t("copies.open")}</Button>}
+                {f && e.lang === "gu" && <Button kind="quiet" icon={Icon.download()} onClick={() => open(e, true)}>{t("corel.short")}</Button>}
                 {f && !running && <Button kind="quiet" icon={Icon.refresh()} onClick={() => make(e.id)} disabled={!!status?.running}>{t("eds.again")}</Button>}
               </span>
             </div>

@@ -38,6 +38,9 @@ export default function Archive() {
                       <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                         <Button kind="quiet" icon={Icon.print()} onClick={() => pdf({ url: media(`/api/issues/${r.date}/pdf`), title: t("pdf.title", { issue: num(lang, r.issueNumber ?? "") }),
                           fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${r.issueNumber ?? ""} - ${r.date.split("-").reverse().join("-")}.pdf` })}>PDF</Button>
+                        <Button kind="quiet" icon={Icon.download()} onClick={() => pdf({ url: media(`/api/issues/${r.date}/editable.pdf`),
+                          title: t("corel.title", { what: t("pdf.title", { issue: num(lang, r.issueNumber ?? "") }) }),
+                          fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${r.issueNumber ?? ""} - ${r.date.split("-").reverse().join("-")} - CorelDRAW.pdf` })}>{t("corel.short")}</Button>
                         <Button onClick={() => open(r.date)}>{t("archive.open")}</Button>
                       </td>
                     </tr>

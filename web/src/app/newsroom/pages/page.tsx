@@ -78,6 +78,9 @@ export default function Paper() {
       <TopBar title={t("paper.title")}>
         <Button kind="quiet" icon={Icon.refresh()} onClick={rebuild} disabled={running}>{running ? t("paper.rebuilding") : t("paper.rebuild")}</Button>
         <Button icon={Icon.print()} onClick={openPdf} disabled={!info}>{t("today.print")}</Button>
+        <Button icon={Icon.download()} disabled={!info} onClick={() => info && pdf({ url: media(`/api/issues/${date}/editable.pdf`),
+          title: t("corel.title", { what: t("pdf.title", { issue: num(lang, info.report.issueNumber) }) }),
+          fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${info.report.issueNumber} - ${date.split("-").reverse().join("-")} - CorelDRAW.pdf` })}>{t("corel.pdf")}</Button>
         <Link className={`${s.btn} ${s.primary}`} href="/newsroom">{Icon.publish()}{t("today.publish")}</Link>
       </TopBar>
       {error && <Note tone="bad">{error}</Note>}

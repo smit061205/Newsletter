@@ -407,6 +407,9 @@ const gu = {
   "today.stopped.title": "તમે છાપું બનાવવાનું રોક્યું",
   "today.stopped.body": "અત્યાર સુધીનું કામ સચવાયેલું છે. તૈયાર હો ત્યારે ત્યાંથી આગળ બનાવો.",
   "today.stopped.go": "આગળ બનાવો",
+  "corel.pdf": "CorelDRAW માટે PDF",
+  "corel.short": "CorelDRAW",
+  "corel.title": "{what} · CorelDRAW માટે (લખાણ સુધારી શકાય)",
   "help.title": "મદદ",
 } as const;
 
@@ -815,6 +818,9 @@ const en: Record<StringKey, string> = {
   "today.stopped.title": "You stopped making the paper",
   "today.stopped.body": "Everything done so far is kept. Carry on from there when you're ready.",
   "today.stopped.go": "Carry on",
+  "corel.pdf": "PDF for CorelDRAW",
+  "corel.short": "CorelDRAW",
+  "corel.title": "{what} · for CorelDRAW (editable text)",
   "help.title": "Help",
 };
 

@@ -82,10 +82,12 @@ export default function Copies() {
     if (m) return t(m[1] === "planning" ? "progress.planning" : "progress.finishing", { item: num(lang, m[2]) });
     return w === "checking" ? t("progress.checking") : w === "translating" ? t("copies.doing.translating") : w === "rewording" ? t("copies.doing.rewording") : w;
   };
-  const open = (n: number) => pdf({
-    url: media(`/api/issues/${date}/copies/${n}.pdf?t=${encodeURIComponent(run?.endedAt ?? "")}`),
-    title: t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }),
-    fileName: `${paperName} ${issueNo} - ${lang === "gu" ? "નકલ" : "copy"} ${n}${run && run.lang !== "gu" ? ` (${run.lang})` : ""} - ${date.split("-").reverse().join("-")}.pdf`,
+  // a copy's print PDF, or (`corel`) the one whose text stays text in CorelDRAW
+  const open = (n: number, corel = false) => pdf({
+    url: media(`/api/issues/${date}/copies/${n}.${corel ? "editable." : ""}pdf?t=${encodeURIComponent(run?.endedAt ?? "")}`),
+    title: corel ? t("corel.title", { what: t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }) })
+      : t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }),
+    fileName: `${paperName} ${issueNo} - ${lang === "gu" ? "નકલ" : "copy"} ${n}${run && run.lang !== "gu" ? ` (${run.lang})` : ""} - ${date.split("-").reverse().join("-")}${corel ? " - CorelDRAW" : ""}.pdf`,
   });
 
   if (!has) {
@@ -171,6 +173,7 @@ export default function Copies() {
                   <Badge tone={f.ready ? "good" : "warn"} dot>{f.ready ? t("archive.ready") : t("archive.look")}</Badge>
                 </div>
                 <Button icon={Icon.print()} onClick={() => open(f.n)}>{t("copies.open")}</Button>
+                {(f.lang ?? "gu") === "gu" && <Button kind="quiet" icon={Icon.download()} onClick={() => open(f.n, true)}>{t("corel.pdf")}</Button>}
               </div>
             ))}
           </div>

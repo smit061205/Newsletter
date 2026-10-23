@@ -284,6 +284,8 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
     }
     if (!made) throw new Error(`${item.name ?? `copy ${n}`} couldn't be laid out unlike the others`);
     await rename(`${item.pdf}.best`, item.pdf);
+    // its pages as laid out, for the editable PDF (export/pdf-editable.ts)
+    await writeFile(item.pdf.replace(/\.pdf$/, ".json"), JSON.stringify(made.built.issue));
     seen.add(made.sig); seen.add(made.layout);
     onFile({ n, ready: made.built.report.ready, pages: made.built.report.pages, cost: spent, sig: [made.sig, made.layout] });
   }
