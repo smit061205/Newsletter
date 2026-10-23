@@ -1,195 +1,190 @@
-# Handoff: the October 2026 cloud session, and how to carry on from your Mac
+# Handoff: where Capital Kranti stands, and what's next
 
-This file records everything one long Claude Code **cloud** session did to this
-project: what was wrong, what changed, how it's run now, and what's left.
-It's written for the next Claude session, the one running **on your Mac** (the
-Claude Desktop app's Code tab, `claude` in Terminal, or Remote Control).
-
-> **Read this first, then `README.md`.** The README is the full technical
-> manual; this file is the story of what changed and the day-to-day routine.
+Written 23 October 2026 for the next Claude Code session (a new account, with
+none of the earlier conversations). **Read `CLAUDE.md` first** (the standing
+rules), then this file (the story and the open work), then `README.md` (the
+technical manual) as needed.
 
 ---
 
-## 1. Why the work moves to your Mac
+## 1. What this is
 
-The cloud container this session ran in **cannot reach**:
-- the licensed **Gopika fonts** (`publications/capital-kranti/fonts/*.ttf`: on the Mac only, never in git);
-- the **database** (`backend/data/capital-kranti.sqlite`: releases, stories, built issues, AI caches);
-- `backend/.env` (the **OpenRouter key**);
-- **your Chrome**, needed to read gujaratinformation.gujarat.gov.in like a person;
-- most outside websites, including the Vercel site.
+An engine that makes a whole daily newspaper by itself, plus the tools the
+editor uses. The first paper is **કેપિટલ ક્રાંતિ (Capital Kranti)**, a Gujarati
+daily from Gandhinagar, 4 pages of 390 × 525 mm. The editor is the user's
+father: **not technical**, works every evening, on a **Windows PC**. The user
+(the developer) works on a Mac.
 
-So in the cloud, every real build had to be pasted back and forth. On the Mac,
-Claude can do it all directly: read releases, build, check the pages, publish.
+Every evening at 8 PM (India time) the engine:
+1. reads the day's press releases from **PIB**: PIB Ahmedabad's Gujarati ones first, then PIB Delhi's Hindi ones translated into Gujarati when the Gujarati ones don't fill the pages;
+2. has an AI (through OpenRouter) rewrite them as newspaper stories;
+3. lays out every page itself, measuring real text in Chromium, in the paper's own Bharati Gopika fonts;
+4. runs the release checks ("gates");
+5. makes a print-ready PDF and page images.
 
----
+The editor then looks it over in the **newsroom**, fixes anything, and presses **Publish** (the website) and **Print PDF** (the printer).
 
-## 2. Where things stand
-
-| | |
-|---|---|
-| Website | Vercel project `web`, `BACKEND_API_MODE=static`; shows what's published in `web/public/issues/` |
-| Published | **Issue 270, 21 Oct 2026, v46: READY**, all gates pass |
-| Database (Mac) | Only 2026-10-21 so far (25 releases, 23 stories) |
-| Next | Issue 269 (20 Oct 2026): needs its releases read in first (section 6) |
-| All code | Merged to `main` (pull requests #1–#9) |
+Repository: <https://github.com/smit061205/Newsletter> (**public**). Branch `main` is current; `redesign` holds the same commits.
 
 ---
 
-## 3. What was done, in order
+## 2. The pieces
 
-### 3.1 Deployment (PRs #1)
-- Checked hosting options: the backend needs Chromium, a persistent disk and a long-running process, so it **can't run on Vercel**. Render (paid) was prepared but **not used** (no budget).
-- **Free setup chosen:** build on the Mac, publish the finished files to the website.
-  - `cli.ts publish --date D [--push] [--force] [--keep N]` (`backend/src/publish.ts`): page JPEGs, the PDF and a small `issue.json` go into `web/public/issues/<date>/`, plus `index.json`; with `--push` it commits and pushes, and Vercel redeploys. It refuses a NOT READY issue unless you pass `--force`, and keeps 14 days.
-  - Website static mode (`web/src/lib/published.ts`, `web/src/app/page.tsx`): shows the published pages, a PDF download and date links.
-  - Also ready for later (unused): `Dockerfile`, `DATA_DIR`, `HOST`/`PORT`, `BACKEND_API_TOKEN` on POSTs, `/healthz`.
-
-### 3.2 Diagnosis of the unpolished issue
-Issue 270 v40 (published early) looked loose. It was measured line by line
-against the 8 August reference PDF (pdfminer):
-
-| Problem | Cause |
-|---|---|
-| Holes and rivers between words | Greedy line breaking, and the browser put all the slack into word gaps |
-| Ragged, small headlines | Display lines left-aligned unless 96% full; size scale too small |
-| Weak kickers and decks | Sized from small headlines, left-aligned |
-| Grey wall of text (620 body lines on p1, against 300 in the original) | Gaps closed by lengthening text, not display |
-| Holes beside ads, yet "READY" | The gap check only looked straight down under each story |
-| Uneven column ends | Leftover lines all came off the last column |
-| Placeholder-looking house-ad box | Last-resort ruled box sized to any gap |
-| Western digits mixed in | ASCII digits printed in the Latin font |
-| One-column stories with 5-line headlines | Allowed for every rank |
-| Ads fixed at their 8 August positions | Coordinates copied from that issue |
-
-### 3.3 The fixes (PRs #2–#8): the layout engine now
-- **Body text** (`backend/src/layout/linebreak.ts`): Knuth–Plass total-fit line breaking. A line's slack is spread over word spacing (70–200%), letter spacing (−0.02 to +0.06 em) and a 97–102% glyph scale. Each line is its own element at its exact width (`compose.ts` `columnElements`); the browser never justifies. Contract fields `wordSpacing` and `nowrap` were added, and the plotter probe now reports `line-fit`.
-- **Display type** (`backend/src/layout/display.ts`): headlines, kickers and decks are fitted to the full width (hScale 0.86–1.2 plus letter spacing), at the largest size allowed, on a tight fixed pitch.
-  - **Every kicker is centred.**
-  - Decks are set like a short paragraph: every line full, the last one natural.
-  - Leads prefer two big lines.
-- **Story structure:** every story is **headline > sub-heading (deck) > body**, enforced as headline ≥ 1.25× deck and deck ≥ 1.15× body (headline min 21pt, deck min 15.6pt). Missing decks come from the release's sub-heading, or the AI writes one (`rewrite.ts` `writeDeck`, cached); the rewrite prompt always asks for one.
-- **Larger type scale** (`publications/capital-kranti/profile.json`):
-  - caps 22–72pt by column span;
-  - rank scale 1 / .78 / .62 / .5 / .42;
-  - leading 1.12;
-  - kicker 0.6× and deck 0.45× the headline.
-- **Text normalisation** (`layout/text.ts`): numbers print in Gujarati digits, while English ones like "ATM 2026" or "COVID-19" stay Latin; phone numbers are kept whole.
-- **White space** (`layout/occupancy.ts`): a whitespace map of the finished page (each story's rectangle, fillers and ads on a columns × 2pt grid). Gate 2 uses it, and the gap closer (`fit.ts`) fills every hole with, in order:
-  - a left-out story;
-  - an AI brief (60, 40 or 25 words);
-  - the house ad;
-  - a public-service message panel (`fillers.messages`).
-
-  There is **at most 1 message and 1 house ad per issue** (`fillers.maxMessages`, `maxHouseAds`).
-- **Density by display first:** a landscape photo goes full width before any text is lengthened.
-- **Columns** end at most one line apart (`module.ts` `balance()`); text under a photo stays on the baseline grid.
-- **Ads** (`layout/ads.ts`): stand-in ads are modules snapped to the column grid at the foot of the page. A booking can still pin a position.
-- **Packer** (`layout/pack.ts`):
-  - the page budget is a preference, but a page may take more copy only while later pages keep enough;
-  - costs for tombstones, out-of-order headline sizes, headlines that can't fill their width, and stories straddling columns of different depth;
-  - no one-column headlines except briefs.
-- **Tombstones** (side-by-side, level, same-size headlines) are resolved on the finished layout (`fit.ts` `detombstone()`). In order:
-  1. the lesser headline ≤ 0.82× its neighbour's;
-  2. else the greater one larger, with shorter text;
-  3. else a hairline **column rule** in the gutter.
-- **AI calls** (`rewrite.ts` `openRouter()`) time out after 90s; the build prints each step as it happens.
-- **Gate 7** (`backend/src/fingerprint.ts`) compares only builds with the same inputs and engine code. A code change no longer fails it.
-
-### 3.4 New quality gates (`backend/src/layout/style.ts`)
-The issue is READY only if gates 1–7 and these all pass:
-- **S1** body spacing: extra word space p95 ≤ 0.5 em, at most 3% loose lines;
-- **S2** every display line fills its width;
-- **S4** columns end level;
-- **S5** fillers under 12% of a page (otherwise the day is short of copy);
-- **S6** Gujarati digits;
-- **S7** headline > sub-heading > body.
-
-Issue 270 v46: S1 extra word space p50 0.04em, p95 0.22em, 0.5% loose lines; 22/22 stories placed; 0 gaps; 1 message panel; 4 column rules.
-
-### 3.5 Testing tools
-- `backend/test/pack-0808.ts`: the whole engine without the licensed fonts, using the free-font profile `publications/dev-test` (regenerate it with `python3 scripts/dev_profile.py` after changing the real profile).
-  - `CK_FAKE_AI=1` stands in for the model (`rewrite.ts` `fakeFit`).
-  - Must exit 0 on 2 pages (`TEST_PAGES=2`, the default).
-  ```
-  CK_PUBLICATION=dev-test DATA_DIR=/tmp/ck-test node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/pack-0808.ts
-  ```
-- `python3 scripts/replica/style_stats.py <issue.pdf>`: word gaps, letter spacing, display fill, headline sizes and body lines per page, from any PDF. The 8 August reference: word gap p50 4.5 / p90 6.7pt; display lines 96–100% full.
-- `backend/test/gaps.mts <date>`: lists a build's empty stretches.
-
-### 3.6 Getting news in (PR #9)
-- `cli.ts ingest` (automatic) is **blocked**: the government site refuses automated browsers. The project's decision is **not to get around this**.
-- `cli.ts status`: every day in the database, with its releases, stories and latest build.
-- **Release reader bookmark:** `http://localhost:4000/reader` (with `cli.ts serve` running) gives a "Send to Capital Kranti" bookmark. On a release page it reads the headline, sub-heading, date line, paragraphs and photos (photos ≤ 1800px), stores them through `/ingest`, and offers to open the previous release. One page at a time.
-- **On the Mac, Claude can do this through your own Chrome** (Claude in Chrome, or the Browser Use plugin in "your Chrome" mode). Use only your own browser: never a cloud browser or an "unblocker" service.
+| Part | Where | Notes |
+|---|---|---|
+| Engine (backend) | `backend/src/` | Node 22 runs the TypeScript directly (`--experimental-strip-types --experimental-sqlite`); SQLite store; HTTP API on 127.0.0.1:4000 (`server.ts`) |
+| Shared code | `shared/src/` | The render contract, the plotter (`plot.ts`) and the PDF writer (`pdf.ts`), used by the engine and the website |
+| Paper profiles | `publications/<id>/` | One paper = one folder: `profile.json` (grid, type, fonts, AI models, rules) and `chrome.json` (masthead, headers, footer, foot rule, stand-in ads). Capital Kranti, `dev-test` (free fonts, for CI), `sample-english`, `sample-urdu` |
+| Newsroom | `web/src/app/newsroom/` | Next.js 16 (**read `web/node_modules/next/dist/docs` before changing Next code: it differs from what you know**). Only exists where `NEWSROOM=1`. Port 3000 |
+| Public website | `web/src/app/page.tsx` | On Vercel (project `web`, `BACKEND_API_MODE=static`); shows what's published in `web/public/issues/` |
+| Desktop app | `desktop/` | Electron: runs the engine and the newsroom in its own Node, window, tray, notifications, updates, uninstall. **Installers built by GitHub Actions** (`.github/workflows/release.yml`) |
+| Old script installers | `windows/`, `mac/`, `scripts/launch.mjs` | Superseded by the desktop app; kept for development. The desktop app moves an old install into itself on first open |
+| CI | `.github/workflows/apps.yml` | Every push: engine typecheck, PIB parser, layout tests (must stay READY), newsroom build, start/stop. Green as of 23 Oct |
 
 ---
 
-## 4. Daily routine (on the Mac)
+## 3. History, briefly
+
+1. **The layout engine** (to 21 Oct): Knuth–Plass body text, display type fitted to width, a whitespace map so nothing is left empty, column balancing, ads on the grid, tombstone avoidance, and the gates (1–7, S1–S7). README §8 and §10 describe them.
+2. **Layout fixes from the paper's feedback** (issues 269–271):
+   - columns end level and there's no gap under photos;
+   - horizontal rules divide stacked stories and fill odd space;
+   - tight spacing between title, sub-title and text;
+   - **at most one slogan ("quote") panel per paper**;
+   - **"વિશેષ લેખ" (special article) only once per paper**.
+3. **News from PIB** (`ingest/pib.ts`, `editorial/translate.ts`): the state government's site blocks bots, and **the project doesn't get around that**.
+4. **The newsroom and apps** (merged 22 Oct): one pipeline as jobs, with a live log, retries and the 8 PM run; the newsroom screens; other papers ("Add a newspaper" from PDFs); right-to-left Urdu; CorelDRAW SVG export; print preflight; the AI editorial plan.
+5. **The redesign** (22–23 Oct): the newsroom rebuilt for a non-technical editor, with:
+   - "Paper & ink" colours, Anek Gujarati + Geist fonts;
+   - **Gujarati by default, English switch**;
+   - a welcome flow, Today with a live progress loader, Review, Publish sheet, Past issues and Help;
+   - the side-panel story editor;
+   - the in-app PDF viewer (it never leaves the app);
+   - costs shown in **₹** (rate in Settings, ₹88 per US$ by default).
+
+   The engine side added:
+   - progress per step;
+   - PIB retries every 10 minutes when PIB is down;
+   - the release date counted as a known number in the fact check;
+   - **gate W:** no full-width story on the front page unless the editor allows it ("Allow full width on the front page" in the story editor; the profile's `grid.frontPageMaxCols`, 7 of 8).
+6. **Print geometry** (23 Oct):
+   - every page but the last ends at 1469.3pt, with a 2.04pt rule across the grid at ~1473.4pt, as in the original paper;
+   - the PDF no longer sits 0.76pt low (it had trimmed Chromium's rounded page at the wrong corner);
+   - the "વ્યવસાયિક સમાચાર" logo strip ad is removed.
+7. **The desktop app** (23 Oct): `desktop/` plus the release workflow. Getting the first installers out took several rounds; the lessons are in §6.
+
+**Published so far:** issues 269–271 (20–22 Oct 2026) on the website. Issue numbers come from the date (22 Oct 2026 = 271).
+
+---
+
+## 4. Running it
 
 ```bash
-cd ~/NewsPaper_Project
-git pull origin main
-B="node --experimental-strip-types --experimental-sqlite --no-warnings backend/src/cli.ts"
-
-# 1. backend running (for the reader / ingest hand-off)
-lsof -ti :4000 | xargs kill; $B serve &
-
-# 2. get the day's releases in (Claude through Chrome, or the bookmark): see section 6
-$B status
-
-# 3. stories, layout, checks
-$B rewrite --date 2026-10-20
-$B build   --date 2026-10-20     # read the gate table at the end
-
-# 4. publish (only when READY)
-$B publish --date 2026-10-20 --push
+# development (Mac): the engine and the newsroom, each in its own terminal
+node --experimental-strip-types --experimental-sqlite --no-warnings backend/src/cli.ts serve --port 4100
+NEWSROOM=1 NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:4100 npm run dev --prefix web -- --port 3100
 ```
 
-- The first build of a day makes the AI calls: a few cents and a few minutes. Rebuilds reuse the cache.
-- Aim for about 20 releases a day for 4 pages. Fewer, and gate 2 or S5 says the day is short of copy: add releases, or build fewer pages with `--pages`.
-- Issue numbers come from the date (2026-10-21 = 270, 2026-10-20 = 269).
+- Use ports **4100/3100** for development. **4000/3000 belong to the installed app** on this Mac; don't run a second engine on them, and **never two engines on one database**.
+- `.claude/launch.json` already has `engine-dev` and `newsroom` for the preview tools.
+- Without `DATA_DIR`, the engine uses the repository's own data: `backend/data/` (database) and `backend/.env` (the OpenRouter key). **Both are git-ignored and must never be committed.**
+- The installed app keeps its data in `~/Library/Application Support/Capital Kranti` (Mac) or `%APPDATA%\Capital Kranti` (Windows), with the key in `settings.env` there.
+- By hand:
+  - `cli.ts all --date D [--from fetch|rewrite|topup|fill|build]`
+  - `cli.ts build --date D`
+  - `cli.ts publish --date D --push` (from `main`: it pushes the current branch)
+  - `cli.ts status`
+
+**Testing a layout change without spending money or touching real issues:** copy the database into a scratch `DATA_DIR`, along with `web/public/media/<date>`. Then:
+- `DATA_DIR=<scratch> cli.ts build --date D` runs without AI.
+- If the change shortens the page body, the no-AI build can't refit stories and shows gaps. Put a copy of the key in `<scratch>/settings.env` for one rebuild (a few rupees), then delete it.
+
+**The CI layout tests** (they must stay READY):
+```bash
+CK_PUBLICATION=dev-test DATA_DIR=/tmp/ck-test node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/pack-0808.ts
+```
 
 ---
 
-## 5. Rules and decisions (don't re-litigate)
+## 5. Making a release (the desktop app)
 
-- **Don't get around the government site's bot block.** Read pages like a person, through your own browser, or use email or official access.
-- **Never commit** `backend/.env` or `backend/data/`. The repo is public. (The Gopika fonts *are* committed: the paper confirmed it's fine, 22 Oct 2026. Fonts copied from a computer's system folder for a test are not.)
-- **No Anthropic models** for the paper's AI (cost); it uses OpenRouter (GPT-6 Luna, Gemini 3.8 Flash).
-- **At most one slogan panel and one house ad per issue.** Fill space with stories.
-- **Every story is headline, sub-heading, body,** in decreasing sizes. **Kickers are centred.**
-- Take inspiration from the 8 August paper, but don't copy its grid or positions. Pages should be dense.
-- The backend decides all layout; the website only shows it.
-- Work on a branch and merge through a pull request. `publish --push` pushes to `main` directly, which is what Vercel deploys.
+1. Push the code to `main`.
+2. On GitHub, go to **Releases → Draft a new release**, choose a new tag `vX.Y.Z` (Create new tag on publish), keep the label **None** (not pre-release), and click **Publish release**.
+3. The **release** workflow builds three installers and attaches them to that release in about 30 minutes:
+   - Mac Apple silicon on `macos-14`;
+   - Mac Intel on `macos-15-intel`;
+   - Windows on `windows-latest`.
+
+The installer names never change, so these links always serve the newest release:
+- `…/releases/latest/download/Capital-Kranti-mac-arm64.dmg`
+- `…/releases/latest/download/Capital-Kranti-mac-x64.dmg`
+- `…/releases/latest/download/Capital-Kranti-Setup.exe`
+
+Installed apps update themselves from Releases:
+- **Windows** uses electron-updater (`latest.yml`).
+- **Mac** downloads the zip and swaps itself in.
+
+**Build and check a Mac app locally before releasing.** It's the only way to catch packaging problems early:
+```bash
+npm install --prefix desktop                                # once
+PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium  # Chromium inside the packages
+npm run build --prefix web && node desktop/stage.mjs
+cd desktop && CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --arm64 --publish never
+codesign --verify --deep --strict "dist/mac-arm64/Capital Kranti.app"
+```
+Then run the engine from *inside the packed app*, as the workflow's "packed app" step does.
+
+**Never open the packed app itself on the user's Mac without asking:** on first open it moves the user's real old install into itself and changes their Dock.
+
+**State on 23 Oct:**
+- Windows installers built and attached from v1.0.2 on.
+- v1.0.4's Mac build succeeded, but its check step had a path bug (fixed). The Mac files aren't online yet.
+- The user installed a locally built `.dmg`.
+- Next release: **v1.0.5** or later, with the fixes from 23 Oct (own engine, Dock, Back in the welcome).
+- The empty releases v1.0.0–v1.0.3 can be deleted.
 
 ---
 
-## 6. What's next
+## 6. Lessons (things that went wrong; don't repeat them)
 
-1. **Issue 269 (20 Oct 2026).** Read its releases (ids just below 55011, back to 19 October), then rewrite, build and publish. Paste-ready task:
-   > Stay on `main`. Start the backend (`lsof -ti :4000 | xargs kill`, then `cli.ts serve` in the background). Using my Chrome, open `https://gujaratinformation.gujarat.gov.in/PressReleaseDetails/?id=<n>&LanguageId=2` one page at a time from id 55010 downwards, wait for the text, and keep the releases whose `.ReleaseDateSubHeaddateTime` says OCT 20 2026. Stop after about 12 earlier-dated pages in a row. Send each one as the bookmark at http://localhost:4000/reader does (`/ingest#<url-encoded JSON>` with `id, url, dateLine, headline, subhead, paras, photos`). If the site blocks the browser, stop. Then `status`, `rewrite`, `build --date 2026-10-20`, and `publish --push` if READY.
-2. **Automatic news**, in order of preference:
-   - **Email inbox ingest** (README 15.2): a dedicated releases inbox that the information offices email or auto-forward to, read over IMAP with an app password in `backend/.env`. `runDay()` already calls `ingestInbox(store, date, {log})`; build `backend/src/ingest/inbox.ts`.
-   - Ask the Information Department for an allow-list or an official feed.
-   - PIB RSS for extra (national) copy.
-   - A paid Gujarati news wire.
-3. The rest of the README's roadmap (15.1, 15.3–15.9): AI editorial plan, editor screen, a second paper, onboarding, Urdu, SVG export, print preflight, clean-up (`backend/test/recompose-0808.ts` is stale, the `compose()` box filler is dead code).
-4. **Worth checking by eye** on new issues:
-   - vowel signs in letter-spaced body lines (Gopika is a legacy font; spacing applies per glyph code);
-   - the look of the column rules;
-   - the message panel.
-
+- **Packaging:**
+  - electron-builder **silently drops the top-level `node_modules` of a folder in `extraResources`**. That's why the engine is staged in `desktop/stage-root/app-engine`, packed from `stage-root`.
+  - **No symlinks in the packed app.** They break signing on Mac and packing on Windows, so `stage.mjs` replaces them with real copies. Next's build links external packages by **absolute path** in `web/.next/node_modules`.
+  - Node won't strip TypeScript under `node_modules`. In the app, `@ck/shared` is resolved by `desktop/engine-hooks.mjs` (`--import`).
+  - The Mac app is **ad-hoc signed** (`identity: "-"`): Apple silicon refuses fully unsigned apps.
+  - First open on current macOS: **System Settings → Privacy & Security → Open Anyway** (right-click → Open no longer works). Removing that needs an Apple Developer account (US$99/yr) for notarisation; on Windows a code-signing certificate removes SmartScreen.
+- **Moving from the old install:** the old app's engine survives its own `--stop` and kept serving port 4000, so the new app used it. The app now **stops whatever else listens on 4000/3000** (`freePorts()` in `desktop/main.js`).
+- **The Dock** stores apps as file URLs (`file:///Applications/Capital%20Kranti.app/`). Read and edit it with `defaults export` and `PlistBuddy`, one entry at a time.
+- **GitHub retired `macos-13`**, so the Intel build runs on `macos-15-intel`.
+- **Test what ships.** Earlier checks ran the engine before packing and so missed packing bugs. The workflow now checks the packed app: its signature, its contents, and that its engine starts.
+- **Release builds use the workflow from the tagged commit,** so a fix needs a **new** release; re-running an old one won't pick it up.
+- **Check the real thing, not a proxy.** For example: the PDF's *content* position, not just its page size; the console 404s, investigated rather than hidden (they were real: the newsroom asked for issues before they existed, and photos had no engine route).
 
 ---
 
-## The newsroom (22 Oct 2026, branch `newsroom`)
+## 7. What's next
 
-What changed, so a later session can carry on:
-- **News is PIB** (`backend/src/ingest/pib.ts`): PIB Ahmedabad's Gujarati releases, topped up with PIB Delhi's Hindi translated into Gujarati (`editorial/translate.ts`) until the pages are full. The state site stays off (PIB only, the user's choice).
-- **One pipeline** (`backend/src/pipeline.ts`) is what the 8 PM run, the newsroom's Run now and `cli.ts all` do; every run is a job with a live log (`/api/events`) and can be retried from a failed step.
-- **The newsroom** (`web/src/app/newsroom/`) runs on the paper's own computer only (`NEWSROOM=1`): Today, News, Stories (edit, rank, photo, drop/restore, Hindi original alongside), Pages (click a story to edit), Ads (book with size and days), Papers (add a newspaper from its PDFs), Settings (run time, OpenRouter key into `backend/.env`).
-- **Apps:** `windows/` and `mac/` installers, both over `scripts/launch.mjs`; CI builds and runs them on Windows and macOS (`.github/workflows/apps.yml`).
-- **New gates:** F (every printed letter in its own font, `fonts/cmap.ts`) and P (print preflight, `export/preflight.ts`). The 8 August test, `sample-english` and the extractor test (`test/extract-0808.ts`) must stay green.
-- **Other papers:** profiles in `publications/<id>/` (from the Papers screen: `onboard/extract.ts`, `onboard/save.ts`), each built in its own process and data folder `papers/<id>/`. `sample-urdu` proves right to left.
-- **Keep:** never two engines on one database (stop with `launch.mjs --stop`, which forces a stuck one); `publish` pushes the current branch, so publish from `main`.
+1. **Get a complete release out** (v1.0.5+). Confirm all three installers are attached, then delete v1.0.0–v1.0.3.
+2. **Install on the father's Windows PC** with the user; it's the real test of the Windows app:
+   - the first open past SmartScreen;
+   - moving the old script install in;
+   - the welcome flow;
+   - a full evening run;
+   - Publish and Print.
+3. **Connect the website** (Publish without Git):
+   - The user registers a GitHub OAuth App with **Device Flow** enabled.
+   - Its Client ID goes in the repository Actions variable `CK_GITHUB_CLIENT_ID` (README, "making a release").
+   - Until then, Publish from the app can't push.
+4. **Rotate the OpenRouter key.** It appeared in a screenshot on 23 Oct. The user makes a new one at openrouter.ai, pastes it in **Settings → AI key**, and deletes the old one.
+5. **Verify in a real run:**
+   - the live progress loader through all five steps;
+   - edit, save, leave out and Undo on real data;
+   - Allow full width (the gate catches a full-width story placed without it);
+   - the evening wake (`pmset` on Mac, a scheduled task on Windows);
+   - Uninstall: once keeping and once removing the archive.
+6. **Rebuild issues 269–271 if they're reprinted.** Their PDFs predate the foot rule, the foot margin and the 0.76pt fix.
+7. **Later:**
+   - signing (Apple Developer and Windows certificate), to remove the first-open warnings;
+   - an Urdu paper's own Nastaliq font;
+   - a releases inbox (email ingest, README §15) if PIB ever isn't enough;
+   - clean-up: `backend/test/recompose-0808.ts` is stale, and the old `windows/` and `mac/` scripts can go once every computer runs the desktop app.
