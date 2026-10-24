@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
-import { Anek_Gujarati, Geist } from "next/font/google";
+import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import Shell from "./Shell";
 import styles from "./newsroom.module.css";
 
-// Anek Gujarati for the interface's Gujarati, Geist for Latin letters and numbers
-const gujarati = Anek_Gujarati({ subsets: ["gujarati", "latin"], weight: ["400", "500", "600", "700"], variable: "--nr-gu" });
-const latin = Geist({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--nr-latin" });
+// Anek Gujarati for the interface's Gujarati, Geist for Latin letters and numbers --
+// the files themselves (app/fonts, SIL OFL), so a build never downloads them
+// (24 Oct: Google Fonts not answering failed the Windows installer's build)
+const gujarati = localFont({ src: "../fonts/AnekGujarati-Variable.woff2", weight: "100 800", variable: "--nr-gu" });
+const latin = localFont({ src: "../fonts/Geist-Variable.woff2", weight: "100 900", variable: "--nr-latin" });
 
 export const metadata: Metadata = { title: "Capital Kranti", icons: { icon: "/newsroom-icon.png" } };
 
