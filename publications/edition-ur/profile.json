@@ -117,7 +117,8 @@
   "afterPhoto": 3,
   "afterCaption": 5,
   "betweenStories": 8,
-  "storyRule": 0.75
+  "storyRule": 0.75,
+  "underHeader": 5
  },
  "photo": {
   "maxCrop": 0.15,

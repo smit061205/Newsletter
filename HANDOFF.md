@@ -104,6 +104,14 @@ Repository: <https://github.com/smit061205/Newsletter> (**public**). Branch `mai
 
      This method came from the user's brother's scraper; it only reads pages PIB serves to programs.
 
+5. **Short days (24 Oct, v1.1.5-v1.1.6):** a Saturday's PIB filled under half the paper, the slogan stretched to a third of the front page, and pages 3-4 were left empty in places. Now:
+   - the slogan panel is one fixed size (`fillers.messageCols`/`messageHeight`), once a paper, claimed before any wait;
+   - the top-up translates PIB's **English** releases as well as Hindi, ranks every one that is news, and keeps late translations as spare copy;
+   - **two more Gujarati sources** (`ingest/official.ts`): the Gujarat CM's office (cmogujarat.gov.in/gu/news) and All India Radio's Gujarati news (newsonair.gov.in/gu, day archives), both open to programs; repeats of the day's news are left out; photos only from the CM's office (AIR's are often agency pictures);
+   - still short: feature articles suited to the time of year, as many as the pages need, printed like the news (the user asked for no special design), on the inside pages;
+   - the number check reads English number words and "આઠ હજાર 224", and the build checks saved flags again;
+   - stories start 5pt under the page header (`spacing.underHeader`).
+
 **Published so far:** issues 269–271 (20–22 Oct 2026) on the website. Issue numbers come from the date (22 Oct 2026 = 271).
 
 ---

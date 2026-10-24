@@ -15,7 +15,7 @@ import { planDay } from "./editorial/plan.ts";
 import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
-import { fitCalls, isSpeechText, speechTwin, writeDeck } from "./editorial/rewrite.ts";
+import { fitCalls, isSpeechText, numbersNotIn, speechTwin, writeDeck } from "./editorial/rewrite.ts";
 import { closeGaps, type FillerCount } from "./layout/fit.ts";
 import { layOut, type EngineResult } from "./layout/engine.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
@@ -407,7 +407,21 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const style = styleChecks(issue, result.plans, chrome.map((c) => ({ top: c.bodyTop, bottom: c.bodyBottom })));
   const lead = result.placed.find((p) => p.page === 1 && p.rank === 1);
   const plotterProblems = warnings;
-  const allFacts = [...result.factChecks, ...result.placed.flatMap((p) => (p.story.factCheck ? [{ story: p.story.id, detail: p.story.factCheck }] : []))];
+  // a story's numbers checked again against its release by today's rules (a
+  // flag saved when it was written can be stale: "આઠ હજાર 224" read as wrong, 24 Oct)
+  const dayReleases = new Map(store.releases(date).map((r) => [storyIdOf(r), r]));
+  const recheck = (s: Story) => {
+    const r = dayReleases.get(s.id);
+    if (!s.factCheck || s.translatedFrom || !r) return s.factCheck;
+    const n = numbersNotIn(`${s.headline} ${s.deck} ${s.bodies.long}`, `${r.headline} ${r.subhead} ${r.body}`, r.date);
+    return n.length ? `numbers not in the release: ${n.join(", ")}` : undefined;
+  };
+  // (the layout passes on each story's saved flag: those are the ones checked again)
+  const byId = new Map(result.placed.map((p) => [p.story.id, p.story]));
+  const seenFact = new Set<string>();
+  const allFacts = [...result.factChecks, ...result.placed.flatMap((p) => (p.story.factCheck ? [{ story: p.story.id, detail: p.story.factCheck }] : []))]
+    .map((f) => { const s = byId.get(f.story); return s && f.detail === s.factCheck ? { ...f, detail: recheck(s) } : f; })
+    .filter((f): f is { story: string; detail: string } => !!f.detail && !seenFact.has(`${f.story}|${f.detail}`) && !!seenFact.add(`${f.story}|${f.detail}`));
   // gate 7 compares only builds made from the same inputs by the same engine:
   // after a change to either, the paper is meant to differ
   const fingerprint = buildFingerprint(store, date);

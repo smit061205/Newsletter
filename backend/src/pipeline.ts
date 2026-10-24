@@ -90,6 +90,19 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       // bring it: the day is made from the releases already saved
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(Date.now());
       const past = date < today;
+      // then the CM's office and All India Radio's Gujarati news (a Gujarati
+      // paper): extra copy, so a site not answering never stops the paper
+      const official = async () => {
+        if (profile.language.lang !== "gu") return;
+        const { ingestOfficial } = await import("./ingest/official.ts");
+        try {
+          const o = await ingestOfficial(store, date, { log: say, progress });
+          say(`the CM's office and All India Radio: ${o.listed} listed, ${o.fetched} new`);
+        } catch (e) {
+          if (stopping) throw e;
+          say(`the CM's office and All India Radio couldn't be read (${e instanceof Error ? e.message : e}): the paper is made from PIB's news`);
+        }
+      };
       let r: Awaited<ReturnType<typeof ingestPib>> | null = null;
       for (let attempt = 0; !r; attempt++) {
         try {
@@ -98,6 +111,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           const saved = store.releases(date).length;
           if (past && saved) {
             say(`PIB won't show ${date}'s list now (${e instanceof Error ? e.message : e}): the paper is made from the ${saved} release(s) saved that day`);
+            await official();
             return;
           }
           if (past) throw new Error(`PIB won't show ${date}'s list, and no news was saved that day`);
@@ -109,6 +123,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         }
       }
       say(`${r.listed} listed, ${r.fetched} new, ${r.skipped} already stored`);
+      await official();
       if (!store.releases(date).length) throw new Error(`PIB has no releases in the paper's language for ${date} yet`);
       return;
     }
