@@ -2,7 +2,7 @@
 
 Written 24 Oct 2026. Status: **planned and agreed in outline; nothing built yet.**
 This replaces the earlier `ECOSYSTEM_PLAN.md` (on the unmerged `reserve` branch).
-The look is in [DESIGN.md](DESIGN.md), and the approved sample in [sample/](sample/).
+The look is in [DESIGN.md](DESIGN.md), and its sample in [sample/](sample/).
 
 ---
 
@@ -31,7 +31,7 @@ engine makes the day's pages from the day's published stories.
 - **Publishing:** anything verified goes live on its own. These wait for the editor's approval:
   - sensitive stories: deaths, accidents, crime, allegations against named people;
   - unverified stories.
-- **Look:** exactly the Washington Post, **dark** by default (a light theme as a switch). See DESIGN.md.
+- **Look:** Capital Kranti's own design system, phone first, in the printed paper's colours; light or dark follows the phone (changed 24 Oct from copying the Washington Post). See DESIGN.md.
 - **Coverage:**
   - three **tiers:** Gujarat, India, World;
   - **genres:** agriculture, economy, tech and science, health, sport, education, entertainment, plus politics and culture as needed.
@@ -313,7 +313,7 @@ Each stage is finished, checked, shown to the user and released before the next.
 - Google News markup, sitemaps, RSS, the About and policy pages.
 - **Check:**
   - pages fast on a phone;
-  - the design side by side with the Post at 390 / 820 / 1440;
+  - every page checked against DESIGN.md §7 at 360 / 390 / 412 / 820 / 1440;
   - the user approves.
 
 ### Stage 2: live official news

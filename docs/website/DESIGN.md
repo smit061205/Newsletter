@@ -1,166 +1,231 @@
-# The website's design: the Washington Post's UI, in Gujarati
+# The website's design: Capital Kranti's own design system
 
-Written 24 Oct 2026. The user wants the website to feel **exactly like the
-Washington Post, dark**: its grid with lines and borders, its header, hover
-states, modules and footer. On 24 Oct 2026 washingtonpost.com was explored in
-the user's Chrome (looking, hovering and opening menus only) and measured with
-the browser. This file is that inventory, mapped to Capital Kranti.
+Written 24 Oct 2026. This replaces the earlier plan to copy the Washington
+Post's look. The user asked for the website to be **the best news site it can
+be for Gujarati readers**, so it has its own design: what the Post does well,
+the Guardian's way of building a front page, and BBC News Gujarati's phone-first
+lightness, under the printed paper's own colours.
 
-**The approved starting point** is the sample in `docs/website/sample/`:
-- `capital-kranti-website.html` is the whole sample: home, a section page, an article page, the drawer, alerts and account panels, and dark and light themes. Open it in a browser; it needs nothing else.
-- It was published as https://claude.ai/artifact/EnGn4RLGwG5BQyeo2nMLpq (version 3).
-- It is generated: `python3 make_page.py` puts `full-img.json` (22 Oct's real stories, photos inlined) into `page_template.html`.
+**The sample** is in `docs/website/sample/`:
+- `capital-kranti-website.html` is the whole sample: home, a section page, an article page, the e-paper, the menu and search, both themes, the text size control and the English switch. Open it in a browser (it needs nothing else), **on a phone first**.
+- It was published as https://claude.ai/artifact/RK4UQHxNmQvWrFZuuksEeY.
+- It is generated: `python3 make_page.py` puts `full-img.json` (22 Oct's real stories, photos inlined) and the 22 Oct printed pages into `page_template.html`.
 
-The real site turns the sample's parts into components. It copies the Post's
-layout and patterns only, **never its logo, fonts, text or images**.
+The real site (stage 1 of ROADMAP.md) turns the sample's parts into components.
 
 ---
 
-## 1. Design tokens (measured)
+## 0. Why not copy one paper
 
-**Fonts:**
-- **The Post uses:**
-  - headline: Postoni (serif);
-  - subhead and labels ("meta"): Franklin (sans);
-  - body: Georgia.
-- **We use:**
-  - Noto Serif Gujarati for headlines and body;
-  - Hind Vadodara for meta, labels and buttons.
-- The paper's Gopika fonts are licensed for print, not the web.
+Checked on 24 Oct 2026:
+- **What can be had legitimately from the Post:** its design kit, WPDS (`@washingtonpost/wpds-ui-kit`, MIT), with its tokens and ~36 basic components (buttons, drawer, carousel, tabs). **Its front-page layouts are not public** (they live in its own publishing system), and **its fonts are licensed to it**. Measuring its pages gives the look at a few widths, not the rules underneath, which is why the first sample broke at the edges.
+- **The Post is built for other readers:** American, paying, often on desktops and iPhones.
+- **Our readers** (Reuters Institute Digital News Report 2026, India):
+  - get news from YouTube (~58%) and WhatsApp (~56%);
+  - trust in news is low and falling (39%), and 53% (2025) named WhatsApp as the biggest source of false news;
+  - are mostly on mid-range Android phones, on mobile data, many of them older.
+- **Google sends less every year:** search referrals to publishers fell ~40% in a year (Chartbeat, July 2025 to July 2026). Readers who come straight to us, or through WhatsApp, matter most.
 
-**Type scale:** 0.75, 0.875, 1, 1.125, 1.25, 1.5, 1.625, 1.75, 2, 2.25, 2.5, 2.75, 3 … 5 rem.
-- Weights 300 / 400 / 700 / 800.
+So the site wins on **trust, speed on a phone, and being where readers already are**, not on looking like a famous paper.
 
-**Line heights:**
-- **The Post:** headline 1.1, body 1.6, meta 1.25.
-- **Gujarati needs more** (its marks above and below): headline about 1.3, body about 1.8.
+**What we take, and from whom** (patterns only; if we ever copy code, keep its licence notice):
 
-**Spacing:** 0.25 rem steps (0.25 to 5 rem).
+| From | What | Licence of their code |
+|---|---|---|
+| The Washington Post | the ruled grid (1 px rules in the middle of gutters), the calm reading page, the drawer and panels | WPDS: MIT |
+| The Guardian (`guardian/dotcom-rendering`) | the front page as a stack of **containers** (one per section), each filled with **cards** of a few fixed sizes; the live list | Apache-2.0 |
+| BBC News Gujarati (`bbc/simorgh`, which renders bbc.com/gujarati) | phone first, light pages, Gujarati type that breathes, fast article pages | Apache-2.0 |
+| The printed Capital Kranti | the purple wordmark, the navy and cyan, the heavy rule over a section | ours |
 
-**Corner radii:** 0.125 to 1.5 rem, plus round (pills and avatars).
+Never the Post's (or anyone's) logo, fonts, text, photos or screenshots in the repository.
 
-**Dark palette** (the default theme):
+---
 
-| Token | Value |
-|---|---|
-| Page | #141414 |
-| Headline text / bright | #dedede / #ffffff |
-| Secondary text | #a1a1a1 |
-| Cell rules | #252525 |
-| Rule over a section name | ~#5a5a5a |
-| Primary pill (Post: Subscribe) | #166dfc |
-| Live / time-ago | #5892c9 |
-| Breaking banner | coral-red, ~#f45a5a |
-| Opinion underline | red |
+## 1. Principles (in order; when two clash, the higher wins)
 
-A **light theme** and **"match device"** are switchable from the account panel.
+1. **Trust you can see.** Every story shows where it came from, that its numbers were checked, when it was updated, and how to report a mistake.
+2. **Phone first.** Designed at 360-412 px wide, then widened. A ₹10,000 Android phone on patchy 4G is the test device.
+3. **Fast and light.** Pages open in about 2 seconds on that phone; nothing waits for a script.
+4. **Easy to read for every age.** Large Gujarati text, generous spacing, a text size control, audio (Listen), high contrast in both themes.
+5. **Where readers are.** WhatsApp sharing and the WhatsApp channel are first-class; video shorts have their own strip; the e-paper is one tap away.
+6. **Calm and ordered.** The ruled grid, few colours, no pop-ups, no autoplay with sound, no clutter. Ads (later) sit in marked slots and never move text.
+7. **Gujarati first.** Every word on screen is Gujarati by default, with an English switch for the site's own labels.
 
-**The grid (the lines and borders the user asked for):**
-- **Columns:** 20 columns of 34 px with 32 px gutters, 1,288 px at most.
-- **Front block:** 15 columns, with a 5-column right rail.
-- **Rows:** 32 px apart inside a block, 64 px between blocks.
-- **The rules:** every cell draws its 1 px rules in the middle of its gutter:
-  - `::before` is the vertical one, at left −16 px;
-  - `::after` is the horizontal one, at top −16 px.
+---
 
-  That is what gives the Post its ruled look; borders on the cells themselves look wrong.
+## 2. Tokens
 
-**Breakpoints:**
-- under 768: one column;
-- 768–1023: tablet;
-- 1024 and up: desktop;
-- 1150 and 1400: wider tunings.
+### 2.1 Colour
 
-**Hover and focus:**
-- headlines dim to grey (no underline);
-- footer and plain links underline;
-- icon buttons get a round grey background;
-- pills darken;
-- focus is always a visible ring.
+The printed paper's colours, measured from the 22 Oct front page: wordmark purple `#7f3894`, top bars navy `#2e3192`, rule cyan `#0aaae4`.
 
-## 2. Header
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `bg` | `#ffffff` | `#121214` | page |
+| `surface` | `#f6f5f8` | `#1c1b20` | boxes, menu, sheets |
+| `ink` | `#1d1d21` | `#e7e7ea` | body text |
+| `strong` | `#111114` | `#ffffff` | headlines |
+| `soft` | `#3f3f46` | `#c9c9d1` | summaries |
+| `muted` | `#5f5f66` | `#a3a3ab` | times, captions, labels |
+| `rule` | `#e4e2e8` | `#2c2b31` | grid rules between cards |
+| `rule-strong` | `#111114` | `#e7e7ea` | the heavy rule over a section (as in print) |
+| `brand` | `#7f3894` | `#c99be0` | wordmark, section names, links |
+| `navy` | `#2e3192` | `#a4a7ff` | the e-paper button (white / dark text on it) |
+| `cyan` | `#0aaae4` | `#0aaae4` | decoration only: the thin line under the header (too light for text) |
+| `live` | `#0b6f99` | `#5cc8f0` | "updated" times, the live dot |
+| `breaking` | `#b3261e` | `#b3261e` | breaking bar (white text) |
+| `checked` | `#1d7a46` | `#62cf8f` | the "checked" mark |
+| `whatsapp` | `#1a7f45` | `#1a7f45` | WhatsApp buttons (white text) |
 
-- **Utility bar** (56 px, sticky):
-  - left: the sections/search icon and the alerts bell (red dot when unread);
-  - right: the primary pill and the account icon.
-  - Once you scroll past the masthead, the small masthead appears in the centre, and the trending row sticks under it.
-- **Masthead:** the large wordmark and an italic tagline.
-- **Section bar:** bold sans links, a thin divider before the product links, and a full-width light rule under it.
-- **Trending row:** "Trending" in bold, then 6 topic links.
-- **Breaking banner:** a full-width coral bar: **"Breaking:"**, the headline, and a close ×.
+All text pairs pass WCAG AA (checked 24 Oct: muted 6.3:1 light / 7.5:1 dark; brand 7.3 / 8.2; live 5.6 / 9.8; white on breaking 6.5, on WhatsApp 5.0).
 
-**Sections drawer** (left, about 286 px; the page dims behind it):
-1. the primary button;
-2. search;
-3. main sections, each with a › that opens a sub-list;
-4. the A–Z list of every section;
-5. "Explore" (the products).
+**Theme:** follows the phone's setting by default; the reader can pick Light or Dark (remembered on that device).
 
-**Alerts panel:** "NEWS ALERTS" with a settings icon. Each alert shows a red dot when unread, the headline, and "BREAKING · time • category".
+### 2.2 Type
 
-**Account panel:** name, links, and **Display theme: Match device / Dark / Light**.
+- **Reading** (headlines, summaries, body): **Noto Serif Gujarati**.
+- **Interface** (labels, buttons, times, menus): **Anek Gujarati**, the newsroom's own UI font, so the site and the app feel like one family.
+- Both free (OFL), from Google Fonts, which sends only the Gujarati and Latin pieces a page uses; self-hosted later. The paper's Gopika fonts are for print only.
+- **Gujarati needs room:** its marks sit above and below the line, so line heights are higher than for English.
+- **Smallest text 13 px**, and only for times and captions. Nothing that must be read is lighter than 400.
 
-## 3. Home page modules, top to bottom
+| Token | Phone | Desktop | Line height | Weight | Use |
+|---|---|---|---|---|---|
+| `display` | 28 | 40 | 1.3 | 700 | the lead story's headline |
+| `h1` | 28 | 40 | 1.3 | 700 | an article's headline |
+| `h2` | 22 | 26 | 1.35 | 700 | large cards, section titles |
+| `h3` | 18 | 20 | 1.45 | 600 | standard cards |
+| `h4` | 16 | 17 | 1.5 | 600 | list items, compact cards |
+| `standfirst` | 17 | 20 | 1.6 | 400 | an article's summary |
+| `body` | 18 | 19 | 1.85 | 400 | article text |
+| `dek` | 15 | 16 | 1.6 | 400 | card summaries |
+| `ui` | 15 | 15 | 1.3 | 500-700 | buttons, menus, section names |
+| `meta` | 13 | 14 | 1.4 | 400-600 | times, places, captions |
 
-1. **Front block (15 columns) plus the right rail (5):**
-   - a kicker with an icon and ›;
-   - a lead package: headline, light summary, byline, and a 10-column photo with a grey caption;
-   - a row of 3 headlines with vertical rules;
-   - **"The 7 · LIVE":** a carousel of developing stories (avatar, minutes ago in blue, "New", ← →);
-   - more packages, some with related links and a white pill badge;
-   - the rail: "Opinions ›" with a red underline; each item has the author (small), the headline (serif 18) and a round avatar; some have "▶ Listen 27 min".
-2. **More Top Stories:** a big photo lead with a badge, 6 headlines divided by rules, and a "Most Read" rail with big serif numbers 1–4.
-3. **Ripple (other outlets):** a description, a "Learn more ↗" pill, and a carousel of other outlets' pieces (outlet logo, author, headline, thumbnail).
-4. **Latest:** 4 columns with labels and times, and an occasional thumbnail.
-5. **Feature cards:** a podcast card with a "▶ Listen" pill, and image cards with labels.
-6. **A section block:** a big photo lead (8 columns), a list of 6 with labels, and a **newsletter promo box**.
-7. **Video:** a landscape video card and **tall 9:16 tiles** (caption over the picture, "▶ 1:39"), with "Watch all" and an arrow carousel.
-8. **Section bands in pairs:** each half has a rule over the name, the name with ›, a lead photo (5 columns) with its headline, and 3 headlines with rules.
-9. A second tall-video strip.
-10. **Diversions:** games with small icons.
-11. **Footer:** the wordmark, 5 link columns, and the copyright line.
+**Text size control:** three steps on articles, 100%, 115%, 130% (remembered).
 
-**Section page:**
-- a big bold sans title with a "+" follow button, and sub-section links;
-- a 3-part top: a text story with a badge, a huge photo, and two photo stories;
-- a **"More stories" river:** a date column, headline, summary, a right photo, and rules between, with a promo in the right rail.
+**Numbers:** the site's own labels use Gujarati digits in Gujarati (૨૨ ઓક્ટોબર) and English digits in English. Story text keeps whatever the story uses.
 
-**Article page:**
-1. Section sub-nav.
-2. A centred 640 px column: headline 48 px serif, summary 20 px light, published and updated times.
-3. Toolbar: Listen (minutes), Share, Save.
-4. Photo and caption (sans 14 px grey), byline.
-5. Body at 20/32.
-6. Recommended stories, a sign-up box, the footer.
+### 2.3 Space, grid and rules
 
-## 4. Mapped to Capital Kranti
+- **Spacing:** steps of 4 px: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64.
+- **Grid** (as the Guardian and the Post, sized for us):
 
-| The Post | Capital Kranti |
-|---|---|
-| Wordmark and tagline | કેપિટલ ક્રાંતિ, "સમાજનો વિવેકપૂર્ણ દ્રષ્ટિકોણ" |
-| Subscribe pill | "ઈ-પેપર" (e-paper: today's printed pages and PDF) |
-| Opinions rail | "વિશેષ" (features and editorials), with a round icon or photo |
-| The 7 · LIVE | "તાજા સમાચાર · LIVE" (latest news), from the live pipeline |
-| Most Read | "સૌથી વધુ વંચાયેલા" (most read; real counts once the site runs) |
-| Ripple | "અન્ય માધ્યમોમાંથી" (from other outlets): credited, linked pieces |
-| Video strips | "વીડિયો સમાચાર" (video news): our shorts (9:16) |
-| Alerts bell | breaking-news alerts |
-| Ask The Post AI | "પૂછો" (ask): later, answers from our own archive |
-| Newsletter promo | WhatsApp Channel / Telegram join box |
-| Diversions | later (a Gujarati crossword) |
-| Paywall, subscriptions, comments | **none**: the paper is free; comments need moderation (later) |
+| Width | Columns | Gutter | Side margin |
+|---|---|---|---|
+| under 740 (phone) | 4 | 16 | 16 |
+| 740-1023 (tablet) | 8 | 24 | 24 |
+| 1024 and up (desktop) | 12 | 32 | 32, content at most 1240 |
 
-**Sections (tiers × genres):**
-- **Tiers:** ગુજરાત (Gujarat), દેશ (India), વિશ્વ (World).
-- **Genres:** ખેતી (agriculture), અર્થતંત્ર (economy), ટેક અને વિજ્ઞાન (tech and science), આરોગ્ય (health), રમતગમત (sport), શિક્ષણ (education), મનોરંજન (entertainment).
+- **Rules:** cards sharing a row are divided by a 1 px `rule` **drawn in the middle of the gutter** (a cell's `::before`), and rows by a 1 px rule across (`::after`). Never borders on the cards themselves.
+- **A section begins** with a 2 px `rule-strong` line across, then its name in `brand` with a ›, as the printed paper's heavy rules.
+- **Corners:** square for photos and cards (a paper, not an app); round only for buttons (pills) and avatars.
+- **Photos:** 3:2 in cards; 16:9 for the lead on desktop; 9:16 for shorts. Every photo has its space reserved, so nothing jumps while loading.
 
-**Language:** Gujarati first, with an English switch (as in the newsroom).
+### 2.4 Motion
 
-## 5. How to check the design
+Short and quiet: 150-200 ms fades and slides for the menu and sheets. Nothing moves on its own except the live dot. All motion off when the phone asks for reduced motion.
 
-- **Widths:** render home, section, article, the open drawer, the alerts and account panels, and the light theme at **390, 820 and 1440** widths.
-- **Must hold:**
-  - no script errors and no sideways scroll;
-  - every rule line and every hover state looked at.
-- **Side by side** with the Post, module by module. **Don't commit the Post's screenshots** (they're its content): take them fresh in the session that needs them.
-- **Send the user** desktop and phone screenshots before calling a page done.
+---
+
+## 3. Components
+
+### 3.1 The frame
+
+- **Header** (sticky, 56 px):
+  - phone: menu ☰ | the wordmark કેપિટલ ક્રાંતિ in `brand` | search;
+  - desktop: the same, plus the date and the e-paper button on the right;
+  - a 2 px `cyan` line under it (the paper's rule).
+- **Section scroller** under the header: ગુજરાત, દેશ, વિશ્વ, ખેતી, અર્થતંત્ર, ટેક-વિજ્ઞાન, આરોગ્ય, રમતગમત, શિક્ષણ, મનોરંજન; scrolls sideways on a phone, the current one underlined.
+- **Breaking bar:** full width, `breaking`, "તાજા સમાચાર:" and the headline; closable; only for real breaking news.
+- **Bottom bar (phone only):** હોમ, તાજા, વીડિયો, ઈ-પેપર, વિભાગો. Thumbs reach it; it hides while scrolling down and returns on scrolling up.
+- **Menu** (a sheet from the left): search, every section with its topics, the e-paper, the WhatsApp channel, Settings (theme, text size, language), About and policies.
+- **Footer:** the wordmark, link columns (About, editorial policy, how we check news, corrections, contact, send us news, advertise, terms, privacy, RSS), the RNI number, the address.
+
+### 3.2 Cards (a few fixed sizes, as the Guardian's)
+
+| Card | Parts | Where |
+|---|---|---|
+| **Lead** | photo (full width on phone), kicker, `display` headline, summary, time | the top of the home and section pages |
+| **Standard** | photo 3:2 (optional), `h3` headline, summary (desktop), time | most containers |
+| **Compact** | `h4` headline, small square photo on the right (optional), time | lists on phone, the rail on desktop |
+| **List item** | time, `h4` headline | "Latest", "Most read" (numbered) |
+| **Short** | 9:16 picture, duration, headline over a dark fade | the video strip |
+| **E-paper page** | page image, page number | the e-paper strip and page |
+
+Rules: a card without a photo is a text card, never an empty grey box. Headlines are never cut off with "…"; summaries may be.
+
+### 3.3 Containers (the front page is a stack of them)
+
+Each container is one section of news with a heading (§2.3), a layout and a link to the full section:
+- **Top:** lead + 3 standard (phone: lead, then 3 compact).
+- **Latest:** a time-stamped list, newest first, with "updated every few minutes" said honestly.
+- **Section (Gujarat, India, World, a topic):** one standard with photo + 3-4 compact; World stays briefs.
+- **Video:** a sideways strip of shorts.
+- **E-paper:** today's 4 printed pages, small, and "read today's paper".
+- **Join:** the WhatsApp channel (and Telegram), one at a time, never a pop-up.
+
+### 3.4 Trust pieces (on every story)
+
+- **Checked mark** (`checked` ✓): "આંકડા મૂળ સ્રોત સાથે ચકાસેલા" (numbers checked against the source), shown when the number check passed.
+- **Times:** published and, when changed, "updated" with the time.
+- **Source box** at the end: each source with a link (PIB, the CM's office, an outlet), and how the story was made, in plain words: written by Capital Kranti's desk from the official release, with AI help, and checked (to confirm with the user, §6).
+- **Correction note:** when a story is corrected, a dated note at the top says what changed. Never a silent change.
+- **"ભૂલ જણાવો"** (report a mistake) on every story.
+- **Photo credit** in every caption.
+
+### 3.5 Article page
+
+1. Section and topic links.
+2. Kicker, `h1` headline, standfirst.
+3. Meta: desk and place, published, updated, the checked mark.
+4. Tools: Listen (minutes), text size (અ− અ અ+), Share, Save. On a phone a **sticky bar at the bottom** holds a green **WhatsApp share** button, Listen and text size.
+5. Photo with caption and credit.
+6. Body in `body` type, at most ~36 Gujarati characters' width per line on desktop (about 640 px).
+7. Source box, report a mistake.
+8. More from the section (compact cards), the WhatsApp channel box.
+
+### 3.6 Section page
+
+Title in `brand` with Follow; topic chips; a Lead; then a river of compact cards with times, newest first; "more" loads the next page (no endless scroll that hides the footer).
+
+### 3.7 E-paper page
+
+The day's printed pages as images (tap to enlarge, pinch to zoom), the PDF to download, and a calendar for earlier days.
+
+### 3.8 States
+
+- **Hover** (desktop only): headlines dim to `soft`; plain links underline; buttons darken.
+- **Focus:** always a visible 2 px ring in `live`.
+- **Pressed:** a slight darkening; touch targets at least 48 × 48 px.
+- **Loading:** reserved space with a faint `surface` block; never a spinner for text.
+- **Empty:** a plain sentence ("આ વિભાગમાં આજે સમાચાર નથી") and a link back.
+- **Offline:** "ઇન્ટરનેટ નથી" with the pages already read still readable (later).
+
+---
+
+## 4. Speed and accessibility budgets
+
+- **Speed** (a mid-range Android phone on slow 4G):
+  - largest content shown in under 2.5 s; nothing shifts (layout shift under 0.1);
+  - page script under 50 KB; the page reads without script;
+  - photos in sizes for each width (AVIF/WebP), lazy below the first screen;
+  - fonts with `display: swap` and only the Gujarati and Latin pieces needed.
+- **Accessibility:** WCAG 2.1 AA; `lang="gu"`; a skip link; real headings in order; every photo with alt text from its caption; everything usable by keyboard and screen reader.
+
+## 5. Language
+
+Gujarati first. The English switch changes the site's own labels, menus and dates; stories stay in Gujarati unless the user decides to translate them (it costs AI money; §6).
+
+## 6. Open questions for the user
+
+1. **How stories say they were made:** "written by Capital Kranti's desk from the official release, with AI help, and checked" in the source box. Is that wording right?
+2. **The English switch:** labels only (free), or stories translated too (AI cost per story)?
+3. **The domain:** the printed paper names `capitalkranti.co.in`; is it the paper's and can it point at the site?
+
+## 7. How to check the design
+
+- **Widths:** 360, 390, 412 (phones), 820 (tablet), 1440 (desktop): home, section, article, e-paper, the open menu, both themes, all three text sizes, English.
+- **Must hold:** no script errors, no sideways scroll, no headline cut off, every rule line in its gutter, every hover and focus state looked at.
+- **Speed:** Lighthouse mobile run on the real site from stage 1 on, against §4.
+- **Send the user** phone and desktop screenshots before calling a page done.
