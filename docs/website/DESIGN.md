@@ -11,7 +11,7 @@ lightness, under the printed paper's own colours.
 - It was published as https://claude.ai/artifact/RK4UQHxNmQvWrFZuuksEeY.
 - It is generated: `python3 make_page.py` puts `full-img.json` (22 Oct's real stories, photos inlined) and the 22 Oct printed pages into `page_template.html`.
 
-The real site (stage 1 of ROADMAP.md) turns the sample's parts into components.
+The real site (phase A of ROADMAP.md) turns the sample's parts into components.
 
 ---
 
@@ -227,5 +227,5 @@ Gujarati first. The English switch changes the site's own labels, menus and date
 
 - **Widths:** 360, 390, 412 (phones), 820 (tablet), 1440 (desktop): home, section, article, e-paper, the open menu, both themes, all three text sizes, English.
 - **Must hold:** no script errors, no sideways scroll, no headline cut off, every rule line in its gutter, every hover and focus state looked at.
-- **Speed:** Lighthouse mobile run on the real site from stage 1 on, against §4.
+- **Speed:** Lighthouse mobile run on the real site from phase A on, against §4.
 - **Send the user** phone and desktop screenshots before calling a page done.
