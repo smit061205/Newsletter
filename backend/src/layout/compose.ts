@@ -118,8 +118,9 @@ export function columnElements(lines: Line[], id: string, aid: string, f: Frame,
       ...elementText([l], legacy), font: BODY.font, size: r2(size), lineHeight: r2(pitch), color: INK, nowrap: true,
     };
     if (l.end && l.width <= width) return { ...base, align: "left" as const };
-    // (a kerned script prints a hair wider than measured: spread to just short of the edge)
-    const s = spread({ natural: l.width, spaces: l.spaces, letters: l.letters }, KERNED.test(l.text) ? width * 0.994 : width, size, l.spaceWidth);
+    // (a kerned script prints a hair wider than measured -- up to 1.4% on a justified Hindi
+    // line, 24 Oct: 5-7 px over the column -- spread to short of the edge by that)
+    const s = spread({ natural: l.width, spaces: l.spaces, letters: l.letters }, KERNED.test(l.text) ? width * 0.98 : width, size, l.spaceWidth);
     // one word too short for its line, with no spaces to spread: flush left,
     // as a typesetter would leave it, rather than letters pulled apart
     if (!l.spaces && s.ratio > 1) return { ...base, align: "left" as const };

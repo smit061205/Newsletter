@@ -205,6 +205,16 @@ export class Store {
       .run(date, version, new Date().toISOString(), JSON.stringify(issue), JSON.stringify(report));
     return version;
   }
+  /** One saved version of a day's issue. */
+  issueVersion(date: string, version: number): { version: number; status: string; issue: IssueRender; report: unknown } | null {
+    const row = this.db.prepare("select version, status, json, report from issues where date = ? and version = ?")
+      .get(date, version) as { version: number; status: string; json: string; report: string } | undefined;
+    return row ? { version: row.version, status: row.status, issue: JSON.parse(row.json), report: JSON.parse(row.report) } : null;
+  }
+  /** A saved issue's report brought up to date (the page review, run after it). */
+  updateReport(date: string, version: number, report: unknown) {
+    this.db.prepare("update issues set report = ? where date = ? and version = ?").run(JSON.stringify(report), date, version);
+  }
   latestIssue(date: string): { version: number; status: string; issue: IssueRender; report: unknown } | null {
     const row = this.db.prepare("select version, status, json, report from issues where date = ? order by version desc limit 1")
       .get(date) as { version: number; status: string; json: string; report: string } | undefined;

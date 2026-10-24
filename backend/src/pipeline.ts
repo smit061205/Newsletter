@@ -81,6 +81,9 @@ export const collecting: { current: Promise<unknown> | null } = { current: null 
 const RETRY_EVERY_MS = 10 * 60_000;
 const RETRIES = 12;
 
+// layout checks a new arrangement of the paper can mend (gate names, report.gates)
+const REPAIR_BY_LAYOUT = /^(2 no empty space|3 no tombstoned|3 headline sizes|3 no headline over|S2 |S4 |S9 |W )/;
+
 /** Runs `job`, noting how long it took as one of the step's parts (the time meter). */
 type Timed = <T>(name: string, job: () => Promise<T>) => Promise<T>;
 
@@ -111,9 +114,14 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           say(`the CM's office and All India Radio couldn't be read (${e instanceof Error ? e.message : e}): the paper is made from PIB's news`);
         }
       })();
+      // (and PIB's Hindi and English releases, read now for the translation step)
+      const foreignRun = profile.language.lang === "gu"
+        ? timed("PIB Hindi and English", async () => { const { readForeign } = await import("./editorial/translate.ts"); return readForeign(store, date, say); })
+            .catch((e: unknown) => { if (stopping) throw e; say(`PIB's Hindi and English releases couldn't be read ahead (${e instanceof Error ? e.message : e})`); return 0; })
+        : Promise.resolve(0);
       // both in: an item that is the same news as a PIB release that came in alongside it goes
       const official = async () => {
-        await officialRun;
+        await Promise.all([officialRun, foreignRun]);
         if (profile.language.lang !== "gu") return;
         const { dropTwinsOfPib } = await import("./ingest/official.ts");
         dropTwinsOfPib(store, date, say);
@@ -205,16 +213,40 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         const { prepareEditions, DEFAULT_EDITIONS } = await import("./editorial/copies.ts");
         void timed("sister papers' wording (beside the layout)", () => prepareEditions(store, date, store.setting("editions", DEFAULT_EDITIONS)));
       }
-      const r = await buildIssue(store, date, { log: say, progress });
+      // (the AI's look at the pages comes after the paper is saved: below)
+      let r = await buildIssue(store, date, { log: say, progress, reviewLater: true });
       // the layout's own parts, for the time meter
       const tm = r.report.timing;
       if (tm) {
         for (const [label, ms] of [["preparing", tm.preparing ?? 0], ["planning", tm.planning], ["fitting", tm.fitting], ["printing", tm.print],
-                                   ["page review", tm.review], ["checks", tm.checks]] as const) {
+                                   ["checks", tm.checks]] as const) {
           if (ms > 500) part(label, ms / 1000);
         }
       }
-      say(`issue ${r.report.issueNumber} v${(r.report as { version?: number }).version ?? "?"}: ${r.report.ready ? "READY" : "NOT READY"}`);
+      // what the checks found, mended here and checked again (twice at most):
+      // a number its source doesn't have, written again without it; a page's
+      // layout failing a check, the paper laid out another way. What can't be
+      // mended is left for the editor, in the report.
+      for (let round = 1; round <= 2; round++) {
+        const failing = r.report.gates.filter((g) => !g.pass);
+        const layout = failing.filter((g) => REPAIR_BY_LAYOUT.test(g.gate));
+        let mended = 0;
+        if (failing.some((g) => g.gate.startsWith("6 "))) {
+          const { repairFacts } = await import("./editorial/repair.ts");
+          mended = await timed(`mending numbers ${round}`, () => repairFacts(store, date, say));
+        }
+        if (!layout.length && !mended) break;
+        say(`mending ${round}: ${[...layout.map((g) => g.gate.replace(/^\S+ /, "")), ...(mended ? [`${mended} story(ies) written again`] : [])].join("; ")} -- laying out again`);
+        r = await timed(`laying out again ${round}`, () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: layout.length ? round : 0 }));
+      }
+      const version = (r.report as { version?: number }).version;
+      say(`issue ${r.report.issueNumber} v${version ?? "?"}: ${r.report.ready ? "READY" : "NOT READY"} (the page review follows)`);
+      // the page review, after the paper is saved: it only reports, so the paper is ready meanwhile
+      if (version) {
+        const { reviewSaved } = await import("./build.ts");
+        // (the newsroom looks again while gate 5 says it's running)
+        void reviewSaved(store, date, version).catch(() => {});
+      }
       return;
     }
   }

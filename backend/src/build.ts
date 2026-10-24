@@ -2,6 +2,7 @@
 // the planner's stories; validated against the render contract, checked with
 // the frontend's own plotter (no text may overflow or run into anything),
 // saved as a draft, and printed to PDF.
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -32,6 +33,10 @@ import { profile } from "./profile.ts";
 import { storyIdOf, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
+  /** the page review left to run after the paper is saved (reviewLater): the paper is ready a minute sooner */
+  reviewLater?: boolean;
+  /** another arrangement of the same day (a repair after a layout check failed): 0 the day's own */
+  seedShift?: number;
               /** how far the build has got: planning the pages, finishing each, checking (pipeline.ts) */
               progress?: (p: Progress) => void;
               /** page images even when the fonts may be served (tests read them) */
@@ -59,6 +64,34 @@ export interface CopyOpts {
   store?: Store;
   /** the stories come in another language (`reword` translates them): not filtered by language until then */
   translate?: boolean;
+}
+
+/** Gate 5's word while the page review runs after the paper is saved (reviewSaved). */
+export const REVIEW_RUNNING = "the page review is running";
+
+/** The page review of a saved issue, run after it (Opts.reviewLater): its
+ * findings and gate 5 written into the stored report, "ready" again from all
+ * the gates. Returns the report, or null if there's nothing to review. */
+export async function reviewSaved(store: Store, date: string, version: number, log: (s: string) => void = () => {}) {
+  const dir = pageImageDir(date);
+  const got = store.issueVersion(date, version);
+  if (!got) return null;
+  const report = got.report as BuildReport;
+  const images = Array.from({ length: report.pages }, (_, i) => path.join(dir, `${i + 1}.png`)).filter((f) => existsSync(f));
+  const review = images.length ? await reviewPages(images, { log }) : null;
+  const confident = (review?.findings ?? []).filter((f) => f.confidence >= 0.8);
+  const gate = report.gates.find((g) => g.gate.startsWith("5 "));
+  if (gate) {
+    gate.pass = !!review && confident.length === 0 && !review.unreviewed.length;
+    gate.detail = !review ? "not run (no API key or no page images)"
+      : review.unreviewed.length ? `page(s) ${review.unreviewed.join(", ")} not reviewed (the model didn't answer)`
+      : confident.map((f) => `p${f.page} ${f.issue} "${f.where.slice(0, 30)}": ${f.note}`).join("; ") || `ok (${review.findings.length} minor note(s))`;
+  }
+  report.review = review?.findings ?? [];
+  report.cost = (report.cost ?? 0) + (review?.cost ?? 0);
+  report.ready = report.gates.every((g) => g.pass);
+  store.updateReport(date, version, report);
+  return report;
 }
 
 /** The day's own seed for the layout's choices: the same day, the same paper. */
@@ -187,15 +220,18 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     }
     // every story prints a headline, a sub-heading and its body: a story
     // without a deck gets its release's own sub-heading, else one written for it
+    // (the release's own at once; those the AI writes, all together and beside the editorial plan below)
     for (const s of stories) {
-      if (s.deck?.trim()) continue;
-      const r = releases.get(s.id);
-      const deck = r?.subhead?.trim() || (r ? (await writeDeck(store, s, r, { log }))?.deck : undefined);
+      const sub = !s.deck?.trim() ? releases.get(s.id)?.subhead?.trim() : undefined;
+      if (sub) { s.deck = sub; store.putStory(s); }
+    }
+    const decksRun = Promise.all(stories.filter((s) => !s.deck?.trim() && releases.has(s.id)).map(async (s) => {
+      const deck = (await writeDeck(store, s, releases.get(s.id)!, { log }))?.deck;
       if (deck) {
         s.deck = deck;
         store.putStory(s);
       }
-    }
+    }));
     // a speech's full text written up beside the event's own story (stories
     // written before the rewrite grouped them): the event's story is enough
     const speechDup = (s: Story) => {
@@ -208,6 +244,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // the editorial plan ranks the day's stories (an editor's own rank wins)
     const rankedByEditor = new Set(edits.filter((e) => typeof e.change.priority === "number").map((e) => e.storyId));
     const planned = await planDay(store, date, pool, { log });
+    // the sub-headings the AI wrote meanwhile, on the stories laid out
+    await decksRun;
+    const deckOf = new Map(stories.map((s) => [s.id, s.deck]));
+    pool = pool.map((s) => (s.deck?.trim() || !deckOf.get(s.id) ? s : { ...s, deck: deckOf.get(s.id)! }));
     if (planned) {
       const by = new Map(planned.plan.map((p) => [p.id, p]));
       pool = pool.map((s) => (!rankedByEditor.has(s.id) && by.has(s.id) ? { ...s, priority: by.get(s.id)!.rank } : s))
@@ -277,7 +317,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     if (engine === "v2") {
       v2 = await layOut({
         pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy,
-        seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : seedOf(date),
+        seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
         ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
         date, fillers, log,
         // (the stories' lengths, then each page as it's laid out -- in the newsroom's words)
@@ -386,7 +426,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // gate 5: a vision model reviews the finished pages (report only)
   const t3 = Date.now();
   let review: Awaited<ReturnType<typeof reviewPages>> = null;
-  if (images && !opts.noReview) {
+  if (images && !opts.noReview && !opts.reviewLater) {
     review = await reviewPages(images.map((_, i) => path.join(pageImageDir(date), `${i + 1}.png`)), { log });
   }
   timing.review = Date.now() - t3;
@@ -438,7 +478,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     .filter((f): f is { story: string; detail: string } => !!f.detail && !seenFact.has(`${f.story}|${f.detail}`) && !!seenFact.add(`${f.story}|${f.detail}`));
   // gate 7 compares only builds made from the same inputs by the same engine:
   // after a change to either, the paper is meant to differ
-  const fingerprint = buildFingerprint(store, date);
+  // (another arrangement on purpose, a repair: compared only with its like)
+  const fingerprint = buildFingerprint(store, date) + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "");
   // (a copy is meant to differ from the day's paper)
   const previous = opts.copy ? null : store.latestIssue(date);
   const comparable = previous && (previous.report as { fingerprint?: string }).fingerprint === fingerprint;
@@ -489,9 +530,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         : same ? "identical to the last build of the same inputs" : "the same inputs and engine gave a different issue: not deterministic" },
   ];
   const confident = (review?.findings ?? []).filter((f) => f.confidence >= 0.8);
+  const later = !!opts.reviewLater && !!images && !opts.noReview;
   gates.splice(6, 0, {
-    gate: "5 the page reviewer sees no clear problem", pass: confident.length === 0 && !review?.unreviewed.length,
-    detail: !review ? "not run (no API key or no page images)"
+    gate: "5 the page reviewer sees no clear problem", pass: later || (confident.length === 0 && !review?.unreviewed.length),
+    detail: later ? REVIEW_RUNNING : !review ? "not run (no API key or no page images)"
       : review.unreviewed.length ? `page(s) ${review.unreviewed.join(", ")} not reviewed (the model didn't answer)`
       : confident.map((f) => `p${f.page} ${f.issue} "${f.where.slice(0, 30)}": ${f.note}`).join("; ") || `ok (${review.findings.length} minor note(s))`,
   });

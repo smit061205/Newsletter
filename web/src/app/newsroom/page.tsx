@@ -67,6 +67,13 @@ export default function Today() {
     call<StoryRow[]>(`/api/stories?date=${date}`).then(setStories).catch(() => {});
   }, [date, hasIssue]);
   useEffect(() => { loadIssue(); }, [loadIssue, issueVersion]);
+  // the AI's page review runs after the paper is saved: look again until it's in
+  const reviewing = !!issue?.report.gates.some((g) => g.gate.startsWith("5 ") && g.detail === "the page review is running");
+  useEffect(() => {
+    if (!reviewing) return;
+    const id = setInterval(loadIssue, 15_000);
+    return () => clearInterval(id);
+  }, [reviewing, loadIssue]);
   useEffect(() => {
     setJob(null); setTicker([]); setPublishing(null);
     call<Job[]>(`/api/jobs?date=${date}`).then((js) => setJob(js[0] ?? null)).catch(() => {});
@@ -196,6 +203,7 @@ export default function Today() {
         )}
         {job && <Stepper job={job} />}
         {job && <TimeMeter job={job} />}
+        {reviewing && !running && <p className={s.faint}>{t("today.reviewing")}</p>}
         {error && <Note tone="bad">{error}</Note>}
         {otherRunning && <p className={s.faint}>{t("today.otherRunning", { date: status!.running!.date })}</p>}
         <div className={s.row} style={{ justifyContent: "space-between" }}>

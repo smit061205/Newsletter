@@ -23,7 +23,9 @@ import { sameNewsIn } from "../editorial/translate.ts";
 import { decodeEntities, imageSize } from "./pib.ts";
 
 const UA = "CapitalKranti-news-ingest/1.0";
-const PAUSE_MS = 1500;
+// a short gap between a site's requests, three of its pages at once at most
+const PAUSE_MS = 400;
+const AT_ONCE = 3;
 const MAX_PAGES = 120; // a day's ceiling for both, whatever happens
 
 export type OfficialSource = "cmo" | "air";
@@ -181,17 +183,25 @@ export async function ingestOfficial(store: Store, date: string, opts: { log?: (
     const items = await list(date).catch((e: unknown) => { log(`${name}: couldn't read the list (${e instanceof Error ? e.message : e})`); return [] as Item[]; });
     log(`${name}: ${items.length} item(s) for ${date}`);
     listed += items.length;
-    for (const it of items) {
+    // (three at a time; each one's request still takes its turn at the site's pace)
+    const queue = [...items];
+    await Promise.all(Array.from({ length: AT_ONCE }, async () => { for (let it = queue.shift(); it; it = queue.shift()) await read(it); }));
+  };
+  const read = async (it: Item) => {
+    {
       opts.progress?.({ done: done++, total: Math.max(listed, done), label: "reading", item: it.headline });
-      if (it.id && store.hasRelease(it.id)) continue;
+      if (it.id && store.hasRelease(it.id)) return;
       const html = await get(it.url).catch(() => null);
       const p = html ? (it.source === "cmo" ? parseCmo(html) : parseAir(html, it.id)) : null;
-      if (!p || !p.paras.length) { log(`  ${it.url}: no text on the page`); continue; }
-      if (p.date && p.date !== date) continue;
-      if (store.hasRelease(p.id)) continue;
+      if (!p || !p.paras.length) { log(`  ${it.url}: no text on the page`); return; }
+      if (p.date && p.date !== date) return;
+      if (store.hasRelease(p.id)) return;
       // (world news in English: translated by the top-up, not compared with the Gujarati)
       const twin = it.lang ? null : sameNewsIn({ headline: p.headline, body: p.paras.join("\n\n") }, taken);
-      if (twin) { log(`  ${p.headline.slice(0, 50)}: the same news as ${twin.source === "pib" ? `PIB ${twin.id}` : `an earlier item (${twin.id})`}, left out`); continue; }
+      if (twin) { log(`  ${p.headline.slice(0, 50)}: the same news as ${twin.source === "pib" ? `PIB ${twin.id}` : `an earlier item (${twin.id})`}, left out`); return; }
+      // (taken at once: three are read side by side, and a twin of this one may be next)
+      if (!it.lang) taken.push({ id: p.id, date, url: it.url, office: OFFICE[it.source], headline: p.headline, subhead: p.subhead,
+                                 body: p.paras.join("\n\n"), photos: [], fetchedAt: "", source: it.source });
       const photos: string[] = [];
       if (p.photo && it.source === "cmo") {
         const img = await fetch(p.photo, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(30_000) }).catch(() => null);
@@ -209,7 +219,6 @@ export async function ingestOfficial(store: Store, date: string, opts: { log?: (
         ...(it.section ? { ministry: it.section } : {}),
       };
       store.putRelease(release);
-      if (!it.lang) taken.push(release);
       fetched++;
       log(`  ${it.source} ${p.headline.slice(0, 70)} (${photos.length} photo${photos.length === 1 ? "" : "s"})`);
     }
