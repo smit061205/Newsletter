@@ -1,0 +1,26 @@
+{
+  "name": "capital-kranti-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Capital Kranti website (docs/website/ROADMAP.md). Its own installs: not part of the root workspaces, never packed into the desktop app.",
+  "scripts": {
+    "dev": "next dev --port 3200",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20.9"
+  },
+  "dependencies": {
+    "next": "16.3.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

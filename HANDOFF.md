@@ -278,6 +278,13 @@ printed paper as one of its products. It is **planned, not built**.
 - **Look:** Capital Kranti's own design system (DESIGN.md, 24 Oct), not a copy of one paper: the Post's ruled grid, the Guardian's containers, BBC Gujarati's phone-first lightness, under the printed paper's purple, navy and cyan. Light or dark follows the phone.
 - **Order (24 Oct): four phases** (ROADMAP §6): A, the website from the evening paper, with Publish sending to it; B, live news from official sources and other outlets; C, the social desk; D, the printed paper made from the website. Within a phase, work goes on without stopping; the user reviews at its end.
 
+**Started (25 Oct):** `site/` exists as a starter: Next.js 16.3.2 with its own
+installs (`site/package-lock.json`, not in the root workspaces), one Gujarati
+"coming soon" page in the design's tokens and fonts, kept out of search engines
+(`robots: noindex`). Its checks are `.github/workflows/site.yml` (only for
+`site/**`); `apps.yml` skips changes only to `site/` or `docs/`. Locally:
+`npm run dev --prefix site` (port 3200). The Vercel project points at `site/`.
+
 **First steps in the new session:**
 1. Read `CLAUDE.md`, this file's §8, and `docs/website/ROADMAP.md` §1 and §6.
 2. Go through the up-front checklist (ROADMAP §6.0) with the user: the decisions, and the accounts they create, with keys saved as Actions secrets by them; never in chat. First test whether PIB answers GitHub's servers (ROADMAP §1.1).
