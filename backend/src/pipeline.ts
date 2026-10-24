@@ -85,11 +85,22 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       const { ingestPib, FEEDS } = await import("./ingest/pib.ts");
       const { profile } = await import("./profile.ts");
       const feed = (profile.language.lang in FEEDS ? profile.language.lang : "en") as keyof typeof FEEDS;
+      // an earlier day: PIB shows it only through its date form, which its
+      // firewall refuses programs (24 Oct 2026) -- and waiting won't bring
+      // that day's news: the day is made from the releases already saved
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(Date.now());
+      const past = date < today;
       let r: Awaited<ReturnType<typeof ingestPib>> | null = null;
       for (let attempt = 0; !r; attempt++) {
         try {
           r = await ingestPib(store, date, feed, { log: say, progress });
         } catch (e) {
+          const saved = store.releases(date).length;
+          if (past && saved) {
+            say(`PIB won't show ${date}'s list now (${e instanceof Error ? e.message : e}): the paper is made from the ${saved} release(s) saved that day`);
+            return;
+          }
+          if (past) throw new Error(`PIB won't show ${date}'s list, and no news was saved that day`);
           if (attempt >= RETRIES) throw e;
           const at = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }).format(Date.now() + RETRY_EVERY_MS);
           say(`PIB isn't answering (${e instanceof Error ? e.message : e}): trying again at ${at}`);
@@ -114,7 +125,10 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       // mustn't stop the evening's paper -- it's made from what the day has
       try {
         const { withPatience } = await import("./ingest/pib.ts");
-        await withPatience({ tries: 2, seconds: 20 }, () => topUp(store, date, { log: say, progress }));
+        // (an earlier day's Hindi list comes only through PIB's date form, which
+        // its firewall refuses programs: one short try, not two)
+        const past = date < new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(Date.now());
+        await withPatience(past ? { tries: 1, seconds: 15 } : { tries: 2, seconds: 20 }, () => topUp(store, date, { log: say, progress }));
       } catch (e) {
         if (stopping) throw e;
         say(`the Hindi top-up couldn't finish (${e instanceof Error ? e.message : e}): the paper is made from what the day has`);
