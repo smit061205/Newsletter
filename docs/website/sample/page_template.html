@@ -1,0 +1,533 @@
+<title>Capital Kranti Website</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+Gujarati:wght@400;600;700;800&family=Hind+Vadodara:wght@300;400;500;600;700&display=swap">
+<style>
+/* Layout: the Washington Post's UI (measured 24 Oct 2026) -- a 20-column grid (34px columns, 32px gutters, 1288px),
+   1px rules drawn in the middle of each gutter, 15+5 front block and rail, section bands in pairs; articles in one 640px column.
+   Dark first (the paper's choice); Light and Match-device from the account panel. */
+:root{
+  --bg:#141414; --panel:#1c1c1c; --ink:#dedede; --strong:#ffffff; --soft:#bdbdbd; --muted:#a1a1a1;
+  --rule:#2a2a2a; --rule-strong:#5a5a5a; --hover:#9a9a9a; --chip:#2b2b2b;
+  --blue:#166dfc; --live:#5892c9; --breaking:#f1554f; --opinion:#d4524d; --badge-bg:#ffffff; --badge-ink:#111111;
+  --serif:'Noto Serif Gujarati','Gujarati Sangam MN',Georgia,serif;
+  --sans:'Hind Vadodara','Gujarati MT','Helvetica Neue',Arial,sans-serif;
+  --gut:32px;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  --bg:#ffffff; --panel:#f5f5f5; --ink:#2a2a2a; --strong:#111111; --soft:#4d4d4d; --muted:#666666;
+  --rule:#e9e9e9; --rule-strong:#a1a1a1; --hover:#666666; --chip:#efefef; --badge-bg:#111111; --badge-ink:#ffffff; color-scheme:light } }
+:root[data-theme="light"]{
+  --bg:#ffffff; --panel:#f5f5f5; --ink:#2a2a2a; --strong:#111111; --soft:#4d4d4d; --muted:#666666;
+  --rule:#e9e9e9; --rule-strong:#a1a1a1; --hover:#666666; --chip:#efefef; --badge-bg:#111111; --badge-ink:#ffffff; color-scheme:light }
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.3;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0;text-align:inherit}
+:focus-visible{outline:2px solid var(--live);outline-offset:3px;border-radius:2px}
+svg.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.wrap{max-width:calc(1288px + 32px);margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* ---------- header ---------- */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--rule)}
+.bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.icons{display:flex;gap:6px;align-items:center}
+.ibtn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;position:relative;color:var(--strong)}
+.ibtn:hover{background:var(--chip)}
+.dot{position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--breaking)}
+.mini{text-align:center;line-height:1.05;opacity:0;transition:opacity .2s;pointer-events:none}
+.stuck .mini{opacity:1;pointer-events:auto}
+.mini b{display:block;font-family:var(--serif);font-weight:800;font-size:22px;color:var(--strong)}
+.mini i{font-family:var(--serif);font-size:11px;color:var(--muted)}
+.right{display:flex;justify-content:flex-end;align-items:center;gap:10px}
+.pill{background:var(--blue);color:#fff;border-radius:999px;padding:7px 16px;font-size:15px;font-weight:700}
+.pill:hover{filter:brightness(.88)}
+.acct{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;color:var(--strong);padding:6px 8px;border-radius:999px}
+.acct:hover{background:var(--chip)}
+.trend-bar{display:none;border-top:1px solid var(--rule)}.stuck .trend-bar{display:block}
+
+.breaking{background:var(--breaking);color:#fff}
+.breaking .wrap{display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;position:relative;font-size:15px;padding-block:8px}
+.breaking b{font-weight:800}.breaking a:hover{text-decoration:underline}
+.breaking .x{position:absolute;right:max(16px,env(safe-area-inset-right,0px));color:#fff}
+
+.mast{text-align:center;padding-block:28px 16px}
+.mast h1{font-family:var(--serif);font-weight:800;font-size:clamp(40px,6vw,66px);line-height:1.15;margin:0;color:var(--strong);letter-spacing:.5px}
+.mast p{font-family:var(--serif);font-style:italic;font-size:17px;color:var(--muted);margin:4px 0 0}
+nav.secs{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 30px;padding-block:16px 15px;border-bottom:1px solid var(--ink);font-weight:700;font-size:15px;color:var(--strong)}
+nav.secs .sep{width:1px;background:var(--rule-strong);align-self:stretch}
+nav.secs button:hover{color:var(--hover)}nav.secs button.on{box-shadow:inset 0 -2px 0 var(--strong)}
+.trending{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 16px;padding-block:13px;font-size:14px;color:var(--soft)}
+.trending b{color:var(--strong)}.trending button:hover{text-decoration:underline}
+
+/* ---------- panels: drawer (left), alerts, account (right) ---------- */
+.shade{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:min(300px,86vw);background:var(--bg);border-right:1px solid var(--rule);z-index:41;overflow:auto;
+  padding:calc(18px + env(safe-area-inset-top,0px)) 22px 30px calc(22px + env(safe-area-inset-left,0px))}
+.drawer .pill{display:block;text-align:center;margin-bottom:16px}
+.ask{display:flex;align-items:center;border:1px solid var(--rule-strong);border-radius:4px;padding:0 10px;margin-bottom:18px}
+.ask input{flex:1;min-width:0;background:none;border:0;color:var(--strong);padding:11px 0;font:inherit;font-size:15px;outline:none}
+.drawer .row{display:flex;justify-content:space-between;align-items:center;width:100%;padding-block:11px;font-weight:700;font-size:15px;color:var(--strong)}
+.drawer .row:hover{color:var(--hover)}
+.drawer .sub{padding:0 0 8px 14px}.drawer .sub button{display:block;padding-block:7px;font-size:14px;color:var(--soft)}
+.drawer .sub button:hover{color:var(--strong)}
+.drawer .chev{transition:transform .2s}.drawer .open .chev{transform:rotate(90deg)}
+.drawer h6{font-size:12px;letter-spacing:1px;color:var(--muted);margin:22px 0 6px;font-weight:700;border-top:1px solid var(--rule);padding-top:18px}
+.drawer .az button{display:block;padding-block:6px;font-size:14px;color:var(--soft)}.drawer .az button:hover{color:var(--strong)}
+.pop{position:fixed;z-index:41;background:var(--bg);border:1px solid var(--rule);box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.alerts{top:calc(56px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));width:min(360px,92vw);max-height:70vh;overflow:auto;padding:14px 18px}
+.alerts header{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:13px;letter-spacing:.8px;color:var(--strong);padding-bottom:8px}
+.alert{display:grid;grid-template-columns:10px 1fr;gap:8px;padding-block:12px;border-top:1px solid var(--rule)}
+.alert .d{width:7px;height:7px;border-radius:50%;background:var(--breaking);margin-top:8px}.alert .d.seen{background:transparent}
+.alert b{font-family:var(--serif);font-weight:600;font-size:15px;line-height:1.45;color:var(--strong);display:block}
+.alert small{font-size:12.5px;color:var(--muted)}.alert small em{font-style:normal;color:var(--breaking);font-weight:700}
+.account{top:0;right:0;bottom:0;width:min(320px,88vw);padding:calc(26px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-right,0px)) 24px 24px;border-width:0 0 0 1px;overflow:auto}
+.account .name{font-family:var(--serif);font-weight:700;font-size:21px;color:var(--strong);text-align:center}
+.account .pill{display:block;text-align:center;margin:12px auto 22px;width:max-content}
+.account a.li{display:block;padding-block:12px;border-top:1px solid var(--rule);font-weight:700;font-size:15px;color:var(--strong)}
+.account a.li small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.account a.li:hover{color:var(--hover)}
+.theme{border-top:1px solid var(--rule);padding-top:16px;margin-top:6px}
+.theme b{display:block;font-size:14px;color:var(--strong);margin-bottom:8px}
+.theme label{display:flex;align-items:center;gap:10px;padding-block:6px;font-size:15px;cursor:pointer}
+.theme input{accent-color:var(--blue);width:16px;height:16px}
+
+/* ---------- grid and rules ---------- */
+main{padding-block:30px 40px}
+.grid{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));column-gap:var(--gut);row-gap:var(--gut)}
+.in15{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));column-gap:var(--gut);row-gap:var(--gut);align-content:start}
+.in10{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));column-gap:var(--gut);row-gap:var(--gut);align-content:start}
+.c{position:relative;min-width:0}
+.vr::before{content:"";position:absolute;top:0;bottom:0;left:calc(var(--gut) / -2);border-left:1px solid var(--rule)}
+.hr::after{content:"";position:absolute;left:calc(var(--gut) / -2);right:calc(var(--gut) / -2);top:calc(var(--gut) / -2);border-top:1px solid var(--rule)}
+.hr.flush::after{left:0;right:0}
+.s3{grid-column:span 3}.s4{grid-column:span 4}.s5{grid-column:span 5}.s7{grid-column:span 7}.s8{grid-column:span 8}.s10{grid-column:span 10}.s12{grid-column:span 12}.s15{grid-column:span 15}.s20{grid-column:span 20}
+.block{margin-top:64px}
+.bandhead{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--rule-strong);padding-top:14px;margin-bottom:18px}
+.bandhead > button,.bandhead > span{display:inline-flex;align-items:center;gap:4px;font-weight:700;font-size:16px;color:var(--strong)}
+.bandhead > button:hover{color:var(--hover)}
+.bandhead svg.i{width:15px;height:15px;stroke-width:2.2}
+
+/* ---------- type ---------- */
+.kicker{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:16px;color:var(--strong);margin-bottom:12px}
+.kicker svg.i{width:15px;height:15px;stroke-width:2.2}
+.label{font-size:13px;color:var(--muted);margin-bottom:6px}.label b{color:var(--strong);font-weight:700}
+.badge{display:inline-flex;align-items:center;gap:5px;background:var(--badge-bg);color:var(--badge-ink);border-radius:999px;padding:2px 10px;font-weight:800;font-size:11.5px;letter-spacing:.4px;margin-bottom:10px}
+.h-xl{font-family:var(--serif);font-weight:700;font-size:28px;line-height:1.32;color:var(--strong);margin:0 0 10px;text-wrap:balance}
+.h-l{font-family:var(--serif);font-weight:700;font-size:21px;line-height:1.38;color:var(--strong);margin:0;text-wrap:balance}
+.h-m{font-family:var(--serif);font-weight:600;font-size:17px;line-height:1.45;color:var(--strong);margin:0;text-wrap:balance}
+.dek{font-weight:300;font-size:16px;line-height:1.55;color:var(--ink);margin:0 0 10px}
+.by{font-size:14px;color:var(--muted);margin:0}.by .t::before{content:"•";margin:0 6px}
+.cap{font-size:13px;color:var(--muted);margin:8px 0 0;line-height:1.45}
+.ph{width:100%;max-width:100%;aspect-ratio:3/2;object-fit:cover;display:block;background:var(--chip)}
+a.h:hover .h-xl,a.h:hover .h-l,a.h:hover .h-m,a.h:hover.h-m,.list a:hover,.op:hover .t,.most a:hover,.rel a:hover{color:var(--hover)}
+.rel{margin-top:16px}.rel a{display:block;font-family:var(--serif);font-weight:600;font-size:16px;line-height:1.45;color:var(--strong);padding-block:12px;border-top:1px solid var(--rule)}
+.listen{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:var(--strong);margin-top:10px}
+.listen .pb{width:30px;height:30px;border-radius:50%;border:1px solid var(--rule-strong);display:grid;place-items:center}
+.listen .pb svg{width:12px;height:12px;fill:var(--strong);stroke:none}
+.listen span.m{color:var(--muted);font-weight:400}
+
+/* live carousel */
+.live .head{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.live .head .ttl{font-family:var(--serif);font-weight:800;font-size:22px;color:var(--strong)}
+.lv{border:1px solid var(--live);color:var(--live);font-weight:700;font-size:12.5px;border-radius:5px;padding:1px 7px;display:inline-flex;align-items:center;gap:5px}
+.lv::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.live .head .d{color:var(--muted);font-size:15px;flex:1}
+.arrows{display:flex;gap:8px}.arrows button{width:32px;height:32px;border-radius:50%;border:1px solid var(--rule-strong);display:grid;place-items:center;color:var(--strong)}
+.arrows button:hover{background:var(--chip)}.arrows button:disabled{opacity:.35;cursor:default}
+.track{display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - 3 * var(--gut)) / 4);column-gap:var(--gut);overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.track::-webkit-scrollbar{display:none}
+.track > *{scroll-snap-align:start;position:relative;min-width:0}
+.track > * + *::before{content:"";position:absolute;top:0;bottom:0;left:calc(var(--gut) / -2);border-left:1px solid var(--rule)}
+.who{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--strong);margin-bottom:8px}
+.av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;flex:none}
+.who em{font-style:normal;color:var(--live);font-size:13px}.new{color:var(--live);font-weight:700;font-size:13px}
+
+/* rail */
+.railh{display:inline-flex;align-items:center;gap:4px;font-weight:700;font-size:16px;color:var(--strong);text-decoration:underline;text-decoration-color:var(--opinion);text-decoration-thickness:2px;text-underline-offset:6px;margin-bottom:6px}
+.op{display:grid;grid-template-columns:1fr auto;gap:12px;padding-block:14px;border-bottom:1px solid var(--rule)}
+.op .w{font-size:14px;color:var(--soft);margin-bottom:4px}
+.op .t{font-family:var(--serif);font-weight:600;font-size:17px;line-height:1.42;color:var(--strong)}
+.op img{width:48px;height:48px;border-radius:50%;object-fit:cover}
+.op small{display:block;color:var(--muted);font-size:13px;margin-top:6px}
+.most ol{list-style:none;margin:0;padding:0;counter-reset:n}
+.most li{counter-increment:n;display:grid;grid-template-columns:34px 1fr;padding-block:12px;border-bottom:1px solid var(--rule)}
+.most li::before{content:counter(n);font-family:var(--serif);font-weight:700;font-size:26px;color:var(--strong);line-height:1}
+.most a{font-family:var(--serif);font-weight:600;font-size:15.5px;line-height:1.45;color:var(--strong)}
+.list a{display:block;font-family:var(--serif);font-weight:600;font-size:16px;line-height:1.45;color:var(--strong);padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--rule)}
+.list a:last-child{border:0;margin:0;padding:0}
+.time{font-size:13px;color:var(--muted);margin-top:6px;display:block}
+
+/* video strip (9:16) */
+.vtrack{display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - 5 * 14px) / 6);column-gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.vtrack::-webkit-scrollbar{display:none}
+.vt{position:relative;aspect-ratio:9/16;border-radius:10px;overflow:hidden;scroll-snap-align:start;background:var(--chip)}
+.vt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.vt::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,.85))}
+.vt .cap2{position:absolute;left:12px;right:12px;bottom:34px;z-index:1;font-family:var(--serif);font-weight:700;font-size:15px;line-height:1.4;color:#fff}
+.vt .dur{position:absolute;left:12px;bottom:12px;z-index:1;color:#fff;font-size:12.5px;display:flex;align-items:center;gap:5px}
+.vt .dur svg{width:10px;height:10px;fill:#fff}
+.vt .tag{position:absolute;left:12px;top:12px;z-index:1;color:#fff;font-size:11px;font-weight:800;letter-spacing:.6px}
+.vt:hover img{transform:scale(1.03);transition:transform .3s}
+.watch{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:var(--strong)}
+
+/* promo boxes */
+.promo{border:1px solid var(--rule);padding:18px;text-align:center}
+.promo .tags{display:inline-flex;border:1px solid var(--strong);font-size:11px;font-weight:800;letter-spacing:.8px;color:var(--strong)}
+.promo .tags span{padding:2px 8px}.promo .tags span+span{border-left:1px solid var(--strong)}
+.promo h5{font-family:var(--serif);font-weight:700;font-size:19px;color:var(--strong);margin:12px 0 6px}
+.promo p{font-size:14px;color:var(--soft);line-height:1.55;margin:0 0 14px}
+.promo .join{display:inline-block;border:1px solid var(--strong);border-radius:999px;padding:7px 18px;font-weight:700;font-size:14px;color:var(--strong)}
+.promo .join:hover{background:var(--strong);color:var(--bg)}
+
+/* footer */
+footer{border-top:1px solid var(--rule);margin-top:64px;padding-block:34px 40px}
+footer .wm{font-family:var(--serif);font-weight:800;font-size:26px;color:var(--strong)}
+.fcols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:24px;margin-top:22px}
+.fcols b{display:block;font-size:13px;color:var(--strong);margin-bottom:10px}
+.fcols a{display:block;font-size:13px;color:var(--soft);padding-block:4px}.fcols a:hover{text-decoration:underline;color:var(--strong)}
+.copy{text-align:center;color:var(--muted);font-size:12.5px;margin-top:30px}
+
+/* section page */
+.sechead{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.sechead h2{font-family:var(--sans);font-weight:700;font-size:clamp(34px,5vw,48px);color:var(--strong);margin:0;line-height:1.2}
+.follow{width:28px;height:28px;border-radius:50%;border:1px solid var(--rule-strong);display:grid;place-items:center;color:var(--strong)}
+.sublinks{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:15px;color:var(--soft);margin-bottom:28px}
+.river .it{display:grid;grid-template-columns:120px minmax(0,1fr) 240px;gap:var(--gut);padding-block:20px;border-top:1px solid var(--rule)}
+.river .dt{font-size:13px;color:var(--muted)}
+.river img{width:100%;aspect-ratio:3/2;object-fit:cover}
+
+/* article */
+.subnav{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 24px;padding-block:12px;border-bottom:1px solid var(--rule);font-size:15px;color:var(--soft)}
+.subnav b{color:var(--strong)}.subnav button:hover{color:var(--strong)}
+.art{max-width:640px;margin:0 auto;padding-block:40px 20px}
+.art h2{font-family:var(--serif);font-weight:700;font-size:clamp(30px,5vw,46px);line-height:1.28;color:var(--strong);margin:0 0 14px;text-wrap:balance}
+.art .dek{font-size:20px;line-height:1.5;color:var(--strong);margin-bottom:14px}
+.art .times{font-size:14px;color:var(--muted);line-height:1.6}
+.tools{display:flex;gap:6px;align-items:center;margin:14px 0 30px;position:relative;flex-wrap:wrap}
+.tool{display:inline-flex;align-items:center;gap:7px;font-size:14px;color:var(--strong);padding:7px 10px;border-radius:999px}
+.tool:hover{background:var(--chip)}.tool.on{color:var(--live)}
+.share{position:absolute;top:44px;left:0;width:240px;padding:8px;z-index:5}
+.share a,.share button{display:flex;align-items:center;gap:10px;width:100%;padding:10px;font-size:14px;color:var(--strong);border-radius:6px}
+.share a:hover,.share button:hover{background:var(--chip)}
+.art .byline{font-size:16px;color:var(--ink);margin:22px 0}.art .byline b{color:var(--strong)}
+.art .body p{font-family:var(--serif);font-size:19px;line-height:1.85;color:var(--strong);margin:0 0 24px}
+.srcbox{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding-block:16px;font-size:14px;color:var(--soft);line-height:1.6;margin-top:6px}
+.srcbox a{color:var(--live)}
+.recs{max-width:640px;margin:10px auto 0}
+.recs h5{font-weight:700;font-size:16px;color:var(--strong);border-top:1px solid var(--rule-strong);padding-top:14px;margin:30px 0 4px}
+.recs a.r{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:16px;padding-block:14px;border-bottom:1px solid var(--rule)}
+.recs a.r img{width:110px;aspect-ratio:3/2;object-fit:cover}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--strong);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:700;font-size:14px;z-index:60}
+.back{display:inline-flex;gap:6px;font-size:14px;font-weight:600;color:var(--live);margin-bottom:22px}
+.samplebar{font-size:12.5px;color:var(--muted);text-align:center;padding-block:6px;border-bottom:1px solid var(--rule)}
+
+/* breakpoints as the Post's: tablet 768-1023, phone under 768 */
+@media (max-width:1149px){ :root{--gut:24px} .h-xl{font-size:25px} .vtrack{grid-auto-columns:calc((100% - 3 * 14px) / 4)} }
+@media (max-width:1023px){
+  .s15,.s20,.s12{grid-column:1/-1} .front > .s5{grid-column:1/-1}
+  .front > .rail.vr::before{display:none}
+  .band2 > .s10{grid-column:1/-1} .band2 > .s10.vr::before{display:none}
+  .fcols{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .track{grid-auto-columns:calc((100% - var(--gut)) / 2)}
+}
+@media (max-width:767px){
+  .grid,.in15,.in10{grid-template-columns:minmax(0,1fr)}
+  .grid > *,.in15 > *,.in10 > *{grid-column:1/-1!important}
+  .vr::before{display:none}
+  .pkg .pic{order:-1}
+  .track{grid-auto-columns:82%}
+  .vtrack{grid-auto-columns:46%}
+  nav.secs{justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap}
+  nav.secs .sep{display:none} .trending{justify-content:flex-start}
+  .acct .nm{display:none}
+  .river .it{grid-template-columns:minmax(0,1fr) 110px}.river .dt{grid-column:1/-1}
+  .fcols{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .breaking .wrap{justify-content:flex-start;padding-right:44px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="samplebar">નમૂનો · ૨૨ ઓક્ટોબર ૨૦૨૬ના PIBના સાચા સમાચારો પરથી કેપિટલ ક્રાંતિ વેબસાઇટનું ડેમો</div>
+<div class="breaking" id="breaking"><div class="wrap"><b>તાજા સમાચાર:</b><a href="#p2326576" id="breakingLink"></a>
+  <button class="x" id="breakingClose" aria-label="બંધ કરો"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div>
+<header class="top">
+  <div class="bar">
+    <div class="icons">
+      <button class="ibtn" id="menuBtn" aria-label="સેક્શન અને શોધ"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h12M3 12h8M3 18h12"/><circle cx="17.5" cy="12.5" r="3"/><path d="M19.7 14.7L22 17"/></svg></button>
+      <button class="ibtn" id="bellBtn" aria-label="તાજા સમાચારની સૂચનાઓ"><svg class="i" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="dot" id="bellDot"></span></button>
+    </div>
+    <a class="mini" href="#home"><b>કેપિટલ ક્રાંતિ</b><i>સમાજનો વિવેકપૂર્ણ દ્રષ્ટિકોણ</i></a>
+    <div class="right"><a class="pill" href="#home" id="epaper">ઈ-પેપર</a>
+      <button class="acct" id="acctBtn"><span class="nm">મારું ખાતું</span><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></button></div>
+  </div>
+  <div class="trend-bar"><div class="wrap"><div class="trending" data-trend></div></div></div>
+</header>
+
+<div class="wrap">
+  <div id="masthead">
+    <div class="mast"><a href="#home"><h1>કેપિટલ ક્રાંતિ</h1></a><p>સમાજનો વિવેકપૂર્ણ દ્રષ્ટિકોણ</p></div>
+    <nav class="secs" id="secnav"></nav>
+    <div class="trending" data-trend></div>
+  </div>
+  <main id="main"></main>
+  <footer id="footer"></footer>
+</div>
+
+<div class="shade" id="shade" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="સેક્શન"></aside>
+<aside class="pop alerts" id="alerts" hidden aria-label="તાજા સમાચારની સૂચનાઓ"></aside>
+<aside class="pop account" id="account" hidden aria-label="મારું ખાતું"></aside>
+<div class="toast" id="toast" hidden></div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(function(){
+  const stories = JSON.parse(document.getElementById('data').textContent);
+  const by = Object.fromEntries(stories.map(s => [s.id, s]));
+  const MAIN = [['gujarat','ગુજરાત'],['india','દેશ'],['world','વિશ્વ'],['farm','ખેતી'],['economy','અર્થતંત્ર'],['tech','ટેક અને વિજ્ઞાન'],['health','આરોગ્ય'],['sport','રમતગમત']];
+  const NAME = Object.fromEntries(MAIN);
+  const SUBS = { gujarat:['ગાંધીનગર','અમદાવાદ','જિલ્લાઓ','ગુજરાત સરકાર'], india:['સંસદ','કેન્દ્ર સરકાર','સંરક્ષણ','યોજનાઓ'], world:['ભારત અને વિશ્વ','પાડોશી દેશો','વિદેશ નીતિ'],
+    farm:['પાક અને ભાવ','સિંચાઈ','યોજનાઓ'], economy:['બજાર','ઉદ્યોગ','રોજગાર'], tech:['AI','અવકાશ','ડિજિટલ ભારત'], health:['આરોગ્ય યોજનાઓ','પોષણ'], sport:['ક્રિકેટ','પેરા રમતો','ઓલિમ્પિક'] };
+  const AZ = ['અર્થતંત્ર','આરોગ્ય','ઈ-પેપર','કૃષિ','ગુજરાત','ટેક અને વિજ્ઞાન','દેશ','પર્યાવરણ','રમતગમત','વિશ્વ','વીડિયો સમાચાર','શિક્ષણ','સંરક્ષણ','હવામાન'];
+  const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const lede = (s, n) => { const t = s.body.replace(/\s+/g,' ').trim(); return t.length > n ? esc(t.slice(0, n).replace(/\s+\S*$/, '')) + '…' : esc(t); };
+  const img = (s, cls = 'ph') => s.img ? `<img class="${cls}" src="${s.img}" alt="">` : '';
+  const ico = { chev:'<svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>', left:'<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
+    play:'<svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>', ballot:'<svg class="i" viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="1"/><path d="M8 9l4-6 4 6"/></svg>' };
+  const CAP = { p2326794:'હરિયાણાના કરનાલમાં ‘ખેત બચાવો અભિયાન’ના પ્રારંભ પ્રસંગે કેન્દ્રીય મંત્રી શિવરાજ સિંહ ચૌહાણ. (PIB)',
+                p2326707:'દિલ્હીમાં યમુના સંબંધિત પ્રોજેક્ટ્સના લોકાર્પણ સમારોહમાં અમિત શાહ. (PIB)', p2326627:'સામાજિક સહાયતા કાર્યક્રમની યોજનાઓનાં નવાં નામ. (PIB)' };
+  const AV = ['#7a5af8','#0e9384','#dd2590','#e04f16','#1570ef','#4e5ba6'];
+  const say = (msg) => { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(say.k); say.k = setTimeout(() => t.hidden = true, 1800); };
+  const store = { get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+  /* ---------- theme ---------- */
+  function applyTheme(t){ const r = document.documentElement; if (t === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', t); }
+  applyTheme(store.get('ck-theme', 'dark'));
+
+  /* ---------- home ---------- */
+  function pkg(id, rel, opts = {}){
+    const s = by[id];
+    return `<div class="s15 c hr pkg"><div class="in15">
+      <div class="s5 c"><a class="h" href="#${id}">${opts.kicker ? `<div class="kicker">${opts.kicker}</div>` : ''}${opts.badge ? `<div class="badge">${opts.badge}</div><br>` : ''}<h2 class="h-xl">${esc(s.h)}</h2><p class="dek">${esc(s.d)}</p></a>
+        <p class="by">કેપિટલ ક્રાંતિ ડેસ્ક${opts.time ? `<span class="t">${opts.time}</span>` : ''}</p>
+        ${rel && rel.length ? `<div class="rel">${rel.map(r => `<a href="#${r}">${esc(by[r].h)}</a>`).join('')}</div>` : ''}</div>
+      <div class="s10 c vr pic"><a href="#${id}">${img(s)}</a><p class="cap">${esc(CAP[id] || 'ફોટો: PIB')}</p></div></div></div>`;
+  }
+  const row3 = ids => `<div class="s15 c hr"><div class="in15">${ids.map((id,i) => `<div class="s5 c ${i ? 'vr' : ''}"><a class="h" href="#${id}"><h3 class="h-l">${esc(by[id].h)}</h3></a></div>`).join('')}</div></div>`;
+  function live(){
+    const items = [['p2326743','રમતગમત','૧૨ મિનિટ'],['p2326850','અર્થતંત્ર','૩૫ મિનિટ'],['p2326774','વિશ્વ','૧ કલાક'],['p2326646','વિશ્વ','૨ કલાક'],['p2326872','આરોગ્ય','૩ કલાક'],['p2326762','ટેક','૪ કલાક'],['p2326589','વિશ્વ','૫ કલાક']];
+    return `<div class="s15 c hr live"><div class="head"><span class="ttl">તાજા સમાચાર</span><span class="lv">LIVE</span><span class="d">આજના મુખ્ય વિકાસ પર અમારી નજર</span>
+      <div class="arrows"><button data-scroll="-1" aria-label="પાછળ">${ico.left}</button><button data-scroll="1" aria-label="આગળ">${ico.chev}</button></div></div>
+      <div class="track" id="liveTrack">${items.map(([id,sec,t],i) => `<a class="h" href="#${id}">${i === 0 ? '<span class="new">નવું</span>' : ''}<div class="who"><span class="av" style="background:${AV[i % AV.length]}">ક</span>${esc(sec)} ડેસ્ક <em>${t}</em></div><h3 class="h-m">${esc(by[id].h)}</h3></a>`).join('')}</div></div>`;
+  }
+  function rail(){
+    const ops = [['p2326370','સુભાષિત','',false],['p2326734','સંરક્ષણ','૩૯ મિનિટ પહેલાં',true],['p2326804','રાષ્ટ્રપતિ ભવન','',true],['p2326749','રમતગમત','',false],['p2326779','અર્થતંત્ર','',true],['p2326691','વિજ્ઞાન','',true]];
+    return `<aside class="s5 c vr rail"><button class="railh" data-sec="india">વિશેષ ${ico.chev}</button>
+      ${ops.map(([id,w,t,pic],i) => `<a class="op" href="#${id}"><div><div class="w">${esc(w)}</div><div class="t">${esc(by[id].h)}</div>${t ? `<small>${t}</small>` : ''}
+        ${i === 2 ? `<span class="listen"><span class="pb">${ico.play}</span>સાંભળો <span class="m">૪ મિનિટ</span></span>` : ''}</div>${pic && by[id].img ? `<img src="${by[id].img}" alt="">` : '<span></span>'}</a>`).join('')}</aside>`;
+  }
+  function band(key, lead, list){
+    return `<div class="s10 c"><div class="bandhead"><button data-sec="${key}">${esc(NAME[key])} ${ico.chev}</button></div><div class="in10">
+      <div class="s5 c"><a class="h" href="#${lead}">${img(by[lead])}<h3 class="h-l" style="margin-top:12px">${esc(by[lead].h)}</h3></a></div>
+      <div class="s5 c vr list">${list.map(id => `<a href="#${id}">${esc(by[id].h)}</a>`).join('')}</div></div></div>`;
+  }
+  function home(){
+    const latest = [['p2326534','દેશ','૫૧ મિનિટ પહેલાં'],['p2326600','વિશ્વ','૧ કલાક પહેલાં'],['p2326427','દેશ','૨ કલાક પહેલાં'],['p2326572','દેશ','૩ કલાક પહેલાં']];
+    const videos = ['p2326794','p2326707','p2326804','p2326734','p2326691','p2326779','p2326715','p2326572'].filter(id => by[id].img);
+    document.getElementById('main').innerHTML = `
+      <div class="grid front">
+        <div class="s15 c"><div class="in15">
+          ${pkg('p2326794', [], { kicker: `${ico.ballot}ખેડૂત અને ખેતી ${ico.chev}`, time: '૧ કલાક પહેલાં' })}
+          ${row3(['p2326576','p2326788','p2326636'])}
+          ${live()}
+          ${pkg('p2326707', ['p2326872','p2326762'], { badge: 'કે.ક્રા. વિશેષ', time: '૨ કલાક પહેલાં' })}
+          ${pkg('p2326627', ['p2326534','p2326589'], { time: '૩ કલાક પહેલાં' })}
+        </div></div>
+        ${rail()}
+      </div>
+
+      <div class="block"><div class="bandhead"><span>વધુ મુખ્ય સમાચાર</span></div><div class="grid">
+        <div class="s8 c"><a class="h" href="#p2326715">${img(by['p2326715'])}<div class="badge" style="margin-top:12px">અહેવાલ</div><h3 class="h-l">${esc(by['p2326715'].h)}</h3></a></div>
+        <div class="s7 c vr list">${['p2326879','p2326498','p2326374','p2326873','p2326728','p2326646'].map(id => `<a href="#${id}">${esc(by[id].h)}</a>`).join('')}</div>
+        <div class="s5 c vr most"><div class="bandhead" style="border:0;padding:0;margin-bottom:6px"><span>સૌથી વધુ વંચાયેલા</span></div>
+          <ol>${['p2326707','p2326743','p2326850','p2326774'].map(id => `<li><a href="#${id}">${esc(by[id].h)}</a></li>`).join('')}</ol></div>
+      </div></div>
+
+      <div class="block"><div class="bandhead"><button data-sec="india">કેપિટલ ક્રાંતિમાંથી તાજું ${ico.chev}</button></div><div class="grid">
+        ${latest.map(([id,lab,t],i) => `<div class="s5 c ${i ? 'vr' : ''}"><div class="label"><b>${lab}</b></div><a class="h" href="#${id}"><h3 class="h-m">${esc(by[id].h)}</h3></a><span class="time">${t}</span></div>`).join('')}
+      </div></div>
+
+      <div class="block"><div class="bandhead"><span>વીડિયો સમાચાર</span><span class="watch">${ico.play.replace('<svg','<svg width="12" height="12" fill="currentColor"')}બધા જુઓ</span></div>
+        <div class="vtrack">${videos.map((id,i) => `<a class="vt" href="#${id}"><img src="${by[id].img}" alt=""><span class="tag">${i % 3 === 0 ? 'તાજા સમાચાર' : esc(NAME[by[id].sec]).toUpperCase()}</span><span class="cap2">${esc(by[id].h)}</span><span class="dur">${ico.play}0:${45 + i}</span></a>`).join('')}</div>
+        <p class="cap">નમૂનો: વીડિયો સમાચાર વેબસાઇટના AI શોર્ટ્સ માટેની જગ્યા છે; અહીં સમાચારના ફોટા બતાવ્યા છે.</p></div>
+
+      <div class="grid band2">
+        ${band('farm','p2326715',['p2326879','p2326374','p2326498'])}
+        <div class="s10 c vr">${band('tech','p2326691',['p2326728','p2326762','p2326872']).replace('<div class="s10 c">','<div>')}</div>
+      </div>
+      <div class="grid band2" style="margin-top:56px">
+        ${band('economy','p2326779',['p2326873','p2326850','p2326498'])}
+        <div class="s10 c vr">${band('india','p2326572',['p2326427','p2326600','p2326534']).replace('<div class="s10 c">','<div>')}</div>
+      </div>
+
+      <div class="block grid">
+        <div class="s5 c promo"><span class="tags"><span>WHATSAPP</span><span>રોજ સાંજે</span></span><h5>કેપિટલ ક્રાંતિ ચેનલ</h5>
+          <p>દિવસના મુખ્ય સમાચાર અને ઈ-પેપર, સીધા તમારા WhatsApp પર.</p><span class="join">જોડાઓ</span></div>
+        <div class="s5 c vr promo"><span class="tags"><span>ALERTS</span><span>તરત</span></span><h5>તાજા સમાચારની સૂચના</h5>
+          <p>મહત્વના સમાચાર આવે કે તરત જાણ મેળવો.</p><span class="join">ચાલુ કરો</span></div>
+        <div class="s10 c vr"><div class="bandhead" style="border:0;padding:0"><span>ઈ-પેપર</span></div>
+          <p class="dek">આજનું છાપેલું કેપિટલ ક્રાંતિ, પાને પાને — ચાર પાનાં, PDFમાં.</p><span class="listen">${ico.chev} આજનું ઈ-પેપર વાંચો</span></div>
+      </div>`;
+    wireCarousel();
+  }
+
+  /* ---------- section and search pages ---------- */
+  function section(key){
+    const list = stories.filter(s => s.sec === key || (key === 'tech' && s.sec === 'health'));
+    const withPic = list.filter(s => s.img);
+    const top = withPic[0] || list[0], side = list.filter(s => s !== top).slice(0, 2);
+    const rest = list.filter(s => s !== top && !side.includes(s));
+    document.getElementById('main').innerHTML = `
+      <div class="sechead"><h2>${esc(NAME[key])}</h2><button class="follow" title="અનુસરો" data-follow="${key}">+</button></div>
+      <div class="sublinks">${(SUBS[key] || []).map(x => `<span>${esc(x)}</span>`).join('')}</div>
+      ${top ? `<div class="grid">
+        <div class="s5 c"><a class="h" href="#${side[0]?.id || top.id}">${side[0] ? `<div class="badge">તાજું</div><br><h3 class="h-xl">${esc(side[0].h)}</h3><p class="dek">${lede(side[0], 220)}</p>` : ''}</a><span class="time">૨૨ ઓક્ટોબર ૨૦૨૬</span></div>
+        <div class="s10 c vr"><a class="h" href="#${top.id}">${img(top)}<h3 class="h-l" style="margin-top:12px">${esc(top.h)}</h3></a></div>
+        <div class="s5 c vr">${side[1] ? `<a class="h" href="#${side[1].id}">${img(side[1])}<h3 class="h-m" style="margin-top:10px">${esc(side[1].h)}</h3></a>` : ''}</div>
+      </div>` : ''}
+      <div class="block river"><div class="bandhead"><span>વધુ સમાચાર</span></div>
+        ${rest.map(s => `<div class="it"><span class="dt">૨૨ ઓક્ટોબર ૨૦૨૬</span><a class="h" href="#${s.id}"><h3 class="h-l">${esc(s.h)}</h3><p class="dek" style="margin-top:8px">${lede(s, 160)}</p></a><div>${img(s, '')}</div></div>`).join('') || '<p class="dek">આ વિભાગમાં આજે બીજા સમાચાર નથી.</p>'}</div>`;
+  }
+  function search(q){
+    const list = stories.filter(s => (s.h + ' ' + s.d + ' ' + s.body).includes(q));
+    document.getElementById('main').innerHTML = `<div class="sechead"><h2>“${esc(q)}”</h2></div><div class="sublinks"><span>${list.length} સમાચાર મળ્યા</span></div>
+      <div class="river">${list.map(s => `<div class="it"><span class="dt">${esc(NAME[s.sec])}</span><a class="h" href="#${s.id}"><h3 class="h-l">${esc(s.h)}</h3><p class="dek" style="margin-top:8px">${lede(s, 160)}</p></a><div>${img(s, '')}</div></div>`).join('') || '<p class="dek">કોઈ સમાચાર મળ્યા નથી. બીજો શબ્દ અજમાવો.</p>'}</div>`;
+  }
+
+  /* ---------- article ---------- */
+  function article(s){
+    const paras = s.body.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    const mins = String(Math.max(1, Math.round(s.body.split(/\s+/).length / 180))).replace(/\d/g, d => '૦૧૨૩૪૫૬૭૮૯'[d]);
+    const recs = stories.filter(x => x.id !== s.id && (x.sec === s.sec || x.img)).slice(0, 4);
+    const saved = store.get('ck-saved', []).includes(s.id);
+    const url = location.href.split('#')[0] + '#' + s.id;
+    document.getElementById('main').innerHTML = `
+      <div class="subnav"><b>${esc(NAME[s.sec])}</b>${(SUBS[s.sec] || []).map(x => `<button data-sec="${s.sec}">${esc(x)}</button>`).join('')}</div>
+      <article class="art">
+        <h2>${esc(s.h)}</h2><p class="dek">${esc(s.d)}</p>
+        <div class="times">૨૨ ઓક્ટોબર ૨૦૨૬, સાંજે ૭:૩૦<br>સુધારેલ: આજે સાંજે ૮:૧૦</div>
+        <div class="tools">
+          <button class="tool" data-listen><svg class="i" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="17" y="14" width="4" height="6" rx="1"/></svg>${mins} મિનિટ</button>
+          <button class="tool" data-share aria-haspopup="true"><svg class="i" viewBox="0 0 24 24"><path d="M14 5l7 7-7 7M21 12H9a6 6 0 0 0-6 6"/></svg>શેર</button>
+          <button class="tool ${saved ? 'on' : ''}" data-save="${s.id}"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" ${saved ? 'fill="currentColor"' : ''}/></svg>${saved ? 'સાચવ્યું' : 'સાચવો'}</button>
+          <div class="pop share" id="shareMenu" hidden style="position:absolute">
+            <button data-copy="${esc(url)}"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/></svg>લિંક કૉપી કરો</button>
+            <a href="https://wa.me/?text=${encodeURIComponent(s.h + ' ' + url)}" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8 19z"/></svg>WhatsApp</a>
+            <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(s.h)}&url=${encodeURIComponent(url)}" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24"><path d="M4 4l16 16M20 4L4 20"/></svg>X</a>
+            <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}" target="_blank" rel="noopener"><svg class="i" viewBox="0 0 24 24"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v3H7v4h3v6h4v-6h3l1-4h-4V8z"/></svg>Facebook</a>
+          </div>
+        </div>
+        ${s.img ? `${img(s)}<p class="cap">${esc(CAP[s.id] || s.cap || 'ફોટો: PIB')}</p>` : ''}
+        <p class="byline">લેખક: <b>કેપિટલ ક્રાંતિ ડેસ્ક</b>, ગાંધીનગર</p>
+        <div class="body">${paras.map(p => `<p>${esc(p)}</p>`).join('')}</div>
+        <div class="srcbox">આ સમાચારનો સ્રોત: <a href="${esc(s.src)}" target="_blank" rel="noopener">પત્ર સૂચના કાર્યાલય (PIB)</a>. આંકડા મૂળ પ્રેસ રિલીઝ સાથે ચકાસેલા છે. ભૂલ દેખાય તો અમને જણાવો.</div>
+      </article>
+      <div class="recs"><h5>તમને આ પણ ગમશે</h5>${recs.map(x => `<a class="r h" href="#${x.id}"><div><div class="label"><b>${esc(NAME[x.sec])}</b></div><h3 class="h-m">${esc(x.h)}</h3></div>${x.img ? `<img src="${x.img}" alt="">` : '<span></span>'}</a>`).join('')}
+        <div class="promo" style="margin-top:30px"><span class="tags"><span>WHATSAPP</span><span>રોજ સાંજે</span></span><h5>આવા સમાચાર રોજ મેળવો</h5><p>કેપિટલ ક્રાંતિની WhatsApp ચેનલમાં જોડાઓ.</p><span class="join">જોડાઓ</span></div></div>`;
+  }
+
+  /* ---------- chrome: nav, trending, drawer, alerts, account, footer ---------- */
+  const nav = MAIN.map(([k,n]) => `<button data-sec="${k}">${esc(n)}</button>`); nav.splice(3, 0, '<span class="sep"></span>');
+  nav.push('<span class="sep"></span><button data-video>વીડિયો</button><a href="#home">ઈ-પેપર</a>');
+  document.getElementById('secnav').innerHTML = nav.join('');
+  const trend = '<b>ચર્ચામાં</b>' + [['ખેત બચાવો અભિયાન','farm'],['ભારત-પોલેન્ડ','world'],['પેરા ગેમ્સ','sport'],['યમુના શુદ્ધીકરણ','india'],['એકતા દિવસ','gujarat'],['BRICS ફોરમ','world']].map(([t,k]) => `<button data-sec="${k}">${t}</button>`).join('');
+  document.querySelectorAll('[data-trend]').forEach(el => el.innerHTML = trend);
+  document.getElementById('breakingLink').textContent = by['p2326576'].h;
+  if (store.get('ck-breaking-closed', false)) document.getElementById('breaking').hidden = true;
+
+  document.getElementById('drawer').innerHTML = `
+    <a class="pill" href="#home">ઈ-પેપર</a>
+    <form class="ask" id="askForm"><input id="q" type="search" placeholder="સવાલ પૂછો અથવા શોધો" aria-label="શોધો"><button aria-label="શોધો"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg></button></form>
+    <button class="row" data-home>મુખ્ય પાનું</button>
+    ${MAIN.map(([k,n]) => `<div class="grp"><button class="row" data-expand="${k}">${esc(n)}<span class="chev">${ico.chev}</span></button>
+      <div class="sub" hidden><button data-sec="${k}">બધા ${esc(n)} સમાચાર</button>${(SUBS[k] || []).map(x => `<button data-sec="${k}">${esc(x)}</button>`).join('')}</div></div>`).join('')}
+    <h6>બધા વિભાગ</h6><div class="az">${AZ.map(x => `<button data-sec="${(MAIN.find(([,n]) => n === x) || ['india'])[0]}">${x}</button>`).join('')}</div>
+    <h6>અમારી સેવાઓ</h6><div class="az"><button>ઈ-પેપર</button><button>WhatsApp ચેનલ</button><button>વીડિયો સમાચાર</button><button>સવાલ પૂછો (AI)</button></div>`;
+
+  const alertsList = [['p2326576','આજે સાંજે ૬:૩૯',true],['p2326743','આજે સાંજે ૪:૧૬',true],['p2326707','આજે બપોરે ૧૧:૧૬',false],['p2326774','આજે સવારે ૯:૧૪',false],['p2326850','ગઈકાલે રાત્રે ૯:૩૭',false]];
+  document.getElementById('alerts').innerHTML = `<header>તાજા સમાચારની સૂચનાઓ <button class="ibtn" aria-label="સૂચનાની પસંદગી"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button></header>
+    ${alertsList.map(([id,t,unread]) => `<a class="alert" href="#${id}"><span class="d ${unread ? '' : 'seen'}"></span><span><b>${esc(by[id].h)}</b><small>${unread ? '<em>તાજા</em> · ' : ''}${t} · ${esc(NAME[by[id].sec])}</small></span></a>`).join('')}`;
+
+  document.getElementById('account').innerHTML = `<div class="name">વાચક</div><a class="pill" href="#home">ઈ-પેપર</a>
+    <a class="li" href="#home">મારા સમાચાર<small>તમે અનુસરો છો તે વિભાગો</small></a><a class="li" href="#saved">સાચવેલા સમાચાર</a>
+    <a class="li" href="#home">WhatsApp અને સૂચનાઓ</a><a class="li" href="#home">સંપર્ક</a>
+    <div class="theme"><b>દેખાવ</b>
+      <label><input type="radio" name="theme" value="auto">ઉપકરણ પ્રમાણે</label><label><input type="radio" name="theme" value="dark">ડાર્ક</label><label><input type="radio" name="theme" value="light">લાઇટ</label></div>`;
+  document.querySelectorAll('input[name=theme]').forEach(r => { r.checked = r.value === store.get('ck-theme', 'dark'); r.addEventListener('change', () => { store.set('ck-theme', r.value); applyTheme(r.value); }); });
+
+  document.getElementById('footer').innerHTML = `<div class="wm">કેપિટલ ક્રાંતિ</div>
+    <div class="fcols">
+      <div><b>કેપિટલ ક્રાંતિ</b><a>અમારા વિશે</a><a>સંપાદકીય નીતિ</a><a>સુધારા અને ભૂલો</a><a>કારકિર્દી</a></div>
+      <div><b>વિભાગો</b>${MAIN.slice(0,6).map(([k,n]) => `<a data-sec="${k}">${n}</a>`).join('')}</div>
+      <div><b>મેળવો</b><a>ઈ-પેપર</a><a>WhatsApp ચેનલ</a><a>સૂચનાઓ</a><a>જૂના અંકો</a></div>
+      <div><b>સંપર્ક</b><a>સમાચાર મોકલો</a><a>જાહેરાત આપો</a><a>ભૂલ જણાવો</a><a>અમારો સંપર્ક</a></div>
+      <div><b>નિયમો</b><a>ઉપયોગના નિયમો</a><a>ગોપનીયતા નીતિ</a><a>RSS</a><a>સાઇટમેપ</a></div>
+    </div><p class="copy">capitalkranti.co.in © ૧૯૯૨–૨૦૨૬ કેપિટલ ક્રાંતિ, ગાંધીનગર · RNI 54922/93 · સમાચાર સ્રોત: PIB</p>`;
+
+  /* ---------- panels ---------- */
+  const panels = ['drawer','alerts','account'].map(id => document.getElementById(id)), shade = document.getElementById('shade');
+  function closeAll(){ panels.forEach(p => p.hidden = true); shade.hidden = true; }
+  function open(id){ closeAll(); document.getElementById(id).hidden = false; shade.hidden = false; }
+  document.getElementById('menuBtn').onclick = () => { open('drawer'); setTimeout(() => document.getElementById('q').focus(), 30); };
+  document.getElementById('bellBtn').onclick = () => { open('alerts'); document.getElementById('bellDot').hidden = true; };
+  document.getElementById('acctBtn').onclick = () => open('account');
+  shade.onclick = closeAll;
+  document.getElementById('breakingClose').onclick = () => { document.getElementById('breaking').hidden = true; store.set('ck-breaking-closed', true); };
+  document.getElementById('askForm').addEventListener('submit', e => { e.preventDefault(); const q = document.getElementById('q').value.trim(); if (!q) return; closeAll(); location.hash = 'q-' + encodeURIComponent(q).replace(/%/g, '_'); });
+
+  document.addEventListener('click', e => {
+    const t = e.target.closest('button, a'); if (!t) { const sm = document.getElementById('shareMenu'); if (sm) sm.hidden = true; return; }
+    if (t.dataset.sec) { e.preventDefault(); closeAll(); location.hash = 'sec-' + t.dataset.sec; }
+    else if (t.hasAttribute('data-home')) { closeAll(); location.hash = 'home'; }
+    else if (t.hasAttribute('data-video')) { location.hash = 'home'; setTimeout(() => document.querySelector('.vtrack')?.scrollIntoView({ block: 'center' }), 60); }
+    else if (t.dataset.expand) { const g = t.parentElement; g.classList.toggle('open'); g.querySelector('.sub').hidden = !g.classList.contains('open'); }
+    else if (t.hasAttribute('data-share')) { const sm = document.getElementById('shareMenu'); sm.hidden = !sm.hidden; e.stopPropagation(); }
+    else if (t.dataset.copy) { navigator.clipboard?.writeText(t.dataset.copy).then(() => say('લિંક કૉપી થઈ'), () => say('લિંક: ' + t.dataset.copy)); document.getElementById('shareMenu').hidden = true; }
+    else if (t.dataset.save) { const list = store.get('ck-saved', []); const id = t.dataset.save; const on = !list.includes(id); store.set('ck-saved', on ? [...list, id] : list.filter(x => x !== id)); article(by[id]); say(on ? 'સમાચાર સાચવ્યા' : 'સાચવેલામાંથી કાઢ્યા'); }
+    else if (t.hasAttribute('data-listen')) { say('સાંભળવાની સુવિધા: સાચી વેબસાઇટમાં ગુજરાતી અવાજ સાથે આવશે'); }
+    else if (t.dataset.follow) { say(NAME[t.dataset.follow] + ' અનુસરો: સાચી વેબસાઇટમાં'); }
+    else if (t.dataset.scroll) { const tr = document.getElementById('liveTrack'); tr.scrollBy({ left: Number(t.dataset.scroll) * tr.clientWidth * 0.75, behavior: 'smooth' }); }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAll(); const sm = document.getElementById('shareMenu'); if (sm) sm.hidden = true; } });
+  function wireCarousel(){
+    const tr = document.getElementById('liveTrack'); if (!tr) return;
+    const [l, r] = document.querySelectorAll('.live .arrows button');
+    const upd = () => { l.disabled = tr.scrollLeft < 4; r.disabled = tr.scrollLeft + tr.clientWidth >= tr.scrollWidth - 4; };
+    tr.addEventListener('scroll', upd, { passive: true }); upd();
+  }
+
+  /* ---------- routing ---------- */
+  function route(){
+    const id = decodeURIComponent(location.hash.slice(1));
+    document.querySelectorAll('#secnav button[data-sec]').forEach(b => b.classList.toggle('on', 'sec-' + b.dataset.sec === id));
+    const isArticle = !!by[id];
+    document.getElementById('masthead').hidden = isArticle;
+    if (isArticle) article(by[id]);
+    else if (id.startsWith('sec-') && NAME[id.slice(4)]) section(id.slice(4));
+    else if (id.startsWith('q-')) search(decodeURIComponent(id.slice(2).replace(/_/g, '%')));
+    else if (id === 'saved') { const ids = store.get('ck-saved', []); search(''); document.querySelector('.sechead h2').textContent = 'સાચવેલા સમાચાર';
+      document.querySelector('.river').innerHTML = ids.map(i => by[i]).filter(Boolean).map(s => `<div class="it"><span class="dt">${esc(NAME[s.sec])}</span><a class="h" href="#${s.id}"><h3 class="h-l">${esc(s.h)}</h3></a><div>${img(s, '')}</div></div>`).join('') || '<p class="dek">હજી કોઈ સમાચાર સાચવ્યા નથી. સમાચારમાં “સાચવો” દબાવો.</p>';
+      document.querySelector('.sublinks').innerHTML = ''; }
+    else home();
+    window.scrollTo(0, 0); onScroll();
+  }
+  function onScroll(){ const m = document.getElementById('masthead'); document.body.classList.toggle('stuck', m.hidden || window.scrollY > m.offsetTop + m.offsetHeight - 40); }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('hashchange', route);
+  route();
+})();
+</script>
