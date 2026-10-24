@@ -96,6 +96,14 @@ async function main() {
       }
       break;
     }
+    case "editions": {
+      // the day's sister papers, as the evening makes them (timed, for the log)
+      const { makeEditions, DEFAULT_EDITIONS } = await import("./editorial/copies.ts");
+      const t = Date.now();
+      await makeEditions(store, date, store.setting("editions", DEFAULT_EDITIONS), { log });
+      log(`editions ${date}: ${((Date.now() - t) / 60_000).toFixed(1)} min`);
+      break;
+    }
     case "copies-in": {
       const { copiesIn } = await import("./editorial/copies.ts");
       await copiesIn(store, flag("spec") ?? "");
