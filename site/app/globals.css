@@ -1,0 +1,24 @@
+/* The design system's tokens (docs/website/DESIGN.md §2.1): the printed paper's
+   purple, navy and cyan; light or dark follows the phone. */
+:root {
+  --bg: #ffffff; --ink: #1d1d21; --muted: #5f5f66; --rule: #e4e2e8;
+  --brand: #7f3894; --cyan: #0aaae4;
+  --ui: var(--font-ui), "Gujarati MT", "Shruti", system-ui, sans-serif;
+  --serif: var(--font-serif), "Gujarati Sangam MN", "Shruti", Georgia, serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #121214; --ink: #e7e7ea; --muted: #a3a3ab; --rule: #2c2b31; --brand: #c99be0; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--ui); }
+.soon {
+  min-height: 100svh; display: grid; place-content: center; justify-items: center; text-align: center; gap: 12px;
+  padding: 48px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
+}
+.wordmark { margin: 0; font-family: var(--ui); font-weight: 800; font-stretch: 112%; font-size: clamp(44px, 12vw, 88px); line-height: 1.1; color: var(--brand); }
+.tagline { margin: 0; font-size: 17px; color: var(--muted); }
+hr { width: 120px; border: 0; border-top: 2px solid var(--cyan); margin: 16px 0; }
+.note { margin: 0; font-family: var(--serif); font-size: 19px; line-height: 1.7; }
+.note.en { font-family: var(--ui); font-size: 15px; color: var(--muted); }
+.legal { margin: 24px 0 0; font-size: 13px; color: var(--muted); }
