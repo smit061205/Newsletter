@@ -730,7 +730,7 @@ function collectHourly(store: Store, log: (s: string) => void) {
   const once = async () => {
     if (collecting.current || currentJob()) return;
     const work = (async () => {
-      const { ingestPib, listPib, readRelease, withPatience, FEEDS } = await import("./ingest/pib.ts");
+      const { ingestPib, withPatience, FEEDS } = await import("./ingest/pib.ts");
       const feed = (profile.language.lang in FEEDS ? profile.language.lang : "en") as keyof typeof FEEDS;
       const { day, time } = indiaNow();
       const gu = feed === "gu";
@@ -738,10 +738,7 @@ function collectHourly(store: Store, log: (s: string) => void) {
         const r = await ingestPib(store, day, feed);
         if (r.fetched) log(`collected ${r.fetched} new PIB release(s) for ${day}`);
         // the releases a Gujarati paper's top-up translates from, read ahead
-        if (!gu) return;
-        for (const other of ["hi", "en"] as const) {
-          for (const it of await listPib(day, other, store)) if (!store.hasRelease(it.prid)) await readRelease(store, day, other, it);
-        }
+        if (gu) await (await import("./editorial/translate.ts")).readForeign(store, day);
       }).catch((e: unknown) => log(`PIB collection skipped this hour: ${e instanceof Error ? e.message : e}`));
       const others = gu ? (async () => {
         const { ingestOfficial } = await import("./ingest/official.ts");

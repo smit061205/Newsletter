@@ -96,7 +96,7 @@ async function rankForGujarat(items: (ListItem & { lang: Foreign })[], printed: 
 }
 
 /** One Hindi or English release as a Gujarati story, numbers checked against the original. */
-export async function translateOne(r: Release, key: string, model = env("OPENROUTER_TRANSLATE_MODEL") ?? profile.editorial.translateModel):
+export async function translateOne(r: Release, key: string, model = env("OPENROUTER_TRANSLATE_MODEL") ?? profile.editorial.translateModel, note = ""):
   Promise<{ story: Story; cost: number }> {
   const res = await openRouter({
     method: "POST",
@@ -109,7 +109,7 @@ export async function translateOne(r: Release, key: string, model = env("OPENROU
           "natural newspaper Gujarati (not word for word), adding nothing that isn't in it. Write people's and places' names as Gujarati " +
           "spells them (નરેન્દ્ર મોદી, નવી દિલ્હી). Every number stays exactly as in the release." +
           (r.lang === "en" ? " Write in Gujarati script throughout: English names, titles and phrases as Gujarati papers write them " +
-            "(Viksit Bharat = વિકસિત ભારત, Ministry of Railways = રેલ મંત્રાલય); only well-known abbreviations (ISRO, AI) stay in English letters." : "") },
+            "(Viksit Bharat = વિકસિત ભારત, Ministry of Railways = રેલ મંત્રાલય); only well-known abbreviations (ISRO, AI) stay in English letters." : "") + note },
         { role: "user", content: releaseText(r) },
       ],
     }),
@@ -129,6 +129,20 @@ export async function translateOne(r: Release, key: string, model = env("OPENROU
     ...(unknown.length ? { factCheck: `numbers not in the ${r.lang === "en" ? "English" : "Hindi"} release: ${unknown.join(", ")}` } : {}),
   };
   return { story, cost: data.usage?.cost ?? 0 };
+}
+
+/** The day's Hindi and English releases read and stored ahead (the run's first
+ * step, beside the paper's own news): the top-up then translates at once
+ * instead of reading PIB page by page first. Greetings left unread. Returns how many. */
+export async function readForeign(store: Store, date: string, log: (s: string) => void = () => {}): Promise<number> {
+  let n = 0;
+  await Promise.all((Object.keys(LANGUAGE) as Foreign[]).map(async (lang) => {
+    const list = await listPib(date, lang, store).catch(() => [] as ListItem[]);
+    await Promise.all(list.filter((i) => !GREETING.test(i.headline) && !store.hasRelease(i.prid))
+      .map(async (i) => { if (await readRelease(store, date, lang, i)) n++; }));
+  }));
+  if (n) log(`PIB Hindi and English: ${n} release(s) read ahead for the translation`);
+  return n;
 }
 
 /** The day's world news from All India Radio's English service (ingest/official.ts),
@@ -160,6 +174,7 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
   const key = env("OPENROUTER_API_KEY");
   const target = profile.editorial.fillTarget;
   const ctx = await fillContext(store, date);
+  let worldRun: Promise<number> = Promise.resolve(0);
   try {
     // first, what's already in Gujarati, by every PRID it goes by
     const gujarati = store.releases(date).filter((r) => r.source === "pib" && (!r.lang || r.lang === "gu"));
@@ -175,13 +190,10 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
         log(`  ${hi.id}: now in Gujarati from PIB (${twin.id}), so its translation is dropped`);
       }
     }
-    // the day's world news first, whatever the pages need
-    let worldCost = 0;
-    if (key) {
-      const had = store.stories(date).length;
-      worldCost = await worldNews(store, date, key, log);
-      for (const s of store.stories(date).slice(had)) ctx.content += await ctx.areaOf(s);
-    }
+    // the day's world news, whatever the pages need -- translated side by side
+    // with the rest (unseen by the count below, so a story or two more may be
+    // translated: kept as spare copy)
+    worldRun = key ? worldNews(store, date, key, log) : Promise.resolve(0);
     const before = ctx.share();
     log(`the day's Gujarati copy fills ${(before * 100).toFixed(0)}% of the pages (wanted: ${(target * 100).toFixed(0)}%)`);
     if (before >= target && !opts.force) return { before, after: before, translated: 0, cost: 0 };
@@ -209,7 +221,7 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
     if (!candidates.length) return { before, after: before, translated: 0, cost: 0 };
     const printed = store.stories(date).map((s) => s.headline);
     const ranked = await rankForGujarat(candidates, printed, key, env("OPENROUTER_MODEL") ?? DEFAULT_MODEL);
-    let cost = ranked.cost + worldCost;
+    let cost = ranked.cost;
     log(`  ranked for Gujarat's readers: ${ranked.order.length} worth printing`);
     let translated = 0;
     let tried = 0;
@@ -253,9 +265,11 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
             ` -> ${(ctx.share() * 100).toFixed(0)}%`);
       }
     }
+    cost += await worldRun.catch(() => 0);
     log(`top-up ${date}: ${translated} translated from Hindi and English, the copy now fills ${(ctx.share() * 100).toFixed(0)}%, $${cost.toFixed(3)}`);
     return { before, after: ctx.share(), translated, cost };
   } finally {
+    await worldRun.catch(() => 0);
     await ctx.close();
   }
 }

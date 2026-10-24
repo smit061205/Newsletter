@@ -15,10 +15,14 @@ import { columnElements, DISPLAY_SAFETY, r1, splitParagraphs, stackLines, widowe
 import type { Line, Measurer } from "./measure.ts";
 import { setDisplay, type DisplaySpec } from "./display.ts";
 import { normalizeStory } from "./text.ts";
+import { profile } from "../profile.ts";
 import { BODY, CAPTION, DECK, GAP, GRID, HEADLINE, KICKER, PHOTO, PT } from "./typography.ts";
 import type { Story } from "../store.ts";
 
 export type Variant = "long" | "medium" | "short";
+
+/** The paper's own script is a kerned one (Hindi, Urdu): see the body's line width. */
+const KERNED_PAPER = profile.language.lang === "hi" || profile.language.lang === "ur";
 
 /** How the story's pictures are shown: 0 = one photo beside the text (the
  * usual), 1 = one photo across the whole story, 2 = two photos side by side
@@ -225,7 +229,9 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   const paras = splitParagraphs(text.bodies[variant]);
   // each paragraph at its best setting, and a line tighter and looser where
   // that sets well (linebreak.ts looseness) -- to end the columns level
-  const req = (loose: number) => ({ paras, width: GRID.column, font: BODY.font, size: BODY.size, indent: BODY.indent, optimal: true,
+  // (a kerned script, Hindi or Urdu, prints about a percent wider than it measures:
+  // its lines broken that much short of the column, so none runs past it -- 24 Oct)
+  const req = (loose: number) => ({ paras, width: KERNED_PAPER ? GRID.column * 0.985 : GRID.column, font: BODY.font, size: BODY.size, indent: BODY.indent, optimal: true,
                                     looseness: paras.map(() => loose) });
   const [lines, tighter, looser] = paras.length ? await m.breakLines([req(0), req(-1), req(1)]) : [[], [], []] as Line[][];
   const byPara = (ls: Line[]) => paras.map((_, i) => ls.filter((l) => l.para === i));

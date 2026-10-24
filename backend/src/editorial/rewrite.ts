@@ -261,7 +261,7 @@ function merged(group: Release[]): Release {
   };
 }
 
-export async function rewriteOne(r: Release, model: string, key: string, together = 1): Promise<{ story: Story; cost: number; seconds: number }> {
+export async function rewriteOne(r: Release, model: string, key: string, together = 1, note = ""): Promise<{ story: Story; cost: number; seconds: number }> {
   const t0 = Date.now();
   const res = await openRouter({
     method: "POST",
@@ -273,7 +273,7 @@ export async function rewriteOne(r: Release, model: string, key: string, togethe
       response_format: { type: "json_schema", json_schema: SCHEMA },
       messages: [
         { role: "system", content: SYSTEM + (together > 1 ? `\nThe text below is ${together} releases on the same occasion: write them up as ONE combined story ` +
-          "(a round-up) that names everyone and everything in them, with one headline for all." : "") },
+          "(a round-up) that names everyone and everything in them, with one headline for all." : "") + note },
         { role: "user", content: releaseText(r) },
       ],
     }),

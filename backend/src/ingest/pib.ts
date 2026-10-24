@@ -19,7 +19,7 @@ const SITE = "https://www.pib.gov.in";
 // names the paper honestly (PIB's firewall turns away agents with an email address in them)
 const UA = "CapitalKranti-news-ingest/1.0";
 const PAUSE_MS = 1500;
-const MAX_PAGES = 300; // a day's ceiling, whatever happens
+const MAX_PAGES = 600; // a run's ceiling, whatever happens
 
 export const FEEDS = {
   gu: { reg: 22, lang: 13, name: "PIB Ahmedabad, Gujarati" },
@@ -149,21 +149,48 @@ export async function withPatience<T>(p: { tries: number; seconds: number }, job
   patience = p;
   try { return await job(); } finally { patience = was; }
 }
-/** One polite GET: a pause since the last one, a few tries with backoff. */
+// How many PIB pages at once, and the gap between their starts: four, a
+// quarter-second apart (one at a time with 1.5 s between kept the evening run
+// waiting minutes on photos, 24 Oct). PIB failing or refusing one: back to one
+// at a time, the long pause, until a run of answers comes back.
+const QUICK = { inFlight: 4, gapMs: 250 };
+const CAREFUL = { inFlight: 1, gapMs: PAUSE_MS };
+let pace = QUICK;
+let answered = 0;
+let inFlight = 0;
+const waiting: (() => void)[] = [];
+async function slot(): Promise<void> {
+  while (inFlight >= pace.inFlight) await new Promise<void>((r) => waiting.push(r));
+  inFlight++;
+  // (the next start time taken before waiting, so no two share it)
+  const at = Math.max(Date.now(), lastRequest + pace.gapMs);
+  lastRequest = at;
+  if (at > Date.now()) await new Promise((r) => setTimeout(r, at - Date.now()));
+}
+function done(ok: boolean) {
+  inFlight--;
+  if (!ok) { pace = CAREFUL; answered = 0; }
+  else if (pace === CAREFUL && ++answered >= 20) pace = QUICK;
+  waiting.shift()?.();
+}
+
+/** One polite GET: a few at once at most, a gap between starts, a few tries with backoff. */
 async function get(url: string, init: RequestInit = {}): Promise<Response> {
   if (++pagesToday > MAX_PAGES) throw new Error(`more than ${MAX_PAGES} PIB pages in one run: stopping`);
   let err: unknown;
   for (let attempt = 0; attempt < patience.tries; attempt++) {
-    const wait = lastRequest + PAUSE_MS * (attempt + 1) - Date.now();
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    lastRequest = Date.now();
+    if (attempt) await new Promise((r) => setTimeout(r, PAUSE_MS * attempt));
+    await slot();
+    let ok = false;
     try {
       const res = await fetch(url, { ...init, headers: { "user-agent": UA, ...(init.headers ?? {}) }, signal: AbortSignal.timeout(patience.seconds * 1000) });
-      if (res.ok) return res;
+      if (res.ok) { ok = true; return res; }
       err = new Error(`PIB answered ${res.status} for ${url}`);
       if (res.status < 500) break;
     } catch (e) {
       err = e;
+    } finally {
+      done(ok);
     }
   }
   throw err instanceof Error ? err : new Error(String(err));
@@ -332,12 +359,14 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
   await mkdir(mediaDir, { recursive: true });
   let fetched = 0;
   let skipped = 0;
-  for (const [k, it] of items.entries()) {
-    if (opts.only && !opts.only.has(it.prid)) continue;
-    opts.progress?.({ done: k, total: items.length, label: "reading", item: it.headline });
-    if (store.hasRelease(it.prid)) { skipped++; continue; }
+  // (side by side: the pace is get()'s)
+  let k = 0;
+  await Promise.all(items.map(async (it) => {
+    if (opts.only && !opts.only.has(it.prid)) return;
+    if (store.hasRelease(it.prid)) { skipped++; return; }
     if (await readRelease(store, date, feed, it, log)) fetched++;
-  }
+    opts.progress?.({ done: ++k, total: items.length, label: "reading", item: it.headline });
+  }));
   opts.progress?.({ done: items.length, total: items.length, label: "reading" });
   return { feed, listed: items.length, fetched, skipped, releases: store.releases(date).filter((r) => r.source === "pib" && r.lang === feed) };
 }
@@ -356,17 +385,18 @@ export async function readRelease(store: Store, date: string, feed: FeedLang, it
   const r = parseRelease(await res.text(), it.prid);
   if (!r || !r.paras.length) { log(`  ${it.prid}: no text on the page`); return false; }
   if (r.date && r.date !== date) { log(`  ${it.prid}: dated ${r.date}, not ${date}`); return false; }
-  const photos: string[] = [];
-  for (const [k, src] of r.photos.slice(0, 4).entries()) {
+  // every photo it has (up to four), side by side, kept in their order
+  const got = await Promise.all(r.photos.slice(0, 4).map(async (src, k) => {
     const img = await get(src).catch(() => null);
-    if (!img) continue;
+    if (!img) return null;
     const bytes = new Uint8Array(await img.arrayBuffer());
     const size = imageSize(bytes);
-    if (!size || size.width < 300 || size.height < 150) continue; // an icon, a banner strip
+    if (!size || size.width < 300 || size.height < 150) return null; // an icon, a banner strip
     const name = `p${it.prid}-${k}.${bytes[0] === 0x89 ? "png" : "jpg"}`;
     await writeFile(path.join(mediaDir, name), bytes);
-    photos.push(`/media/${date}/${name}`);
-  }
+    return `/media/${date}/${name}`;
+  }));
+  const photos = got.filter((p): p is string => !!p);
   const release: Release = {
     id: it.prid, date, url: `${SITE}/PressReleasePage.aspx?PRID=${it.prid}`, office: r.office,
     headline: r.headline, subhead: r.subhead, body: r.paras.join("\n\n"), photos, fetchedAt: new Date().toISOString(),

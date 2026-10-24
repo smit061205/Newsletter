@@ -14,7 +14,8 @@ import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
 
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
-const LANGS: PaperLang[] = ["gu", "hi", "ur"];
+// (Urdu waits for its own fonts and layout)
+const LANGS: PaperLang[] = ["gu", "hi"];
 // translating a story (once, whatever the number of copies), US$
 const PER_TRANSLATION = 0.004;
 const SHUFFLES: Shuffle[] = ["keepLead", "anywhere", "samePage"];

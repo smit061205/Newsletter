@@ -120,6 +120,14 @@ Repository: <https://github.com/smit061205/Newsletter> (**public**). Branch `mai
    - **Fixes:** marks Gopika draws as letters (`@` as જ, `[` as ચ, `{` as મ, `"` as ×…) set in the Latin face (`LEGACY_TAKEN`, measure.ts); sub-heading 0.6 of the headline (was 0.45); a translation's "。" and Urdu's "₹"; number checks read millions/crores/lakhs as each other.
    - **More news:** All India Radio's sections kept (national, international…); its English service's world news (up to 4 a day) translated; the build keeps the best 3 national and 2 world stories in the paper.
 
+7. **Self-repair and a faster cold run (24 Oct, v1.1.9):**
+   - **Measured cold (nothing collected ahead) on 24 Oct:** the day's paper 3:20, READY (fetch 0:21, writing 0:27, translating 0:51, layout 1:40 with one repair); the 4 sister papers about 3 min after it, all clean on the first try.
+   - **Faster:** PIB read 4 pages at once a quarter-second apart, backing off to one at a time on trouble (`pib.ts slot`); every photo of a release at once; the Hindi and English releases read in the first step (`readForeign`); the CM's office and All India Radio 3 at a time each; world news translated beside the PIB top-up; the editorial plan beside the AI-written sub-headings; the page review after the paper is saved (`reviewSaved`; gate 5 says "running", the newsroom looks again every 15 s).
+   - **Self-repair (`pipeline.ts` build step, `editorial/repair.ts`):** after the checks, a story with a number its source doesn't have is written again told to leave it out, and a failed layout check lays the paper out another way (`seedShift`), twice at most; what can't be mended stays for the editor.
+   - **Fixes:** a word-final halant dropped ("કાર્યરત્" isn't in Gopika); filler slots never shorter than six lines (`FILL_MIN`); Hindi body lines broken at 98.5% of the column and justified to 98% (it prints ~1.4% wider than it measures).
+   - **No Urdu paper** for now (the user's decision): its Nastaliq never set right; it waits for the fonts and layout the user will give. Kept in the code (`edition-ur`), left out of the sister papers and the Copies screen.
+   - **Next agreed:** sister papers that never keep a blank (a last fill that always succeeds), up to three arrangements keeping the best, the page review for them too, and a release test that replays recent real days; then a Gemma-vs-current translation test (Gemma 4 26B is ~15x cheaper than Gemini 3.8 Flash; the free one is rate-limited and lacks strict JSON).
+
 **Published so far:** issues 269–271 (20–22 Oct 2026) on the website. Issue numbers come from the date (22 Oct 2026 = 271).
 
 ---

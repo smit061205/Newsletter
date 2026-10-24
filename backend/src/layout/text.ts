@@ -55,7 +55,10 @@ function printableGujarati(text: string): string {
   const out = devanagariToGujarati(text)
     // Gurmukhi lines up with Gujarati letter for letter (U+0A00 -> U+0A80)
     .replace(/[\u0A00-\u0A7F]/g, (c) => { const g = String.fromCodePoint(c.codePointAt(0)! + 0x80); return /\p{Cn}/u.test(g) ? c : g; })
-    .replace(/[ૅૉઍઑ]/g, (c) => CANDRA[c]);
+    .replace(/[ૅૉઍઑ]/g, (c) => CANDRA[c])
+    // a halant ending a word ("કાર્યરત્", 24 Oct): Gopika has no such form, and
+    // Gujarati papers print the word without it
+    .replace(/([\u0A95-\u0AB9])\u0ACD(?=[^\u0A80-\u0AFF\u200C\u200D]|$)/g, "$1");
   return out.replace(/[^\u0A80-\u0AFF\x09\x0A\x0D\x20-\x7E\u00A0-\u00FF\u2000-\u206F\u20B9\u0964\u0965\u200C\u200D]/gu, (c) => {
     removed.add(c);
     return "";

@@ -59,7 +59,7 @@ export async function planDay(store: Store, date: string, stories: Story[], opts
           "that affect people; then the rest. One or two leads (rank 1), four or five front-page stories (rank 2). Round-ups of " +
           "greetings or congratulations are briefs (5). A story with a photo makes a better front-page story, all else equal. " +
           "Return every story id given, once." },
-        { role: "user", content: stories.map((s) => `${s.id} | ${words(s.bodies.long)} words${s.photo ? " | photo" : ""}${s.translatedFrom ? " | from Hindi (national)" : ""}\n` +
+        { role: "user", content: stories.map((s) => `${s.id} | ${words(s.bodies.long)} words${s.photo ? " | photo" : ""}${s.translatedFrom ? ` | translated from ${s.translatedFrom === "en" ? "English" : "Hindi"}` : ""}\n` +
           `  ${s.headline}\n  ${s.deck}\n  ${s.bodies.long.slice(0, 220).replace(/\s+/g, " ")}`).join("\n") },
       ],
     }),

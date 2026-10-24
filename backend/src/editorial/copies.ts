@@ -53,7 +53,6 @@ export const DEFAULT_EDITIONS: Edition[] = [
   { id: "gu-2", name: "ગુજરાતી છાપું ૨", lang: "gu" },
   { id: "gu-3", name: "ગુજરાતી છાપું ૩", lang: "gu" },
   { id: "hi-1", name: "હિન્દી છાપું", lang: "hi" },
-  { id: "ur-1", name: "ઉર્દૂ છાપું", lang: "ur" },
 ];
 
 /** One run: the day's copies, or its sister papers. */
@@ -519,12 +518,13 @@ async function prepareAll(store: Store, tasks: Task[], say: Say): Promise<void> 
 
 /** The sister papers' wording and translations started while the day's own
  * paper is still being laid out (pipeline.ts): done by the time they're made. */
-export function prepareEditions(store: Store, date: string, editions: Edition[]): Promise<void> {
+export function prepareEditions(store: Store, date: string, all: Edition[]): Promise<void> {
+  const editions = all.filter((e) => e.lang !== "ur");
   if (!editions.length) return Promise.resolve();
   const tasks: Task[] = editions.map((e) => ({
     lang: e.lang, label: e.name, seen: [],
     spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: [] },
-    item: { n: 100 + editions.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + editions.indexOf(e) },
+    item: { n: 100 + all.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + all.indexOf(e) },
   }));
   const work = Promise.all(tasks.map((task, i) => runWorker(store, { ...task, spec: { ...task.spec, prepare: true } }, 50 + i, () => {}, () => {})
     .catch(() => {}))).then(() => {});
@@ -584,7 +584,9 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
  * reworded (headline and sub-heading), the others translated. */
 export async function makeEditions(store: Store, date: string, editions: Edition[], opts: { log: Say; only?: string }): Promise<Batch> {
   const day = dayOf(store, date);
-  const list = editions.filter((e) => !opts.only || e.id === opts.only);
+  // (no Urdu paper until its own fonts and layout are given: 24 Oct, the editor's word --
+  // its Nastaliq never set right and took ten minutes a paper)
+  const list = editions.filter((e) => e.lang !== "ur" && (!opts.only || e.id === opts.only));
   const previous = batchOf("editions", date);
   const batch: Batch = { kind: "editions", date, count: list.length, reword: "headlineDeck", shuffle: "keepLead", lang: "gu", status: "running",
                          startedAt: new Date().toISOString(), done: 0, cost: 0, log: [],
@@ -595,11 +597,13 @@ export async function makeEditions(store: Store, date: string, editions: Edition
     await mkdir(editionsDir(date), { recursive: true });
     say(list.map((e) => `${e.name} (${LANG_NAME[e.lang]})`).join(", "));
     // each paper's own seed, from its place in the full list: the same paper lays out the same way each time
-    const tasks: Task[] = list.map((e) => ({
+    const tasks: Task[] = list.map((e): Task => ({
       lang: e.lang, label: e.name, seen: day.seen,
       spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: day.pageOf, lead: day.lead },
       item: { n: 100 + editions.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + editions.indexOf(e) },
-    }));
+    }))
+      // the Urdu paper last: it takes longest (its Nastaliq not yet tuned), the others shouldn't wait behind it
+      .sort((a, b) => Number(a.lang === "ur") - Number(b.lang === "ur"));
     const finished = tracker(batch, tasks.length);
     await layOutUnique(store, tasks, day.seen, say, (t, f) => {
       finished(t);
