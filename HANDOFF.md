@@ -1,7 +1,8 @@
 # Handoff: where Capital Kranti stands, and what's next
 
 Written 23 October 2026 for the next Claude Code session (a new account, with
-none of the earlier conversations). **Read `CLAUDE.md` first** (the standing
+none of the earlier conversations); brought up to date on 24 October 2026.
+**Starting the website? Go to §8 first.** **Read `CLAUDE.md` first** (the standing
 rules), then this file (the story and the open work), then `README.md` (the
 technical manual) as needed.
 
@@ -86,6 +87,22 @@ Repository: <https://github.com/smit061205/Newsletter> (**public**). Branch `mai
    - Publish in the app without a GitHub sign-in says so plainly (it tried `git` and failed); an edit made while another day's run went is laid out once that run ends.
 
 3. **The new layout engine (24 Oct, v1.1.0):** the old engine packed stories, then asked the AI to rewrite them one by one to close each gap -- slow (a copy took 41 min), and it stretched short releases until they said things twice and still left holes. The new one (`layout/engine.ts`, README §8.3) makes every length a story may print at first (`editorial/ladder.ts`: its own three, cut by sentences; longer AI versions only on a short day), shares the stories over the pages, then for each page solves hundreds of guillotine designs exactly in whole points (`designs.ts`, `guillotine.ts`) -- no AI in the loop, no hole by construction. Ads go at the foot in their best tidy arrangement; a strip by an ad no story fits takes a written item (`fill.ts`). The old engine lays out any page the new one can't. New gates S8 (says a thing twice) and S9 (a loose story). Measured on 22 Oct (real AI): the day's paper READY in 3.3 min (1.8 of it the page review), its 4 pages solved in ~10 s; 3 copies READY in 1.5 min, $0.006 in all; the Hindi paper READY in 2.9 min (the old engine's had 14-19 gaps, overflows, repeats). Fixed on the way: Hindi headings were letter-spaced (letter spacing applies to every Devanagari character: lines ran 65-127 px over), the brief writer wrote sister papers' items in Gujarati and shared its cache across papers.
+
+4. **PIB and the run (24 Oct, v1.1.1-v1.1.4):**
+   - **What PIB allows programs** (checked 24 Oct, from the same Mac and connection, so it's not an address block):
+     - today's list and any single release page: yes;
+     - **its date form for earlier days: no.** The firewall drops it, even when the program pretends to be Firefox (tested once).
+   - **v1.1.1:** an earlier day is made from its saved releases when PIB won't show it.
+   - **v1.1.2:** the engine collects today's Gujarati and Hindi lists every hour while it runs (`collectHourly` in `server.ts`), stores new releases, and saves the lists (`pib-list/<feed>/<date>` in settings). An earlier day uses its saved list.
+   - **v1.1.3:** "Start again from the beginning" on Today. It stops the run, then runs from the first step, keeping what was done.
+   - **v1.1.4:** a missed day (no saved list) is found **by release number** (`scanDay` in `ingest/pib.ts`):
+     - every release in every language takes the next number, and each page says its day and office;
+     - it halves the gap to find the day's edge, then reads out both ways, one page a second, until 60 pages are past the day;
+     - it saves the Gujarati, Hindi and English lists together;
+     - 23 Oct took about 10 minutes (40 Gujarati, 72 Hindi, 74 English);
+     - **the edges are ragged** (2327294 is the 23rd, 2327300 the 22nd), hence reading both ways.
+
+     This method came from the user's brother's scraper; it only reads pages PIB serves to programs.
 
 **Published so far:** issues 269–271 (20–22 Oct 2026) on the website. Issue numbers come from the date (22 Oct 2026 = 271).
 
@@ -178,6 +195,11 @@ Then run the engine from *inside the packed app*, as the workflow's "packed app"
 
 ## 7. What's next
 
+Releases: **v1.1.4** is the latest (check the release workflow's result
+through the GitHub API before saying a release works; `gh` isn't installed).
+
+The desktop app's open items:
+
 0. **The new layout engine (v1.1.0):**
    - **PIB photos are dropped** from stories 2 columns or wider: they're ~600 px wide, and the print rule asks 200 ppi (under 3 inches). Ask the user whether 150 ppi is acceptable for the paper (profile `photo.minPpi`).
    - **Page designs from back issues:** the designs are grown from rules today; 5-10 back-issue PDFs would let `designs.ts` prefer the paper's own (to collect from the user).
@@ -210,3 +232,30 @@ Then run the engine from *inside the packed app*, as the workflow's "packed app"
    - an Urdu paper's own Nastaliq font;
    - a releases inbox (email ingest, README §15) if PIB ever isn't enough;
    - clean-up: `backend/test/recompose-0808.ts` is stale, and the old `windows/` and `mac/` scripts can go once every computer runs the desktop app.
+
+---
+
+## 8. The website: start here in a new session
+
+The user wants a live website as the heart of the paper, with a social media
+desk (Facebook, Instagram, X, Telegram, YouTube Shorts, WhatsApp) and the
+printed paper as one of its products. It is **planned, not built**.
+
+**Read first:**
+- `docs/website/ROADMAP.md`: what it does, the newsroom and social pipelines, the stages to build it in, costs in ₹, and what's needed from the user.
+- `docs/website/DESIGN.md`: the Washington Post's UI (dark), measured on 24 Oct, mapped to Gujarati: tokens, the ruled grid, header, modules, section and article pages.
+- `docs/website/sample/capital-kranti-website.html`: the sample the user liked. Open it in a browser. It was published as https://claude.ai/artifact/EnGn4RLGwG5BQyeo2nMLpq.
+
+**Decided:**
+- **Where:** the code goes in a new **`site/`** folder.
+  - It is **not** in the root workspaces, so its libraries stay out of the desktop app.
+  - It borrows the engine's code by path (PIB reading, the Gujarati text cleaning, the checks).
+- **Running:** it has its own CI and deploys to a cloud server. App releases still come only from version tags.
+- **Look:** the Washington Post, dark by default. Only its patterns are copied, never its logo, fonts, text or images.
+- **Order:** stage 0 (server, domain, empty site), then stage 1 (the website from the evening paper's stories, with Publish sending to it), then live news, other outlets, and the social desk.
+
+**First steps in the new session:**
+1. Read `CLAUDE.md`, this file's §8, and `docs/website/ROADMAP.md` §1 and §6.
+2. Ask the user for stage 0's needs: the cloud server account and the domain. They create them; keys are entered in the server's settings, never in chat.
+3. Build stage 0, then stage 1, and show the user screenshots at phone and desktop widths before moving on.
+
