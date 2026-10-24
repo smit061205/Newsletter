@@ -594,6 +594,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
     }
   }, log);
   backupDaily(store, log);
+  collectHourly(store, log);
   // the rupee rate, kept up to date (when it's on): now, then every few hours
   rupeeRate(store, log).catch(() => {});
   setInterval(() => rupeeRate(store, log).catch(() => {}), 3 * 3600_000);
@@ -712,6 +713,36 @@ function backupDaily(store: Store, log: (s: string) => void) {
   const safe = () => once().catch((e) => log(`backup failed: ${e instanceof Error ? e.message : e}`));
   safe();
   setInterval(safe, 60 * 60_000);
+}
+
+/** Today's news read off PIB every hour while the engine runs: the paper's
+ * own releases stored, and the day's lists saved (the Hindi one too, for a
+ * Gujarati paper's top-up). PIB shows programs only today's list -- its
+ * date form is refused (24 Oct 2026) -- so a day made later, or again, is
+ * made from what was collected through it. Quiet: PIB not answering waits
+ * for the next hour; never while a run is going. */
+function collectHourly(store: Store, log: (s: string) => void) {
+  let busy = false;
+  const once = async () => {
+    if (busy || currentJob()) return;
+    busy = true;
+    try {
+      const { ingestPib, listPib, withPatience, FEEDS } = await import("./ingest/pib.ts");
+      const feed = (profile.language.lang in FEEDS ? profile.language.lang : "en") as keyof typeof FEEDS;
+      const { day } = indiaNow();
+      await withPatience({ tries: 1, seconds: 30 }, async () => {
+        const r = await ingestPib(store, day, feed);
+        if (r.fetched) log(`collected ${r.fetched} new PIB release(s) for ${day}`);
+        if (feed === "gu") await listPib(day, "hi", store);
+      });
+    } catch (e) {
+      log(`PIB collection skipped this hour: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      busy = false;
+    }
+  };
+  setTimeout(once, 60_000);
+  setInterval(once, 60 * 60_000);
 }
 
 /** The papers: publications/<id>/ each (those that ship with the code, and
