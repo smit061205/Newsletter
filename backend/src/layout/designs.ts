@@ -88,15 +88,26 @@ function grow(r: Region, stories: DesignStory[], rng: () => number): Tree | null
     if (!cuts.length) return no("no cut beside the ads");
     return rowAt(r, (good.length ? good : cuts)[Math.floor(rng() * (good.length || cuts.length))], stories, rng);
   }
-  // a narrow strip with no story for it (beside an ad): a filler
-  if (!r.items.length) return cols <= 2 ? { kind: "fill", cols } : no("empty");
+  // a strip with no story for it (beside or over an ad): a filler
+  if (!r.items.length) return cols <= 4 ? { kind: "fill", cols } : no("empty");
   const first = stories[r.items[0]];
   if (r.items.length === 1) {
-    if (!first.widths.includes(cols)) return no("width");
-    if (first.fill) return { kind: "fill", cols };
-    // a block far from the story's own size can't be filled by it
+    if (first.fill) return first.widths.includes(cols) || cols <= 4 ? { kind: "fill", cols } : no("width");
+    if (!first.widths.includes(cols)) {
+      // a strip the story can't take whole (over one of several ads side by
+      // side, 24 Oct's page 3): the story at a width it may take, a filler
+      // beside it -- rather than no design at all
+      const w = first.widths.filter((x) => x < cols && cols - x <= 3).sort((a, b) => b - a)[0];
+      if (!w) return no("width");
+      const story: Tree = { kind: "story", story: r.items[0], cols: w };
+      return join("row", cols, rng() < 0.5 ? [story, { kind: "fill", cols: cols - w }] : [{ kind: "fill", cols: cols - w }, story]);
+    }
+    // a block far from the story's own size can't be filled by it -- unless,
+    // much too big for it, a filler takes the rest of the height under it
     const ratio = first.area(cols) / (spanOf(cols) * r.height);
-    return ratio > 0.45 && ratio < 2.2 ? { kind: "story", story: r.items[0], cols } : no(`ratio ${ratio < 0.45 ? "low" : "high"}`);
+    if (ratio > 0.45 && ratio < 2.2) return { kind: "story", story: r.items[0], cols };
+    if (ratio <= 0.45 && ratio > 0.12 && cols <= 4) return join("stack", cols, [{ kind: "story", story: r.items[0], cols }, { kind: "fill", cols }]);
+    return no(`ratio ${ratio < 0.45 ? "low" : "high"}`);
   }
   // the first story across the top, the rest below; or the first story's
   // column (a width it may take) beside the rest; or a few across the top

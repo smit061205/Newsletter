@@ -195,6 +195,7 @@ export default function Today() {
           </div>
         )}
         {job && <Stepper job={job} />}
+        {job && <TimeMeter job={job} />}
         {error && <Note tone="bad">{error}</Note>}
         {otherRunning && <p className={s.faint}>{t("today.otherRunning", { date: status!.running!.date })}</p>}
         <div className={s.row} style={{ justifyContent: "space-between" }}>
@@ -273,6 +274,52 @@ function Stepper({ job }: { job: Job }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** "3:07" */
+const clock = (secs: number) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}`;
+
+/** The time meter: a clock from the moment the paper started, and how long
+ * each step (and its parts) took -- the longest marked, so the slow part
+ * shows itself. Live while the paper is being made; the record after. */
+function TimeMeter({ job }: { job: Job }) {
+  const { t, lang } = useApp();
+  const live = job.status === "running";
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [live]);
+  const at = (iso?: string) => (iso ? Date.parse(iso) : 0);
+  const end = live ? now : at(job.endedAt) || now;
+  const rows = job.steps.filter((x) => x.startedAt).map((x) => ({ step: x, secs: Math.max(0, ((x.endedAt ? at(x.endedAt) : end) - at(x.startedAt)) / 1000) }));
+  const most = Math.max(1, ...rows.map((r) => r.secs));
+  const partName = (n: string) => {
+    const key = `time.part.${n}` as StringKey;
+    const got = t(key);
+    return got === key ? n : got;
+  };
+  return (
+    <div className={s.timeMeter}>
+      <div className={s.timeHead}>
+        <span className={s.faint}>{t(live ? "time.running" : "time.took")}</span>
+        <strong className={s.timeClock}>{num(lang, clock((end - at(job.startedAt)) / 1000))}</strong>
+      </div>
+      {rows.map(({ step, secs }) => (
+        <div key={step.name} className={s.timeRow} data-slowest={!live && rows.length > 1 && secs === most}>
+          <span className={s.timeName}>{t(`step.${step.name}` as StringKey)}</span>
+          <span className={s.timeBar}><span style={{ width: `${(secs / most) * 100}%` }} /></span>
+          <span className={s.timeSecs}>{num(lang, clock(secs))}</span>
+          {!!step.parts?.length && (
+            <span className={s.timeParts}>
+              {step.parts.map((p, i) => <span key={i}>{partName(p.name)} {num(lang, clock(p.seconds))}</span>)}
+            </span>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

@@ -71,7 +71,8 @@ async function main() {
     }
     case "all": {
       const { runPipeline } = await import("./pipeline.ts");
-      await runPipeline(store, date, { by: "cli", from: flag("from") as never, log });
+      // (--evening: as the 8 PM run, which starts the sister papers' wording beside the layout)
+      await runPipeline(store, date, { by: args.includes("--evening") ? "schedule" : "cli", from: flag("from") as never, log });
       break;
     }
     case "publish": {
@@ -94,6 +95,14 @@ async function main() {
         log(`${d}  ${String(releases.get(d) ?? 0).padStart(8)} ${String(stories.get(d) ?? 0).padStart(7)}  ` +
             (got ? `v${got.version} ${got.status}${ready === undefined ? "" : ready ? ", READY" : ", NOT READY"}` : "-"));
       }
+      break;
+    }
+    case "editions": {
+      // the day's sister papers, as the evening makes them (timed, for the log)
+      const { makeEditions, DEFAULT_EDITIONS } = await import("./editorial/copies.ts");
+      const t = Date.now();
+      await makeEditions(store, date, store.setting("editions", DEFAULT_EDITIONS), { log });
+      log(`editions ${date}: ${((Date.now() - t) / 60_000).toFixed(1)} min`);
       break;
     }
     case "copies-in": {

@@ -72,13 +72,20 @@ export function settleInterrupted(store: Store) {
 }
 /** The job running now, if any: one at a time. */
 export const currentJob = () => running;
+/** The hourly collection under way, if any (server.ts): a run waits for it, so
+ * the two never write the same stories at once. */
+export const collecting: { current: Promise<unknown> | null } = { current: null };
 
 // PIB not answering (its server down, the internet gone): the fetch waits and
 // tries again, every 10 minutes for up to 2 hours, saying so
 const RETRY_EVERY_MS = 10 * 60_000;
 const RETRIES = 12;
 
-async function step(store: Store, date: string, name: StepName, say: (s: string) => void, progress: (p: Progress) => void) {
+/** Runs `job`, noting how long it took as one of the step's parts (the time meter). */
+type Timed = <T>(name: string, job: () => Promise<T>) => Promise<T>;
+
+async function step(store: Store, date: string, name: StepName, say: (s: string) => void, progress: (p: Progress) => void,
+                    timed: Timed, part: (name: string, seconds: number) => void, by: Job["by"]) {
   switch (name) {
     case "fetch": {
       // the paper's own language from PIB (Gujarati: PIB Ahmedabad)
@@ -92,21 +99,29 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       const past = date < today;
       // then the CM's office and All India Radio's Gujarati news (a Gujarati
       // paper): extra copy, so a site not answering never stops the paper
-      const official = async () => {
+      // (read side by side with PIB: each site at its own polite pace)
+      const officialRun = (async () => {
         if (profile.language.lang !== "gu") return;
         const { ingestOfficial } = await import("./ingest/official.ts");
         try {
-          const o = await ingestOfficial(store, date, { log: say, progress });
+          const o = await timed("CM's office and All India Radio", () => ingestOfficial(store, date, { log: say }));
           say(`the CM's office and All India Radio: ${o.listed} listed, ${o.fetched} new`);
         } catch (e) {
           if (stopping) throw e;
           say(`the CM's office and All India Radio couldn't be read (${e instanceof Error ? e.message : e}): the paper is made from PIB's news`);
         }
+      })();
+      // both in: an item that is the same news as a PIB release that came in alongside it goes
+      const official = async () => {
+        await officialRun;
+        if (profile.language.lang !== "gu") return;
+        const { dropTwinsOfPib } = await import("./ingest/official.ts");
+        dropTwinsOfPib(store, date, say);
       };
       let r: Awaited<ReturnType<typeof ingestPib>> | null = null;
       for (let attempt = 0; !r; attempt++) {
         try {
-          r = await ingestPib(store, date, feed, { log: say, progress });
+          r = await timed("PIB", () => ingestPib(store, date, feed, { log: say, progress }));
         } catch (e) {
           const saved = store.releases(date).length;
           if (past && saved) {
@@ -114,7 +129,12 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
             await official();
             return;
           }
-          if (past) throw new Error(`PIB won't show ${date}'s list, and no news was saved that day`);
+          if (past) {
+            // (the other sources may have the day all the same)
+            await official();
+            if (store.releases(date).length) { say(`PIB won't show ${date}'s list: the paper is made from the other sources' news`); return; }
+            throw new Error(`PIB won't show ${date}'s list, and no news was saved that day`);
+          }
           if (attempt >= RETRIES) throw e;
           const at = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }).format(Date.now() + RETRY_EVERY_MS);
           say(`PIB isn't answering (${e instanceof Error ? e.message : e}): trying again at ${at}`);
@@ -157,7 +177,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       const { writeFeatures } = await import("./editorial/features.ts");
       const { profile } = await import("./profile.ts");
       const WANT = 1.1;
-      for (let round = 0; round < 6; round++) {
+      for (let round = 0; round < 3; round++) {
         const ctx = await fillContext(store, date);
         const share = ctx.share();
         const features = store.stories(date).filter((s) => s.id.startsWith("f-"));
@@ -166,15 +186,34 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         if (share >= WANT) return say(`the copy fills ${(share * 100).toFixed(0)}% of the pages${round ? "" : ": no features needed"}`);
         // how many more, from a feature's size (a first guess: an eighth of a page)
         const need = Math.ceil(((WANT - share) * ctx.room) / (each || ctx.room / (8 * profile.issue.pages)));
-        say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: writing ${Math.min(4, need)} feature article(s)`);
+        say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: writing ${need} feature article(s)`);
         progress({ done: round, total: round + 1, label: "features", item: `${(share * 100).toFixed(0)}%` });
-        const cost = await writeFeatures(store, date, Math.max(1, Math.min(4, need)), { log: say });
-        if (cost === null) return; // no AI key
+        // all at once, three to a request, each request its own subjects (so no two write on the same thing)
+        const SUBJECTS = ["health", "farming", "festivals", "culture", "history", "places in Gujarat", "the home", "science", "the environment", "food", "education", "travel"];
+        const calls = Math.ceil(need / 3);
+        const costs = await Promise.all(Array.from({ length: calls }, (_, i) =>
+          writeFeatures(store, date, Math.min(3, need - 3 * i), { log: say, subjects: SUBJECTS.filter((_, k) => k % calls === i) })
+            .catch((e: unknown) => { say(`  features failed (${e instanceof Error ? e.message : e})`); return 0; })));
+        if (costs.some((c) => c === null)) return; // no AI key
       }
       return;
     }
     case "build": {
+      // the evening's sister papers (server.ts, when that's on): their wording and
+      // translations begun now, beside this layout -- ready when they're made
+      if (by === "schedule" && store.setting("editionsAuto", true)) {
+        const { prepareEditions, DEFAULT_EDITIONS } = await import("./editorial/copies.ts");
+        void timed("sister papers' wording (beside the layout)", () => prepareEditions(store, date, store.setting("editions", DEFAULT_EDITIONS)));
+      }
       const r = await buildIssue(store, date, { log: say, progress });
+      // the layout's own parts, for the time meter
+      const tm = r.report.timing;
+      if (tm) {
+        for (const [label, ms] of [["preparing", tm.preparing ?? 0], ["planning", tm.planning], ["fitting", tm.fitting], ["printing", tm.print],
+                                   ["page review", tm.review], ["checks", tm.checks]] as const) {
+          if (ms > 500) part(label, ms / 1000);
+        }
+      }
       say(`issue ${r.report.issueNumber} v${(r.report as { version?: number }).version ?? "?"}: ${r.report.ready ? "READY" : "NOT READY"}`);
       return;
     }
@@ -192,6 +231,11 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
   const letSleep = keepAwake();
   const emit = (line?: string) => { store.putJob(job); for (const fn of listeners) fn(job, line); };
   emit();
+  // (the hourly collection finishing first: it was writing the same day's stories)
+  if (collecting.current) {
+    opts.log?.("  waiting for the hourly collection to finish");
+    await collecting.current;
+  }
   try {
     for (const s of job.steps) {
       if (s.status === "skipped") continue;
@@ -213,7 +257,12 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
         if (Date.now() - lastSent > 500 || p.done === p.total) { lastSent = Date.now(); emit(); }
       };
       try {
-        await step(store, date, s.name, say, progress);
+        const part = (name: string, seconds: number) => { (s.parts ??= []).push({ name, seconds: Math.round(seconds * 10) / 10 }); emit(); };
+        const timed: Timed = async (name, job) => {
+          const t = Date.now();
+          try { return await job(); } finally { part(name, (Date.now() - t) / 1000); }
+        };
+        await step(store, date, s.name, say, progress, timed, part, job.by);
         s.status = "done";
       } catch (e) {
         s.status = "failed";
@@ -229,6 +278,15 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
     return job;
   } finally {
     job.endedAt = new Date().toISOString();
+    // the run's time record, step by step, in its log (the slowest is the one to work on)
+    const secs = (a?: string, b?: string) => (a && b ? (Date.parse(b) - Date.parse(a)) / 1000 : 0);
+    const clock = (t: number) => `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, "0")}`;
+    const ran = job.steps.filter((x) => x.startedAt && x.endedAt);
+    if (ran.length) {
+      const line = `time: ${ran.map((x) => `${x.name} ${clock(secs(x.startedAt, x.endedAt))}`).join(", ")} -- ${clock(secs(job.startedAt, job.endedAt))} in all`;
+      ran[ran.length - 1].log.push(line);
+      opts.log?.(`  ${line}`);
+    }
     running = null;
     stopping = false;
     letSleep();

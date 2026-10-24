@@ -112,6 +112,14 @@ Repository: <https://github.com/smit061205/Newsletter> (**public**). Branch `mai
    - the number check reads English number words and "આઠ હજાર 224", and the build checks saved flags again;
    - stories start 5pt under the page header (`spacing.underHeader`).
 
+6. **Speed, the time meter and print fixes (24 Oct, v1.1.7):**
+   - **The time meter:** the Today screen shows a clock from the run's start and each step's time (and its parts: each source, layout planning, review…), the slowest marked; every run's record is in its log ("time: …") and its job. Copies and sister papers have their own (`Batch.times`).
+   - **Measured on 24 Oct (cold, nothing collected ahead), before → after:** the day's paper 9.1 → 4.2 min (fetch 0:56 → 0:41, writing 2:01 → 0:32, translating 2:14 → 1:20, features 0:49 → 0:22, layout 3:06 → 1:15); the 5 sister papers 18.6 → 1.6 min after it. (The page review didn't run in the "after" layout: the OpenRouter key's $5 limit ran out; at 4 pages at once it adds ~30 s.)
+   - **How:** every AI request of a step goes out at once (`openRouter` retries 429/502/503 with a growing wait; no cap of our own); the 4 pages reviewed at once; features asked in one batch of requests; PIB, the CM's office and All India Radio read side by side, each site at its own pace; the hourly collection also reads PIB's Hindi and English releases, the other sources, writes the day's stories, and from 5 PM translates (`collectHourly`; a run waits for it, `pipeline.ts collecting`); copies and sister papers do all their wording first, every paper at once in light workers (`prepareAll`, started beside the evening layout by `prepareEditions`), then lay out two at a time.
+   - **White space in copies:** pages the new engine couldn't solve went to the old engine, which left gaps. Now every page's last try has a filler slot (up to 4 columns), and a story that can't take a strip's width over one of several side-by-side ads takes a width it can with a filler beside it (`designs.ts`). The Urdu paper is still slow and gappy (its Nastaliq font was never tuned).
+   - **Fixes:** marks Gopika draws as letters (`@` as જ, `[` as ચ, `{` as મ, `"` as ×…) set in the Latin face (`LEGACY_TAKEN`, measure.ts); sub-heading 0.6 of the headline (was 0.45); a translation's "。" and Urdu's "₹"; number checks read millions/crores/lakhs as each other.
+   - **More news:** All India Radio's sections kept (national, international…); its English service's world news (up to 4 a day) translated; the build keeps the best 3 national and 2 world stories in the paper.
+
 **Published so far:** issues 269–271 (20–22 Oct 2026) on the website. Issue numbers come from the date (22 Oct 2026 = 271).
 
 ---

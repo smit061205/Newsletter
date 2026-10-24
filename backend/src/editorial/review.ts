@@ -48,7 +48,8 @@ export async function reviewPages(pngFiles: string[], opts: { log?: (s: string) 
   const findings: Finding[] = [];
   const unreviewed: number[] = []; // pages it never saw: the gate can't pass on them
   let cost = 0;
-  for (const [i, file] of pngFiles.entries()) {
+  // every page at once (one after another took two of the layout's three minutes, 24 Oct)
+  const one = async (file: string, i: number) => {
     const b64 = (await readFile(file)).toString("base64");
     const res = await openRouter({
       method: "POST",
@@ -65,7 +66,7 @@ export async function reviewPages(pngFiles: string[], opts: { log?: (s: string) 
     if (!res.ok) {
       opts.log?.(`  review of page ${i + 1} failed (OpenRouter ${res.status}: ${(await res.text()).slice(0, 160)})`);
       unreviewed.push(i + 1);
-      continue;
+      return;
     }
     const data = (await res.json()) as { choices: { message: { content: string } }[]; usage?: { cost?: number } };
     cost += data.usage?.cost ?? 0;
@@ -76,6 +77,10 @@ export async function reviewPages(pngFiles: string[], opts: { log?: (s: string) 
       opts.log?.(`  review of page ${path.basename(file)}: unreadable answer`);
       unreviewed.push(i + 1);
     }
-  }
+  };
+  await Promise.all(pngFiles.map(one));
+  // (in page order, as one after another gave them)
+  findings.sort((a, b) => a.page - b.page);
+  unreviewed.sort((a, b) => a - b);
   return { findings, cost, unreviewed };
 }

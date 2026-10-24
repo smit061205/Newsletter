@@ -69,6 +69,8 @@ export interface JobStep {
   log: string[];
   error?: string;
   progress?: Progress;
+  /** how long its parts took, in seconds, as they finish (the newsroom's time meter) */
+  parts?: { name: string; seconds: number }[];
 }
 export interface Job {
   id: number;
@@ -106,6 +108,9 @@ export class Store {
   constructor(file = DB_PATH) {
     mkdirSync(path.dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
+    // several processes write it a moment apart (copy workers merging their AI work back, the
+    // hourly collection): one finding it busy waits a little instead of failing
+    this.db.exec("pragma busy_timeout = 15000");
     this.db.exec(`
       create table if not exists releases (id integer primary key, date text, json text);
       create table if not exists stories (id text primary key, date text, json text);
@@ -140,6 +145,7 @@ export class Store {
   putStory(s: Story) { this.put("stories", s.id, s.date, s); }
   stories(date: string) { return this.all<Story>("stories", date); }
   deleteStory(id: string) { this.db.prepare("delete from stories where id = ?").run(id); }
+  deleteRelease(id: number) { this.db.prepare("delete from releases where id = ?").run(id); }
   story(id: string): Story | null {
     const row = this.db.prepare("select json from stories where id = ?").get(id) as { json: string } | undefined;
     return row ? JSON.parse(row.json) : null;

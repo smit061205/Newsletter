@@ -86,6 +86,10 @@ export function topFor(baseline: number, fontAscent: number, fontDescent: number
   return Math.round(baseline * k - offset - 1) / k;
 }
 
+// ASCII marks the Gopika (legacy) faces draw as something else -- "@" as જ,
+// "[" as ચ, "{" as મ, '"' as ×, "*" as a star (checked glyph by glyph, 24 Oct):
+// only ! % ( ) + , - . / : ; = ? and the quotes print as themselves
+const LEGACY_TAKEN = /(["#$&*<>@[\\\]^_{|}~]+)/;
 const LATIN_TOKEN = /[A-Za-z0-9]+(?:[.,:\-\/%&+'’][A-Za-z0-9]+)*|[^A-Za-z0-9]+/g;
 
 /** Merge neighbouring runs in the same font. */
@@ -155,8 +159,14 @@ export class Measurer {
     for (const tok of text.match(LATIN_TOKEN) ?? []) {
       if (/^[A-Za-z0-9]/.test(tok) && latin) {
         runs.push({ text: tok, font: latin });
-      } else {
-        const e = this.encoder.encode(tok);
+        continue;
+      }
+      // a mark whose code the legacy font gives a Gujarati letter is set in
+      // the Latin face (24 Oct: "CHHAAP@Sabarmati" printed "CHHAAPજSabarmati")
+      for (const part of latin ? tok.split(LEGACY_TAKEN) : [tok]) {
+        if (!part) continue;
+        if (latin && LEGACY_TAKEN.test(part)) { runs.push({ text: part, font: latin }); continue; }
+        const e = this.encoder.encode(part);
         e.unknown.forEach((u) => this.unencodable.add(u));
         runs.push({ text: e.text });
       }

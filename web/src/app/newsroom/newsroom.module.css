@@ -206,6 +206,20 @@
 .stepItem[data-state="done"] .stepName { color: var(--text-2); }
 @media (max-width: 640px) { .stepper { grid-template-columns: 1fr; } .heroTop { align-items: flex-start; } .heroTitle { font-size: 23px; } }
 
+/* the time meter: the run's clock and each step's time, the slowest marked */
+.timeMeter { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--sunken); border-radius: var(--r-sm); }
+.timeHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 2px; }
+.timeClock { font-size: 22px; font-variant-numeric: tabular-nums; }
+.timeRow { display: grid; grid-template-columns: minmax(120px, 190px) minmax(0, 1fr) 52px; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); }
+.timeName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeBar { height: 6px; border-radius: 999px; background: var(--hairline); overflow: hidden; }
+.timeBar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.timeRow[data-slowest="true"] { color: var(--ink); font-weight: 600; }
+.timeRow[data-slowest="true"] .timeBar span { background: var(--warn); }
+.timeSecs { text-align: right; font-variant-numeric: tabular-nums; }
+.timeParts { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-3); margin-top: -2px; }
+@media (max-width: 640px) { .timeRow { grid-template-columns: minmax(0, 1fr) 80px 48px; } }
+
 /* the paper being made, live: a page outline that fills in story by story */
 .making { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 32px; align-items: center; }
 @media (max-width: 720px) { .making { grid-template-columns: 1fr; } .sheet { max-width: 220px; } }
