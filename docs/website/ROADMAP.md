@@ -86,16 +86,31 @@ git push) stays until the new site is live, then redirects to it.
 Nothing here needs a paid server. Each service's free limits change, so
 **check them when setting up** and write the numbers into this file.
 
-| Job | Free service | Why it fits | Limits to check |
+**Decided 24 Oct: everything on Vercel for now, Cloudflare later.** The user
+chose not to open a Cloudflare account yet (its photo storage asks for a card).
+The code uses nothing Vercel-only (standard Next.js, plain Postgres, files
+behind one small storage module), so the later move is a redeploy plus a
+one-time copy of the stories and photos.
+
+| Job | Now (free) | Later | Free limits (checked 24 Oct 2026) |
 |---|---|---|---|
-| **The pipeline** (watchers, writing, cards, shorts, posting) | **GitHub Actions**, on a schedule | free for a public repository (this one is); each run has Node, Chromium and `ffmpeg` | scheduled runs every 5 minutes at most, and they're often late by several minutes, so "live" means within about 10-20 minutes; a run can't last over 6 hours |
-| **The website** | **Cloudflare Workers** (chosen 24 Oct; Vercel's free plan is non-commercial) | free, fast in India, HTTPS included | Vercel's free plan is for **non-commercial** use, which matters once the site carries ads; Cloudflare's free plan allows commercial use; daily request and build limits |
-| **The database** | **Cloudflare D1** (chosen 24 Oct) | stories are text: a free database holds years of them; one account with the site | 500 MB a database (a new one per year if needed), 5 GB an account, daily read limits (pages are cached) |
-| **Photos, cards and shorts** | **Cloudflare R2** (free storage) | no charge for people viewing them | about 10 GB free; asks for a card on file (a billing alert is set) |
-| **The address** | **`capitalkranti.co.in`**, the paper's own (a free `…workers.dev` address until it points at the site) | ₹0 more (the paper already renews it) | its DNS can move to Cloudflare's free DNS |
+| **The pipeline** (watchers, writing, cards, shorts, posting) | **GitHub Actions**, on a schedule | the same | free for a public repository; each run has Node, Chromium and `ffmpeg`; scheduled runs every 5 minutes at most, often late by several minutes ("live" means within about 10-20 minutes); 6 hours a run at most |
+| **The website** | **Vercel** (Hobby), a new project with its root in `site/` | Cloudflare Workers | **non-commercial use only**; 100 GB transfer, 1 million function calls, **4 CPU-hours of server work** and **5,000 image resizes** a month. Pages are cached and refreshed only when a story changes, and photos are resized by the pipeline, not by Vercel |
+| **The database** | **Neon** Postgres, free, through Vercel's marketplace | Cloudflare D1 (or keep Neon) | 1 GB; **100 compute-hours a month**; it sleeps after 5 minutes idle. So the pipeline runs **every 15 minutes** (not 10) and the site reads through its cache: awake about 40% of the time ≈ 75 compute-hours |
+| **Photos** | **Vercel Blob**, free | Cloudflare R2 | **1 GB stored, 2,000 uploads a month, 10,000 uncached reads, 10 GB transfer.** One photo per story, resized to ~100 KB, at most **50 uploads a day** (counted; the rest of the day's stories go without a photo). Cards and shorts are not stored here (phase C needs a bigger store) |
+| **The address** | **`capitalkranti.co.in`**, pointed at Vercel (a free `…vercel.app` address until then) | pointed at Cloudflare | ₹0 more (the paper already renews it) |
+
+**On Vercel's free plan, going over a limit pauses that feature for 30 days**
+(no bill). So the pipeline counts its own uploads and resizes, the dashboard
+shows each limit's use, and an alert goes out at 80%.
+
+**When to move to Cloudflare** (whichever comes first):
+- before the site carries any ad (Vercel's free plan is non-commercial);
+- before phase C (cards and shorts need more than 1 GB and 2,000 uploads a month);
+- if a limit nears 80% two months running.
 
 **How it runs:**
-- **Every 10 minutes**, a scheduled GitHub Actions run reads the sources and writes the new stories into the database.
+- **Every 15 minutes** (the free database's compute hours, above), a scheduled GitHub Actions run reads the sources and writes the new stories into the database.
 - It makes and posts that story's cards, then ends.
 - The website reads the database, so a new story is live when the run ends.
 - **Heavier jobs** (the evening short, the morning carousel) are their own scheduled runs.
@@ -208,7 +223,7 @@ Every page follows DESIGN.md.
 
 **Measured:** privacy-friendly page analytics (views, reading time, what's shared), feeding the "decide" step and the Most Read list.
 
-**The editor's side** (on the phone; the father and the user sign in with Google through Cloudflare Access):
+**The editor's side** (on the phone; the father and the user sign in with their Google accounts, section 6.0 item 8):
 - **The approval queue:** approve, change or reject a story, and its posts.
 - **The live desk:** what is coming in, what was published, what each platform posted.
 - **Settings:**
@@ -325,11 +340,11 @@ and entered by the user; never in chat or the repository.
 | 1 | How stories say they were made | **The source and the number check only; AI is not mentioned in the text.** (AI-made pictures and video are still labelled, as Meta and YouTube require.) | A |
 | 2 | The English switch | **Labels and stories.** Stories are translated by a **free** OpenRouter model (`:free`; the account has bought over US$10, so 1,000 requests a day, 20 a minute). A story whose translation misses the day's allowance stays Gujarati-only until the next day; translations are number-checked. | A |
 | 3 | The domain | **`capitalkranti.co.in` is the paper's.** It is pointed at the site in phase A, with guided steps the user does at the registrar. | A |
-| 4 | Website host | **Cloudflare** (its free plan allows a site with ads). Next.js runs on Workers through the OpenNext adapter. | A |
-| 5 | Database and photos | **All on Cloudflare:** stories in **D1** (free: 500 MB a database, 5 GB an account), photos, cards and shorts in **R2** (free 10 GB; it asks for a card on file; a billing alert is set). One account. | A |
-| 6 | Keys as Actions secrets | **To do (user):** the Cloudflare account, R2 turned on with a billing alert, an API token (Account: D1 Edit, Workers R2 Storage Edit, Workers Scripts Edit, Account Settings Read), saved as `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. Checked by name (never value) when phase A starts. | A |
+| 4 | Website host | **Vercel for now** (decided 24 Oct, replacing Cloudflare until the move; see section 1.1): a new Vercel project for `site/`. **Cloudflare later**, before ads or phase C. | A |
+| 5 | Database and photos | **For now:** stories in **Neon** Postgres and photos in **Vercel Blob**, both free and made from the Vercel project's Storage tab (no card). **Later:** Cloudflare D1 and R2. | A |
+| 6 | Keys as Actions secrets | **To do (user):** in Vercel, the new project from this repository with its root directory `site/`, and its Storage tab's Neon database and Blob store connected to it; then two repository secrets copied from the project's environment variables: `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN`. Checked by name (never value) when phase A starts. (No Cloudflare account yet.) | A |
 | 7 | A new OpenRouter key | **To do (user):** a new key in every app's Settings and as the secret `OPENROUTER_API_KEY`; then the old key deleted. | A |
-| 8 | The editor's sign-in | **Both the father and the user, with their Google accounts**, through Cloudflare Access (free up to 50 people). Their addresses are entered in Cloudflare's settings by the user, never in the repository. | B |
+| 8 | The editor's sign-in | **Both the father and the user, with their Google accounts.** On Vercel this is the site's own Google sign-in (Auth.js, free): **to do (user) in phase B**, a Google sign-in client made in Google Cloud (guided), and the two allowed addresses entered in Vercel's settings, never in the repository. On Cloudflare later, Cloudflare Access may replace it. | B |
 | 9 | A daily AI ceiling | **₹25 a day** (at most ~₹750 a month) for all paid AI of the live news; translations on the free model don't count. At the ceiling, new stories wait for the next day; breaking news is still written. Changeable in Settings. | B |
 | 10 | Slow outside steps | **To do (user), soon:** Instagram switched to a Business account linked to the Page; the user an admin of the Facebook Page; signing in to X works. Meta's app review starts once phase A is live (it asks for a live site and privacy policy). | C |
 | 11 | X | **No automatic posting** (X charges programs per post since Feb 2026: about ₹1.3 a plain post, ₹17.6 with a link). The desk prepares a ready post and card for X each day; the user posts by hand. | C |
@@ -338,7 +353,7 @@ and entered by the user; never in chat or the repository.
 ### Phase A: the website (stages 0 and 1)
 
 1. **First, the test that shapes phase B:** does PIB answer GitHub's servers (section 1.1)? Also how late scheduled runs start.
-2. **Groundwork:** the `site/` folder, its own CI (`site.yml`, run only for `site/**`), the host, the database, photo storage, a scheduled run that writes to the database.
+2. **Groundwork:** the `site/` folder, its own CI (`site.yml`, run only for `site/**`); the Vercel project, Neon and Blob (section 1.1); a scheduled run that writes to the database; today's `web` project set to skip builds for `site/` changes, and the new one to build only for them.
 3. **The site:** DESIGN.md as components; home, article, section (tiers × genres), latest, search, the e-paper and the archive; the trust pieces on every story; About, editorial policy, how we check news, corrections, contact, terms, privacy.
 4. **Publish from the newsroom** sends the day's stories to the site's API instead of a git push (this also removes the GitHub sign-in problem in HANDOFF §7). Each story gets its tier and genres at publish (one cheap AI call).
 5. **Found by Google:** NewsArticle markup, the sitemaps and news sitemap, RSS per section, share previews.
@@ -386,7 +401,7 @@ These are in ₹ at the Settings rate, rough, to be measured in phase B.
 
 | Item | Per day | Per month |
 |---|---|---|
-| Hosting, database, storage, scheduled runs (free plans, section 1.1) | ₹0 | ₹0 |
+| Hosting, database, storage, scheduled runs (Vercel, Neon and Blob free plans for now, section 1.1) | ₹0 | ₹0 |
 | Domain (`capitalkranti.co.in`, already the paper's) | — | the paper's existing renewal |
 | Writing the stories, and the decide, tag and caption calls (cheap models; world stories as briefs) | at most ₹25 (the ceiling) | at most ~₹750 |
 | English translations | ₹0 (free model) | ₹0 |
@@ -430,7 +445,7 @@ with the daily ceiling the editor can change.
 
 Section 6.0 is the full checklist, with when each item is needed. In short:
 
-1. **The Cloudflare account** and its keys as Actions secrets, and a new OpenRouter key (phase A); pointing `capitalkranti.co.in` at the site.
+1. **The Vercel project** with its Neon database and Blob store, their two keys as Actions secrets, and a new OpenRouter key (phase A); pointing `capitalkranti.co.in` at the site. The Cloudflare account only when the site moves.
 2. **Admin access** to the Facebook Page and the X account, and an **Instagram Business account** linked to the Page (phase C). All links are made through the site's own sign-in screens; no passwords or keys in chat.
 3. **X:** decided 24 Oct, posted by hand for now.
 4. **Approval of the design** (done 24 Oct), the voice (phase C), and the posting schedule.
