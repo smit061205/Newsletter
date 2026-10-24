@@ -49,7 +49,7 @@ Never the Post's (or anyone's) logo, fonts, text, photos or screenshots in the r
 4. **Easy to read for every age.** Large Gujarati text, generous spacing, a text size control, audio (Listen), high contrast in both themes.
 5. **Where readers are.** WhatsApp sharing and the WhatsApp channel are first-class; video shorts have their own strip; the e-paper is one tap away.
 6. **Calm and ordered.** The ruled grid, few colours, no pop-ups, no autoplay with sound, no clutter. Ads (later) sit in marked slots and never move text.
-7. **Gujarati first.** Every word on screen is Gujarati by default, with an English switch for the site's own labels.
+7. **Gujarati first.** Every word on screen is Gujarati by default, with an English switch for the labels and the stories.
 
 ---
 
@@ -169,7 +169,7 @@ Each container is one section of news with a heading (§2.3), a layout and a lin
 
 - **Checked mark** (`checked` ✓): "આંકડા મૂળ સ્રોત સાથે ચકાસેલા" (numbers checked against the source), shown when the number check passed.
 - **Times:** published and, when changed, "updated" with the time.
-- **Source box** at the end: each source with a link (PIB, the CM's office, an outlet), and how the story was made, in plain words: written by Capital Kranti's desk from the official release, with AI help, and checked (to confirm with the user, §6).
+- **Source box** at the end: each source with a link (PIB, the CM's office, an outlet), and "દરેક આંકડો મૂળ સ્રોત સાથે મેળવ્યો છે" (every number was matched against the original source). AI is not mentioned in the text (decided 24 Oct); AI-made pictures and video are always labelled.
 - **Correction note:** when a story is corrected, a dated note at the top says what changed. Never a silent change.
 - **"ભૂલ જણાવો"** (report a mistake) on every story.
 - **Photo credit** in every caption.
@@ -215,13 +215,13 @@ The day's printed pages as images (tap to enlarge, pinch to zoom), the PDF to do
 
 ## 5. Language
 
-Gujarati first. The English switch changes the site's own labels, menus and dates; stories stay in Gujarati unless the user decides to translate them (it costs AI money; §6).
+Gujarati first. The English switch changes the site's labels, menus and dates, and shows each story's English translation (made by a free OpenRouter model, numbers checked; decided 24 Oct). A story without a translation yet shows in Gujarati with a short English note saying so.
 
-## 6. Open questions for the user
+## 6. Decided with the user (24 Oct)
 
-1. **How stories say they were made:** "written by Capital Kranti's desk from the official release, with AI help, and checked" in the source box. Is that wording right?
-2. **The English switch:** labels only (free), or stories translated too (AI cost per story)?
-3. **The domain:** the printed paper names `capitalkranti.co.in`; is it the paper's and can it point at the site?
+1. **How stories say they were made:** the source and the number check only; AI is not mentioned in the text.
+2. **The English switch:** labels and stories (stories translated by a free model).
+3. **The domain:** `capitalkranti.co.in` is the paper's and will point at the site.
 
 ## 7. How to check the design
 

@@ -47,7 +47,7 @@ These come from `CLAUDE.md`:
 - **Costs:** every cost shown in ₹.
 - **AI:** no Anthropic models for the paper's own AI (OpenRouter models from the profile).
 - **The repository is public:** keys are entered in the website's own settings page and never committed.
-- **Language:** Gujarati first, English as a switch.
+- **Language:** Gujarati first, English as a switch (labels and stories, the stories translated by a free model).
 
 ---
 
@@ -89,10 +89,10 @@ Nothing here needs a paid server. Each service's free limits change, so
 | Job | Free service | Why it fits | Limits to check |
 |---|---|---|---|
 | **The pipeline** (watchers, writing, cards, shorts, posting) | **GitHub Actions**, on a schedule | free for a public repository (this one is); each run has Node, Chromium and `ffmpeg` | scheduled runs every 5 minutes at most, and they're often late by several minutes, so "live" means within about 10-20 minutes; a run can't last over 6 hours |
-| **The website** | **Cloudflare** (Pages / Workers), or **Vercel**'s free plan (where today's site already is) | free, fast in India, HTTPS included | Vercel's free plan is for **non-commercial** use, which matters once the site carries ads; Cloudflare's free plan allows commercial use; daily request and build limits |
-| **The database** | a free Postgres (**Neon** or **Supabase**) | stories are text: a free database holds years of them | storage (about 0.5 GB), and Supabase pauses a project idle for a week |
-| **Photos, cards and shorts** | **Cloudflare R2** (free storage) | no charge for people viewing them | about 10 GB free |
-| **The address** | a free one first (`capitalkranti.pages.dev` or `…vercel.app`) | ₹0 | a real domain (~₹800-1,000 a year) when the paper wants one |
+| **The website** | **Cloudflare Workers** (chosen 24 Oct; Vercel's free plan is non-commercial) | free, fast in India, HTTPS included | Vercel's free plan is for **non-commercial** use, which matters once the site carries ads; Cloudflare's free plan allows commercial use; daily request and build limits |
+| **The database** | **Cloudflare D1** (chosen 24 Oct) | stories are text: a free database holds years of them; one account with the site | 500 MB a database (a new one per year if needed), 5 GB an account, daily read limits (pages are cached) |
+| **Photos, cards and shorts** | **Cloudflare R2** (free storage) | no charge for people viewing them | about 10 GB free; asks for a card on file (a billing alert is set) |
+| **The address** | **`capitalkranti.co.in`**, the paper's own (a free `…workers.dev` address until it points at the site) | ₹0 more (the paper already renews it) | its DNS can move to Cloudflare's free DNS |
 
 **How it runs:**
 - **Every 10 minutes**, a scheduled GitHub Actions run reads the sources and writes the new stories into the database.
@@ -110,9 +110,9 @@ Nothing here needs a paid server. Each service's free limits change, so
 - Keep it as plan B, not the start.
 
 **What still costs money:** the **AI** (writing, captions, the voice for
-shorts) and **X**'s posting plan. Section 7 has the figures; a daily ceiling in
-₹ keeps the AI within what the user can spend, and stories can be fewer and
-shorter at first.
+shorts). Section 7 has the figures; a daily ceiling of ₹25 keeps the AI
+within what the user can spend, and English translations use a free model.
+X is not posted to automatically (it charges per post), so it costs nothing.
 
 ---
 
@@ -192,7 +192,7 @@ Every page follows DESIGN.md.
 - **About, contact, corrections policy, terms, privacy**: a news site needs them, and Google News looks for them.
 
 **For readers:**
-- Gujarati first with an English switch.
+- Gujarati first with an English switch (labels and stories).
 - Dark / light / match device.
 - Follow genres (the home page leans to them).
 - Web push alerts for breaking news (opt-in).
@@ -208,14 +208,14 @@ Every page follows DESIGN.md.
 
 **Measured:** privacy-friendly page analytics (views, reading time, what's shared), feeding the "decide" step and the Most Read list.
 
-**The editor's side** (sign-in, on the phone):
+**The editor's side** (on the phone; the father and the user sign in with Google through Cloudflare Access):
 - **The approval queue:** approve, change or reject a story, and its posts.
 - **The live desk:** what is coming in, what was published, what each platform posted.
 - **Settings:**
   - the AI keys and social account links, entered there and stored on the server, never in the repository;
   - the ₹ rate;
   - posting schedules;
-  - a daily cost ceiling, if wanted.
+  - the daily AI ceiling (₹25 to start).
 - **The dashboard:** stories, reach, clicks, and **every cost in ₹**, per day, tier, genre and platform.
 
 ---
@@ -264,7 +264,7 @@ Formats, made from a story by its route:
 | **Website** | first, always | every post links back to the article |
 | **Facebook Page** | Meta's Graph API (Page posts, photos, Reels) | one Meta app; app review for the posting permissions |
 | **Instagram** | Instagram's content publishing API (images, carousels up to 10, Reels) | needs a Business account linked to the Page; there is a daily cap on API posts (check the current number) |
-| **X** | X API v2 | posting needs a paid plan; check the current price before building, and show it in ₹ |
+| **X** | **by hand for now** | X charges programs per post (about ₹1.3, or ₹17.6 with a link; Feb 2026 on). The desk prepares a ready post and card each day for the user to post from the X app, like the WhatsApp Channel |
 | **Telegram channel** | Telegram Bot API | free and simple; a good first channel to test the desk |
 | **YouTube Shorts** | YouTube Data API upload | uploads use a large share of the daily quota; new apps' uploads may stay private until Google's audit (check) |
 | **WhatsApp Channel** | no public posting API that we know of | the desk prepares a copy-ready post and card; the editor shares it in one tap (check for an API when building) |
@@ -317,23 +317,23 @@ sessions.
 
 ### 6.0 Before starting: the up-front checklist
 
-Settled once, so no phase stops to ask. Accounts and keys are always made and
-entered by the user; never in chat or the repository.
+Gone through with the user on 24 Oct 2026. Accounts and keys are always made
+and entered by the user; never in chat or the repository.
 
-| # | What | Who | Needed by |
+| # | What | Decided | Needed by |
 |---|---|---|---|
-| 1 | How stories say they were made: "written by the Capital Kranti desk from the government press release, with AI help; every number checked" (DESIGN.md §6) | user decides | A |
-| 2 | The English switch: the site's labels only (free), or stories translated too (AI cost per story) | user decides | A |
-| 3 | The domain: is `capitalkranti.co.in` the paper's, and can it point at the site? (A free address until then) | user | A (or later) |
-| 4 | Website host account: Cloudflare (ads allowed on the free plan) or Vercel (free plan non-commercial) | user makes it | A |
-| 5 | Database account: Supabase recommended (it can also hold the editor's sign-in and, at first, photos), or Neon | user makes it | A |
-| 6 | The keys from 4 and 5 saved as the repository's **Actions secrets** | user | A |
-| 7 | **A new OpenRouter key** (the old one appeared in a screenshot on 23 Oct), in the app's Settings and as an Actions secret | user | A |
-| 8 | Who signs in as editor (the father, the user, or both) and how (an email link or a password) | user decides | B |
-| 9 | **A daily AI ceiling in ₹** for live news, so it can run for real without asking | user decides | B |
-| 10 | **Start the slow outside steps now**, guided: a Meta app and its review for posting (can take weeks); the Instagram Business account linked to the Page; admin access to the Page and X | user, guided | C |
-| 11 | X's posting price, once checked and shown in ₹: yes or no | user decides | C |
-| 12 | Optionally, a yes on writing to PIB for program access (RNI 54922/93), and who signs it | user decides | any |
+| 1 | How stories say they were made | **The source and the number check only; AI is not mentioned in the text.** (AI-made pictures and video are still labelled, as Meta and YouTube require.) | A |
+| 2 | The English switch | **Labels and stories.** Stories are translated by a **free** OpenRouter model (`:free`; the account has bought over US$10, so 1,000 requests a day, 20 a minute). A story whose translation misses the day's allowance stays Gujarati-only until the next day; translations are number-checked. | A |
+| 3 | The domain | **`capitalkranti.co.in` is the paper's.** It is pointed at the site in phase A, with guided steps the user does at the registrar. | A |
+| 4 | Website host | **Cloudflare** (its free plan allows a site with ads). Next.js runs on Workers through the OpenNext adapter. | A |
+| 5 | Database and photos | **All on Cloudflare:** stories in **D1** (free: 500 MB a database, 5 GB an account), photos, cards and shorts in **R2** (free 10 GB; it asks for a card on file; a billing alert is set). One account. | A |
+| 6 | Keys as Actions secrets | **To do (user):** the Cloudflare account, R2 turned on with a billing alert, an API token (Account: D1 Edit, Workers R2 Storage Edit, Workers Scripts Edit, Account Settings Read), saved as `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. Checked by name (never value) when phase A starts. | A |
+| 7 | A new OpenRouter key | **To do (user):** a new key in every app's Settings and as the secret `OPENROUTER_API_KEY`; then the old key deleted. | A |
+| 8 | The editor's sign-in | **Both the father and the user, with their Google accounts**, through Cloudflare Access (free up to 50 people). Their addresses are entered in Cloudflare's settings by the user, never in the repository. | B |
+| 9 | A daily AI ceiling | **₹25 a day** (at most ~₹750 a month) for all paid AI of the live news; translations on the free model don't count. At the ceiling, new stories wait for the next day; breaking news is still written. Changeable in Settings. | B |
+| 10 | Slow outside steps | **To do (user), soon:** Instagram switched to a Business account linked to the Page; the user an admin of the Facebook Page; signing in to X works. Meta's app review starts once phase A is live (it asks for a live site and privacy policy). | C |
+| 11 | X | **No automatic posting** (X charges programs per post since Feb 2026: about ₹1.3 a plain post, ₹17.6 with a link). The desk prepares a ready post and card for X each day; the user posts by hand. | C |
+| 12 | Writing to PIB | **Not now;** revisit only if PIB blocks the live news. | — |
 
 ### Phase A: the website (stages 0 and 1)
 
@@ -387,17 +387,17 @@ These are in ₹ at the Settings rate, rough, to be measured in phase B.
 | Item | Per day | Per month |
 |---|---|---|
 | Hosting, database, storage, scheduled runs (free plans, section 1.1) | ₹0 | ₹0 |
-| Domain (optional; a free address first) | — | ₹0, or ~₹80 (about ₹1,000 a year) |
-| Writing ~100-300 stories (mostly the cheap model; world stories as briefs) | ₹10-150 | ₹300-4,500 |
-| Decide, tag and caption calls (cheap) | ₹2-15 | ₹60-450 |
+| Domain (`capitalkranti.co.in`, already the paper's) | — | the paper's existing renewal |
+| Writing the stories, and the decide, tag and caption calls (cheap models; world stories as briefs) | at most ₹25 (the ceiling) | at most ~₹750 |
+| English translations | ₹0 (free model) | ₹0 |
 | Cards | ~₹0 (own server) | ~₹0 |
 | Shorts: voice for 2-4 a day | ₹5-20 | ₹150-600 |
-| X posting | — | check the current price |
+| X posting | ₹0 (by hand) | ₹0 |
 | Telegram, Facebook, Instagram, YouTube posting | ₹0 | ₹0 |
-| **To start (phases A-C, without shorts)** | | **about ₹400-5,500, nearly all of it the AI; a daily ceiling keeps it low** |
+| **To start (phases A-C, without shorts)** | | **at most about ₹750, all of it the AI, held by the ₹25 daily ceiling** |
 
 The dashboard shows the real figures in ₹ per day, tier, genre and platform,
-with an optional daily ceiling the editor sets.
+with the daily ceiling the editor can change.
 
 ---
 
@@ -430,8 +430,8 @@ with an optional daily ceiling the editor sets.
 
 Section 6.0 is the full checklist, with when each item is needed. In short:
 
-1. **Free accounts** for the website host and the database (phase A); a domain only later, if wanted.
+1. **The Cloudflare account** and its keys as Actions secrets, and a new OpenRouter key (phase A); pointing `capitalkranti.co.in` at the site.
 2. **Admin access** to the Facebook Page and the X account, and an **Instagram Business account** linked to the Page (phase C). All links are made through the site's own sign-in screens; no passwords or keys in chat.
-3. A decision on **X's posting price** once checked (phase C).
+3. **X:** decided 24 Oct, posted by hand for now.
 4. **Approval of the design** (done 24 Oct), the voice (phase C), and the posting schedule.
-5. Optionally, a yes on **writing to PIB** for program access, and who signs it.
+5. **Writing to PIB:** not now (24 Oct).
