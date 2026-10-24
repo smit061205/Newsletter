@@ -156,7 +156,7 @@ export const digits = (s: string) => new Set((s.replace(/[૦-૯]/g, (d) => Str
 
 // small numbers as the releases often spell them, 1-20 (Gujarati, Hindi, then English)
 const NUMBER_WORDS: string[][] = [
-  [], ["એક", "एक", "one"], ["બે", "दो", "two"], ["ત્રણ", "तीन", "three"], ["ચાર", "चार", "four"], ["પાંચ", "पांच", "पाँच", "five"],
+  [], ["એક", "एक", "one", "પહેલી", "પહેલો", "પહેલા"], ["બે", "दो", "two"], ["ત્રણ", "तीन", "three"], ["ચાર", "चार", "four"], ["પાંચ", "पांच", "पाँच", "five"],
   ["છ", "छह", "छः", "six"], ["સાત", "सात", "seven"], ["આઠ", "आठ", "eight"], ["નવ", "नौ", "nine"], ["દસ", "दस", "ten"],
   ["અગિયાર", "ग्यारह", "eleven"], ["બાર", "बारह", "twelve"], ["તેર", "तेरह", "thirteen"], ["ચૌદ", "चौदह", "fourteen"],
   ["પંદર", "पंद्रह", "fifteen"], ["સોળ", "सोलह", "sixteen"], ["સત્તર", "सत्रह", "seventeen"], ["અઢાર", "अठारह", "eighteen"],
@@ -176,6 +176,11 @@ export function numbersNotIn(out: string, source: string, date?: string): string
   const latin = source.replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d))).replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d)));
   for (const m of latin.matchAll(/(\d+(?:\.\d+)?)\s*(हज़ार|हजार|હજાર|लाख|લાખ)/g)) {
     known.add(String(Math.round(Number(m[1]) * (/लाख|લાખ/.test(m[2]) ? 100_000 : 1000))));
+  }
+  // "આઠ હજાર 224", "બે હજાર 356": thousands in words, the rest in figures (All India Radio's way) = 8224, 2356
+  for (const m of latin.matchAll(/([\p{L}\p{M}]+)\s+(हज़ार|हजार|હજાર)\s+(\d{1,3})(?!\d)/gu)) {
+    const k = NUMBER_WORDS.findIndex((ws) => ws.includes(m[1].toLowerCase()));
+    if (k > 0) known.add(String(k * 1000 + Number(m[3])));
   }
   const words = new Set(source.toLowerCase().split(/[\s,.;:()'"‘’“”!?।-]+/));
   return [...digits(out)].filter((n) => {

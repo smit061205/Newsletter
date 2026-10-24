@@ -98,6 +98,8 @@ export const ProfileSchema = z.object({
     /** between two stories stacked in the same columns, and the rule drawn in that gap (0 = none) */
     betweenStories: pt.default(8),
     storyRule: pt.default(0),
+    /** clear space under the page header before the first stories (24 Oct: a big headline at the top touched it) */
+    underHeader: pt.default(0),
   }),
   photo: z.object({
     maxCrop: z.number().min(0).max(1),

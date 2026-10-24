@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import type { Element, TextElement } from "@ck/shared/contract";
 import { profile, profilePath } from "../profile.ts";
 import { elementText, topFor, type Measurer } from "../layout/measure.ts";
+import { GAP } from "../layout/typography.ts";
 
 interface Field {
   x: number; y: number; width: number; height: number;
@@ -106,5 +107,6 @@ export async function chromeFor(n: number, total: number, issueDate: string, iss
   }
   // the template's own foot margin, else the footer's top, else the page's
   const bottom = Math.min(role.bodyBottom ?? template.page.height, footer ? footer.y : template.page.height);
-  return { elements: els, bodyTop: role.bodyTop, bodyBottom: bottom };
+  // (the stories start a little under the header: profile spacing.underHeader)
+  return { elements: els, bodyTop: role.bodyTop + GAP.underHeader, bodyBottom: bottom };
 }
