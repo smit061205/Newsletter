@@ -100,7 +100,20 @@ export default function Today() {
     catch (e) { setError((e as Error).message); }
   };
   const [stopping, setStopping] = useState(false);
-  useEffect(() => { if (!running) setStopping(false); }, [running]);
+  // "start again from the beginning" while a run goes: stop it, then run from the first step
+  const [restarting, setRestarting] = useState(false);
+  useEffect(() => {
+    if (running) return;
+    setStopping(false);
+    if (restarting) { setRestarting(false); run(); }
+  }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
+  const restart = async () => {
+    if (!window.confirm(t("today.restart.confirm"))) return;
+    if (!running) return run();
+    setRestarting(true);
+    setStopping(true);
+    try { await call("/api/jobs/current/stop", { json: {} }); } catch (e) { setError((e as Error).message); setStopping(false); setRestarting(false); }
+  };
   const stop = async () => {
     if (!window.confirm(t("stop.confirm"))) return;
     setStopping(true);
@@ -138,10 +151,12 @@ export default function Today() {
           : failed && failed.error === "stopped by the editor" ? (
             <Hero tone="warn" icon={Icon.alert()} title={t("today.stopped.title")} body={t("today.stopped.body")}>
               <Button kind="primary" big icon={Icon.refresh()} onClick={() => run(failed.name)}>{t("today.stopped.go")}</Button>
+              <Button big onClick={restart}>{t("today.restart")}</Button>
             </Hero>
           ) : failed ? (
             <Hero tone="bad" icon={Icon.alert()} title={t("today.failed.title")} body={t("today.failed.body", { step: t(`step.${failed.name}` as StringKey) })}>
               <Button kind="primary" big icon={Icon.refresh()} onClick={() => run(failed.name)}>{t("today.retry")}</Button>
+              <Button big onClick={restart}>{t("today.restart")}</Button>
             </Hero>
           ) : !hasIssue ? (
             <Hero tone="accent" icon={Icon.sparkle()} title={t("today.none.title")} body={t("today.none.body", { time: num(lang, status?.runAt ?? "20:00") })}>
@@ -175,7 +190,8 @@ export default function Today() {
 
         {running && (
           <div className={s.row} style={{ justifyContent: "flex-end" }}>
-            <Button kind="danger" onClick={stop} disabled={stopping}>{stopping ? t("stop.stopping") : t("stop.paper")}</Button>
+            <Button icon={Icon.refresh()} onClick={restart} disabled={stopping}>{restarting ? t("today.restarting") : t("today.restart")}</Button>
+            <Button kind="danger" onClick={stop} disabled={stopping}>{stopping && !restarting ? t("stop.stopping") : t("stop.paper")}</Button>
           </div>
         )}
         {job && <Stepper job={job} />}
