@@ -317,7 +317,7 @@ footer .wm b{font-size:28px}
       settings:'સેટિંગ્સ', theme:'દેખાવ', themeAuto:'ફોન પ્રમાણે', light:'લાઇટ', dark:'ડાર્ક', size:'અક્ષરનું કદ', language:'ભાષા', services:'અમારી સેવાઓ', about:'અમારા વિશે',
       listen:'સાંભળો', min:'મિનિટ', share:'WhatsApp પર મોકલો', shareShort:'મોકલો', save:'સાચવો', saved:'સાચવ્યું', published:'પ્રકાશિત', updatedAt:'સુધારેલ',
       checked:'આંકડા મૂળ સ્રોત સાથે ચકાસેલા', desk:'કેપિટલ ક્રાંતિ ડેસ્ક', place:'ગાંધીનગર', by:'લેખક', srcTitle:'આ સમાચારનો સ્રોત',
-      how:'કેપિટલ ક્રાંતિ ડેસ્કે સરકારી પ્રેસ રિલીઝ પરથી AIની મદદથી આ સમાચાર લખ્યા છે; દરેક આંકડો મૂળ રિલીઝ સાથે મેળવ્યો છે.', report:'ભૂલ દેખાય? અમને જણાવો',
+      how:'દરેક આંકડો મૂળ રિલીઝ સાથે મેળવ્યો છે.', report:'ભૂલ દેખાય? અમને જણાવો',
       fix:'સુધારો (નમૂનો): સમાચાર સુધારાય ત્યારે અહીં તારીખ સાથે લખાશે કે શું બદલાયું.', related:'આ વિભાગમાંથી વધુ', photo:'ફોટો',
       sampleListen:'નમૂનો: સાચી સાઇટમાં ગુજરાતી અવાજમાં સંભળાશે', sampleReport:'નમૂનો: સાચી સાઇટમાં અહીં ભૂલ જણાવવાનું ફોર્મ ખૂલશે', sampleFollow:'નમૂનો: સાચી સાઇટમાં હોમ પેજ આ વિભાગ તરફ ઝૂકશે',
       sampleJoin:'નમૂનો: સાચી સાઇટમાં WhatsApp ચેનલ ખૂલશે', samplePdf:'નમૂનો: સાચી સાઇટમાં PDF ડાઉનલોડ થશે', savedToast:'સમાચાર સાચવ્યા', unsavedToast:'સાચવેલામાંથી કાઢ્યા',
@@ -334,14 +334,14 @@ footer .wm b{font-size:28px}
       settings:'Settings', theme:'Appearance', themeAuto:'Match phone', light:'Light', dark:'Dark', size:'Text size', language:'Language', services:'Our services', about:'About us',
       listen:'Listen', min:'min', share:'Send on WhatsApp', shareShort:'Send', save:'Save', saved:'Saved', published:'Published', updatedAt:'Updated',
       checked:'Numbers checked against the original source', desk:'Capital Kranti desk', place:'Gandhinagar', by:'By', srcTitle:'Where this story comes from',
-      how:'Written by the Capital Kranti desk from the government’s press release, with AI help; every number was matched against the original release.', report:'Spotted a mistake? Tell us',
+      how:'Every number was matched against the original release.', report:'Spotted a mistake? Tell us',
       fix:'Correction (sample): when a story is corrected, a dated note here says what changed.', related:'More from this section', photo:'Photo',
       sampleListen:'Sample: the real site reads the story aloud in a Gujarati voice', sampleReport:'Sample: the real site opens a form to report the mistake', sampleFollow:'Sample: the real site leans the home page towards this section',
       sampleJoin:'Sample: the real site opens the WhatsApp channel', samplePdf:'Sample: the real site downloads the PDF', savedToast:'Story saved', unsavedToast:'Removed from saved',
       morning:'', noon:'', evening:'', night:'', today:'Today',
       f1:'Capital Kranti', f2:'Sections', f3:'Get it', f4:'Policies', fAbout:'About us', fPolicy:'Editorial policy', fHow:'How we check the news', fFix:'Corrections', fContact:'Contact',
       fSend:'Send us news', fAds:'Advertise', fTerms:'Terms of use', fPrivacy:'Privacy', fRss:'RSS', fArchive:'Past issues', fWa:'WhatsApp channel',
-      legal:'© 1992–2026 Capital Kranti, Gandhinagar · RNI 54922/93 · capitalkranti.co.in' } };
+      legal:'© 1992–2026 Capital Kranti, Gandhinagar · RNI 54922/93 · capitalkranti.co.in', noEnglish:'The English translation of this story isn’t ready yet, so it is shown in Gujarati. In the real site, stories are translated by a free AI model.' } };
   const t = k => T[lang][k] ?? T.gu[k] ?? k;
   const SECS = [['gujarat','ગુજરાત','Gujarat'],['india','દેશ','India'],['world','વિશ્વ','World'],['farm','ખેતી','Farming'],['economy','અર્થતંત્ર','Economy'],
     ['tech','ટેક-વિજ્ઞાન','Tech & science'],['health','આરોગ્ય','Health'],['sport','રમતગમત','Sport'],['education','શિક્ષણ','Education'],['entertainment','મનોરંજન','Entertainment']];
@@ -439,6 +439,7 @@ footer .wm b{font-size:28px}
       <button class="ib" data-sample="sampleListen" aria-label="${t('listen')}">${ico.listen}</button><button class="ib" data-cycle-size aria-label="${t('size')}">${ico.textsize}</button>`;
     return `<div class="artg"><article class="art">
         <a class="crumbs" href="#sec-${s.sec}">${esc(secName(s.sec))} ${ico.chev}</a>
+        ${lang === 'en' ? `<p class="fix">${t('noEnglish')}</p>` : ''}
         <h1>${esc(s.h)}</h1><p class="stand">${esc(s.d)}</p>
         <div class="times">${t('by')} <b>${t('desk')}</b>, ${t('place')}<br>${t('published')}: ${t('today')} ${clock(s.t)}${s.id === 'p2326707' ? ` · ${t('updatedAt')}: ${clock(s.t + 50)}` : ''}</div>
         <div class="chk">${ico.check}${t('checked')}</div>
