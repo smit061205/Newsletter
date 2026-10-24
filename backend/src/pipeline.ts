@@ -85,9 +85,9 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       const { ingestPib, FEEDS } = await import("./ingest/pib.ts");
       const { profile } = await import("./profile.ts");
       const feed = (profile.language.lang in FEEDS ? profile.language.lang : "en") as keyof typeof FEEDS;
-      // an earlier day: PIB shows it only through its date form, which its
-      // firewall refuses programs (24 Oct 2026) -- and waiting won't bring
-      // that day's news: the day is made from the releases already saved
+      // an earlier day: its list as collected that day, or found on PIB by
+      // release number (ingest/pib.ts); if neither can be had, waiting won't
+      // bring it: the day is made from the releases already saved
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(Date.now());
       const past = date < today;
       let r: Awaited<ReturnType<typeof ingestPib>> | null = null;
@@ -125,8 +125,8 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       // mustn't stop the evening's paper -- it's made from what the day has
       try {
         const { withPatience } = await import("./ingest/pib.ts");
-        // (an earlier day's Hindi list comes only through PIB's date form, which
-        // its firewall refuses programs: one short try, not two)
+        // (an earlier day's Hindi list was saved with its Gujarati one, collected
+        // or found by number: one short try, not two)
         const past = date < new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(Date.now());
         await withPatience(past ? { tries: 1, seconds: 15 } : { tries: 2, seconds: 20 }, () => topUp(store, date, { log: say, progress }));
       } catch (e) {
