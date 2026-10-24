@@ -250,12 +250,12 @@ printed paper as one of its products. It is **planned, not built**.
 - **Where:** the code goes in a new **`site/`** folder.
   - It is **not** in the root workspaces, so its libraries stay out of the desktop app.
   - It borrows the engine's code by path (PIB reading, the Gujarati text cleaning, the checks).
-- **Running:** it has its own CI and deploys to a cloud server. App releases still come only from version tags.
+- **Running: free hosting, no paid server** (the user has no budget for one). The pipeline runs as scheduled GitHub Actions runs (free for this public repository); the site is on a free host (Cloudflare or Vercel), with a free Postgres (Neon or Supabase) and free photo storage (Cloudflare R2). ROADMAP §1.1 has the details and the two things to test first. App releases still come only from version tags.
 - **Look:** the Washington Post, dark by default. Only its patterns are copied, never its logo, fonts, text or images.
 - **Order:** stage 0 (server, domain, empty site), then stage 1 (the website from the evening paper's stories, with Publish sending to it), then live news, other outlets, and the social desk.
 
 **First steps in the new session:**
 1. Read `CLAUDE.md`, this file's §8, and `docs/website/ROADMAP.md` §1 and §6.
-2. Ask the user for stage 0's needs: the cloud server account and the domain. They create them; keys are entered in the server's settings, never in chat.
+2. Ask the user for stage 0's needs: free accounts on the chosen host and database. They create them and save the keys as Actions secrets themselves; never in chat. First test whether PIB answers GitHub's servers (ROADMAP §1.1).
 3. Build stage 0, then stage 1, and show the user screenshots at phone and desktop widths before moving on.
 

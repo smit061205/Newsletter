@@ -27,7 +27,7 @@ engine makes the day's pages from the day's published stories.
 
 ### Decisions already made (24 Oct)
 
-- **Hosting:** a cloud server, always on, so the website never depends on the father's computer or the 8 PM run.
+- **Hosting: free services to start** (decided 24 Oct; no money for a server). The website and its pipeline still never depend on the father's computer or the 8 PM run. Section 1.1 has the setup; a paid server only if the paper outgrows it.
 - **Publishing:** anything verified goes live on its own. These wait for the editor's approval:
   - sensitive stories: deaths, accidents, crime, allegations against named people;
   - unverified stories.
@@ -57,7 +57,7 @@ These come from `CLAUDE.md`:
 backend/    the engine (the desktop app's)   ─┐
 web/        the newsroom (the desktop app's)  ├─ packed into the desktop app (desktop/stage.mjs)
 shared/, publications/                       ─┘
-site/       NEW: the website, its workers and the social desk (the cloud server only)
+site/       NEW: the website, its pipeline and the social desk (free hosting, section 1.1)
 docs/website/   this roadmap, the design, the sample
 ```
 
@@ -75,12 +75,44 @@ docs/website/   this roadmap, the design, the sample
 
 **What's in `site/`:**
 - **The website:** Next.js, server-rendered and cached, for speed and Google. Read `web/node_modules/next/dist/docs` first: this Next differs from what you know.
-- **A worker process:** the watchers, the queue, the AI steps, the card and short makers, and the posters.
-- **Postgres** for stories, sources, posts and costs.
-- **Deploy:** one Docker setup on a cloud server near India (a Mumbai region), behind HTTPS on the paper's domain.
+- **The pipeline:** the watchers, the AI steps, the card and short makers, and the posters, as short runs every few minutes (no always-on process; section 1.1).
+- **A database** for stories, sources, posts and costs.
 
 **The current public site** (`web/src/app/page.tsx` on Vercel, published by
 git push) stays until the new site is live, then redirects to it.
+
+### 1.1 Free hosting
+
+Nothing here needs a paid server. Each service's free limits change, so
+**check them when setting up** and write the numbers into this file.
+
+| Job | Free service | Why it fits | Limits to check |
+|---|---|---|---|
+| **The pipeline** (watchers, writing, cards, shorts, posting) | **GitHub Actions**, on a schedule | free for a public repository (this one is); each run has Node, Chromium and `ffmpeg` | scheduled runs every 5 minutes at most, and they're often late by several minutes, so "live" means within about 10-20 minutes; a run can't last over 6 hours |
+| **The website** | **Cloudflare** (Pages / Workers), or **Vercel**'s free plan (where today's site already is) | free, fast in India, HTTPS included | Vercel's free plan is for **non-commercial** use, which matters once the site carries ads; Cloudflare's free plan allows commercial use; daily request and build limits |
+| **The database** | a free Postgres (**Neon** or **Supabase**) | stories are text: a free database holds years of them | storage (about 0.5 GB), and Supabase pauses a project idle for a week |
+| **Photos, cards and shorts** | **Cloudflare R2** (free storage) | no charge for people viewing them | about 10 GB free |
+| **The address** | a free one first (`capitalkranti.pages.dev` or `…vercel.app`) | ₹0 | a real domain (~₹800-1,000 a year) when the paper wants one |
+
+**How it runs:**
+- **Every 10 minutes**, a scheduled GitHub Actions run reads the sources and writes the new stories into the database.
+- It makes and posts that story's cards, then ends.
+- The website reads the database, so a new story is live when the run ends.
+- **Heavier jobs** (the evening short, the morning carousel) are their own scheduled runs.
+
+**Two things to test first, in stage 0:**
+1. **Whether PIB answers GitHub's servers.** They're abroad, and PIB's firewall may treat them differently from a computer in India. If it doesn't answer, the **desktop app**, which already collects PIB hourly (v1.1.2), sends what it collects to the website's database. Then PIB news is live while the father's computer is on, and other sources still come from GitHub.
+2. **How late the scheduled runs really are,** to tell the user honestly how "live" the site is.
+
+**A genuinely free server, if one is ever needed:**
+- Oracle Cloud's "Always Free" machines are a real always-on server at ₹0.
+- But sign-up asks for a card (to verify, not to charge), new machines are sometimes unavailable, and idle ones can be reclaimed.
+- Keep it as plan B, not the start.
+
+**What still costs money:** the **AI** (writing, captions, the voice for
+shorts) and **X**'s posting plan. Section 7 has the figures; a daily ceiling in
+₹ keeps the AI within what the user can spend, and stories can be fewer and
+shorter at first.
 
 ---
 
@@ -266,11 +298,13 @@ Each stage is finished, checked, shown to the user and released before the next.
 
 ### Stage 0: groundwork
 
-- The `site/` folder, its own CI (`site.yml`, triggered by `site/**`), and Docker.
-- The cloud server, the domain and HTTPS, and Postgres with daily backups.
-- **Check:** an empty site live on the domain; a push to `site/` deploys; the desktop app's release unaffected.
+- The `site/` folder, its own CI (`site.yml`, triggered by `site/**`).
+- The free services of section 1.1: the website host, the database, photo storage, and the scheduled pipeline run.
+- **The two tests** of section 1.1: PIB from GitHub's servers, and how late scheduled runs are.
+- **Check:** an empty site live on its free address; a push to `site/` deploys; a scheduled run writes to the database; the desktop app's release unaffected.
 - **Needed from the user:**
-  - the cloud server account and a domain (the user creates them; keys go in the server's settings, never in chat or the repo).
+  - free accounts on the chosen services (Cloudflare or Vercel, and Neon or Supabase), made by the user;
+  - their keys are saved as the repository's **Actions secrets** by the user, never in chat or the repo.
 
 ### Stage 1: the website, from the evening paper
 
@@ -341,15 +375,15 @@ These are in ₹ at the Settings rate, rough, to be measured in stage 2.
 
 | Item | Per day | Per month |
 |---|---|---|
-| Cloud server, database, backups | — | ₹1,000-3,000 |
-| Domain | — | ~₹100 (about ₹1,000 a year) |
+| Hosting, database, storage, scheduled runs (free plans, section 1.1) | ₹0 | ₹0 |
+| Domain (optional; a free address first) | — | ₹0, or ~₹80 (about ₹1,000 a year) |
 | Writing ~100-300 stories (mostly the cheap model; world stories as briefs) | ₹10-150 | ₹300-4,500 |
 | Decide, tag and caption calls (cheap) | ₹2-15 | ₹60-450 |
 | Cards | ~₹0 (own server) | ~₹0 |
 | Shorts: voice for 2-4 a day | ₹5-20 | ₹150-600 |
 | X posting | — | check the current price |
 | Telegram, Facebook, Instagram, YouTube posting | ₹0 | ₹0 |
-| **To start (stages 0-4)** | | **about ₹2,000-8,000** |
+| **To start (stages 0-4)** | | **about ₹400-5,500, nearly all of it the AI; a daily ceiling keeps it low** |
 
 The dashboard shows the real figures in ₹ per day, tier, genre and platform,
 with an optional daily ceiling the editor sets.
@@ -376,13 +410,14 @@ with an optional daily ceiling the editor sets.
   - cheap models for briefs;
   - each event written once;
   - a daily ceiling.
-- **The server going down:** health checks, automatic restart, daily database backups; the printed paper still works from the desktop app.
+- **Free plans changing or running out:** the limits are written down (section 1.1) and watched on the dashboard; the code avoids depending on one host, so the site can move. The printed paper still works from the desktop app whatever happens.
+- **Scheduled runs late or skipped:** stories go up 10-20 minutes after the source; breaking news isn't instant. Honest wording on the site ("updated every few minutes").
 
 ---
 
 ## 9. Needed from the user, overall
 
-1. A **cloud server account** and a **domain** (stage 0).
+1. **Free accounts** for the website host and the database (stage 0); a domain only later, if wanted.
 2. **Admin access** to the Facebook Page and the X account, and an **Instagram Business account** linked to the Page (stages 4-5). All links are made through the site's own sign-in screens; no passwords or keys in chat.
 3. A decision on **X's posting price** once checked (stage 4).
 4. **Approval of the design** (stage 1), the voice (stage 6), and the posting schedule.
