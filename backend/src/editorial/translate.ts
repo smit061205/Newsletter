@@ -1,17 +1,18 @@
-// The Hindi top-up. When the day's Gujarati releases don't fill the paper,
-// the desk takes PIB's Hindi releases -- the central government's national
+// The top-up. When the day's Gujarati releases don't fill the paper, the desk
+// takes PIB's Hindi and English releases -- the central government's national
 // news -- and translates the best of them into the paper's Gujarati:
 //
-//   1. the day's Hindi list, less any release PIB also issued in Gujarati
-//      (its language versions) and less greetings and condolences;
-//   2. one cheap AI call ranks the rest for a Gujarat reader;
+//   1. the day's Hindi and English lists, less any release PIB also issued in
+//      Gujarati (its language versions) and less greetings and condolences;
+//   2. one cheap AI call ranks the rest for a Gujarat reader, one of each
+//      release PIB put out in both languages, nothing the paper already has;
 //   3. the best are fetched and translated one by one, each measured as it
 //      would print, until the copy reaches the profile's fill target (or the
 //      profile sets a daily AI ceiling and it's spent: none by default).
 //
 // A translation adds nothing: every number in it is checked against the
-// Hindi original, and each one is marked "translated from Hindi" for the
-// editor, who sees the original beside it.
+// original, and each one is marked as translated for the editor, who sees
+// the original beside it.
 import { fillContext } from "../build.ts";
 import { ingestPib, listPib, type ListItem } from "../ingest/pib.ts";
 import { profile } from "../profile.ts";
@@ -46,7 +47,9 @@ export function sameNewsIn(r: Pick<Release, "headline" | "body">, gujarati: Rele
 }
 
 // a message on an occasion, not news: a congratulation, condolence, greeting or tribute
-const GREETING = /बधाई|शुभकामना|श्रद्धांजलि|शोक|नमन|स्मरण किया|पुण्यतिथि|जयंती पर|अभिनंदन|सुभाषित/;
+const GREETING = /बधाई|शुभकामना|श्रद्धांजलि|शोक|नमन|स्मरण किया|पुण्यतिथि|जयंती पर|अभिनंदन|सुभाषित|congratulat|condol|greet|tribute|homage|wishes|birth anniversary|death anniversary/i;
+const LANGUAGE = { hi: "HINDI", en: "ENGLISH" } as const;
+type Foreign = keyof typeof LANGUAGE;
 
 const RANK_SCHEMA = {
   name: "ranking",
@@ -62,8 +65,11 @@ const RANK_SCHEMA = {
   },
 };
 
-/** The candidates' PRIDs, best first for a Gujarati daily in Gandhinagar. */
-async function rankForGujarat(items: ListItem[], key: string, model: string): Promise<{ order: number[]; cost: number }> {
+/** The candidates' PRIDs, best first for a Gujarati daily in Gandhinagar --
+ * all of them that are news (the top-up stops when the pages are full), one
+ * of each release in both languages, none the paper has (`printed`). */
+async function rankForGujarat(items: (ListItem & { lang: Foreign })[], printed: string[], key: string, model: string):
+  Promise<{ order: number[]; cost: number }> {
   const res = await openRouter({
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
@@ -71,11 +77,14 @@ async function rankForGujarat(items: ListItem[], key: string, model: string): Pr
       model, temperature: 0, usage: { include: true },
       response_format: { type: "json_schema", json_schema: RANK_SCHEMA },
       messages: [
-        { role: "system", content: "You are the news editor of a Gujarati daily in Gandhinagar, Gujarat. From the central government's " +
-          "Hindi press releases below, choose the ones worth printing for Gujarat's readers, best first: anything about Gujarat, then " +
-          "national decisions, schemes and figures that affect ordinary people, then major national and international events. Leave out " +
-          "routine meetings, greetings, condolences, minor appointments and near-duplicates of each other. Return JSON {order: [PRIDs]}." },
-        { role: "user", content: items.map((i) => `${i.prid} | ${i.ministry} | ${i.headline}`).join("\n") },
+        { role: "system", content: "You are the news editor of a Gujarati daily in Gandhinagar, Gujarat. The central government's " +
+          "Hindi [HI] and English [EN] press releases are below; many are the same release in both languages. Order them best first " +
+          "for Gujarat's readers: anything about Gujarat, then national decisions, schemes and figures that affect ordinary people, " +
+          "then other national and international news, then the rest. Include every one that is news. Leave out only greetings, " +
+          "condolences and tributes, the second language of a release already listed, and news the paper already prints (its " +
+          "Gujarati headlines are given). Return JSON {order: [PRIDs]}." },
+        { role: "user", content: `The paper already prints:\n${printed.join("\n") || "(nothing yet)"}\n\nReleases:\n` +
+          items.map((i) => `${i.prid} | [${i.lang.toUpperCase()}] ${i.ministry} | ${i.headline}`).join("\n") },
       ],
     }),
   });
@@ -86,7 +95,7 @@ async function rankForGujarat(items: ListItem[], key: string, model: string): Pr
   return { order: [...new Set(order)], cost: data.usage?.cost ?? 0 };
 }
 
-/** One Hindi release as a Gujarati story, numbers checked against the Hindi. */
+/** One Hindi or English release as a Gujarati story, numbers checked against the original. */
 export async function translateOne(r: Release, key: string, model = env("OPENROUTER_TRANSLATE_MODEL") ?? profile.editorial.translateModel):
   Promise<{ story: Story; cost: number }> {
   const res = await openRouter({
@@ -96,9 +105,11 @@ export async function translateOne(r: Release, key: string, model = env("OPENROU
       model, temperature: 0.2, usage: { include: true },
       response_format: { type: "json_schema", json_schema: SCHEMA },
       messages: [
-        { role: "system", content: SYSTEM + "\nThe release below is in HINDI. Write the story in GUJARATI: a faithful translation into " +
+        { role: "system", content: SYSTEM + `\nThe release below is in ${LANGUAGE[(r.lang as Foreign) ?? "hi"] ?? "HINDI"}. Write the story in GUJARATI: a faithful translation into ` +
           "natural newspaper Gujarati (not word for word), adding nothing that isn't in it. Write people's and places' names as Gujarati " +
-          "spells them (નરેન્દ્ર મોદી, નવી દિલ્હી). Every number stays exactly as in the release." },
+          "spells them (નરેન્દ્ર મોદી, નવી દિલ્હી). Every number stays exactly as in the release." +
+          (r.lang === "en" ? " Write in Gujarati script throughout: English names, titles and phrases as Gujarati papers write them " +
+            "(Viksit Bharat = વિકસિત ભારત, Ministry of Railways = રેલ મંત્રાલય); only well-known abbreviations (ISRO, AI) stay in English letters." : "") },
         { role: "user", content: releaseText(r) },
       ],
     }),
@@ -114,8 +125,8 @@ export async function translateOne(r: Release, key: string, model = env("OPENROU
     // national news from Delhi: below the Gujarati releases unless the model rates it high
     priority: Math.max(2, out.priority), page: out.page,
     photo: r.photos[0] ?? null, caption: out.caption,
-    source: r.url, model, needsReview: true, translatedFrom: "hi",
-    ...(unknown.length ? { factCheck: `numbers not in the Hindi release: ${unknown.join(", ")}` } : {}),
+    source: r.url, model, needsReview: true, translatedFrom: r.lang ?? "hi",
+    ...(unknown.length ? { factCheck: `numbers not in the ${r.lang === "en" ? "English" : "Hindi"} release: ${unknown.join(", ")}` } : {}),
   };
   return { story, cost: data.usage?.cost ?? 0 };
 }
@@ -130,10 +141,10 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
   const ctx = await fillContext(store, date);
   try {
     // first, what's already in Gujarati, by every PRID it goes by
-    const gujarati = store.releases(date).filter((r) => r.source === "pib" && r.lang !== "hi");
+    const gujarati = store.releases(date).filter((r) => r.source === "pib" && (!r.lang || r.lang === "gu"));
     const have = new Set(gujarati.flatMap((r) => [r.id, ...(r.langVersions ?? [])]));
     // a translation the Gujarati release (published later in the day) now covers: the Gujarati one prints
-    for (const s of store.stories(date).filter((s) => s.translatedFrom === "hi")) {
+    for (const s of store.stories(date).filter((s) => s.translatedFrom)) {
       const hi = s.releaseId ? store.release(s.releaseId) : null;
       const linked = hi && gujarati.find((g) => g.id === hi.id || (g.langVersions ?? []).includes(hi.id) || (hi.langVersions ?? []).includes(g.id));
       const twin = hi && (linked ?? sameNewsIn(hi, gujarati));
@@ -150,12 +161,26 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
       log("no OPENROUTER_API_KEY in backend/.env: no translations");
       return { before, after: before, translated: 0, cost: 0 };
     }
-    const done = new Set(store.stories(date).filter((s) => s.translatedFrom).map((s) => s.releaseId));
-    const list = await listPib(date, "hi", store);
-    const candidates = list.filter((i) => !have.has(i.prid) && !GREETING.test(i.headline));
-    log(`PIB Hindi: ${list.length} listed, ${candidates.length} not in Gujarati already and not a greeting`);
+    const translations = store.stories(date).filter((s) => s.translatedFrom);
+    const done = new Set(translations.map((s) => s.releaseId));
+    // a release translated already, by every PRID it goes by (its Hindi and English twins)
+    const taken = new Set(translations.flatMap((s) => {
+      const r = s.releaseId ? store.release(s.releaseId) : null;
+      return r ? [r.id, ...(r.langVersions ?? [])] : [];
+    }));
+    const candidates: (ListItem & { lang: Foreign })[] = [];
+    for (const lang of Object.keys(LANGUAGE) as Foreign[]) {
+      const list = await listPib(date, lang, store).catch((e: unknown) => {
+        log(`PIB ${lang === "hi" ? "Hindi" : "English"}: couldn't read the list (${e instanceof Error ? e.message : e})`);
+        return [] as ListItem[];
+      });
+      const fresh = list.filter((i) => !have.has(i.prid) && !GREETING.test(i.headline));
+      log(`PIB ${lang === "hi" ? "Hindi" : "English"}: ${list.length} listed, ${fresh.length} not in Gujarati already and not a greeting`);
+      candidates.push(...fresh.map((i) => ({ ...i, lang })));
+    }
     if (!candidates.length) return { before, after: before, translated: 0, cost: 0 };
-    const ranked = await rankForGujarat(candidates, key, env("OPENROUTER_MODEL") ?? DEFAULT_MODEL);
+    const printed = store.stories(date).map((s) => s.headline);
+    const ranked = await rankForGujarat(candidates, printed, key, env("OPENROUTER_MODEL") ?? DEFAULT_MODEL);
     let cost = ranked.cost;
     log(`  ranked for Gujarat's readers: ${ranked.order.length} worth printing`);
     let translated = 0;
@@ -173,12 +198,16 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
       const batch: Release[] = [];
       while (batch.length < need && k < order.length) {
         const prid = order[k++];
-        opts.progress?.({ done: tried++, total: order.length, label: "translating", item: candidates.find((c) => c.prid === prid)?.headline });
+        const item = candidates.find((c) => c.prid === prid)!;
+        opts.progress?.({ done: tried++, total: order.length, label: "translating", item: item.headline });
+        if (taken.has(prid)) { log(`  ${prid}: translated already in its other language`); continue; }
         // fetch it; its own page may name a Gujarati version the list didn't
-        await ingestPib(store, date, "hi", { only: new Set([prid]), log: () => {} });
-        const r = store.releases(date).find((x) => x.id === prid && x.lang === "hi");
+        await ingestPib(store, date, item.lang, { only: new Set([prid]), log: () => {} });
+        const r = store.releases(date).find((x) => x.id === prid && x.lang === item.lang);
         if (!r) { log(`  ${prid}: couldn't read it`); continue; }
         if ((r.langVersions ?? []).some((v) => have.has(v))) { log(`  ${prid}: already in the paper in Gujarati`); continue; }
+        if ((r.langVersions ?? []).some((v) => taken.has(v))) { log(`  ${prid}: translated already in its other language`); continue; }
+        for (const v of [r.id, ...(r.langVersions ?? [])]) taken.add(v);
         const twin = sameNewsIn(r, gujarati);
         if (twin) { log(`  ${prid}: the same news as Gujarati ${twin.id} (${twin.headline.slice(0, 40)}): not translated`); continue; }
         batch.push(r);
@@ -187,8 +216,8 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
       for (const x of results) {
         if ("error" in x) { log(`  ${x.r.id}: translation failed (${x.error instanceof Error ? x.error.message : x.error})`); continue; }
         cost += x.got.cost;
-        // the pages filled up with the ones before it: not printed (as one at a time would never have asked)
-        if (ctx.share() >= target) { log(`  ${x.r.id}: translated, but the pages are full: left out`); continue; }
+        // (the pages filled up with the ones before it: kept all the same, paid
+        // for -- the layout's reserve for a hole or a short page)
         store.putStory(x.got.story);
         translated++;
         ctx.content += await ctx.areaOf(x.got.story);
@@ -196,7 +225,7 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
             ` -> ${(ctx.share() * 100).toFixed(0)}%`);
       }
     }
-    log(`top-up ${date}: ${translated} translated from Hindi, the copy now fills ${(ctx.share() * 100).toFixed(0)}%, $${cost.toFixed(3)}`);
+    log(`top-up ${date}: ${translated} translated from Hindi and English, the copy now fills ${(ctx.share() * 100).toFixed(0)}%, $${cost.toFixed(3)}`);
     return { before, after: ctx.share(), translated, cost };
   } finally {
     await ctx.close();

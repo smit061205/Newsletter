@@ -135,12 +135,8 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
       return { elements: ad, height: h };
     }
   }
-  if (ctx.fillers.messages.size < profile.fillers.maxMessages) {
-    const msg = await messageFiller(id, colX(col), y, w, h, page * 3, ctx.m, ctx.fillers.messages);
-    if (msg && h - msg.height < 1.5 * pitch + 8 * PT) {
-      ctx.fillers.messages.add(msg.text);
-      return { elements: msg.elements, height: msg.height };
-    }
-  }
+  // (one size: what's under it is the next item's, fillHole)
+  const msg = await messageFiller(id, colX(col), y, w, h, page * 3, ctx.m, ctx.fillers);
+  if (msg) return { elements: msg.elements, height: msg.height };
   return null;
 }

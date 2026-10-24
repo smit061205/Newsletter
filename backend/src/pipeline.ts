@@ -136,14 +136,26 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       return;
     }
     case "fill": {
+      // as many features as the pages still need (a weekend's PIB can fill
+      // under half the paper, 24 Oct), a few at a time, measured as they come
       const { fillContext } = await import("./build.ts");
-      const ctx = await fillContext(store, date);
-      const share = ctx.share();
-      await ctx.close();
-      if (share >= 1) return say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: no features needed`);
-      if (store.stories(date).some((s) => s.id.startsWith("f-"))) return say("the day has its features already");
       const { writeFeatures } = await import("./editorial/features.ts");
-      await writeFeatures(store, date, share < 0.85 ? 3 : 2, { log: say });
+      const { profile } = await import("./profile.ts");
+      const WANT = 1.1;
+      for (let round = 0; round < 6; round++) {
+        const ctx = await fillContext(store, date);
+        const share = ctx.share();
+        const features = store.stories(date).filter((s) => s.id.startsWith("f-"));
+        const each = features.length ? (await Promise.all(features.map((f) => ctx.areaOf(f)))).reduce((a, b) => a + b, 0) / features.length : 0;
+        await ctx.close();
+        if (share >= WANT) return say(`the copy fills ${(share * 100).toFixed(0)}% of the pages${round ? "" : ": no features needed"}`);
+        // how many more, from a feature's size (a first guess: an eighth of a page)
+        const need = Math.ceil(((WANT - share) * ctx.room) / (each || ctx.room / (8 * profile.issue.pages)));
+        say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: writing ${Math.min(4, need)} feature article(s)`);
+        progress({ done: round, total: round + 1, label: "features", item: `${(share * 100).toFixed(0)}%` });
+        const cost = await writeFeatures(store, date, Math.max(1, Math.min(4, need)), { log: say });
+        if (cost === null) return; // no AI key
+      }
       return;
     }
     case "build": {

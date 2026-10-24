@@ -76,7 +76,7 @@ export default function Stories() {
                     <span className={s.listMeta}>{x.deck}</span>
                     <span className={s.listBadges}>
                       {x.dropped ? <Badge tone="bad">{t("badge.out")}</Badge> : x.page ? <Badge tone="good">{t("badge.page", { n: num(lang, x.page) })}</Badge> : <Badge>{t("badge.notPlaced")}</Badge>}
-                      {x.translatedFrom && <Badge tone="accent">{t("badge.hindi")}</Badge>}
+                      {x.translatedFrom && <Badge tone="accent">{t(x.translatedFrom === "en" ? "badge.english" : "badge.hindi")}</Badge>}
                       {(x.mergedFrom?.length ?? 0) > 1 && <Badge tone="accent">{t("badge.roundup", { n: num(lang, x.mergedFrom!.length) })}</Badge>}
                       {x.id.startsWith("f-") && <Badge>{t("badge.feature")}</Badge>}
                       {x.factCheck && <Badge tone="warn">{t("badge.numbers")}</Badge>}

@@ -75,7 +75,7 @@ export function StoryPanel({ story, onClose, onChanged }: { story: StoryRow; onC
     }>
       <div className={s.row}>
         {story.page ? <Badge tone="good">{t("badge.page", { n: num(lang, story.page) })}</Badge> : story.dropped ? <Badge tone="bad">{t("badge.out")}</Badge> : <Badge>{t("badge.notPlaced")}</Badge>}
-        {story.translatedFrom && <Badge tone="accent">{t("badge.hindi")}</Badge>}
+        {story.translatedFrom && <Badge tone="accent">{t(story.translatedFrom === "en" ? "badge.english" : "badge.hindi")}</Badge>}
         {(story.mergedFrom?.length ?? 0) > 1 && <Badge tone="accent">{t("badge.roundup", { n: num(lang, story.mergedFrom!.length) })}</Badge>}
       </div>
       {nums && <Note tone="warn">{t("edit.numbers", { nums: num(lang, nums) })}</Note>}
@@ -112,7 +112,7 @@ export function StoryPanel({ story, onClose, onChanged }: { story: StoryRow; onC
 
       {originals.length > 0 && (
         <details className={s.details} open={!!nums || !!story.translatedFrom}>
-          <summary>{story.translatedFrom ? t("edit.originalHindi") : t("edit.original")}</summary>
+          <summary>{story.translatedFrom ? t(story.translatedFrom === "en" ? "edit.originalEnglish" : "edit.originalHindi") : t("edit.original")}</summary>
           {originals.map((o) => (
             <div key={o.id} className={s.field} style={{ marginTop: 10 }}>
               <strong lang={o.lang}>{o.headline}</strong>

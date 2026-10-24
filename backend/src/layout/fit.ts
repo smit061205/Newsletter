@@ -120,47 +120,53 @@ export async function houseAd(id: string, x: number, y: number, w: number, h: nu
   return null;
 }
 
-/** A public-service message (profile fillers.messages), set as large as the
- * box allows in fitted display type, centred in a ruled panel -- the way the
- * paper prints "રક્તદાન મહાદાન ચક્ષુદાન શ્રેષ્ઠદાન". The `n`th message first,
- * so a page's fillers differ. Returns the elements and the height used. */
-export async function messageFiller(id: string, x: number, y: number, w: number, h: number, n: number, m: Measurer, skip: Set<string>):
+/** A public-service message (profile fillers.messages) in a ruled panel, the
+ * way the paper prints "રક્તદાન મહાદાન ચક્ષુદાન શ્રેષ્ઠદાન" -- always one size
+ * (profile fillers.messageCols wide, messageHeight tall), never grown to a
+ * hole's size (24 Oct: one took a third of the front page): only a hole as
+ * wide as the panel and at least as deep takes it, and what's under it is
+ * filled by the caller. One in the paper (maxMessages), claimed before any
+ * wait, so pages laid out side by side can't both take one. The `n`th
+ * message first. Returns the elements and the height used. */
+export async function messageFiller(id: string, x: number, y: number, w: number, h: number, n: number, m: Measurer, fillers: FillerCount):
   Promise<{ elements: Element[]; height: number; text: string } | null> {
-  // each message once a page while there are others left
-  const fresh = profile.fillers.messages.filter((t) => !skip.has(t));
-  const messages = fresh.length ? fresh : profile.fillers.messages;
-  // down to a one-line strip, the way papers run a slogan across a gap
-  if (!messages.length || h < 28 * PT || w < GRID.column) return null;
-  const pad = Math.min(8 * PT, h * 0.15);
-  const inner = w - 2 * pad;
-  // a panel no taller than its width allows to look like one: a deeper hole takes more than one
-  const most = Math.min(h, Math.max(1.6 * w, 120 * PT));
-  let best: { text: string; size: number; lines: number; height: number } | null = null;
-  for (let k = 0; k < messages.length; k++) {
-    const text = messages[(n + k) % messages.length];
-    for (let lines = 1; lines <= 6; lines++) {
-      const got = await setDisplay(m, text, { font: HEADLINE.font, max: Math.min(64 * PT, most * 0.4), min: 12 * PT, maxLines: lines,
-                                             leading: 1.2, align: "fit" }, `${id}-t`, id, 0, 0, inner);
-      if (!got || got.lines !== lines || got.bottom > most - 2 * pad) continue;
-      // the message and setting that fill the panel best (a tall box round two
-      // short lines reads as empty); among equals, the larger type
-      if (!best || got.bottom > best.height + 0.5 || (Math.abs(got.bottom - best.height) <= 0.5 && got.size > best.size)) {
-        best = { text, size: got.size, lines, height: got.bottom };
+  const { messages: all, messageCols, messageHeight, maxMessages } = profile.fillers;
+  const boxW = spanWidth(messageCols);
+  const boxH = messageHeight * PT;
+  if (!all.length || Math.abs(w - boxW) > 1 || h < boxH - 0.5 || fillers.messages.size >= maxMessages) return null;
+  const claim = `\u0000${id}`;
+  fillers.messages.add(claim);
+  try {
+    const fresh = all.filter((t) => !fillers.messages.has(t));
+    const messages = fresh.length ? fresh : all;
+    const pad = 8 * PT;
+    const inner = boxW - 2 * pad;
+    let best: { text: string; size: number; lines: number; height: number } | null = null;
+    for (let k = 0; k < messages.length; k++) {
+      const text = messages[(n + k) % messages.length];
+      for (let lines = 1; lines <= 5; lines++) {
+        const got = await setDisplay(m, text, { font: HEADLINE.font, max: Math.min(40 * PT, boxH * 0.3), min: 12 * PT, maxLines: lines,
+                                               leading: 1.2, align: "fit" }, `${id}-t`, id, 0, 0, inner);
+        if (!got || got.lines !== lines || got.bottom > boxH - 2 * pad) continue;
+        // the message and setting that fill the panel best; among equals, the larger type
+        if (!best || got.bottom > best.height + 0.5 || (Math.abs(got.bottom - best.height) <= 0.5 && got.size > best.size)) {
+          best = { text, size: got.size, lines, height: got.bottom };
+        }
       }
+      if (best) break; // the day's message, not the one that happens to fill best
     }
+    if (!best) return null;
+    const set = await setDisplay(m, best.text, { font: HEADLINE.font, max: best.size, min: best.size, maxLines: best.lines,
+                                                leading: 1.2, align: "fit" }, `${id}-t`, id, x + pad, y + (boxH - best.height) / 2, inner);
+    if (!set) return null;
+    fillers.messages.add(best.text);
+    return {
+      elements: [{ id: `${id}-box`, kind: "rect", articleId: id, x, y, width: boxW, height: boxH, stroke: INK, strokeWidth: 1.5 * PT }, ...set.elements],
+      height: boxH, text: best.text,
+    };
+  } finally {
+    fillers.messages.delete(claim);
   }
-  if (!best) return null;
-  // the panel fills the hole up to the shape a panel can have, the message
-  // set as large as that allows -- never stretched past it over a deeper
-  // gap (a tall ruled box round two short lines reads as an empty hole)
-  const boxH = most;
-  const set = await setDisplay(m, best.text, { font: HEADLINE.font, max: best.size, min: best.size, maxLines: best.lines,
-                                              leading: 1.2, align: "fit" }, `${id}-t`, id, x + pad, y + (boxH - best.height) / 2, inner);
-  if (!set) return null;
-  return {
-    elements: [{ id: `${id}-box`, kind: "rect", articleId: id, x, y, width: w, height: boxH, stroke: INK, strokeWidth: 1.5 * PT }, ...set.elements],
-    height: boxH, text: best.text,
-  };
 }
 
 /** Fillers used so far in the issue (shared by its pages): profile
@@ -191,7 +197,6 @@ export async function closeGaps(plan: PagePlan, ctx: {
   // An empty area `cols` wide from column `col`, `h` tall from `y`: filled
   // with real content, never left blank -- a left-out story that fits, else
   // one summarised by the AI as a brief, else the paper's house ad.
-  const usedMessages = ctx.fillers.messages;
   const fillArea = async (col: number, cols: number, y: number, h: number, where: string): Promise<boolean> => {
     // an area wider than a story may be (a whole-page strip): two side by side
     if (cols > MAX_STORY_COLS) {
@@ -274,13 +279,14 @@ export async function closeGaps(plan: PagePlan, ctx: {
     const ad = cols >= 3 && h <= 0.6 * w && ctx.fillers.houseAds < profile.fillers.maxHouseAds
       ? await houseAd(id, colX(col), y, w, h, m) : null;
     if (ad) ctx.fillers.houseAds++;
-    const msg = ad || usedMessages.size >= profile.fillers.maxMessages ? null
-      : await messageFiller(id, colX(col), y, w, h, plan.page * 3, m, usedMessages);
-    if (msg) usedMessages.add(msg.text);
+    const msg = ad ? null : await messageFiller(id, colX(col), y, w, h, plan.page * 3, m, ctx.fillers);
     if (!ad && !msg) return false;
     extra.push(...(ad ?? msg!.elements));
     extraBlocks.push({ x0: colX(col), x1: colX(col) + w, y0: y });
     note(`  ${ad ? "house ad" : "message"} ${where} (${((ad ? h : msg!.height) / PT).toFixed(0)}pt)`);
+    // the panel is one size: what's under it is filled on its own
+    const under = msg ? h - msg.height - GAP.betweenStories : 0;
+    if (under >= 1.5 * pitch) await fillArea(col, cols, y + msg!.height + GAP.betweenStories, under, where);
     return true;
   };
 

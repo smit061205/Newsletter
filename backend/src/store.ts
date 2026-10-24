@@ -20,8 +20,8 @@ export interface Release {
   fetchedAt: string;
   /** where it came from: the state's Information Department (the default, for older rows) or PIB */
   source?: "gujinfo" | "pib";
-  /** its language: Gujarati (the default) or Hindi, which is translated */
-  lang?: "gu" | "hi";
+  /** its language: Gujarati (the default), or Hindi or English, which are translated */
+  lang?: "gu" | "hi" | "en";
   /** PIB: the ministry that issued it */
   ministry?: string;
   /** PIB: the same release in other languages (their PRIDs) */

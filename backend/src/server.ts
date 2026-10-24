@@ -210,7 +210,7 @@ function releaseStatus(store: Store, date: string) {
       id: r.id, source: r.source ?? "gujinfo", lang: r.lang ?? "gu", ministry: r.ministry ?? r.office, headline: r.headline,
       url: r.url, photos: r.photos, body: r.body,
       story: story?.id ?? null, inPaper: story ? placed.has(story.id) : false,
-      translated: story?.translatedFrom === "hi", roundUp: (story?.mergedFrom?.length ?? 0) > 1,
+      translated: !!story?.translatedFrom, roundUp: (story?.mergedFrom?.length ?? 0) > 1,
     };
   });
 }
@@ -733,7 +733,8 @@ function collectHourly(store: Store, log: (s: string) => void) {
       await withPatience({ tries: 1, seconds: 30 }, async () => {
         const r = await ingestPib(store, day, feed);
         if (r.fetched) log(`collected ${r.fetched} new PIB release(s) for ${day}`);
-        if (feed === "gu") await listPib(day, "hi", store);
+        // (and the lists a Gujarati paper's top-up translates from)
+        if (feed === "gu") for (const other of ["hi", "en"] as const) await listPib(day, other, store);
       });
     } catch (e) {
       log(`PIB collection skipped this hour: ${e instanceof Error ? e.message : e}`);

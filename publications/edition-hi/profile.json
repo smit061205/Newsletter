@@ -138,7 +138,7 @@
   "leadModel": "google/gemini-3.8-flash",
   "leadStories": 3,
   "translateModel": "google/gemini-3.8-flash",
-  "fillTarget": 1.1
+  "fillTarget": 1.35
  },
  "fontLicence": "Tiro Devanagari Hindi and Hind, from Google Fonts: SIL Open Font License 1.1 (licence files in fonts/).",
  "fillers": {

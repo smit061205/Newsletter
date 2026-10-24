@@ -95,7 +95,11 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
       // the page with the most room still wanted, the front page first for the
       // day's important stories; a page with a related story only if no other has room
       const want = rooms.map((_, k) => share[k] - used[k] - s.mid);
+      // (news fills the front pages first, a feature article the inside ones:
+      // 24 Oct's short day put five features on the front page)
+      const feature = s.story.id.startsWith("f-");
       const score = (k: number) => want[k] / rooms[k] + (k === 0 && s.story.priority <= 2 ? 0.15 : 0)
+        + (feature ? (k === 0 ? -0.5 : 0.05 * k) : 0.08 * (rooms.length - 1 - k))
         - (pages[k].some((o) => related(o.story, s.story)) ? 0.3 : 0) + (opts.rng ? (opts.rng() - 0.5) * 0.12 : 0);
       p = rooms.map((_, k) => k).reduce((a, b) => (score(b) > score(a) ? b : a));
       if (rooms[p] - used[p] < s.min * 0.6) { held.push(s); continue; }
@@ -226,6 +230,24 @@ export async function layOut(args: {
       const d = diag.get(i)!;
       const sum = (k: number, f: "min" | "max" | "mid") => shares[k].reduce((a, s) => a + s[f], 0);
       const isShort = sum(i, "mid") < rooms[i];
+      // no design could be made at all (narrow strips by the ads no story of
+      // the page can take): a reserve story that runs in one or two columns
+      if (d.short === 0 && d.long === 0) {
+        let narrow: Sized | undefined;
+        for (const s of [...held].sort((a, b) => a.mid - b.mid)) {
+          const rank = rankOf(s.story, false);
+          for (const cols of blocks.widths(s.story, rank).filter((c) => c <= 2)) {
+            if ((await blocks.options(s.story, rank, cols)).length) { narrow = s; break; }
+          }
+          if (narrow) break;
+        }
+        if (narrow) {
+          held.splice(held.indexOf(narrow), 1);
+          shares[i].push(narrow);
+          log(`  page ${i + 1}: no design fits its ads: ${narrow.story.id} (it runs in a narrow column) added from the reserve`);
+          continue;
+        }
+      }
       if (d.short > d.long || (round >= 1 && isShort && !shortBy.has(i))) {
         // too little copy for the page: a held story, else the smallest from a page that has the most to spare
         const spare = held.sort((a, b) => a.story.priority - b.story.priority || b.mid - a.mid)[0];

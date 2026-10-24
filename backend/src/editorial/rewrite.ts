@@ -154,11 +154,13 @@ export const digits = (s: string) => new Set((s.replace(/[૦-૯]/g, (d) => Str
   .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
   .match(/\d+(?:[.,]\d+)*/g) ?? []));
 
-// small numbers as the releases often spell them, 1-20 (Gujarati, then Hindi)
+// small numbers as the releases often spell them, 1-20 (Gujarati, Hindi, then English)
 const NUMBER_WORDS: string[][] = [
-  [], ["એક", "एक"], ["બે", "दो"], ["ત્રણ", "तीन"], ["ચાર", "चार"], ["પાંચ", "पांच", "पाँच"], ["છ", "छह", "छः"], ["સાત", "सात"],
-  ["આઠ", "आठ"], ["નવ", "नौ"], ["દસ", "दस"], ["અગિયાર", "ग्यारह"], ["બાર", "बारह"], ["તેર", "तेरह"], ["ચૌદ", "चौदह"],
-  ["પંદર", "पंद्रह"], ["સોળ", "सोलह"], ["સત્તર", "सत्रह"], ["અઢાર", "अठारह"], ["ઓગણીસ", "उन्नीस"], ["વીસ", "बीस"],
+  [], ["એક", "एक", "one"], ["બે", "दो", "two"], ["ત્રણ", "तीन", "three"], ["ચાર", "चार", "four"], ["પાંચ", "पांच", "पाँच", "five"],
+  ["છ", "छह", "छः", "six"], ["સાત", "सात", "seven"], ["આઠ", "आठ", "eight"], ["નવ", "नौ", "nine"], ["દસ", "दस", "ten"],
+  ["અગિયાર", "ग्यारह", "eleven"], ["બાર", "बारह", "twelve"], ["તેર", "तेरह", "thirteen"], ["ચૌદ", "चौदह", "fourteen"],
+  ["પંદર", "पंद्रह", "fifteen"], ["સોળ", "सोलह", "sixteen"], ["સત્તર", "सत्रह", "seventeen"], ["અઢાર", "अठारह", "eighteen"],
+  ["ઓગણીસ", "उन्नीस", "nineteen"], ["વીસ", "बीस", "twenty"],
 ];
 /** The numbers in `out` that aren't in `source` -- written in any digits,
  * with or without commas between them, or (up to 20) spelt out there. */
@@ -175,7 +177,7 @@ export function numbersNotIn(out: string, source: string, date?: string): string
   for (const m of latin.matchAll(/(\d+(?:\.\d+)?)\s*(हज़ार|हजार|હજાર|लाख|લાખ)/g)) {
     known.add(String(Math.round(Number(m[1]) * (/लाख|લાખ/.test(m[2]) ? 100_000 : 1000))));
   }
-  const words = new Set(source.split(/[\s,.;:()'"‘’“”!?।-]+/));
+  const words = new Set(source.toLowerCase().split(/[\s,.;:()'"‘’“”!?।-]+/));
   return [...digits(out)].filter((n) => {
     const v = plain(n);
     if (known.has(v)) return false;
@@ -281,7 +283,8 @@ export async function rewriteDay(store: Store, date: string, opts: { log: (s: st
   // the English one is the same news -- translating it would print the
   // story twice. Only Gujarati releases become stories.
   // (a Gujarati paper translates its Hindi releases instead: editorial/translate.ts)
-  const all = store.releases(date).filter((r) => profile.language.lang !== "gu" || r.lang !== "hi");
+  // the paper's own language only (another's is the top-up's to translate, translate.ts)
+  const all = store.releases(date).filter((r) => !r.lang || r.lang === profile.language.lang);
   // releases in the paper's own script (a release issued in two languages is the same news)
   const own = SCRIPT[profile.language.lang] ?? /[A-Za-z]/g;
   const releases = all.filter((r) => share(r.headline + r.body.slice(0, 400), own) > 0.5);

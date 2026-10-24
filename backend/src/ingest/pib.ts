@@ -358,7 +358,7 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
     const release: Release = {
       id: it.prid, date, url: `${SITE}/PressReleasePage.aspx?PRID=${it.prid}`, office: r.office,
       headline: r.headline, subhead: r.subhead, body: r.paras.join("\n\n"), photos, fetchedAt: new Date().toISOString(),
-      source: "pib", lang: feed === "en" ? undefined : feed, ministry: r.ministry || it.ministry, langVersions: r.langVersions,
+      source: "pib", lang: feed, ministry: r.ministry || it.ministry, langVersions: r.langVersions,
     };
     store.putRelease(release);
     fetched++;
