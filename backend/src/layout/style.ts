@@ -55,7 +55,10 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
       const plain = e.plainText ?? textOf(e);
       // a number left in Latin digits that the paper prints in its own
       const digits = (t: string) => t.replace(/[^0-9૦-૯۰-۹]/g, "");
-      if (/[0-9]/.test(plain) && digits(normalizeText(plain)) !== digits(plain)) latinDigits.push(`p${page.number} ${e.id}`);
+      // (a number at either end of a line is read with its neighbour on the
+      // next or last line -- "ACE" / "2032" -- which this one line can't see)
+      const inner = plain.replace(/^[\d.,:/-]+\s*/, "").replace(/\s*[\d.,:/-]+$/, "");
+      if (/[0-9]/.test(inner) && digits(normalizeText(inner)) !== digits(inner)) latinDigits.push(`p${page.number} ${e.id}`);
       if (!isBodyLine(e)) continue;
       const col = e.id.replace(/l\d+$/, "");
       columns.set(col, [...(columns.get(col) ?? []), e.y + e.height]);

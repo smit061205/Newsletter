@@ -120,15 +120,20 @@ export const ProfileSchema = z.object({
     /** at most this many message panels, and house ads, in a whole issue */
     maxMessages: z.number().int().nonnegative().default(1),
     maxHouseAds: z.number().int().nonnegative().default(1),
-  }).default({ houseAd: [], messages: [], maxMessages: 1, maxHouseAds: 1 }),
+    /** a message panel's one size, whatever the hole: columns wide, and points
+     * tall (24 Oct: one stretched to a third of the front page) */
+    messageCols: z.number().int().positive().default(1),
+    messageHeight: z.number().positive().default(140),
+  }).default({ houseAd: [], messages: [], maxMessages: 1, maxHouseAds: 1, messageCols: 1, messageHeight: 140 }),
   editorial: z.object({
     workhorseModel: z.string().min(1),
     leadModel: z.string().min(1),
     leadStories: z.number().int().nonnegative(),
     /** translates Hindi releases into the paper's language when its own don't fill it */
     translateModel: z.string().min(1).default("google/gemini-3.8-flash"),
-    /** the copy wanted, as a share of the pages at natural size (over 1, so the packer has choices) */
-    fillTarget: z.number().positive().default(1.1),
+    /** the copy wanted, as a share of the pages at natural size: over 1, so the
+     * layout has choices and a reserve of stories for holes and short pages */
+    fillTarget: z.number().positive().default(1.35),
     /** a ceiling on a day's top-up AI spend (US$), if the paper wants one; none by default: the top-up stops when the pages are full */
     dailyBudgetUsd: z.number().positive().optional(),
     /** the layout engine: "v2" (designs solved exactly, layout/engine.ts) or "v1" (packed, then gaps closed) */

@@ -1,16 +1,16 @@
-// Feature articles for a short day: when the day's releases don't fill the
-// pages, the desk runs evergreen features -- season, health, heritage,
-// festivals -- the way papers carry a "વિશેષ લેખ". Written by the AI from
-// general knowledge only, never news: no events, no named living people, no
-// quotes and no numbers at all (there's no release to check a number
-// against, so any digit throws the article out). Every one is kicked
-// "વિશેષ લેખ", ranked below the news, and marked for an editor's review.
+// Feature articles for a short day: when the day's news doesn't fill the
+// pages, the desk runs evergreen features -- the season and its coming
+// festivals, health, farming, heritage, the home -- as many as the pages
+// still need. Written by the AI from general knowledge only, never news: no
+// events, no named living people, no quotes and no numbers at all (there's no
+// release to check a number against, so any digit throws the article out).
+// They print like the news (no kicker, no special title), ranked below it
+// and placed on the inside pages, and are marked for an editor's review.
 import { profile } from "../profile.ts";
 import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, openRouter } from "./rewrite.ts";
 import { inPaperLanguage } from "../layout/stories.ts";
 
-export const FEATURE_KICKER = "વિશેષ લેખ";
 
 const SCHEMA = {
   name: "features",
@@ -27,7 +27,7 @@ const SCHEMA = {
             topic: { type: "string", description: "The topic in English, a few words" },
             headline: { type: "string", description: "Headline, 5-10 words" },
             deck: { type: "string", description: "The sub-heading, one line of 8-16 words" },
-            body_long: { type: "string", description: "About 350 words, paragraphs separated by a blank line" },
+            body_long: { type: "string", description: "About 500 words, paragraphs separated by a blank line" },
             body_medium: { type: "string", description: "About 60% of body_long" },
             body_short: { type: "string", description: "About 35% of body_long" },
           },
@@ -42,7 +42,8 @@ const LANG_NAME = ({ gu: "Gujarati", hi: "Hindi", ur: "Urdu" } as Record<string,
 const SYSTEM = `${profile.language.lang === "gu" ? `તમે ગાંધીનગરના ગુજરાતી દૈનિક "${profile.name.split(" (")[0]}" માટે વિશેષ લેખ લખો છો.\n` : ""}` +
 `You write evergreen feature articles in clear, formal newspaper ${LANG_NAME} for a day with little news. Write in ${LANG_NAME} only.
 Rules -- these are absolute:
-- General, well-established knowledge only: seasonal health and safety, festivals and their meaning, Gujarat's culture and heritage, household tips, the environment.
+- General, well-established knowledge only: the season's health and safety, the season's farming, the meaning and customs of festivals near this time of year, Gujarat's culture, history and places, household tips, the environment, science explained simply.
+- Suited to the time of year you are given, and useful or interesting to a Gujarati family.
 - NOT news: no events, announcements, schemes, prices, dates or "today/recently".
 - No named living people, no quotes, no organisations' claims.
 - No numbers of any kind (no digits, no years, no statistics, no percentages). Write "many", "centuries old" and so on instead, in ${LANG_NAME}.
@@ -65,7 +66,7 @@ export async function writeFeatures(store: Store, date: string, count: number,
   const have = store.stories(date).filter((s) => s.id.startsWith("f-"));
   const news = store.stories(date).filter((s) => !s.id.startsWith("f-")).map((s) => s.headline);
   const model = opts.model ?? env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
-  const month = new Date(`${date}T12:00:00Z`).toLocaleString("en", { month: "long" });
+  const day = new Date(`${date}T12:00:00Z`).toLocaleString("en", { day: "numeric", month: "long", timeZone: "UTC" });
   const res = await openRouter({
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
@@ -74,7 +75,8 @@ export async function writeFeatures(store: Store, date: string, count: number,
       response_format: { type: "json_schema", json_schema: SCHEMA },
       messages: [
         { role: "system", content: SYSTEM },
-        { role: "user", content: `Write ${count} feature articles for a Gujarati daily in ${month} (Gujarat, India).\n` +
+        { role: "user", content: `Write ${count} feature articles for a ${LANG_NAME} daily, for ${day} (Gujarat, India): ` +
+          `on different subjects (health, farming, festivals, culture, history, places, the home, science), each suited to this time of year.\n` +
           `Avoid these topics (already in the paper): ${[...have.map((s) => s.headline), ...news].join(" | ") || "none"}` },
       ],
     }),
@@ -92,7 +94,7 @@ export async function writeFeatures(store: Store, date: string, count: number,
     }
     const story: Story = {
       id: `f-${date}-${++n}`, releaseId: null, date,
-      kicker: FEATURE_KICKER, headline: f.headline.trim(), deck: f.deck.trim(),
+      kicker: "", headline: f.headline.trim(), deck: f.deck.trim(),
       bodies: { long: f.body_long.trim(), medium: f.body_medium.trim(), short: f.body_short.trim() },
       priority: 5, page: 4, photo: null, photos: [], caption: "",
       source: `AI feature (${f.topic})`, model, needsReview: true,

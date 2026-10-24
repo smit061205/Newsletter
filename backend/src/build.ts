@@ -10,7 +10,7 @@ import { printIssue } from "@ck/shared/pdf";
 import { assetFile, OUT_DIR, PLOT_ORIGIN } from "./config.ts";
 import { chromeFor } from "./chrome/chrome.ts";
 import { Measurer } from "./layout/measure.ts";
-import { FEATURE_KICKER } from "./editorial/features.ts";
+
 import { planDay } from "./editorial/plan.ts";
 import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
@@ -215,10 +215,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     }
     planCost = planned?.cost ?? 0;
     planEntries = planned?.plan ?? [];
-    // "વિશેષ લેખ" marks the paper's one special article: the first feature
-    // keeps it, the others print without a kicker
-    let special = false;
-    pool = pool.map((s) => (s.kicker !== FEATURE_KICKER ? s : special ? { ...s, kicker: "" } : ((special = true), s)));
+    // feature articles print like the news: no kicker, no special title (24 Oct, the editor's wish)
+    pool = pool.map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s));
     let rewordCost = 0;
     if (opts.copy) {
       const c = opts.copy;
