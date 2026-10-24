@@ -266,7 +266,7 @@ desk (Facebook, Instagram, X, Telegram, YouTube Shorts, WhatsApp) and the
 printed paper as one of its products. It is **planned, not built**.
 
 **Read first:**
-- `docs/website/ROADMAP.md`: what it does, the newsroom and social pipelines, the stages to build it in, costs in ₹, and what's needed from the user.
+- `docs/website/ROADMAP.md`: what it does, the newsroom and social pipelines, the four phases to build it in, the up-front checklist (§6.0), costs in ₹, and what's needed from the user.
 - `docs/website/DESIGN.md`: Capital Kranti's own design system (24 Oct): phone first, the printed paper's colours, the ruled grid, containers of cards, the trust pieces on every story; why it no longer copies the Washington Post.
 - `docs/website/sample/capital-kranti-website.html`: the sample of that design. Open it in a browser, on a phone first. It was published as https://claude.ai/artifact/RK4UQHxNmQvWrFZuuksEeY (the earlier Post-style sample, in git history, was https://claude.ai/artifact/EnGn4RLGwG5BQyeo2nMLpq).
 
@@ -276,10 +276,10 @@ printed paper as one of its products. It is **planned, not built**.
   - It borrows the engine's code by path (PIB reading, the Gujarati text cleaning, the checks).
 - **Running: free hosting, no paid server** (the user has no budget for one). The pipeline runs as scheduled GitHub Actions runs (free for this public repository); the site is on a free host (Cloudflare or Vercel), with a free Postgres (Neon or Supabase) and free photo storage (Cloudflare R2). ROADMAP §1.1 has the details and the two things to test first. App releases still come only from version tags.
 - **Look:** Capital Kranti's own design system (DESIGN.md, 24 Oct), not a copy of one paper: the Post's ruled grid, the Guardian's containers, BBC Gujarati's phone-first lightness, under the printed paper's purple, navy and cyan. Light or dark follows the phone.
-- **Order:** stage 0 (server, domain, empty site), then stage 1 (the website from the evening paper's stories, with Publish sending to it), then live news, other outlets, and the social desk.
+- **Order (24 Oct): four phases** (ROADMAP §6): A, the website from the evening paper, with Publish sending to it; B, live news from official sources and other outlets; C, the social desk; D, the printed paper made from the website. Within a phase, work goes on without stopping; the user reviews at its end.
 
 **First steps in the new session:**
 1. Read `CLAUDE.md`, this file's §8, and `docs/website/ROADMAP.md` §1 and §6.
-2. Ask the user for stage 0's needs: free accounts on the chosen host and database. They create them and save the keys as Actions secrets themselves; never in chat. First test whether PIB answers GitHub's servers (ROADMAP §1.1).
-3. Build stage 0, then stage 1, and show the user screenshots at phone and desktop widths before moving on.
+2. Go through the up-front checklist (ROADMAP §6.0) with the user: the decisions, and the accounts they create, with keys saved as Actions secrets by them; never in chat. First test whether PIB answers GitHub's servers (ROADMAP §1.1).
+3. Build phase A, then show the user the live site at phone and desktop widths before moving on.
 

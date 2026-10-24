@@ -100,7 +100,7 @@ Nothing here needs a paid server. Each service's free limits change, so
 - The website reads the database, so a new story is live when the run ends.
 - **Heavier jobs** (the evening short, the morning carousel) are their own scheduled runs.
 
-**Two things to test first, in stage 0:**
+**Two things to test first, at the start of phase A:**
 1. **Whether PIB answers GitHub's servers.** They're abroad, and PIB's firewall may treat them differently from a computer in India. If it doesn't answer, the **desktop app**, which already collects PIB hourly (v1.1.2), sends what it collects to the website's database. Then PIB news is live while the father's computer is on, and other sources still come from GitHub.
 2. **How late the scheduled runs really are,** to tell the user honestly how "live" the site is.
 
@@ -174,7 +174,7 @@ shorter at first.
    A cheap model writes most stories; a stronger one writes the top and breaking ones (OpenRouter, never Anthropic).
 6. **Publish:** the page is live in seconds; the sitemap, the Google News sitemap and the RSS feeds update. A correction is an edit with a visible "updated" note, never a silent change.
 7. **Social desk:** section 5 takes the published story and makes what its route asks for.
-8. **The evening paper:** section 6, stage 8.
+8. **The evening paper:** section 6, phase D.
 
 ---
 
@@ -292,73 +292,83 @@ Formats, made from a story by its route:
 
 ---
 
-## 6. Building it, in stages
+## 6. Building it, in four phases
 
-Each stage is finished, checked, shown to the user and released before the next.
+Decided 24 Oct: the eight stages planned first are grouped into **four
+phases**, so the work takes fewer rounds of questions and reviews without
+losing quality. Within a phase the work is built, checked and fixed without
+stopping; the user is asked only at the phase's review, or when something
+comes up that they would care about. Each phase ends finished, checked, shown
+to the user, merged and released (CLAUDE.md).
 
-### Stage 0: groundwork
+**How quality holds with fewer reviews:** automatic checks run on every change
+in `site.yml`, in place of looking by hand:
+- every page at 360 / 390 / 412 / 820 / 1440: no sideways scroll, no script errors, accessibility (DESIGN.md §7);
+- speed on phone settings, against DESIGN.md §4;
+- every story's numbers against its sources (`numbersNotIn`), and no sentence said twice (`quality.ts`);
+- each card rendered and checked: text fits, nothing clipped, contrast.
 
-- The `site/` folder, its own CI (`site.yml`, triggered by `site/**`).
-- The free services of section 1.1: the website host, the database, photo storage, and the scheduled pipeline run.
-- **The two tests** of section 1.1: PIB from GitHub's servers, and how late scheduled runs are.
-- **Check:** an empty site live on its free address; a push to `site/` deploys; a scheduled run writes to the database; the desktop app's release unaffected.
-- **Needed from the user:**
-  - free accounts on the chosen services (Cloudflare or Vercel, and Neon or Supabase), made by the user;
-  - their keys are saved as the repository's **Actions secrets** by the user, never in chat or the repo.
+Anything that reaches real readers (live publishing, real social accounts, the
+printed paper) still gets a real-world trial before it's called done.
 
-### Stage 1: the website, from the evening paper
+Pieces of a phase that don't depend on each other (for example the card
+templates and the news pipeline) may be built side by side in separate
+sessions.
 
-- The design system from DESIGN.md as components; home, article, tier and genre pages, search, the e-paper and the archive.
-- The newsroom's **Publish** sends the day's stories to the site's API instead of a git push. That also removes the GitHub sign-in problem in HANDOFF §7.
-- Google News markup, sitemaps, RSS, the About and policy pages.
-- **Check:**
-  - pages fast on a phone;
-  - every page checked against DESIGN.md §7 at 360 / 390 / 412 / 820 / 1440;
-  - the user approves.
+### 6.0 Before starting: the up-front checklist
 
-### Stage 2: live official news
+Settled once, so no phase stops to ask. Accounts and keys are always made and
+entered by the user; never in chat or the repository.
 
-- Watchers for PIB (today's lists every few minutes), the Gujarat government and ministries.
-- Cluster, verify, decide, write, publish within minutes.
-- The editor's approval queue on the phone.
-- **Check:** a day of live running, every story number-checked, costs in ₹ on the dashboard.
+| # | What | Who | Needed by |
+|---|---|---|---|
+| 1 | How stories say they were made: "written by the Capital Kranti desk from the government press release, with AI help; every number checked" (DESIGN.md §6) | user decides | A |
+| 2 | The English switch: the site's labels only (free), or stories translated too (AI cost per story) | user decides | A |
+| 3 | The domain: is `capitalkranti.co.in` the paper's, and can it point at the site? (A free address until then) | user | A (or later) |
+| 4 | Website host account: Cloudflare (ads allowed on the free plan) or Vercel (free plan non-commercial) | user makes it | A |
+| 5 | Database account: Supabase recommended (it can also hold the editor's sign-in and, at first, photos), or Neon | user makes it | A |
+| 6 | The keys from 4 and 5 saved as the repository's **Actions secrets** | user | A |
+| 7 | **A new OpenRouter key** (the old one appeared in a screenshot on 23 Oct), in the app's Settings and as an Actions secret | user | A |
+| 8 | Who signs in as editor (the father, the user, or both) and how (an email link or a password) | user decides | B |
+| 9 | **A daily AI ceiling in ₹** for live news, so it can run for real without asking | user decides | B |
+| 10 | **Start the slow outside steps now**, guided: a Meta app and its review for posting (can take weeks); the Instagram Business account linked to the Page; admin access to the Page and X | user, guided | C |
+| 11 | X's posting price, once checked and shown in ₹: yes or no | user decides | C |
+| 12 | Optionally, a yes on writing to PIB for program access (RNI 54922/93), and who signs it | user decides | any |
 
-### Stage 3: other outlets, tiers and genres
+### Phase A: the website (stages 0 and 1)
 
-- RSS watchers for national, regional and world outlets.
-- The 2-source rule, the originality check, the credits and source box.
-- The "from other outlets" carousel; the full tiers × genres pages.
-- **Check:** no story matches a source's wording; all credited; world stories stay briefs.
+1. **First, the test that shapes phase B:** does PIB answer GitHub's servers (section 1.1)? Also how late scheduled runs start.
+2. **Groundwork:** the `site/` folder, its own CI (`site.yml`, run only for `site/**`), the host, the database, photo storage, a scheduled run that writes to the database.
+3. **The site:** DESIGN.md as components; home, article, section (tiers × genres), latest, search, the e-paper and the archive; the trust pieces on every story; About, editorial policy, how we check news, corrections, contact, terms, privacy.
+4. **Publish from the newsroom** sends the day's stories to the site's API instead of a git push (this also removes the GitHub sign-in problem in HANDOFF §7). Each story gets its tier and genres at publish (one cheap AI call).
+5. **Found by Google:** NewsArticle markup, the sitemaps and news sitemap, RSS per section, share previews.
+6. **Issues 269-271** moved in, if wanted; the old public site redirects to the new one.
+- **Review:** the live site at phone and desktop widths in both themes; a real evening's Publish from the app; the automatic checks green; the desktop app's release unaffected. Released with the newsroom change.
 
-### Stage 4: social desk, part 1 (cards)
+### Phase B: live news (stages 2 and 3)
 
-- The card renderer and templates, captions, the posting queue and schedule.
-- **Telegram first** (free, easy), then the **Facebook Page** and **X**.
-- **Check:** a week of daily posts with no mistakes; analytics coming back.
-- **Needed from the user:**
-  - admin on the Facebook Page;
-  - the X account and a decision on X's posting price;
-  - creating a Meta app (guided).
+1. **One pipeline with sources that plug in:** watchers → cluster → verify → decide → write → publish (section 3).
+2. **Sources:** PIB's lists every few minutes (or, if PIB refuses GitHub, sent in by the desktop app's hourly collection), the Gujarat CM's office, All India Radio Gujarati, ministries; then other outlets' RSS.
+3. **Rules:** the two-source rule, the originality check against every source, credits and the source box, sensitive and unconfirmed stories held for the editor.
+4. **The editor's side on the phone:** the approval queue, the live desk, Settings (keys, ₹ rate, the daily ceiling), the cost dashboard in ₹.
+5. The "from other outlets" carousel, the full tiers × genres pages, breaking alerts.
+- **Review:** a day of real running under the daily ceiling: every story number-checked, none matching a source's wording, all credited, world stories kept as briefs, the costs in ₹. Stories go live on their own only after this.
 
-### Stage 5: Instagram
+### Phase C: social media (stages 4, 5 and 6)
 
-- The Business account linked to the Page; single cards, top-5 carousels.
-- **Check:** a week of posts; the daily cap respected.
+1. **One card renderer** (HTML templates in Chromium, in DESIGN.md's look) for headline, breaking, quote, top-5 carousel and share-preview cards; captions written in Gujarati and number-checked.
+2. **One posting queue** with the schedule, per-platform approval, retries and daily caps (section 5.3).
+3. **Shorts:** script, the Gujarati voice (compare Google and Azure on quality and ₹; the user picks), pictures with gentle motion, burned-in captions, `ffmpeg`.
+4. **Platforms switch on as their approvals arrive:** Telegram first (no approval needed), then the Facebook Page, Instagram (cards, carousels, Reels), X (if its price is accepted), YouTube Shorts; the WhatsApp Channel's copy-ready posts.
+- **Review:** a week of posts on Telegram before the others go on, then each platform's first posts; the cost of each short in ₹; the voice approved.
 
-### Stage 6: shorts
+### Phase D: the printed paper from the website (stage 7)
 
-- The 60-second evening roundup and breaking shorts; the Gujarati voice chosen.
-- Facebook and Instagram Reels, then YouTube Shorts.
-- The WhatsApp Channel's copy-ready posts.
-- **Check:** quality the user approves; the cost of each short in ₹.
+Kept on its own: it changes how the printed paper is made.
+- At 8 PM the layout engine takes the day's published stories (Gujarat first) instead of fetching them itself; the desktop app and the website agree on the day's stories; the app still lays out and prints.
+- **Review:** a week of papers made this way, READY and as good as now; CI layout tests still READY.
 
-### Stage 7: the printed paper from the website
-
-- At 8 PM, the layout engine takes the day's published stories (Gujarat first) instead of fetching itself.
-- The desktop app and the server agree on the day's stories; the app still lays out and prints.
-- **Check:** a week of papers made this way, READY, as good as now.
-
-### Stage 8: later
+### Later
 
 - "પૂછો" (ask): answers from our own archive.
 - A Gujarati crossword.
@@ -366,12 +376,13 @@ Each stage is finished, checked, shown to the user and released before the next.
 - Notices and online ad booking.
 - Back issues in the archive.
 - Comments, if the editor wants them.
+- Offline reading of pages already opened.
 
 ---
 
 ## 7. Cost
 
-These are in ₹ at the Settings rate, rough, to be measured in stage 2.
+These are in ₹ at the Settings rate, rough, to be measured in phase B.
 
 | Item | Per day | Per month |
 |---|---|---|
@@ -383,7 +394,7 @@ These are in ₹ at the Settings rate, rough, to be measured in stage 2.
 | Shorts: voice for 2-4 a day | ₹5-20 | ₹150-600 |
 | X posting | — | check the current price |
 | Telegram, Facebook, Instagram, YouTube posting | ₹0 | ₹0 |
-| **To start (stages 0-4)** | | **about ₹400-5,500, nearly all of it the AI; a daily ceiling keeps it low** |
+| **To start (phases A-C, without shorts)** | | **about ₹400-5,500, nearly all of it the AI; a daily ceiling keeps it low** |
 
 The dashboard shows the real figures in ₹ per day, tier, genre and platform,
 with an optional daily ceiling the editor sets.
@@ -417,8 +428,10 @@ with an optional daily ceiling the editor sets.
 
 ## 9. Needed from the user, overall
 
-1. **Free accounts** for the website host and the database (stage 0); a domain only later, if wanted.
-2. **Admin access** to the Facebook Page and the X account, and an **Instagram Business account** linked to the Page (stages 4-5). All links are made through the site's own sign-in screens; no passwords or keys in chat.
-3. A decision on **X's posting price** once checked (stage 4).
-4. **Approval of the design** (stage 1), the voice (stage 6), and the posting schedule.
+Section 6.0 is the full checklist, with when each item is needed. In short:
+
+1. **Free accounts** for the website host and the database (phase A); a domain only later, if wanted.
+2. **Admin access** to the Facebook Page and the X account, and an **Instagram Business account** linked to the Page (phase C). All links are made through the site's own sign-in screens; no passwords or keys in chat.
+3. A decision on **X's posting price** once checked (phase C).
+4. **Approval of the design** (done 24 Oct), the voice (phase C), and the posting schedule.
 5. Optionally, a yes on **writing to PIB** for program access, and who signs it.
