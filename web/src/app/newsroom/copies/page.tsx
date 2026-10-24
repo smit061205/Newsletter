@@ -16,12 +16,7 @@ import type { StringKey } from "../ui/strings";
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
 // (Urdu waits for its own fonts and layout)
 const LANGS: PaperLang[] = ["gu", "hi"];
-// translating a story (once, whatever the number of copies), US$
-const PER_TRANSLATION = 0.004;
 const SHUFFLES: Shuffle[] = ["keepLead", "anywhere", "samePage"];
-// the AI's usual cost per story per copy (US$), and the length fitting per copy
-const PER_STORY: Record<Reword, number> = { headline: 0.0004, headlineDeck: 0.0006, all: 0.004 };
-const PER_COPY: Record<Reword, number> = { headline: 0.03, headlineDeck: 0.03, all: 0.07 };
 
 export default function Copies() {
   const { t, lang, date, toast, pdf } = useApp();
@@ -72,9 +67,13 @@ export default function Copies() {
       toast(t("copies.making", { done: num(lang, 1), total: num(lang, count) }));
     } catch (e) { setError((e as Error).message); }
   };
-  const stories = info?.report.placed.length ?? 25;
-  const estimate = translated ? stories * PER_TRANSLATION + count * PER_COPY.all : count * (stories * PER_STORY[reword] + PER_COPY[reword]);
-  const minutes = Math.round(count * minutesPerCopy * (reword === "all" || translated ? 1.4 : 1) + (translated ? 2 : 0));
+  // the estimate from what this paper's copies really cost and took (learned by the
+  // engine from each batch): every story of the day is worded, placed or not; a
+  // translation is paid once, however many copies
+  const stories = (info?.report.placed.length ?? 25) + (info?.report.leftOut.length ?? 0);
+  const rate = (k: string) => status?.costRates?.[k] ?? 0;
+  const estimate = translated ? stories * rate(`translate-${paperLang}`) : count * stories * rate(reword);
+  const minutes = Math.max(1, Math.round(count * (status?.copyMinutes ?? minutesPerCopy) + (translated ? 1 : 0)));
   const paperBusy = !!status?.running && status.running.date === date;
   const issueNo = info?.report.issueNumber ?? status?.issue?.issueNumber ?? 0;
   const paperName = status?.paper.name.split(" (")[0] ?? "Capital Kranti";
@@ -158,9 +157,9 @@ export default function Copies() {
           </div>
           {running && (
             <div className={s.ringWrap}>
-              <Ring pct={batchProgress(run, run.count * minutesPerCopy).share * 100} />
+              <Ring pct={batchProgress(run, run.count * (status?.copyMinutes ?? minutesPerCopy)).share * 100} />
               <div className={s.heroText}>
-                <span className={s.muted}>{t("today.making.left", { min: num(lang, batchProgress(run, run.count * minutesPerCopy).minutes) })}</span>
+                <span className={s.muted}>{t("today.making.left", { min: num(lang, batchProgress(run, run.count * (status?.copyMinutes ?? minutesPerCopy)).minutes) })}</span>
                 {Object.entries(run.parts ?? {}).filter(([, p]) => p.share < 1).map(([label, p]) => (
                   <span key={label} className={s.faint}>{label.replace(/^copy (\d+)$/, (_, n) => t("copies.copy", { n: num(lang, n) }))}: {whatOf(p.what)} · {num(lang, Math.round(p.share * 100))}%</span>
                 ))}

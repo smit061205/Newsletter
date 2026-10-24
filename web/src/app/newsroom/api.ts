@@ -21,6 +21,8 @@ export interface Status {
   today: string; now: string; runAt: string; autoRun: boolean; nextRun: string | null;
   running: Job | null; lastJob: Job | null; openrouterKey: boolean;
   lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number; inrAuto: boolean; inrUpdated: string; notify: boolean; siteUrl: string;
+  /** what a story costs in each kind of copy (US$), learned from real batches, and a copy's minutes */
+  costRates: Record<string, number>; copyMinutes: number;
   issue: { version: number; status: string; ready?: boolean; issueNumber?: number } | null; version: string;
   /** the paper this newsroom is working on */
   paper: { id: string; name: string };

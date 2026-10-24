@@ -105,6 +105,15 @@ async function main() {
       log(`editions ${date}: ${((Date.now() - t) / 60_000).toFixed(1)} min`);
       break;
     }
+    case "copies": {
+      // the day's copies, as the newsroom makes them (timed, with their cost)
+      const { makeCopies } = await import("./editorial/copies.ts");
+      const t = Date.now();
+      const b = await makeCopies(store, date, { count: Number(flag("count") ?? 3), reword: (flag("reword") ?? "all") as never,
+                                                shuffle: (flag("shuffle") ?? "keepLead") as never, lang: flag("lang") as never, log });
+      log(`copies ${date}: ${((Date.now() - t) / 60_000).toFixed(1)} min, $${b.cost.toFixed(4)}`);
+      break;
+    }
     case "copies-in": {
       const { copiesIn } = await import("./editorial/copies.ts");
       await copiesIn(store, flag("spec") ?? "");
