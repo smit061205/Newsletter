@@ -65,6 +65,7 @@ const gu = {
   "progress.finishing": "પાનું {item} પૂરું થાય છે",
   "progress.checking": "પાનાં તપાસાય છે",
   "progress.waiting": "PIB જવાબ નથી આપતું — {item} વાગ્યે ફરી પ્રયત્ન",
+  "progress.recovering": "PIB પરથી આ દિવસના સમાચાર શોધાય છે ({done} / {total})",
   "progress.starting": "શરૂ થાય છે…",
 
   "check.ok": "બધું બરાબર",
@@ -482,6 +483,7 @@ const en: Record<StringKey, string> = {
   "progress.finishing": "Finishing page {item}",
   "progress.checking": "Checking the pages",
   "progress.waiting": "PIB isn't answering — trying again at {item}",
+  "progress.recovering": "Finding this day's news on PIB ({done} of {total})",
   "progress.starting": "Starting…",
 
   "check.ok": "All good",

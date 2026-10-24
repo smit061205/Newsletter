@@ -182,10 +182,107 @@ function saveList(store: Store, feed: FeedLang, date: string, items: ListItem[])
   store.putSetting(listKey(feed, date), [...items, ...had.filter((it) => !seen.has(it.prid))]);
 }
 
+// ---- an earlier day nobody collected: read PIB's release pages by number ----
+// Every release, in every language and office, takes the next number (some
+// 1,000-1,500 a day), and each page says its day and office. So a missed day's
+// lists are found by locating where its numbers start (a few pages, halving
+// the gap) and reading on from there, one page a second, until the next day's.
+const SCAN_PAUSE_MS = 1000;
+const SCAN_PAGES = 4000; // a scan's ceiling, whatever happens
+const MARGIN = 100; // pages past the day's edge read before stopping (a few come out of order)
+
+type Peek = { date: string; feed: FeedLang | null; item: ListItem } | null;
+let scanReads = 0;
+/** One release page by number: its day and, when it is one of the feeds, which. */
+async function peek(prid: number): Promise<Peek> {
+  if (++scanReads > SCAN_PAGES) throw new Error(`more than ${SCAN_PAGES} PIB pages in one search: stopping`);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const wait = lastRequest + SCAN_PAUSE_MS * (attempt + 1) - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastRequest = Date.now();
+    try {
+      const res = await fetch(`${SITE}/PressReleaseIframePage.aspx?PRID=${prid}`, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(30_000) });
+      if (!res.ok) { if (res.status < 500) return null; continue; }
+      const r = parseRelease(await res.text(), prid);
+      if (!r?.date) return null; // no release under that number
+      const words = `${r.headline} ${r.paras.slice(0, 3).join(" ")}`;
+      const count = (re: RegExp) => (words.match(re) ?? []).length;
+      const [gu, hi, en] = [count(/[\u0A80-\u0AFF]/g), count(/[\u0900-\u097F]/g), count(/[A-Za-z]/g)];
+      const feed: FeedLang | null = /ahmedabad/i.test(r.office) && gu > hi && gu > en ? "gu"
+        : /delhi/i.test(r.office) && hi > gu && hi > en ? "hi"
+        : /delhi/i.test(r.office) && en > gu && en > hi ? "en" : null;
+      return { date: r.date, feed, item: { prid, ministry: r.ministry, headline: r.headline } };
+    } catch { /* once more */ }
+  }
+  throw new Error(`PIB isn't answering (release ${prid})`);
+}
+/** The day at `prid`, or the next number that has a release. */
+async function dayAt(prid: number): Promise<{ prid: number; date: string }> {
+  for (let p = prid; p < prid + 20; p++) {
+    const got = await peek(p);
+    if (got) return { prid: p, date: got.date };
+  }
+  throw new Error(`no PIB releases between ${prid} and ${prid + 20}`);
+}
+
+/** Every feed's list for `date` (before `later`, a day PIB's list showed,
+ * whose releases start at `anchor`), saved: what the day's paper and its
+ * Hindi top-up choose from. */
+async function scanDay(store: Store, date: string, anchor: number, later: string,
+                       opts: { log?: (s: string) => void; progress?: (p: Progress) => void }): Promise<void> {
+  const log = opts.log ?? (() => {});
+  scanReads = 0;
+  const days = Math.max(1, Math.round((Date.parse(later) - Date.parse(date)) / 86_400_000));
+  log(`PIB shows programs only today's list: finding ${date}'s releases by their numbers (one page a second)`);
+  const report = (done: number, total: number) => opts.progress?.({ done, total, label: "recovering", item: date });
+  report(0, 1);
+  // where the day starts: back far enough to be before it, then halve the gap
+  let hi = anchor;
+  let span = days * 1500;
+  let lo = Math.max(1, hi - span);
+  while ((await dayAt(lo)).date >= date) {
+    hi = lo;
+    span *= 2;
+    lo = Math.max(1, lo - span);
+    if (lo === 1) break;
+  }
+  while (hi - lo > 8) {
+    const mid = Math.floor((lo + hi) / 2);
+    const at = await dayAt(mid);
+    if (at.date < date) lo = at.prid; else hi = mid;
+  }
+  // then read out from there both ways, until a margin of pages is all the
+  // day before (going back) or after (going on): the edges are a little ragged
+  const found: Record<FeedLang, ListItem[]> = { gu: [], hi: [], en: [] };
+  const estimate = Math.round((anchor - hi) / days) + 2 * MARGIN;
+  let read = 0;
+  const walk = async (from: number, step: 1 | -1, beyond: (d: string) => boolean) => {
+    let past = 0;
+    for (let p = from; p >= 1 && p < anchor && past < MARGIN; p += step) {
+      report(read, Math.max(estimate, read + MARGIN));
+      read++;
+      const got = await peek(p);
+      if (!got) continue;
+      if (beyond(got.date)) { past++; continue; }
+      if (got.date !== date) continue;
+      past = 0;
+      if (got.feed) found[got.feed].push(got.item);
+    }
+  };
+  await walk(hi - 1, -1, (d) => d < date);
+  await walk(hi, 1, (d) => d > date);
+  for (const list of Object.values(found)) list.sort((a, b) => a.prid - b.prid);
+  for (const feed of Object.keys(found) as FeedLang[]) saveList(store, feed, date, found[feed]);
+  store.putSetting(`pib-scanned/${date}`, true);
+  report(1, 1);
+  log(`${date}: ${found.gu.length} Gujarati, ${found.hi.length} Hindi and ${found.en.length} English release(s) found in ${read} numbers`);
+}
+
 /** The list for one feed on `date`: today's straight off the page (and
- * saved); another day's as saved that day, or else by posting the page's own
- * date form back (as choosing it does). */
-async function listFor(feed: FeedLang, date: string, store?: Store): Promise<ListItem[]> {
+ * saved); another day's as saved that day (collected, or found by number);
+ * a day PIB hasn't reached by posting the page's own date form back. */
+async function listFor(feed: FeedLang, date: string, store?: Store,
+                       opts: { log?: (s: string) => void; progress?: (p: Progress) => void } = {}): Promise<ListItem[]> {
   const { reg, lang } = FEEDS[feed];
   const url = `${SITE}/allRel.aspx?reg=${reg}&lang=${lang}`;
   const res = await get(url);
@@ -196,6 +293,12 @@ async function listFor(feed: FeedLang, date: string, store?: Store): Promise<Lis
   if (first.date === date) return first.items;
   const saved = store && savedList(store, feed, date);
   if (saved?.length) return saved;
+  if (store && first.date && date < first.date && first.items.length) {
+    if (!store.setting(`pib-scanned/${date}`, false)) {
+      await scanDay(store, date, Math.min(...first.items.map((it) => it.prid)), first.date, opts);
+    }
+    return savedList(store, feed, date) ?? [];
+  }
   // ASP.NET postback: every hidden field, the date chosen
   const form = new URLSearchParams();
   for (const m of html.matchAll(/<input type="hidden" name="([^"]+)" id="[^"]*" value="([^"]*)"/g)) form.set(m[1], decodeEntities(m[2]));
@@ -223,7 +326,7 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
                                 opts: { log?: (s: string) => void; only?: Set<number>; progress?: (p: Progress) => void } = {}): Promise<PibResult> {
   const log = opts.log ?? (() => {});
   pagesToday = 0;
-  const items = await listFor(feed, date, store);
+  const items = await listFor(feed, date, store, opts);
   log(`${FEEDS[feed].name}: ${items.length} release(s) listed for ${date}`);
   const mediaDir = path.join(MEDIA_DIR, date);
   await mkdir(mediaDir, { recursive: true });
@@ -266,4 +369,7 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
 }
 
 /** Just the list (no release pages): what a Hindi top-up chooses from. */
-export const listPib = (date: string, feed: FeedLang, store?: Store) => { pagesToday = 0; return listFor(feed, date, store); };
+export const listPib = (date: string, feed: FeedLang, store?: Store, opts: { log?: (s: string) => void; progress?: (p: Progress) => void } = {}) => {
+  pagesToday = 0;
+  return listFor(feed, date, store, opts);
+};
