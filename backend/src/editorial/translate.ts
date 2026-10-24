@@ -151,7 +151,7 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
       return { before, after: before, translated: 0, cost: 0 };
     }
     const done = new Set(store.stories(date).filter((s) => s.translatedFrom).map((s) => s.releaseId));
-    const list = await listPib(date, "hi");
+    const list = await listPib(date, "hi", store);
     const candidates = list.filter((i) => !have.has(i.prid) && !GREETING.test(i.headline));
     log(`PIB Hindi: ${list.length} listed, ${candidates.length} not in Gujarati already and not a greeting`);
     if (!candidates.length) return { before, after: before, translated: 0, cost: 0 };

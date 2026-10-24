@@ -169,16 +169,33 @@ async function get(url: string, init: RequestInit = {}): Promise<Response> {
   throw err instanceof Error ? err : new Error(String(err));
 }
 
-/** The list for one feed on `date`: today's straight off the page, another
- * day's by posting the page's own date form back (as choosing it does). */
-async function listFor(feed: FeedLang, date: string): Promise<ListItem[]> {
+/** A day's list as read through that day (the collector reads today's every
+ * hour): an earlier day's comes from here, since PIB's date form is refused
+ * to programs (24 Oct 2026). Each reading adds to what was saved. */
+const listKey = (feed: FeedLang, date: string) => `pib-list/${feed}/${date}`;
+export function savedList(store: Store, feed: FeedLang, date: string): ListItem[] | null {
+  return store.setting<ListItem[] | null>(listKey(feed, date), null);
+}
+function saveList(store: Store, feed: FeedLang, date: string, items: ListItem[]) {
+  const had = savedList(store, feed, date) ?? [];
+  const seen = new Set(items.map((it) => it.prid));
+  store.putSetting(listKey(feed, date), [...items, ...had.filter((it) => !seen.has(it.prid))]);
+}
+
+/** The list for one feed on `date`: today's straight off the page (and
+ * saved); another day's as saved that day, or else by posting the page's own
+ * date form back (as choosing it does). */
+async function listFor(feed: FeedLang, date: string, store?: Store): Promise<ListItem[]> {
   const { reg, lang } = FEEDS[feed];
   const url = `${SITE}/allRel.aspx?reg=${reg}&lang=${lang}`;
   const res = await get(url);
   const cookie = res.headers.getSetCookie?.().map((c) => c.split(";")[0]).join("; ") ?? "";
   const html = await res.text();
   const first = parseList(html);
+  if (store && first.date && first.items.length) saveList(store, feed, first.date, first.items);
   if (first.date === date) return first.items;
+  const saved = store && savedList(store, feed, date);
+  if (saved?.length) return saved;
   // ASP.NET postback: every hidden field, the date chosen
   const form = new URLSearchParams();
   for (const m of html.matchAll(/<input type="hidden" name="([^"]+)" id="[^"]*" value="([^"]*)"/g)) form.set(m[1], decodeEntities(m[2]));
@@ -206,7 +223,7 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
                                 opts: { log?: (s: string) => void; only?: Set<number>; progress?: (p: Progress) => void } = {}): Promise<PibResult> {
   const log = opts.log ?? (() => {});
   pagesToday = 0;
-  const items = await listFor(feed, date);
+  const items = await listFor(feed, date, store);
   log(`${FEEDS[feed].name}: ${items.length} release(s) listed for ${date}`);
   const mediaDir = path.join(MEDIA_DIR, date);
   await mkdir(mediaDir, { recursive: true });
@@ -249,4 +266,4 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
 }
 
 /** Just the list (no release pages): what a Hindi top-up chooses from. */
-export const listPib = (date: string, feed: FeedLang) => { pagesToday = 0; return listFor(feed, date); };
+export const listPib = (date: string, feed: FeedLang, store?: Store) => { pagesToday = 0; return listFor(feed, date, store); };
