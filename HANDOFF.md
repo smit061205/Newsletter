@@ -251,15 +251,15 @@ printed paper as one of its products. It is **planned, not built**.
 
 **Read first:**
 - `docs/website/ROADMAP.md`: what it does, the newsroom and social pipelines, the stages to build it in, costs in ₹, and what's needed from the user.
-- `docs/website/DESIGN.md`: the Washington Post's UI (dark), measured on 24 Oct, mapped to Gujarati: tokens, the ruled grid, header, modules, section and article pages.
-- `docs/website/sample/capital-kranti-website.html`: the sample the user liked. Open it in a browser. It was published as https://claude.ai/artifact/EnGn4RLGwG5BQyeo2nMLpq.
+- `docs/website/DESIGN.md`: Capital Kranti's own design system (24 Oct): phone first, the printed paper's colours, the ruled grid, containers of cards, the trust pieces on every story; why it no longer copies the Washington Post.
+- `docs/website/sample/capital-kranti-website.html`: the sample of that design. Open it in a browser, on a phone first. It was published as https://claude.ai/artifact/RK4UQHxNmQvWrFZuuksEeY (the earlier Post-style sample, in git history, was https://claude.ai/artifact/EnGn4RLGwG5BQyeo2nMLpq).
 
 **Decided:**
 - **Where:** the code goes in a new **`site/`** folder.
   - It is **not** in the root workspaces, so its libraries stay out of the desktop app.
   - It borrows the engine's code by path (PIB reading, the Gujarati text cleaning, the checks).
 - **Running: free hosting, no paid server** (the user has no budget for one). The pipeline runs as scheduled GitHub Actions runs (free for this public repository); the site is on a free host (Cloudflare or Vercel), with a free Postgres (Neon or Supabase) and free photo storage (Cloudflare R2). ROADMAP §1.1 has the details and the two things to test first. App releases still come only from version tags.
-- **Look:** the Washington Post, dark by default. Only its patterns are copied, never its logo, fonts, text or images.
+- **Look:** Capital Kranti's own design system (DESIGN.md, 24 Oct), not a copy of one paper: the Post's ruled grid, the Guardian's containers, BBC Gujarati's phone-first lightness, under the printed paper's purple, navy and cyan. Light or dark follows the phone.
 - **Order:** stage 0 (server, domain, empty site), then stage 1 (the website from the evening paper's stories, with Publish sending to it), then live news, other outlets, and the social desk.
 
 **First steps in the new session:**
