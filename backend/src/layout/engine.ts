@@ -161,7 +161,7 @@ export async function layOut(args: {
       ladders.set(s.id, got.rungs);
       cost += got.cost;
       args.progress?.(++done, stories.length, "lengths");
-    }), 8);
+    }), Math.max(1, stories.length)); // all at once (the AI's longer versions; OpenRouter retries what's turned away)
   };
   // (a copy: the day's paper's longer versions, already paid for)
   await lengths(args.pool, args.longer ? false : "cached");
@@ -216,12 +216,17 @@ export async function layOut(args: {
     await inParallel(todo.map((i) => async () => {
       const n = i + 1;
       tried.set(i, shares[i].map((s) => s.story.id).join() + round);
+      // the last try: a filler slot on every page still unsolved, as well as
+      // the stories -- whatever its ads leave, the page is made exactly here
+      // (a held story as a brief, an item written to its size), never handed
+      // to the old engine, which left the copies' white space (24 Oct)
+      const slot = shortBy.get(i) ?? (round === 3 ? (FILL_MAX / 2) * spanOf(1) : 0);
       const got = await solvePage(n, shares[i].map((s) => s.story), args.bands[i], pageAds(n), blocks, m,
-                                  seeded(args.seed * 31 + n + round * 7919), args.avoid, log, round, fill, shortBy.get(i) ?? 0, round === 3);
+                                  seeded(args.seed * 31 + n + round * 7919), args.avoid, log, round, fill, slot, round === 3);
       pages[i] = got.page;
       diag.set(i, got.diagnosis);
       if (got.page) args.progress?.(++pagesDone, total, "pages");
-    }), 2);
+    }), total); // every page at once
     // held stories set as briefs by an ad are on their pages now
     for (const s of [...held]) if (!fill.held.includes(s.story)) held.splice(held.indexOf(s), 1);
     const failed = todo.filter((i) => !pages[i]);
@@ -324,7 +329,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
       },
     };
   });
-  if (shortBy > 0) ds.push({ fill: true, widths: [1, 2, 3], area: () => shortBy });
+  // (up to four columns: the strip over one of several ads side by side, 24 Oct's page 3)
+  if (shortBy > 0) ds.push({ fill: true, widths: [1, 2, 3, 4], area: () => shortBy });
   const height = band.bottom - band.top;
   const t1 = Date.now();
   // the page's ads in each tidy arrangement (all at their sizes, at the foot):

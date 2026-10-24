@@ -94,7 +94,7 @@ export interface BuildReport {
   plan: { id: string; rank: number; reason: string }[];
   /** how long each part of the layout took (ms) and the AI length fits it asked
    * for, and the memory the engine and the computer had (MB) -- for making it faster */
-  timing?: { planning: number; fitting: number; print: number; review: number; checks: number; total: number; fits: number;
+  timing?: { preparing?: number; planning: number; fitting: number; print: number; review: number; checks: number; total: number; fits: number;
              engineMb: number; freeMb: number };
   /** spacing and fill measures, and the loosest body lines (for the editor) */
   style: ReturnType<typeof styleChecks>["stats"];
@@ -143,7 +143,8 @@ export async function fillContext(store: Store, date: string): Promise<{
 export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport }> {
   const { log } = opts;
   // how long each part takes (report.timing)
-  const timing = { start: Date.now(), planning: 0, fitting: 0, print: 0, review: 0 };
+  const began = Date.now();
+  const timing = { start: Date.now(), preparing: 0, planning: 0, fitting: 0, print: 0, review: 0 };
   let fitsBefore = fitCalls();
   let stories = store.stories(date);
   if (!stories.length && store.releases(date).length) {
@@ -215,6 +216,17 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     }
     planCost = planned?.cost ?? 0;
     planEntries = planned?.plan ?? [];
+    // a few of the day's biggest national and world stories always in the
+    // paper (24 Oct: the editor asked for them), the best ranked of each kind
+    // raised to where the pages take them -- All India Radio says which is which
+    const kind = (s: Story) => releases.get(s.id)?.ministry;
+    for (const [section, want] of [["રાષ્ટ્રીય", 3], ["આંતરરાષ્ટ્રીય", 2]] as const) {
+      const best = pool.filter((s) => kind(s) === section && !rankedByEditor.has(s.id)).sort((a, b) => a.priority - b.priority).slice(0, want);
+      if (!best.length) continue;
+      pool = pool.map((s) => (best.includes(s) && s.priority > 3 ? { ...s, priority: 3 } : s))
+        .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
+      log(`  ${section === "રાષ્ટ્રીય" ? "national" : "world"} news kept in: ${best.map((s) => s.id).join(", ")}`);
+    }
     // feature articles print like the news: no kicker, no special title (24 Oct, the editor's wish)
     pool = pool.map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s));
     let rewordCost = 0;
@@ -249,6 +261,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     log(`  the day's copy fills ${(share * 100).toFixed(0)}% of the pages at its natural size`);
     const pagesOut = new Map<number, Element[]>();
     timing.start = Date.now();
+    // (the stories made ready: sub-headings written, the editorial plan)
+    timing.preparing = timing.start - began;
     fitsBefore = fitCalls();
     const placed: { page: number; story: Story; variant: string; cols: number; rank: number }[] = [];
     const gaps: { page: number; col: number; y0: number; y1: number }[] = [];
@@ -484,12 +498,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const ready = gates.every((g) => g.pass);
   const min = (ms: number) => Math.round(ms / 600) / 100;
   const took = {
-    planning: timing.planning, fitting: timing.fitting, print: timing.print, review: timing.review,
+    preparing: timing.preparing, planning: timing.planning, fitting: timing.fitting, print: timing.print, review: timing.review,
     checks: Date.now() - timing.start - timing.planning - timing.fitting - timing.print - timing.review,
     total: Date.now() - timing.start, fits: fitCalls() - fitsBefore,
     engineMb: Math.round(process.memoryUsage().rss / 2 ** 20), freeMb: Math.round(os.freemem() / 2 ** 20),
   };
-  log(`timing: planning ${min(took.planning)}m, fitting ${min(took.fitting)}m (${took.fits} AI length fits), printing ${min(took.print)}m, ` +
+  log(`timing: preparing ${min(took.preparing)}m, planning ${min(took.planning)}m, fitting ${min(took.fitting)}m (${took.fits} AI length fits), printing ${min(took.print)}m, ` +
       `page review ${min(took.review)}m, checks ${min(took.checks)}m -- ${min(took.total)}m; memory: engine ${took.engineMb} MB, computer free ${took.freeMb} MB`);
 
   const report: Omit<BuildReport, "version"> = {

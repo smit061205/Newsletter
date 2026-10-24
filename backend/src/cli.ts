@@ -71,7 +71,8 @@ async function main() {
     }
     case "all": {
       const { runPipeline } = await import("./pipeline.ts");
-      await runPipeline(store, date, { by: "cli", from: flag("from") as never, log });
+      // (--evening: as the 8 PM run, which starts the sister papers' wording beside the layout)
+      await runPipeline(store, date, { by: args.includes("--evening") ? "schedule" : "cli", from: flag("from") as never, log });
       break;
     }
     case "publish": {

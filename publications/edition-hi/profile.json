@@ -105,7 +105,7 @@
   },
   "deck": {
    "font": "hind-semibold",
-   "ratio": 0.45,
+   "ratio": 0.6,
    "min": 14,
    "leading": 1.15
   },

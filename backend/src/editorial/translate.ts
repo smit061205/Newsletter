@@ -14,7 +14,7 @@
 // original, and each one is marked as translated for the editor, who sees
 // the original beside it.
 import { fillContext } from "../build.ts";
-import { ingestPib, listPib, type ListItem } from "../ingest/pib.ts";
+import { listPib, readRelease, type ListItem } from "../ingest/pib.ts";
 import { profile } from "../profile.ts";
 import { storyIdOf, type Progress, type Release, type Store, type Story } from "../store.ts";
 import { devanagariToGujarati } from "../layout/text.ts";
@@ -131,6 +131,27 @@ export async function translateOne(r: Release, key: string, model = env("OPENROU
   return { story, cost: data.usage?.cost ?? 0 };
 }
 
+/** The day's world news from All India Radio's English service (ingest/official.ts),
+ * translated whatever the pages need -- a few big world stories belong in every
+ * paper (24 Oct, the editor) -- all at once. Returns what it cost. */
+async function worldNews(store: Store, date: string, key: string, log: (s: string) => void): Promise<number> {
+  const done = new Set(store.stories(date).map((s) => s.id));
+  const todo = store.releases(date).filter((r) => r.source === "air" && r.lang === "en" && !done.has(storyIdOf(r)));
+  if (!todo.length) return 0;
+  let cost = 0;
+  await Promise.all(todo.map(async (r) => {
+    try {
+      const got = await translateOne(r, key);
+      cost += got.cost;
+      store.putStory(got.story);
+      log(`  world news: ${got.story.headline.slice(0, 60)}`);
+    } catch (e) {
+      log(`  world news ${r.id}: translation failed (${e instanceof Error ? e.message : e})`);
+    }
+  }));
+  return cost;
+}
+
 /** Translate Hindi releases into `date`'s paper until its copy is enough.
  * Returns what it did; never throws for one bad release. */
 export async function topUp(store: Store, date: string, opts: { log: (s: string) => void; force?: boolean; progress?: (p: Progress) => void }):
@@ -153,6 +174,13 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
         ctx.content -= await ctx.areaOf(s);
         log(`  ${hi.id}: now in Gujarati from PIB (${twin.id}), so its translation is dropped`);
       }
+    }
+    // the day's world news first, whatever the pages need
+    let worldCost = 0;
+    if (key) {
+      const had = store.stories(date).length;
+      worldCost = await worldNews(store, date, key, log);
+      for (const s of store.stories(date).slice(had)) ctx.content += await ctx.areaOf(s);
     }
     const before = ctx.share();
     log(`the day's Gujarati copy fills ${(before * 100).toFixed(0)}% of the pages (wanted: ${(target * 100).toFixed(0)}%)`);
@@ -181,28 +209,28 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
     if (!candidates.length) return { before, after: before, translated: 0, cost: 0 };
     const printed = store.stories(date).map((s) => s.headline);
     const ranked = await rankForGujarat(candidates, printed, key, env("OPENROUTER_MODEL") ?? DEFAULT_MODEL);
-    let cost = ranked.cost;
+    let cost = ranked.cost + worldCost;
     log(`  ranked for Gujarat's readers: ${ranked.order.length} worth printing`);
     let translated = 0;
     let tried = 0;
-    // a few at a time: as many as the pages still look short of (from the
-    // day's average story), at most 4 -- read from PIB one by one, translated
-    // together, kept in rank order up to the same point as one at a time
+    // as many at once as the pages still look short of (from the day's
+    // average story), all translated together -- each read from PIB first
+    // (one by one, politely) unless the hourly collection has it already
     const order = ranked.order.filter((prid) => !done.has(prid));
     let k = 0;
     while (k < order.length && ctx.share() < target) {
       const ceiling = profile.editorial.dailyBudgetUsd;
       if (ceiling !== undefined && cost >= ceiling) { log(`  the day's AI budget ($${ceiling}) is spent: stopping`); break; }
       const perStory = ctx.content / Math.max(1, store.stories(date).length);
-      const need = Math.max(1, Math.min(4, Math.ceil(((target - ctx.share()) * ctx.room) / Math.max(1, perStory))));
+      const need = Math.max(1, Math.ceil(((target - ctx.share()) * ctx.room) / Math.max(1, perStory)));
       const batch: Release[] = [];
       while (batch.length < need && k < order.length) {
         const prid = order[k++];
         const item = candidates.find((c) => c.prid === prid)!;
         opts.progress?.({ done: tried++, total: order.length, label: "translating", item: item.headline });
         if (taken.has(prid)) { log(`  ${prid}: translated already in its other language`); continue; }
-        // fetch it; its own page may name a Gujarati version the list didn't
-        await ingestPib(store, date, item.lang, { only: new Set([prid]), log: () => {} });
+        // fetch it (unless collected already); its own page may name a Gujarati version the list didn't
+        if (!store.hasRelease(prid)) await readRelease(store, date, item.lang, item);
         const r = store.releases(date).find((x) => x.id === prid && x.lang === item.lang);
         if (!r) { log(`  ${prid}: couldn't read it`); continue; }
         if ((r.langVersions ?? []).some((v) => have.has(v))) { log(`  ${prid}: already in the paper in Gujarati`); continue; }

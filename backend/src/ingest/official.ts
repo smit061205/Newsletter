@@ -6,7 +6,9 @@
 //        state's own news from Gandhinagar, five a page, newest first (?page=N)
 //   air  All India Radio's Gujarati news, newsonair.gov.in/gu: each day's
 //        archive (/gu/YYYY/MM/DD/, then /page/N/), Ahmedabad's regional news
-//        among the national
+//        among the national; and its English service's world news (the
+//        Gujarati one has little or none), up to WORLD_MAX a day, translated
+//        by the top-up (editorial/translate.ts worldNews)
 //
 // Each item is stored as a release in the paper's language, so the rewrite
 // writes it up like a PIB release; one that is the same news as a release
@@ -16,7 +18,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR } from "../config.ts";
-import type { Progress, Release, Store } from "../store.ts";
+import { storyIdOf, type Progress, type Release, type Store } from "../store.ts";
 import { sameNewsIn } from "../editorial/translate.ts";
 import { decodeEntities, imageSize } from "./pib.ts";
 
@@ -27,16 +29,22 @@ const MAX_PAGES = 120; // a day's ceiling for both, whatever happens
 export type OfficialSource = "cmo" | "air";
 /** Release ids: far above PIB's PRIDs, so the two never meet in the store. */
 const ID_BASE: Record<OfficialSource, number> = { cmo: 3_000_000_000, air: 4_000_000_000 };
+/** All India Radio's English posts (numbered apart from its Gujarati ones). */
+const AIR_EN_BASE = 5_000_000_000;
+const WORLD_MAX = 4;
 export const OFFICE: Record<OfficialSource, string> = { cmo: "મુખ્યમંત્રી કાર્યાલય, ગુજરાત", air: "આકાશવાણી સમાચાર" };
 
-let last = 0;
+// each site its own pace (the two are read side by side, each politely)
+const last = new Map<string, number>();
 let pages = 0;
 async function get(url: string): Promise<string | null> {
   if (++pages > MAX_PAGES) throw new Error(`more than ${MAX_PAGES} pages from the official sources in one run: stopping`);
+  const host = new URL(url).host;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const wait = last + PAUSE_MS * (attempt + 1) - Date.now();
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    last = Date.now();
+    // (the next slot is taken before waiting, so two calls for one site never share it)
+    const at = Math.max(Date.now(), (last.get(host) ?? 0) + PAUSE_MS * (attempt + 1));
+    last.set(host, at);
+    if (at > Date.now()) await new Promise((r) => setTimeout(r, at - Date.now()));
     try {
       const res = await fetch(url, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(30_000) });
       if (res.status === 404) return null;
@@ -46,7 +54,8 @@ async function get(url: string): Promise<string | null> {
   throw new Error(`no answer from ${new URL(url).host}`);
 }
 
-const text = (html: string) => decodeEntities(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, ""))
+// (invisible joiners some items carry are dropped: no font draws them)
+const text = (html: string) => decodeEntities(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")).replace(/[\u200b-\u200d\u2060\ufeff]/g, "")
   .split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
 const paragraphs = (html: string) => [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
   .flatMap((m) => text(m[1]).split("\n")).filter((p) => p.length > 1);
@@ -61,7 +70,14 @@ function cmoDate(s: string): string | null {
   return m && month ? iso(m[3], month, m[1]) : null;
 }
 
-export interface Item { source: OfficialSource; id: number; url: string; headline: string; date: string }
+export interface Item { source: OfficialSource; id: number; url: string; headline: string; date: string; section?: string; lang?: "en" }
+
+/** All India Radio's sections, as the paper names them (the release's "ministry": what kind of news it is). */
+export const AIR_SECTION: Record<string, string> = {
+  national: "રાષ્ટ્રીય", international: "આંતરરાષ્ટ્રીય", "regional-news": "પ્રાદેશિક", sports: "રમતગમત",
+  business: "વેપાર", "business-miscellaneous": "વેપાર", health: "આરોગ્ય", "science-and-technologies": "વિજ્ઞાન અને ટેકનોલોજી",
+  entertainment: "મનોરંજન", elections: "ચૂંટણી", weather: "હવામાન",
+};
 
 /** The CM's office: the day's items, from its news pages (newest first) until they're older. */
 async function cmoList(date: string): Promise<Item[]> {
@@ -83,6 +99,24 @@ async function cmoList(date: string): Promise<Item[]> {
   return out;
 }
 
+/** All India Radio in English: the day's world news (its "international" section), the first few. */
+async function airWorldList(date: string): Promise<Item[]> {
+  const [y, m, d] = date.split("-");
+  const out: Item[] = [];
+  for (let page = 1; page <= 6 && out.length < WORLD_MAX; page++) {
+    const html = await get(`https://newsonair.gov.in/${y}/${m}/${d}/${page > 1 ? `page/${page}/` : ""}`);
+    if (!html) break;
+    const rows = [...html.matchAll(/<article class="post-(\d+)([^"]*)"[\s\S]*?<h3 class="entry-title">\s*<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
+    if (!rows.length) break;
+    for (const r of rows) {
+      if (!/category-international\b/.test(r[2]) || out.length >= WORLD_MAX) continue;
+      out.push({ source: "air", id: AIR_EN_BASE + Number(r[1]), url: r[3], headline: text(r[4]), date, section: AIR_SECTION.international, lang: "en" });
+    }
+    if (!html.includes(`/page/${page + 1}/`)) break;
+  }
+  return out;
+}
+
 /** All India Radio: the day's archive, page by page. */
 async function airList(date: string): Promise<Item[]> {
   const [y, m, d] = date.split("-");
@@ -90,9 +124,12 @@ async function airList(date: string): Promise<Item[]> {
   for (let page = 1; page <= 8; page++) {
     const html = await get(`https://newsonair.gov.in/gu/${y}/${m}/${d}/${page > 1 ? `page/${page}/` : ""}`);
     if (!html) break;
-    const rows = [...html.matchAll(/<article class="post-(\d+)[^"]*"[\s\S]*?<h3 class="entry-title">\s*<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
+    const rows = [...html.matchAll(/<article class="post-(\d+)([^"]*)"[\s\S]*?<h3 class="entry-title">\s*<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)];
     if (!rows.length) break;
-    for (const r of rows) out.push({ source: "air", id: ID_BASE.air + Number(r[1]), url: r[2], headline: text(r[3]), date });
+    for (const r of rows) {
+      const cat = r[2].match(/category-([\w-]+)/g)?.map((c) => c.slice(9)).find((c) => AIR_SECTION[c]);
+      out.push({ source: "air", id: ID_BASE.air + Number(r[1]), url: r[3], headline: text(r[4]), date, section: cat ? AIR_SECTION[cat] : undefined });
+    }
     if (!html.includes(`/page/${page + 1}/`)) break;
   }
   return out;
@@ -119,9 +156,15 @@ export function parseAir(html: string, id: number): Page | null {
   const body = html.match(/<div class="entry-content">([\s\S]*?)<\/div><!-- \.entry-content -->/)?.[1] ?? "";
   if (!headline || !body) return null;
   const when = html.match(/(જાન્યુઆરી|ફેબ્રુઆરી|માર્ચ|એપ્રિલ|મે|જૂન|જુલાઈ|ઓગસ્ટ|સપ્ટેમ્બર|ઓક્ટોબર|નવેમ્બર|ડિસેમ્બર)\s+(\d{1,2}),\s+(\d{4})/);
+  // (the English service: "October 24, 2026")
+  const en = html.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(\d{4})/);
   const photo = html.match(/<figure class="featured-media">[\s\S]*?<img[^>]+src="([^"]+)"/)?.[1] ?? null;
-  return { id, headline, subhead: "", date: when ? iso(when[3], GU_MONTHS.indexOf(when[1]) + 1, when[2]) : null,
-           paras: paragraphs(body), photo };
+  // (some items' paragraphs are divs, not p's)
+  const paras = paragraphs(body).length ? paragraphs(body)
+    : [...body.matchAll(/<div[^>]*>([\s\S]*?)<\/div>/gi)].map((m) => text(m[1])).filter((p) => p.length > 1);
+  return { id, headline, subhead: "",
+           date: when ? iso(when[3], GU_MONTHS.indexOf(when[1]) + 1, when[2]) : en ? iso(en[3], MONTHS.indexOf(en[1].slice(0, 3).toLowerCase()) + 1, en[2]) : null,
+           paras, photo };
 }
 
 /** Every item of `date` from both sources not stored yet, with its photo. */
@@ -129,46 +172,67 @@ export async function ingestOfficial(store: Store, date: string, opts: { log?: (
   Promise<{ listed: number; fetched: number }> {
   const log = opts.log ?? (() => {});
   pages = 0;
-  const items: Item[] = [];
-  for (const [name, list] of [["the CM's office", cmoList], ["All India Radio, Gujarati", airList]] as const) {
-    const got = await list(date).catch((e: unknown) => { log(`${name}: couldn't read the list (${e instanceof Error ? e.message : e})`); return []; });
-    log(`${name}: ${got.length} item(s) for ${date}`);
-    items.push(...got);
-  }
   const taken = store.releases(date).filter((r) => !r.lang || r.lang === "gu");
   const mediaDir = path.join(MEDIA_DIR, date);
   await mkdir(mediaDir, { recursive: true });
-  let fetched = 0;
-  for (const [k, it] of items.entries()) {
-    opts.progress?.({ done: k, total: items.length, label: "reading", item: it.headline });
-    if (it.id && store.hasRelease(it.id)) continue;
-    const html = await get(it.url).catch(() => null);
-    const p = html ? (it.source === "cmo" ? parseCmo(html) : parseAir(html, it.id)) : null;
-    if (!p || !p.paras.length) { log(`  ${it.url}: no text on the page`); continue; }
-    if (p.date && p.date !== date) continue;
-    if (store.hasRelease(p.id)) continue;
-    const twin = sameNewsIn({ headline: p.headline, body: p.paras.join("\n\n") }, taken);
-    if (twin) { log(`  ${p.headline.slice(0, 50)}: the same news as ${twin.source === "pib" ? `PIB ${twin.id}` : `an earlier item (${twin.id})`}, left out`); continue; }
-    const photos: string[] = [];
-    if (p.photo && it.source === "cmo") {
-      const img = await fetch(p.photo, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(30_000) }).catch(() => null);
-      const bytes = img?.ok ? new Uint8Array(await img.arrayBuffer()) : null;
-      const size = bytes ? imageSize(bytes) : null;
-      if (bytes && size && size.width >= 300 && size.height >= 150) {
-        const name = `${it.source}${p.id - ID_BASE[it.source]}.${bytes[0] === 0x89 ? "png" : "jpg"}`;
-        await writeFile(path.join(mediaDir, name), bytes);
-        photos.push(`/media/${date}/${name}`);
+  let listed = 0, fetched = 0, done = 0;
+  // one source's day: its list, then its items one by one (the two sources side by side)
+  const one = async (name: string, list: (date: string) => Promise<Item[]>) => {
+    const items = await list(date).catch((e: unknown) => { log(`${name}: couldn't read the list (${e instanceof Error ? e.message : e})`); return [] as Item[]; });
+    log(`${name}: ${items.length} item(s) for ${date}`);
+    listed += items.length;
+    for (const it of items) {
+      opts.progress?.({ done: done++, total: Math.max(listed, done), label: "reading", item: it.headline });
+      if (it.id && store.hasRelease(it.id)) continue;
+      const html = await get(it.url).catch(() => null);
+      const p = html ? (it.source === "cmo" ? parseCmo(html) : parseAir(html, it.id)) : null;
+      if (!p || !p.paras.length) { log(`  ${it.url}: no text on the page`); continue; }
+      if (p.date && p.date !== date) continue;
+      if (store.hasRelease(p.id)) continue;
+      // (world news in English: translated by the top-up, not compared with the Gujarati)
+      const twin = it.lang ? null : sameNewsIn({ headline: p.headline, body: p.paras.join("\n\n") }, taken);
+      if (twin) { log(`  ${p.headline.slice(0, 50)}: the same news as ${twin.source === "pib" ? `PIB ${twin.id}` : `an earlier item (${twin.id})`}, left out`); continue; }
+      const photos: string[] = [];
+      if (p.photo && it.source === "cmo") {
+        const img = await fetch(p.photo, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(30_000) }).catch(() => null);
+        const bytes = img?.ok ? new Uint8Array(await img.arrayBuffer()) : null;
+        const size = bytes ? imageSize(bytes) : null;
+        if (bytes && size && size.width >= 300 && size.height >= 150) {
+          const name = `${it.source}${p.id - ID_BASE[it.source]}.${bytes[0] === 0x89 ? "png" : "jpg"}`;
+          await writeFile(path.join(mediaDir, name), bytes);
+          photos.push(`/media/${date}/${name}`);
+        }
       }
+      const release: Release = {
+        id: p.id, date, url: it.url, office: OFFICE[it.source], headline: p.headline, subhead: p.subhead,
+        body: p.paras.join("\n\n"), photos, fetchedAt: new Date().toISOString(), source: it.source, lang: it.lang ?? "gu",
+        ...(it.section ? { ministry: it.section } : {}),
+      };
+      store.putRelease(release);
+      if (!it.lang) taken.push(release);
+      fetched++;
+      log(`  ${it.source} ${p.headline.slice(0, 70)} (${photos.length} photo${photos.length === 1 ? "" : "s"})`);
     }
-    const release: Release = {
-      id: p.id, date, url: it.url, office: OFFICE[it.source], headline: p.headline, subhead: p.subhead,
-      body: p.paras.join("\n\n"), photos, fetchedAt: new Date().toISOString(), source: it.source, lang: "gu",
-    };
-    store.putRelease(release);
-    taken.push(release);
-    fetched++;
-    log(`  ${it.source} ${p.headline.slice(0, 70)} (${photos.length} photo${photos.length === 1 ? "" : "s"})`);
+  };
+  await Promise.all([one("the CM's office", cmoList), one("All India Radio, Gujarati", airList), one("All India Radio, world news", airWorldList)]);
+  opts.progress?.({ done: listed, total: listed, label: "reading" });
+  return { listed, fetched };
+}
+
+/** The day's items from these sources that turned out to be the same news as
+ * a PIB release (read side by side with them, so PIB's may have come after):
+ * taken out, PIB's being the source of record. Returns how many. */
+export function dropTwinsOfPib(store: Store, date: string, log: (s: string) => void = () => {}): number {
+  const all = store.releases(date);
+  const pib = all.filter((r) => r.source === "pib" && (!r.lang || r.lang === "gu"));
+  let n = 0;
+  for (const r of all.filter((x) => (x.source === "cmo" || x.source === "air") && x.lang !== "en")) {
+    const twin = sameNewsIn(r, pib);
+    if (!twin) continue;
+    store.deleteRelease(r.id);
+    store.deleteStory(storyIdOf(r));
+    log(`  ${r.headline.slice(0, 50)}: the same news as PIB ${twin.id}, left out`);
+    n++;
   }
-  opts.progress?.({ done: items.length, total: items.length, label: "reading" });
-  return { listed: items.length, fetched };
+  return n;
 }

@@ -336,36 +336,45 @@ export async function ingestPib(store: Store, date: string, feed: FeedLang,
     if (opts.only && !opts.only.has(it.prid)) continue;
     opts.progress?.({ done: k, total: items.length, label: "reading", item: it.headline });
     if (store.hasRelease(it.prid)) { skipped++; continue; }
-    const res = await get(`${SITE}/PressReleaseIframePage.aspx?PRID=${it.prid}`).catch((e) => {
-      log(`  ${it.prid}: couldn't read it (${e instanceof Error ? e.message : e})`);
-      return null;
-    });
-    if (!res) continue;
-    const r = parseRelease(await res.text(), it.prid);
-    if (!r || !r.paras.length) { log(`  ${it.prid}: no text on the page`); continue; }
-    if (r.date && r.date !== date) { log(`  ${it.prid}: dated ${r.date}, not ${date}`); continue; }
-    const photos: string[] = [];
-    for (const [k, src] of r.photos.slice(0, 4).entries()) {
-      const img = await get(src).catch(() => null);
-      if (!img) continue;
-      const bytes = new Uint8Array(await img.arrayBuffer());
-      const size = imageSize(bytes);
-      if (!size || size.width < 300 || size.height < 150) continue; // an icon, a banner strip
-      const name = `p${it.prid}-${k}.${bytes[0] === 0x89 ? "png" : "jpg"}`;
-      await writeFile(path.join(mediaDir, name), bytes);
-      photos.push(`/media/${date}/${name}`);
-    }
-    const release: Release = {
-      id: it.prid, date, url: `${SITE}/PressReleasePage.aspx?PRID=${it.prid}`, office: r.office,
-      headline: r.headline, subhead: r.subhead, body: r.paras.join("\n\n"), photos, fetchedAt: new Date().toISOString(),
-      source: "pib", lang: feed, ministry: r.ministry || it.ministry, langVersions: r.langVersions,
-    };
-    store.putRelease(release);
-    fetched++;
-    log(`  ${it.prid}  ${release.ministry!.slice(0, 26).padEnd(26)} ${r.headline.slice(0, 60)}  (${photos.length} photo${photos.length === 1 ? "" : "s"})`);
+    if (await readRelease(store, date, feed, it, log)) fetched++;
   }
   opts.progress?.({ done: items.length, total: items.length, label: "reading" });
   return { feed, listed: items.length, fetched, skipped, releases: store.releases(date).filter((r) => r.source === "pib" && r.lang === feed) };
+}
+
+/** One release page read and stored, with its photos: what the list named
+ * as `it` (a top-up reads only the ones it will translate). False if it
+ * couldn't be read or isn't that day's. */
+export async function readRelease(store: Store, date: string, feed: FeedLang, it: ListItem, log: (s: string) => void = () => {}): Promise<boolean> {
+  const mediaDir = path.join(MEDIA_DIR, date);
+  await mkdir(mediaDir, { recursive: true });
+  const res = await get(`${SITE}/PressReleaseIframePage.aspx?PRID=${it.prid}`).catch((e) => {
+    log(`  ${it.prid}: couldn't read it (${e instanceof Error ? e.message : e})`);
+    return null;
+  });
+  if (!res) return false;
+  const r = parseRelease(await res.text(), it.prid);
+  if (!r || !r.paras.length) { log(`  ${it.prid}: no text on the page`); return false; }
+  if (r.date && r.date !== date) { log(`  ${it.prid}: dated ${r.date}, not ${date}`); return false; }
+  const photos: string[] = [];
+  for (const [k, src] of r.photos.slice(0, 4).entries()) {
+    const img = await get(src).catch(() => null);
+    if (!img) continue;
+    const bytes = new Uint8Array(await img.arrayBuffer());
+    const size = imageSize(bytes);
+    if (!size || size.width < 300 || size.height < 150) continue; // an icon, a banner strip
+    const name = `p${it.prid}-${k}.${bytes[0] === 0x89 ? "png" : "jpg"}`;
+    await writeFile(path.join(mediaDir, name), bytes);
+    photos.push(`/media/${date}/${name}`);
+  }
+  const release: Release = {
+    id: it.prid, date, url: `${SITE}/PressReleasePage.aspx?PRID=${it.prid}`, office: r.office,
+    headline: r.headline, subhead: r.subhead, body: r.paras.join("\n\n"), photos, fetchedAt: new Date().toISOString(),
+    source: "pib", lang: feed, ministry: r.ministry || it.ministry, langVersions: r.langVersions,
+  };
+  store.putRelease(release);
+  log(`  ${it.prid}  ${release.ministry!.slice(0, 26).padEnd(26)} ${r.headline.slice(0, 60)}  (${photos.length} photo${photos.length === 1 ? "" : "s"})`);
+  return true;
 }
 
 /** Just the list (no release pages): what a Hindi top-up chooses from. */

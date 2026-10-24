@@ -57,7 +57,7 @@ const hasDigit = (s: string) => /[0-9૦-૯]/.test(s);
 /** Adds `count` feature articles to `date` (on top of any it already has),
  * all from one call. Returns what it cost; null without an API key. */
 export async function writeFeatures(store: Store, date: string, count: number,
-                                    opts: { log: (s: string) => void; model?: string }): Promise<number | null> {
+                                    opts: { log: (s: string) => void; model?: string; subjects?: string[] }): Promise<number | null> {
   const key = env("OPENROUTER_API_KEY");
   if (!key) {
     opts.log("no OPENROUTER_API_KEY in backend/.env: no features written");
@@ -76,7 +76,7 @@ export async function writeFeatures(store: Store, date: string, count: number,
       messages: [
         { role: "system", content: SYSTEM },
         { role: "user", content: `Write ${count} feature articles for a ${LANG_NAME} daily, for ${day} (Gujarat, India): ` +
-          `on different subjects (health, farming, festivals, culture, history, places, the home, science), each suited to this time of year.\n` +
+          `on different subjects (${(opts.subjects ?? ["health", "farming", "festivals", "culture", "history", "places", "the home", "science"]).join(", ")}), each suited to this time of year.\n` +
           `Avoid these topics (already in the paper): ${[...have.map((s) => s.headline), ...news].join(" | ") || "none"}` },
       ],
     }),
@@ -86,14 +86,19 @@ export async function writeFeatures(store: Store, date: string, count: number,
   const out = JSON.parse(data.choices[0].message.content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")) as
     { features: { topic: string; headline: string; deck: string; body_long: string; body_medium: string; body_short: string }[] };
   let n = have.length;
+  let added = 0;
   for (const f of out.features) {
     const all = [f.headline, f.deck, f.body_long, f.body_medium, f.body_short].join(" ");
     if (hasDigit(all)) {
       opts.log(`  feature "${f.topic}" left out: it has a number, and there's no source to check it against`);
       continue;
     }
+    // (a free number: features are written several requests at once)
+    const ids = new Set(store.stories(date).map((s) => s.id));
+    while (ids.has(`f-${date}-${++n}`));
+    added++;
     const story: Story = {
-      id: `f-${date}-${++n}`, releaseId: null, date,
+      id: `f-${date}-${n}`, releaseId: null, date,
       kicker: "", headline: f.headline.trim(), deck: f.deck.trim(),
       bodies: { long: f.body_long.trim(), medium: f.body_medium.trim(), short: f.body_short.trim() },
       priority: 5, page: 4, photo: null, photos: [], caption: "",
@@ -103,7 +108,7 @@ export async function writeFeatures(store: Store, date: string, count: number,
     opts.log(`  ${story.id}: ${f.topic} -- ${story.headline}`);
   }
   const cost = data.usage?.cost ?? 0;
-  opts.log(`features ${date}: ${n - have.length} written (${model}), $${cost.toFixed(3)}`);
+  opts.log(`features ${date}: ${added} written (${model}), $${cost.toFixed(3)}`);
   return cost;
 }
 

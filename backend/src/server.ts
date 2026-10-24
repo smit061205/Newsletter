@@ -38,7 +38,7 @@ import path from "node:path";
 import { MEDIA_DIR } from "./config.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { DATA_DIR, ENV_FILE, PAPERS_HOME, publicationDir, ROOT } from "./config.ts";
-import { currentJob, onJob, runPipeline, settleInterrupted, STEPS } from "./pipeline.ts";
+import { collecting, currentJob, onJob, runPipeline, settleInterrupted, STEPS } from "./pipeline.ts";
 import type { Ad, Release, StepName, Store } from "./store.ts";
 import { profile, PUBLICATION as PUBLICATION_ID } from "./profile.ts";
 import { DEFAULT_EDITIONS, type Edition } from "./editorial/copies.ts";
@@ -715,32 +715,53 @@ function backupDaily(store: Store, log: (s: string) => void) {
   setInterval(safe, 60 * 60_000);
 }
 
-/** Today's news read off PIB every hour while the engine runs: the paper's
- * own releases stored, and the day's lists saved (the Hindi one too, for a
- * Gujarati paper's top-up). PIB shows programs only today's list -- its
- * date form is refused (24 Oct 2026) -- so a day made later, or again, is
- * made from what was collected through it. Quiet: PIB not answering waits
- * for the next hour; never while a run is going. */
+/** The day's work done as the news comes in, every hour while the engine
+ * runs, so the evening run is left with little but the layout:
+ *   - PIB's own releases, and (a Gujarati paper) the CM's office and All India
+ *     Radio side by side; PIB's Hindi and English releases read too, ready to
+ *     translate; the day's lists saved (PIB shows programs only today's list,
+ *     its date form refused, 24 Oct 2026: a day made later is made from these);
+ *   - the stories written as their releases arrive (the evening keeps them:
+ *     no paying twice);
+ *   - from 5 PM, a day still short of copy translated up to the pages' need.
+ * Quiet: a site not answering waits for the next hour. Never while a run goes
+ * (and a run that starts meanwhile waits for it: pipeline.ts collecting). */
 function collectHourly(store: Store, log: (s: string) => void) {
-  let busy = false;
   const once = async () => {
-    if (busy || currentJob()) return;
-    busy = true;
-    try {
-      const { ingestPib, listPib, withPatience, FEEDS } = await import("./ingest/pib.ts");
+    if (collecting.current || currentJob()) return;
+    const work = (async () => {
+      const { ingestPib, listPib, readRelease, withPatience, FEEDS } = await import("./ingest/pib.ts");
       const feed = (profile.language.lang in FEEDS ? profile.language.lang : "en") as keyof typeof FEEDS;
-      const { day } = indiaNow();
-      await withPatience({ tries: 1, seconds: 30 }, async () => {
+      const { day, time } = indiaNow();
+      const gu = feed === "gu";
+      const pib = withPatience({ tries: 1, seconds: 30 }, async () => {
         const r = await ingestPib(store, day, feed);
         if (r.fetched) log(`collected ${r.fetched} new PIB release(s) for ${day}`);
-        // (and the lists a Gujarati paper's top-up translates from)
-        if (feed === "gu") for (const other of ["hi", "en"] as const) await listPib(day, other, store);
-      });
-    } catch (e) {
-      log(`PIB collection skipped this hour: ${e instanceof Error ? e.message : e}`);
-    } finally {
-      busy = false;
-    }
+        // the releases a Gujarati paper's top-up translates from, read ahead
+        if (!gu) return;
+        for (const other of ["hi", "en"] as const) {
+          for (const it of await listPib(day, other, store)) if (!store.hasRelease(it.prid)) await readRelease(store, day, other, it);
+        }
+      }).catch((e: unknown) => log(`PIB collection skipped this hour: ${e instanceof Error ? e.message : e}`));
+      const others = gu ? (async () => {
+        const { ingestOfficial } = await import("./ingest/official.ts");
+        const o = await ingestOfficial(store, day);
+        if (o.fetched) log(`collected ${o.fetched} new item(s) from the CM's office and All India Radio for ${day}`);
+      })().catch((e: unknown) => log(`the CM's office and All India Radio skipped this hour: ${e instanceof Error ? e.message : e}`)) : null;
+      await Promise.all([pib, others]);
+      if (gu) (await import("./ingest/official.ts")).dropTwinsOfPib(store, day);
+      // written ahead (an AI key needed): the evening keeps what's written
+      if (!envHas("OPENROUTER_API_KEY")) return;
+      const quiet = () => {};
+      const { rewriteDay } = await import("./editorial/rewrite.ts");
+      await rewriteDay(store, day, { log: quiet });
+      if (gu && time >= "17:00") {
+        const { topUp } = await import("./editorial/translate.ts");
+        await topUp(store, day, { log: quiet });
+      }
+    })();
+    collecting.current = work.catch((e: unknown) => log(`the hourly collection stopped: ${e instanceof Error ? e.message : e}`))
+      .finally(() => { collecting.current = null; });
   };
   setTimeout(once, 60_000);
   setInterval(once, 60 * 60_000);

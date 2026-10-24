@@ -36,6 +36,7 @@ import { profile } from "../profile.ts";
 import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
 import { settable } from "./quality.ts";
+import { applyTextEdits, droppedBy } from "../layout/stories.ts";
 
 export type Reword = "headline" | "headlineDeck" | "all";
 export type Shuffle = CopyOpts["shuffle"];
@@ -73,6 +74,8 @@ export interface Batch {
   share?: number;
   /** each copy's own progress and what it's doing */
   parts?: Record<string, { share: number; what: string }>;
+  /** the time meter: how long the wording took, and each one's layout (seconds) */
+  times?: { name: string; seconds: number }[];
 }
 /** Kept for the newsroom (api.ts CopiesRun). */
 export type CopiesRun = Batch;
@@ -225,6 +228,9 @@ interface SetSpec {
   pageOf: [string, number][]; lead?: string;
   /** placements already used (the day's paper, earlier copies): none may repeat */
   seen: string[];
+  /** only reword (or translate) the day's stories for each item, caching them, and lay nothing out:
+   * every copy's AI work done at once before the layouts, which run a couple at a time (memory) */
+  prepare?: boolean;
 }
 type Say = (line: string) => void;
 type OnFile = (f: { n: number; ready: boolean; pages: number; cost: number; sig: string[] }) => void;
@@ -241,24 +247,30 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
   for (const item of spec.items) {
     const n = item.n;
     let rewordCost = 0;
-    // the stories reworded (or translated) for this one, a few at a time
+    // the stories reworded (or translated) for this one, all at once (OpenRouter retries what it turns away)
     const reword = async (pool: Story[]) => {
       const out: Story[] = new Array(pool.length);
-      let cost = 0, changed = 0, next = 0;
-      await Promise.all(Array.from({ length: 6 }, async () => {
-        while (next < pool.length) {
-          const i = next++;
-          const r = key || process.env.CK_FAKE_AI === "1" ? await rewordStory(store, pool[i], n, spec.reword, key ?? "", spec.translate) : { story: pool[i], cost: 0 };
-          out[i] = r.story;
-          progress(0.15 * (out.filter(Boolean).length / pool.length), spec.translate ? "translating" : "rewording");
-          cost += r.cost;
-          if (r.story.headline !== pool[i].headline) changed++;
-        }
+      let cost = 0, changed = 0, done = 0;
+      await Promise.all(pool.map(async (s, i) => {
+        const r = key || process.env.CK_FAKE_AI === "1" ? await rewordStory(store, s, n, spec.reword, key ?? "", spec.translate) : { story: s, cost: 0 };
+        out[i] = r.story;
+        progress(0.15 * (++done / pool.length), spec.translate ? "translating" : "rewording");
+        cost += r.cost;
+        if (r.story.headline !== s.headline) changed++;
       }));
       rewordCost += cost;
       say(`  ${item.name ?? `copy ${n}`}: ${changed} of ${pool.length} stories ${spec.translate ? "translated" : "reworded"}`);
       return { pool: out, cost };
     };
+    if (spec.prepare) {
+      // the day's stories as the build hands them to `reword` (edits applied,
+      // left-out ones gone, features without a kicker): their wording cached
+      const edits = store.edits(spec.date);
+      const dropped = droppedBy(edits);
+      await reword(applyTextEdits(store.stories(spec.date), edits).filter((s) => !dropped.has(s.id))
+        .map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s)));
+      continue;
+    }
     // a reworded body is fitted to its space on its own (not with the day's fits)
     const own = Object.create(store) as Store;
     own.fitted = (k: string) => store.fitted(`copy${n}|${k}`);
@@ -364,7 +376,8 @@ async function runTasks(store: Store, tasks: Task[], say: Say, onFile: (t: Task,
   await Promise.all(Array.from({ length: slots }, async (_, slot) => {
     while (queue.length && !stopping) {
       const t = queue.shift()!;
-      try { await runWorker(store, t, slot, say, (f) => onFile(t, f)); }
+      const began = Date.now();
+      try { await runWorker(store, t, slot, say, (f) => onFile(t, f)); timeMark(t.label, (Date.now() - began) / 1000); }
       catch (e) { if (!stopping) { failures.push(`${t.label}: ${e instanceof Error ? e.message : e}`); say(`${t.label} stopped: ${e instanceof Error ? e.message : e}`); } }
     }
   }));
@@ -462,6 +475,11 @@ function dayOf(store: Store, date: string) {
 }
 
 /** Run a batch (one at a time), its record kept beside its PDFs. */
+/** A part of the running batch done, for its time meter. */
+function timeMark(name: string, seconds: number) {
+  if (running) (running.times ??= []).push({ name, seconds: Math.round(seconds * 10) / 10 });
+}
+
 async function runBatch(batch: Batch, dir: string, work: (say: Say) => Promise<void>, log: Say): Promise<Batch> {
   if (running) throw new Error(`${running.kind === "copies" ? "copies" : "the other papers"} for ${running.date} are still being made`);
   running = batch;
@@ -484,9 +502,41 @@ async function runBatch(batch: Batch, dir: string, work: (say: Say) => Promise<v
   return batch;
 }
 
+/** Every task's AI work at once, before any layout: a light worker per task
+ * (its own paper's language; no browser) rewording or translating the day's
+ * stories into the shared cache, which the layout workers then read. A
+ * preparation already under way for the day (started beside the evening's
+ * layout, prepareEditions) is waited for, not repeated. */
+let preparing: { date: string; work: Promise<void> } | null = null;
+async function prepareAll(store: Store, tasks: Task[], say: Say): Promise<void> {
+  const t = Date.now();
+  if (preparing?.date === tasks[0]?.spec.date) await preparing.work;
+  await Promise.all(tasks.map((task, i) => runWorker(store, { ...task, spec: { ...task.spec, prepare: true } }, 50 + i, () => {}, () => {})
+    .catch((e: unknown) => say(`${task.label}: couldn't prepare its wording ahead (${e instanceof Error ? e.message : e}); it words them as it's laid out`))));
+  say(`wording for ${tasks.length} paper(s) ready in ${Math.round((Date.now() - t) / 1000)}s`);
+  timeMark("wording", (Date.now() - t) / 1000);
+}
+
+/** The sister papers' wording and translations started while the day's own
+ * paper is still being laid out (pipeline.ts): done by the time they're made. */
+export function prepareEditions(store: Store, date: string, editions: Edition[]): Promise<void> {
+  if (!editions.length) return Promise.resolve();
+  const tasks: Task[] = editions.map((e) => ({
+    lang: e.lang, label: e.name, seen: [],
+    spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: [] },
+    item: { n: 100 + editions.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + editions.indexOf(e) },
+  }));
+  const work = Promise.all(tasks.map((task, i) => runWorker(store, { ...task, spec: { ...task.spec, prepare: true } }, 50 + i, () => {}, () => {})
+    .catch(() => {}))).then(() => {});
+  preparing = { date, work };
+  return work.finally(() => { if (preparing?.work === work) preparing = null; });
+}
+
 /** Lay `tasks` out, then any that came out placed like another (workers run
  * side by side, so they can't see each other) once more with another seed. */
 async function layOutUnique(store: Store, tasks: Task[], seen: string[], say: Say, done: (t: Task, f: Parameters<OnFile>[0]) => void) {
+  // the wording first, every paper at once; then the layouts, a couple at a time
+  await prepareAll(store, tasks, say);
   const results = new Map<Task, Parameters<OnFile>[0]>();
   await runTasks(store, tasks, say, (t, f) => results.set(t, f));
   const known = new Set(seen);

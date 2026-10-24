@@ -11,6 +11,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { batchProgress, call, media, type CopiesRun, type Edition, type Settings } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
+import { BatchTime } from "../ui/BatchTime";
 import { ck } from "../ui/desktop";
 import { num, rupees, shortDate } from "../ui/format";
 import { Badge, Button, Icon, Note, useApp } from "../ui/kit";
@@ -358,6 +359,7 @@ function Editions() {
         <span className={s.faint}>{t("eds.cost")}</span>
         {run && <span className={s.faint}>{t("copies.cost", { cost: rupees(lang, run.cost, status?.inrPerUsd ?? 88) })}</span>}
       </div>
+      {run && <BatchTime run={run} />}
       {run && (
         <details className={s.details}>
           <summary>{t("today.details")}</summary>

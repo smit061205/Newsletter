@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { batchProgress, call, media, type CopiesRun, type IssueInfo, type Job, type PaperLang, type Reword, type Shuffle } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
+import { BatchTime } from "../ui/BatchTime";
 import { num, rupees } from "../ui/format";
 import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
@@ -181,6 +182,7 @@ export default function Copies() {
               </div>
             ))}
           </div>
+          <BatchTime run={run} />
           <div className={s.row} style={{ justifyContent: "space-between" }}>
             <span className={s.faint}>{t("copies.cost", { cost: rupees(lang, run.cost, status?.inrPerUsd ?? 88) })}</span>
           </div>

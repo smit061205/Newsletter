@@ -34,12 +34,22 @@ export const LEAD_MODEL = profile.editorial.leadModel;
  * timeout or network failure comes back as a 504, which every caller already
  * treats as a failed call (the story keeps what it had). */
 export async function openRouter(init: RequestInit, seconds = 90): Promise<Response> {
-  try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", { ...init, signal: AbortSignal.timeout(seconds * 1000) });
-    return new Response(await res.text(), { status: res.status });
-  } catch (e) {
-    return new Response(`no answer in ${seconds}s (${e instanceof Error ? e.message : e})`, { status: 504 });
+  // every AI call of a step goes out at once (no cap of our own: OpenRouter
+  // sets none for paid models): one turned away as too many, or a provider's
+  // hiccup, waits a moment -- longer each time, as long as asked -- and goes again
+  let last: Response | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", { ...init, signal: AbortSignal.timeout(seconds * 1000) });
+      last = new Response(await res.text(), { status: res.status });
+      if (res.status !== 429 && res.status !== 502 && res.status !== 503) return last;
+      const asked = Number(res.headers.get("retry-after"));
+      await new Promise((r) => setTimeout(r, (Number.isFinite(asked) && asked > 0 ? asked * 1000 : 1000 * 2 ** attempt) + Math.random() * 500));
+    } catch (e) {
+      return new Response(`no answer in ${seconds}s (${e instanceof Error ? e.message : e})`, { status: 504 });
+    }
   }
+  return last!;
 }
 
 export function env(name: string): string | undefined {
@@ -176,6 +186,14 @@ export function numbersNotIn(out: string, source: string, date?: string): string
   const latin = source.replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d))).replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d)));
   for (const m of latin.matchAll(/(\d+(?:\.\d+)?)\s*(हज़ार|हजार|હજાર|लाख|લાખ)/g)) {
     known.add(String(Math.round(Number(m[1]) * (/लाख|લાખ/.test(m[2]) ? 100_000 : 1000))));
+  }
+  // "377 million" is "૩૭.૭ કરોડ" in an Indian paper: millions, billions, crores and lakhs as each other
+  const asNumber = (n: number) => String(Math.round(n * 1000) / 1000);
+  for (const m of latin.replace(/,/g, "").matchAll(/(\d+(?:\.\d+)?)\s*(million|billion|crore|lakh|કરોડ|લાખ|करोड़|करोड|लाख)/gi)) {
+    const v = Number(m[1]);
+    const unit = m[2].toLowerCase();
+    const units = /million/.test(unit) ? v * 1e6 : /billion/.test(unit) ? v * 1e9 : /crore|કરોડ|करोड/.test(unit) ? v * 1e7 : v * 1e5;
+    for (const per of [1e5, 1e6, 1e7, 1e9]) known.add(asNumber(units / per));
   }
   // "આઠ હજાર 224", "બે હજાર 356": thousands in words, the rest in figures (All India Radio's way) = 8224, 2356
   for (const m of latin.matchAll(/([\p{L}\p{M}]+)\s+(हज़ार|हजार|હજાર)\s+(\d{1,3})(?!\d)/gu)) {
@@ -335,12 +353,13 @@ export async function rewriteDay(store: Store, date: string, opts: { log: (s: st
   };
   let written = 0;
   opts.progress?.({ done: 0, total: groups.length, label: "writing" });
-  for (let i = 0; i < groups.length; i += 5) {
-    for (const story of await Promise.all(groups.slice(i, i + 5).map(one))) {
-      store.putStory(story);
-      opts.progress?.({ done: ++written, total: groups.length, label: "writing", item: story.headline });
-    }
-  }
+  // all of them at once, stored in the day's order (it settles ties in the layout)
+  const stories = await Promise.all(groups.map(async (g) => {
+    const story = await one(g);
+    opts.progress?.({ done: ++written, total: groups.length, label: "writing", item: story.headline });
+    return story;
+  }));
+  for (const story of stories) store.putStory(story);
   opts.log(`rewrite ${date}: ${groups.length} stories from ${releases.length} releases` +
            (key ? ` (${workhorse}; leads ${lead}), $${spent.toFixed(3)}${failed ? `, ${failed} kept as published` : ""}` : " (as published)"));
 }

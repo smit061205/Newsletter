@@ -24,7 +24,7 @@ import { findGaps, type Gap } from "./occupancy.ts";
 import { BODY, DECK, GAP, GRID, HEADLINE, INK, MAX_STORY_COLS, PT } from "./typography.ts";
 
 /** How many stories of a page grow at once (their AI length fits in flight together). */
-const FITS_AT_ONCE = 5;
+const FITS_AT_ONCE = 16;
 /** Run `jobs`, at most `limit` at a time; their results in order. */
 async function inParallel<T>(jobs: (() => Promise<T>)[], limit: number): Promise<T[]> {
   const out: T[] = new Array(jobs.length);

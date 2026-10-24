@@ -3,7 +3,9 @@
 
 export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build";
 export interface Progress { done: number; total: number; label: string; item?: string }
-export interface JobStep { name: StepName; status: "waiting" | "running" | "done" | "failed" | "skipped"; startedAt?: string; endedAt?: string; log: string[]; error?: string; progress?: Progress }
+export interface JobStep { name: StepName; status: "waiting" | "running" | "done" | "failed" | "skipped"; startedAt?: string; endedAt?: string; log: string[]; error?: string; progress?: Progress;
+  /** how long its parts took (seconds), as they finish */
+  parts?: { name: string; seconds: number }[] }
 export interface Job { id: number; date: string; by: string; status: "running" | "done" | "failed"; startedAt: string; endedAt?: string; steps: JobStep[] }
 export interface Gate { gate: string; pass: boolean; detail: string }
 export interface Report {
@@ -54,7 +56,9 @@ export interface CopiesRun { kind: "copies" | "editions"; date: string; count: n
   status: "running" | "done" | "failed" | "stopped"; startedAt: string; endedAt?: string; done: number;
   files: { n: number; id?: string; name?: string; lang: PaperLang; ready: boolean; pages: number }[]; cost: number; log: string[]; error?: string;
   /** how far it has got, 0-1, page by page; and each copy's own progress and what it's doing */
-  share?: number; parts?: Record<string, { share: number; what: string }> }
+  share?: number; parts?: Record<string, { share: number; what: string }>;
+  /** the time meter: the wording, and each one's layout (seconds) */
+  times?: { name: string; seconds: number }[] }
 
 /** A batch's share done (0-1), and minutes left from how fast it has gone so far (or `guess` before it knows). */
 export function batchProgress(run: CopiesRun, guess: number): { share: number; minutes: number } {
