@@ -97,9 +97,9 @@ Repository: <https://github.com/smit061205/Newsletter> (**public**). Branch `mai
    - **v1.1.3:** "Start again from the beginning" on Today. It stops the run, then runs from the first step, keeping what was done.
    - **v1.1.4:** a missed day (no saved list) is found **by release number** (`scanDay` in `ingest/pib.ts`):
      - every release in every language takes the next number, and each page says its day and office;
-     - it halves the gap to find the day's edge, then reads out both ways, one page a second, until 60 pages are past the day;
+     - it halves the gap to find the day's edge, then reads out both ways, one page a second, until 100 pages are past the day;
      - it saves the Gujarati, Hindi and English lists together;
-     - 23 Oct took about 10 minutes (40 Gujarati, 72 Hindi, 74 English);
+     - 23 Oct took about 14 minutes (43 Gujarati, 76 Hindi, 84 English, in 833 numbers);
      - **the edges are ragged** (2327294 is the 23rd, 2327300 the 22nd), hence reading both ways.
 
      This method came from the user's brother's scraper; it only reads pages PIB serves to programs.
