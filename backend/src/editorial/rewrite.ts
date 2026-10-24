@@ -175,7 +175,8 @@ const NUMBER_WORDS: string[][] = [
 /** The numbers in `out` that aren't in `source` -- written in any digits,
  * with or without commas between them, or (up to 20) spelt out there. */
 export function numbersNotIn(out: string, source: string, date?: string): string[] {
-  const plain = (n: string) => n.replace(/,/g, "");
+  // (no commas, and no ".00" -- a table's "1,03,63,188.00" is the story's ૧,૦૩,૬૩,૧૮૮)
+  const plain = (n: string) => n.replace(/,/g, "").replace(/\.0+$/, "");
   const known = new Set([...digits(source)].map(plain));
   // the release's own date (its day, month and year): a story may say "22 October"
   if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -186,6 +187,10 @@ export function numbersNotIn(out: string, source: string, date?: string): string
   const latin = source.replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d))).replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d)));
   for (const m of latin.matchAll(/(\d+(?:\.\d+)?)\s*(हज़ार|हजार|હજાર|लाख|લાખ)/g)) {
     known.add(String(Math.round(Number(m[1]) * (/लाख|લાખ/.test(m[2]) ? 100_000 : 1000))));
+  }
+  // "3 હજાર 897", "3 લાખ 75 હજાર": figures with the words for thousand and lakh between them
+  for (const m of latin.matchAll(/(?:(\d+)\s*(?:लाख|લાખ)\s*)?(\d+)\s*(?:हज़ार|हजार|હજાર)\s*(\d{1,3})?(?!\d)/g)) {
+    known.add(String(Number(m[1] ?? 0) * 100_000 + Number(m[2]) * 1000 + Number(m[3] ?? 0)));
   }
   // "377 million" is "૩૭.૭ કરોડ" in an Indian paper: millions, billions, crores and lakhs as each other
   const asNumber = (n: number) => String(Math.round(n * 1000) / 1000);

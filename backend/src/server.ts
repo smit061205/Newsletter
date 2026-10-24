@@ -41,7 +41,7 @@ import { DATA_DIR, ENV_FILE, PAPERS_HOME, publicationDir, ROOT } from "./config.
 import { collecting, currentJob, onJob, runPipeline, settleInterrupted, STEPS } from "./pipeline.ts";
 import type { Ad, Release, StepName, Store } from "./store.ts";
 import { profile, PUBLICATION as PUBLICATION_ID } from "./profile.ts";
-import { DEFAULT_EDITIONS, type Edition } from "./editorial/copies.ts";
+import { DEFAULT_EDITIONS, START_RATES, type CostKind, type Edition } from "./editorial/copies.ts";
 
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json") {
   res.writeHead(status, {
@@ -175,6 +175,9 @@ export function settingsOf(store: Store) {
     onboarded: store.setting("onboarded", !!process.env.CK_PAPERS_HOME && PUBLICATION_ID !== "capital-kranti"),
     /** rupees to a US dollar, for showing the AI's cost (reported in USD) */
     inrPerUsd: store.setting("inrPerUsd", 88),
+    /** what a story really costs in each kind of copy (US$), learned from batches (editorial/copies.ts), and a copy's minutes */
+    costRates: { ...START_RATES, ...store.setting<Partial<Record<CostKind, number>>>("costRates", {}) },
+    copyMinutes: store.setting("copyMinutes", 1),
     /** the rate kept up to date from the day's exchange rate (rupeeRate) */
     inrAuto: store.setting("inrAuto", true),
     /** when it was last brought up to date (ISO), "" never */

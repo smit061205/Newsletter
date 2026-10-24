@@ -356,7 +356,11 @@ function Editions() {
       </div>
       {auto !== null && <label className={s.switch}><input type="checkbox" checked={auto} onChange={(ev) => setAutoOn(ev.target.checked)} /><span>{t("eds.auto")}</span></label>}
       <div className={s.row} style={{ justifyContent: "space-between" }}>
-        <span className={s.faint}>{t("eds.cost")}</span>
+        {/* (from what this paper's sister papers really cost, learned each evening: a day of about 45 stories) */}
+        <span className={s.faint}>{t("eds.cost", {
+          gu: rupees(lang, 45 * (status?.costRates?.headlineDeck ?? 0), status?.inrPerUsd ?? 88),
+          hi: rupees(lang, 45 * (status?.costRates?.["translate-hi"] ?? 0), status?.inrPerUsd ?? 88),
+        })}</span>
         {run && <span className={s.faint}>{t("copies.cost", { cost: rupees(lang, run.cost, status?.inrPerUsd ?? 88) })}</span>}
       </div>
       {run && <BatchTime run={run} />}

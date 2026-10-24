@@ -266,8 +266,10 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
       // left-out ones gone, features without a kicker): their wording cached
       const edits = store.edits(spec.date);
       const dropped = droppedBy(edits);
-      await reword(applyTextEdits(store.stories(spec.date), edits).filter((s) => !dropped.has(s.id))
+      const got = await reword(applyTextEdits(store.stories(spec.date), edits).filter((s) => !dropped.has(s.id))
         .map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s)));
+      // (what the wording cost, for the batch's total and the cost estimate)
+      say(`@@cost ${JSON.stringify({ cost: got.cost, stories: got.pool.length })}`);
       continue;
     }
     // a reworded body is fitted to its space on its own (not with the day's fits)
@@ -376,7 +378,8 @@ async function runTasks(store: Store, tasks: Task[], say: Say, onFile: (t: Task,
     while (queue.length && !stopping) {
       const t = queue.shift()!;
       const began = Date.now();
-      try { await runWorker(store, t, slot, say, (f) => onFile(t, f)); timeMark(t.label, (Date.now() - began) / 1000); }
+      // (a layout's own cost goes into the batch where its file is taken: counted once)
+      try { await runWorker(store, t, slot, say, (f) => { spend(t, f.cost, 0, false); onFile(t, f); }); timeMark(t.label, (Date.now() - began) / 1000); }
       catch (e) { if (!stopping) { failures.push(`${t.label}: ${e instanceof Error ? e.message : e}`); say(`${t.label} stopped: ${e instanceof Error ? e.message : e}`); } }
     }
   }));
@@ -388,7 +391,7 @@ async function runTasks(store: Store, tasks: Task[], say: Say, onFile: (t: Task,
 /** The shared browser's address while a batch runs (the workers connect to it). */
 let ws = "";
 
-async function runWorker(store: Store, t: Task, slot: number, say: Say, onFile: OnFile) {
+async function runWorker(store: Store, t: Task, slot: number, say: Say, onFile: OnFile, onCost?: (c: { cost: number; stories: number }) => void) {
   const paper = t.lang === profile.language.lang ? profile.id : EDITION_OF[t.lang];
   const dataDir = path.join(PAPERS_HOME, "papers", paper, `worker-${slot + 1}`);
   await mkdir(dataDir, { recursive: true });
@@ -408,6 +411,7 @@ async function runWorker(store: Store, t: Task, slot: number, say: Say, onFile: 
         if (l.startsWith("@@file ")) onFile(JSON.parse(l.slice(7)));
         else if (l.startsWith("@@progress ")) { const x = JSON.parse(l.slice(11)) as { share: number; what: string }; partProgress?.(t, x.share, x.what); }
         else if (l.startsWith("@@error ")) error = l.slice(8);
+        else if (/^\s*\[copies\]\s*@@cost /.test(l)) onCost?.(JSON.parse(l.replace(/^\s*\[copies\]\s*@@cost /, "")));
         else if (/^\s*\[copies\]/.test(l)) say(`[${t.label}] ${l.replace(/^\s*\[copies\] ?/, "").trim()}`);
       };
       child.stdout!.on("data", (d) => { buf += d; let i; while ((i = buf.indexOf("\n")) >= 0) { line(buf.slice(0, i)); buf = buf.slice(i + 1); } });
@@ -474,6 +478,46 @@ function dayOf(store: Store, date: string) {
 }
 
 /** Run a batch (one at a time), its record kept beside its PDFs. */
+// ---- the cost estimate, learned: what each kind of copy really cost per
+// story (US$), and how long a copy took -- the newsroom's estimate (settings
+// costRates, copyMinutes). Started from a measured run, each batch averaged in.
+export type CostKind = "headline" | "headlineDeck" | "all" | "translate-hi" | "translate-ur" | "translate-gu";
+/** Measured on 25 Oct 2026 against the OpenRouter key's own usage: 3 copies worded
+ * whole $0.084 (55 stories), 3 Gujarati sister papers and the Hindi one $0.427. */
+export const START_RATES: Record<CostKind, number> = { headline: 0.00008, headlineDeck: 0.00016, all: 0.00051, "translate-hi": 0.0073, "translate-ur": 0.0073, "translate-gu": 0.0073 };
+const kindOf = (t: Task): CostKind => (t.spec.translate ? `translate-${t.lang}` : t.spec.reword) as CostKind;
+/** The running batch's spend per task: its kind, US$, and the stories its wording covered. */
+const ledger = new Map<Task["label"], { kind: CostKind; usd: number; stories: number }>();
+function spend(t: Task, usd: number, stories: number, intoBatch = true) {
+  const e = ledger.get(t.label) ?? { kind: kindOf(t), usd: 0, stories: 0 };
+  e.usd += usd;
+  e.stories = Math.max(e.stories, stories);
+  ledger.set(t.label, e);
+  if (running && usd && intoBatch) running.cost += usd;
+}
+/** The batch's rates, averaged into what earlier batches taught (a translation
+ * is paid once a language, however many copies: its rate is per story, not per copy). */
+function learn(store: Store, batch: Batch) {
+  const by = new Map<CostKind, { usd: number; stories: number }>();
+  for (const e of ledger.values()) {
+    if (!e.stories) continue;
+    const g = by.get(e.kind) ?? { usd: 0, stories: 0 };
+    g.usd += e.usd;
+    g.stories = e.kind.startsWith("translate") ? Math.max(g.stories, e.stories) : g.stories + e.stories;
+    by.set(e.kind, g);
+  }
+  const rates = { ...START_RATES, ...store.setting<Partial<Record<CostKind, number>>>("costRates", {}) };
+  for (const [kind, g] of by) if (g.usd > 0) rates[kind] = rates[kind] ? (rates[kind] + g.usd / g.stories) / 2 : g.usd / g.stories;
+  store.putSetting("costRates", rates);
+  // and the minutes a copy takes, from this one
+  const secs = (Date.parse(batch.endedAt ?? new Date().toISOString()) - Date.parse(batch.startedAt)) / 1000;
+  if (batch.count && secs > 0) {
+    const was = store.setting<number>("copyMinutes", 0);
+    const now = secs / 60 / batch.count;
+    store.putSetting("copyMinutes", Math.round((was ? (was + now) / 2 : now) * 10) / 10);
+  }
+}
+
 /** A part of the running batch done, for its time meter. */
 function timeMark(name: string, seconds: number) {
   if (running) (running.times ??= []).push({ name, seconds: Math.round(seconds * 10) / 10 });
@@ -483,6 +527,7 @@ async function runBatch(batch: Batch, dir: string, work: (say: Say) => Promise<v
   if (running) throw new Error(`${running.kind === "copies" ? "copies" : "the other papers"} for ${running.date} are still being made`);
   running = batch;
   stopping = false;
+  ledger.clear();
   const say = (line: string) => { batch.log.push(line); if (batch.log.length > 600) batch.log.splice(0, batch.log.length - 600); log(`  [${batch.kind}] ${line}`); };
   try {
     await work(say);
@@ -510,7 +555,8 @@ let preparing: { date: string; work: Promise<void> } | null = null;
 async function prepareAll(store: Store, tasks: Task[], say: Say): Promise<void> {
   const t = Date.now();
   if (preparing?.date === tasks[0]?.spec.date) await preparing.work;
-  await Promise.all(tasks.map((task, i) => runWorker(store, { ...task, spec: { ...task.spec, prepare: true } }, 50 + i, () => {}, () => {})
+  await Promise.all(tasks.map((task, i) => runWorker(store, { ...task, spec: { ...task.spec, prepare: true } }, 50 + i, () => {}, () => {},
+    (c) => spend(task, c.cost, c.stories))
     .catch((e: unknown) => say(`${task.label}: couldn't prepare its wording ahead (${e instanceof Error ? e.message : e}); it words them as it's laid out`))));
   say(`wording for ${tasks.length} paper(s) ready in ${Math.round((Date.now() - t) / 1000)}s`);
   timeMark("wording", (Date.now() - t) / 1000);
@@ -526,6 +572,7 @@ export function prepareEditions(store: Store, date: string, all: Edition[]): Pro
     spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: [] },
     item: { n: 100 + all.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + all.indexOf(e) },
   }));
+  // (its cost is the evening run's: counted there, not in a batch)
   const work = Promise.all(tasks.map((task, i) => runWorker(store, { ...task, spec: { ...task.spec, prepare: true } }, 50 + i, () => {}, () => {})
     .catch(() => {}))).then(() => {});
   preparing = { date, work };
@@ -577,6 +624,7 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
       batch.done = batch.files.length;
       say(`copy ${f.n} ready${f.ready ? "" : " (some checks need a look)"}`);
     });
+    learn(store, batch);
   }, opts.log);
 }
 
@@ -613,5 +661,6 @@ export async function makeEditions(store: Store, date: string, editions: Edition
       batch.done++;
       say(`${e.name} ready${f.ready ? "" : " (some checks need a look)"}`);
     });
+    learn(store, batch);
   }, opts.log);
 }
