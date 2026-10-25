@@ -32,7 +32,13 @@ export function arrangeAds(ads: Ad[], band: Band): Ad[] {
   const placed: Ad[] = [];
   for (const f of free) {
     let best: { c0: number; y: number } | null = null;
-    for (let c0 = GRID.columns - f.cols; c0 >= 0; c0--) {
+    // the columns tried in the order the editor's place prefers (the first of equals wins):
+    // from the right (the default), from the left, or outward from the middle
+    const span = GRID.columns - f.cols;
+    const order = f.ad.place === "left" ? Array.from({ length: span + 1 }, (_, i) => i)
+      : f.ad.place === "middle" ? Array.from({ length: span + 1 }, (_, i) => i).sort((a, b) => Math.abs(a - span / 2) - Math.abs(b - span / 2) || a - b)
+      : Array.from({ length: span + 1 }, (_, i) => span - i);
+    for (const c0 of order) {
       const y = Math.min(...floor.slice(c0, c0 + f.cols)) - f.height;
       if (y < band.top) continue;
       if (!best || y > best.y + 0.5) best = { c0, y };

@@ -66,6 +66,16 @@ export interface CopyOpts {
   translate?: boolean;
 }
 
+/** The sample ads (the paper's own stand-ins for a day with nothing booked) as
+ * the editor keeps them: printed at all (setting samplesOn), and which of them
+ * not (samplesOff) -- taken out of every paper laid out after, for good. */
+export function sampleAdsOf(store: Store) {
+  const ids = new Set(referenceAds("").map((a) => a.id));
+  const on = store.setting("samplesOn", true);
+  const off = new Set(store.setting<string[]>("samplesOff", []));
+  return { isSample: (id: string) => ids.has(id), use: (id: string) => on && !off.has(id), on, off };
+}
+
 /** Gate 5's word while the page review runs after the paper is saved (reviewSaved). */
 export const REVIEW_RUNNING = "the page review is running";
 
@@ -141,8 +151,9 @@ export async function fillContext(store: Store, date: string): Promise<{
   room: number; content: number; share: () => number; areaOf: (s: Story) => Promise<number>; close: () => Promise<void>;
 }> {
   const total = profile.issue.pages;
-  let ads = standInsMovable(store.ads(date));
-  if (!ads.length) ads = referenceAds(date);
+  const samples = sampleAdsOf(store);
+  let ads = standInsMovable(store.ads(date)).filter((a) => !samples.isSample(a.id) || samples.use(a.id));
+  if (!ads.length && !store.ads(date).length) ads = referenceAds(date).filter((a) => samples.use(a.id));
   const m = await Measurer.open(FONTS, FACES);
   try {
     const chrome: Awaited<ReturnType<typeof chromeFor>>[] = [];
@@ -186,11 +197,15 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     stories = store.stories(date);
   }
   if (!stories.length) throw new Error(`no stories for ${date}: ingest and rewrite the day first`);
-  let ads = standInsMovable(store.ads(date));
-  if (!ads.length) {
-    ads = referenceAds(date);
-    for (const a of ads) store.putAd(a);
-    log(`no ads booked for ${date}: placed the 8 August ads as stand-ins`);
+  // the sample ads, as the editor keeps them (the Ads screen): all off, or some
+  const samples = sampleAdsOf(store);
+  let ads = standInsMovable(store.ads(date)).filter((a) => !samples.isSample(a.id) || samples.use(a.id));
+  if (!ads.length && !store.ads(date).length) {
+    // (all of them kept for the day, so one turned back on returns; the ones in use printed)
+    const all = referenceAds(date);
+    for (const a of all) store.putAd(a);
+    ads = all.filter((a) => samples.use(a.id));
+    if (ads.length) log(`no ads booked for ${date}: placed the sample ads`);
   }
   const total = opts.pages ?? profile.issue.pages;
   const issueNumber = opts.issueNumber ?? issueNumberFor(date);

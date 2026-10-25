@@ -90,6 +90,8 @@ export interface Ad {
   url: string;
   /** false: the layout may place it (layout/ads.ts); otherwise it's booked at x, y */
   pinned?: boolean;
+  /** where along the foot of its page the editor wants it (the layout keeps it there); none: the layout's choice, on the right */
+  place?: "left" | "middle" | "right";
 }
 
 export interface Edit {

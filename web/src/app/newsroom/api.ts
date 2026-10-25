@@ -22,7 +22,7 @@ export interface Status {
   running: Job | null; lastJob: Job | null; openrouterKey: boolean;
   lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number; inrAuto: boolean; inrUpdated: string; notify: boolean; siteUrl: string;
   /** what a story costs in each kind of copy (US$), learned from real batches, and a copy's minutes */
-  costRates: Record<string, number>; copyMinutes: number;
+  costRates: Record<string, number>; copyMinutes: number; samplesOn: boolean;
   issue: { version: number; status: string; ready?: boolean; issueNumber?: number } | null; version: string;
   /** the paper this newsroom is working on */
   paper: { id: string; name: string };
@@ -38,7 +38,10 @@ export interface StoryRow {
   caption: string; source: string; model: string; factCheck?: string; translatedFrom?: string; mergedFrom?: number[];
   dropped: boolean; edited: boolean; page: number | null; cols: number | null; fullWidth?: boolean;
 }
+export type AdPlace = "left" | "middle" | "right";
 export interface AdRow { id: string; date: string; page: number; width: number; height: number; url: string;
+  /** where along the foot of its page (a booking); a sample: whether it's printed */
+  place?: AdPlace; inUse: boolean;
   /** a stand-in from the reference issue, not a booking */
   sample: boolean;
   /** every day the booking runs */

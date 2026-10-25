@@ -48,7 +48,7 @@ function send(res: ServerResponse, status: number, body: unknown, type = "applic
     "content-type": type,
     "access-control-allow-origin": "*",
     "access-control-allow-headers": "content-type, authorization",
-    "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+    "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
     // Chrome asks before a public page may reach a server on this machine
     // (Private Network Access): the release reader runs on the
     // Information Department's own page and posts here
@@ -178,6 +178,8 @@ export function settingsOf(store: Store) {
     /** what a story really costs in each kind of copy (US$), learned from batches (editorial/copies.ts), and a copy's minutes */
     costRates: { ...START_RATES, ...store.setting<Partial<Record<CostKind, number>>>("costRates", {}) },
     copyMinutes: store.setting("copyMinutes", 1),
+    /** the sample ads printed on a day with nothing booked (the Ads screen) */
+    samplesOn: store.setting("samplesOn", true),
     /** the rate kept up to date from the day's exchange rate (rupeeRate) */
     inrAuto: store.setting("inrAuto", true),
     /** when it was last brought up to date (ISO), "" never */
@@ -487,11 +489,42 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
       if (parts[0] === "api" && parts[1] === "ads") {
         if (req.method === "GET") {
           const { standInsMovable, referenceAds } = await import("./layout/stories.ts");
-          const samples = new Set(referenceAds("").map((a) => a.id));
-          // each booking with every day it runs (a row per day: "<id>@<date>")
+          const { sampleAdsOf } = await import("./build.ts");
+          const samples = sampleAdsOf(store);
+          const day = url.searchParams.get("date") ?? indiaNow().day;
+          // each booking with every day it runs (a row per day: "<id>@<date>"); then every
+          // sample ad, used or not (they print on a day with nothing booked)
           const days = (id: string) => (store.db.prepare("select date from ads where id like ? order by date").all(`${id}@%`) as { date: string }[]).map((r) => r.date);
-          return send(res, 200, standInsMovable(store.ads(url.searchParams.get("date") ?? indiaNow().day))
-            .map((a) => ({ ...a, sample: samples.has(a.id), days: samples.has(a.id) ? [a.date] : days(a.id) })));
+          const booked = standInsMovable(store.ads(day)).filter((a) => !samples.isSample(a.id))
+            .map((a) => ({ ...a, sample: false, inUse: true, days: days(a.id) }));
+          const stand = referenceAds(day).map((a) => ({ ...a, sample: true, inUse: samples.use(a.id), days: [day] }));
+          return send(res, 200, [...booked, ...stand]);
+        }
+        // the sample ads: all on or off, or one of them (taken out of every paper after)
+        if (req.method === "POST" && parts[2] === "samples") {
+          const body = (await readJson(req)) as { on?: boolean; id?: string; use?: boolean };
+          if (typeof body.on === "boolean") store.putSetting("samplesOn", body.on);
+          if (body.id && typeof body.use === "boolean") {
+            const off = new Set(store.setting<string[]>("samplesOff", []));
+            if (body.use) off.delete(body.id); else off.add(body.id);
+            store.putSetting("samplesOff", [...off]);
+          }
+          return send(res, 200, { on: store.setting("samplesOn", true), off: store.setting<string[]>("samplesOff", []) });
+        }
+        // a booking moved: another page, or another place along its foot (every day it runs)
+        if (req.method === "PATCH" && parts[2]) {
+          const id = decodeURIComponent(parts[2]);
+          const body = (await readJson(req)) as { page?: number; place?: Ad["place"] };
+          if (body.page !== undefined && !(body.page >= 1 && body.page <= profile.issue.pages)) return send(res, 400, { error: `the paper has pages 1 to ${profile.issue.pages}` });
+          if (body.place !== undefined && !["left", "middle", "right"].includes(body.place)) return send(res, 400, { error: "the place is left, middle or right" });
+          const rows = store.db.prepare("select id, json from ads where id = ? or id like ?").all(id, `${id}@%`) as { id: string; json: string }[];
+          if (!rows.length) return send(res, 404, { error: "no such ad" });
+          for (const r of rows) {
+            const ad = JSON.parse(r.json) as Ad;
+            store.db.prepare("update ads set json = ? where id = ?").run(JSON.stringify({ ...ad, ...(body.page ? { page: body.page } : {}),
+              ...(body.place ? { place: body.place } : {}), x: 0, y: 0, pinned: false }), r.id);
+          }
+          return send(res, 200, { moved: rows.length });
         }
         if (req.method === "POST") return send(res, 200, await bookAd(store, (await readJson(req)) as AdBooking));
         if (req.method === "DELETE" && parts[2]) {
@@ -643,6 +676,8 @@ async function rupeeRate(store: Store, log: (s: string) => void, now = false) {
 /** An ad booked in the newsroom: its image, its size on the page, the page and the days it runs. */
 interface AdBooking {
   name: string; base64: string; cols: number; heightCm: number; page: number;
+  /** where along the foot of the page (the layout's choice, on the right, if none) */
+  place?: Ad["place"];
   dates?: string[]; weekdays?: number[]; from?: string; to?: string;
 }
 
@@ -680,7 +715,8 @@ async function bookAd(store: Store, b: AdBooking): Promise<{ booked: string[] }>
     const { referenceAds } = await import("./layout/stories.ts");
     const standIns = new Set(referenceAds("").map((a) => a.id));
     for (const a of ads) if (standIns.has(a.id) || a.url.startsWith("/chrome/ads/")) store.db.prepare("delete from ads where id = ? and date = ?").run(a.id, date);
-    const ad: Ad = { id: `${id}`, date, page: b.page, x: 0, y: 0, width, height, url: `/media/ads/${file}`, pinned: false };
+    const ad: Ad = { id: `${id}`, date, page: b.page, x: 0, y: 0, width, height, url: `/media/ads/${file}`, pinned: false,
+                     ...(b.place && ["left", "middle", "right"].includes(b.place) ? { place: b.place } : {}) };
     store.db.prepare("insert or replace into ads (id, date, json) values (?, ?, ?)").run(`${id}@${date}`, date, JSON.stringify(ad));
   }
   return { booked: [...days].sort() };

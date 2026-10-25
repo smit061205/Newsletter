@@ -435,8 +435,11 @@ const colsOf = (a: Ad) => Math.max(1, Math.min(GRID.columns, Math.round((a.width
 export function adLayouts(ads: Ad[], band: Band): Ad[][] {
   if (!ads.length) return [ads];
   const out = new Map<string, Ad[]>();
+  // (an ad the editor put somewhere stays there: arrangements that move it are left out)
+  const placedAt = new Map(ads.filter((a) => a.place).map((a) => [a.id, Math.round(a.x)]));
   const keep = (list: Ad[] | null) => {
     if (!list || list.some((a) => a.y < band.top + 60 * PT)) return;
+    if (list.some((a) => placedAt.has(a.id) && Math.round(a.x) !== placedAt.get(a.id))) return;
     out.set(list.map((a) => `${a.id}:${Math.round(a.x)}:${Math.round(a.y)}`).sort().join(), list);
   };
   keep(ads);
