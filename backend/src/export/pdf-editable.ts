@@ -2,9 +2,11 @@
 // one text line in the paper's own font, as a page-layout program writes it
 // (the paper's own PageMaker PDFs: each font a simple TrueType font, Windows
 // encoding, named as Windows knows it -- "BBharatiGopikaTwo",
-// "BBharatiGopikaTwo,Bold" -- word and letter spacing and the squeeze as
-// text settings), so CorelDRAW sets it in the installed Gopika and it stays
-// editable. Photos, ads and rules go in as they are (full quality).
+// "BBharatiGopikaTwo,Bold" -- word and letter spacing as text settings, the
+// squeeze in the line's text matrix as PageMaker writes it: CorelDRAW drops a
+// horizontal-scaling setting (Tz), so squeezed headlines came in full width,
+// over their neighbours and off the page, 25 Oct), so CorelDRAW sets it in the
+// installed Gopika and it stays editable. Photos, ads and rules go in as they are (full quality).
 //
 // The print PDF (shared/pdf.ts, drawn by Chromium) is unchanged: its text is
 // glyph by glyph in subset fonts, which CorelDRAW imports grey or not at all.
@@ -315,8 +317,9 @@ function drawText(page: PDFPage, e: TextElement, fonts: Map<string, PdfFont>, k:
     const x0 = e.align === "center" ? e.x + (e.width - widthNow) / 2 : e.align === "right" ? e.x + e.width - widthNow : e.x + indent;
     const y = e.y + i * e.lineHeight + baseline(e.size);
     const ops: PDFOperator[] = [op(PDFOperatorNames.BeginText)];
-    ops.push(op(PDFOperatorNames.SetTextHorizontalScaling, h * 100), op(PDFOperatorNames.SetCharacterSpacing, ls * k),
-             op(PDFOperatorNames.SetWordSpacing, ws * k), op(PDFOperatorNames.MoveText, x0 * k, H - y * k));
+    // (the squeeze scales the spacing with the letters, as Tz would)
+    ops.push(op(PDFOperatorNames.SetCharacterSpacing, ls * k), op(PDFOperatorNames.SetWordSpacing, ws * k),
+             op(PDFOperatorNames.SetTextMatrix, h, 0, 0, 1, x0 * k, H - y * k));
     let color = "";
     for (const x of pieces) {
       const c = rgb(x.color);
