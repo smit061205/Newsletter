@@ -19,8 +19,6 @@ export async function GET() {
   const [one] = await sql.query(`select photo->>'url' as url from stories where photo is not null limit 1`).catch(() => []);
   const name = (one?.url as string | undefined)?.replace(/^\/media\//, "");
   const photos = { key: !!process.env.BLOB_READ_WRITE_TOKEN, name: name ?? null,
-    // the names (only) of the storage settings this deployment has, to see how the store was connected
-    settings: Object.keys(process.env).filter((k) => /BLOB|READ_WRITE|STORE/.test(k)).sort(),
     head: name ? await head(name).then((b) => `found (${b.size} bytes)`, (e) => `failed: ${e instanceof Error ? e.message : e}`) : null,
     get: name ? await get(name, { access: "private" }).then((r) => (r ? "found" : "null"), (e) => `failed: ${e instanceof Error ? e.message : e}`) : null };
   return Response.json({
