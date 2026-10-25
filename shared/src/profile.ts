@@ -141,6 +141,16 @@ export const ProfileSchema = z.object({
     /** the layout engine: "v2" (designs solved exactly, layout/engine.ts) or "v1" (packed, then gaps closed) */
     layoutEngine: z.enum(["v1", "v2"]).default("v2"),
   }),
+  /** the paper's website (site/, docs/website/ROADMAP.md): its address, the free
+   * models its hourly run tags and translates with (tried in order), and the
+   * free plans' daily ceilings it keeps under */
+  website: z.object({
+    url: z.string().url().default("https://capital-kranti.vercel.app"),
+    freeModels: z.array(z.string().min(1)).min(1).default(["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free"]),
+    dailyFreeRequests: z.number().int().positive().default(900),
+    dailyUploads: z.number().int().positive().default(50),
+  }).default({ url: "https://capital-kranti.vercel.app", freeModels: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free"],
+               dailyFreeRequests: 900, dailyUploads: 50 }),
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;
