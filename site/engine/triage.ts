@@ -28,6 +28,10 @@ You get a numbered list of new items from news sources (Gujarati, Hindi or Engli
   7-8 important (state or national policy, big economy or science news, major sport results involving India);
   5-6 worth a story; 3-4 worth a short brief; 0-2 not for us (local trivia from far away, celebrity gossip, opinion, ads, live blogs, quizzes, horoscopes).
   News about Gujarat counts more; world news only when it matters to India or is globally major.
+  Routine government publicity is NOT news and scores 0-3 however official: awareness campaigns ("Special Campaign", Swachhata drives),
+  meetings, reviews, courtesy calls, visits without a decision, greetings and condolence messages, book fairs, exhibitions, workshops,
+  webinars, newsletters, "to visit"/"to inaugurate" announcements of minor events. A decision, a new scheme, money, a result, or a number
+  that affects people is news.
 - tier: "gujarat" (about Gujarat), "india" (national), or "world" (other countries, or India abroad).
 - genres: up to 2 of "farm","economy","tech","health","sport","education","entertainment"; [] if none fit.
 - sensitive: true for deaths, accidents, crime, violence, communal matters, sexual offences, allegations against named people, health scares; else false.

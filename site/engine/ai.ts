@@ -106,7 +106,8 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
       // the day's free allowance is the account's: a 429 that says so stops the run's AI
       if (res.status === 429 && /per-day|free-models-per-day/i.test(why)) return { ok: false, why, stop: true };
       // busy, gone, or too slow: set aside for a while, ask the next
-      if ([404, 408, 429, 502, 503, 504].includes(res.status)) resting.set(model, Date.now() + REST_MS);
+      // ("rate-limited upstream" asks to retry shortly: a minute; anything else longer)
+      if ([404, 408, 429, 502, 503, 504].includes(res.status)) resting.set(model, Date.now() + (res.status === 429 ? 60_000 : REST_MS));
       continue;
     }
     const answer = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
