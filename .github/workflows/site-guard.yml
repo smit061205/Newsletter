@@ -28,6 +28,8 @@ jobs:
           PR_BASE: ${{ github.event.pull_request.base.ref }}
           BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
+          # the filters below end "false" on a file of the other kind; that isn't a failure
+          set +e
           kind() {
             case "$1" in
               site/*|docs/website/*|.github/workflows/site*.yml|.github/workflows/site*.yaml) echo site ;;
