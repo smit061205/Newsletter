@@ -68,7 +68,9 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
           <div className="body">{paragraphs(w.body).map((p, i) => <p key={i}>{p}</p>)}</div>
           <div className="srcbox">
             <h2>{t(lang, "srcTitle")}</h2>
-            {s.source ? <a href={s.source.url} target="_blank" rel="noopener">{s.source.name}{s.source.office ? `, ${s.source.office}` : ""}</a>
+            {s.sources.length > 1 ? (
+              <ul className="srcs">{s.sources.map((x) => <li key={x.url}><a href={x.url} target="_blank" rel="noopener">{x.name}</a></li>)}</ul>
+            ) : s.source ? <a href={s.source.url} target="_blank" rel="noopener">{s.source.name}{s.source.office ? `, ${s.source.office}` : ""}</a>
                       : <span>{t(lang, "desk")}</span>}
             {s.checked && <p className="how">{t(lang, "how")}</p>}
             <a className="report" href={mail}><Flag />{t(lang, "report")}</a>

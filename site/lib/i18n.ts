@@ -6,7 +6,7 @@ const WORDS = {
   gu: {
     skip: "મુખ્ય સમાચાર પર જાઓ", menu: "મેનુ", sections: "વિભાગો", search: "શોધો", close: "બંધ કરો", epaper: "ઈ-પેપર",
     home: "હોમ", latest: "તાજા", latestTitle: "તાજા સમાચાર", allLatest: "બધા તાજા સમાચાર", archive: "જૂના અંકો",
-    updated: "દરરોજ સાંજે નવા સમાચાર", more: "વધુ", none: "આ વિભાગમાં હજી સમાચાર નથી.", back: "હોમ પર જાઓ",
+    updated: "દિવસભર નવા સમાચાર", more: "વધુ", none: "આ વિભાગમાં હજી સમાચાર નથી.", back: "હોમ પર જાઓ",
     searchPlaceholder: "સમાચાર શોધો", found: "સમાચાર મળ્યા", notFound: "કોઈ સમાચાર ન મળ્યા. બીજો શબ્દ અજમાવો.", searchTitle: "શોધ",
     settings: "સેટિંગ્સ", theme: "દેખાવ", themeAuto: "ફોન પ્રમાણે", light: "લાઇટ", dark: "ડાર્ક", size: "અક્ષરનું કદ", language: "ભાષા",
     services: "અમારી સેવાઓ", about: "અમારા વિશે",
@@ -26,7 +26,7 @@ const WORDS = {
   en: {
     skip: "Skip to the news", menu: "Menu", sections: "Sections", search: "Search", close: "Close", epaper: "E-paper",
     home: "Home", latest: "Latest", latestTitle: "Latest news", allLatest: "All the latest", archive: "Past issues",
-    updated: "New stories every evening", more: "More", none: "No stories in this section yet.", back: "Go to the home page",
+    updated: "News all day", more: "More", none: "No stories in this section yet.", back: "Go to the home page",
     searchPlaceholder: "Search the news", found: "stories found", notFound: "No stories found. Try another word.", searchTitle: "Search",
     settings: "Settings", theme: "Appearance", themeAuto: "Match phone", light: "Light", dark: "Dark", size: "Text size", language: "Language",
     services: "Our services", about: "About us",

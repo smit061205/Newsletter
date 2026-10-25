@@ -32,7 +32,11 @@ export default async function Home({ lang }: { lang: Lang }) {
   const [stories, issue] = await Promise.all([latestStories(200), latestIssue()]);
   const day = stories[0]?.issueDate;
   const today = stories.filter((s) => s.issueDate === day);
-  const lead = today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
+  // the lead: the engine's most important story of the last 12 hours when it's
+  // headline-sized (ROADMAP §0.1), else the printed paper's front page
+  const recentLive = stories.filter((s) => s.origin === "live" && Date.now() - Date.parse(s.publishedAt) < 12 * 3600_000 && (s.importance ?? 0) >= 7.5)
+    .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
+  const lead = recentLive[0] ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
   const six = today.filter((s) => s !== lead).slice(0, 6);
   const byTime = [...stories].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || (a.page ?? 9) - (b.page ?? 9) || (a.rank ?? 99) - (b.rank ?? 99));
   const shown = new Set([lead, ...six].filter(Boolean).map((s) => s!.id));

@@ -9,6 +9,8 @@ export interface Photo { url: string; width: number; height: number }
 export interface Source { kind: "pib" | "cmo" | "air" | "gujinfo" | "other"; name: string; url: string; office?: string }
 export interface English { kicker: string; headline: string; deck: string; body: string; caption: string }
 export interface Correction { at: string; gu: string; en?: string }
+/** Every source a live story was written and checked from (the engine's, site/engine). */
+export interface StorySource { name: string; url: string; trust?: "official" | "outlet" | "factcheck" }
 
 export interface Story {
   id: string;
@@ -29,6 +31,11 @@ export interface Story {
   rank: number | null;
   en: English | null;
   corrections: Correction[];
+  /** 'paper': from the evening paper; 'live': written by the engine through the day */
+  origin: "paper" | "live";
+  sources: StorySource[];
+  /** the engine's measure of how much it matters (live stories) */
+  importance: number | null;
 }
 
 export interface IssuePage { number: number; url: string; width: number; height: number }

@@ -217,6 +217,8 @@ a.h:hover .display,a.h:hover .h3,a.h:hover .h4{color:var(--soft)}
 .srcbox{border-top:2px solid var(--rule-strong);padding-top:14px;margin-top:28px;font-size:15px;line-height:1.6;color:var(--soft)}
 .srcbox h2{font-size:16px;font-weight:700;color:var(--strong);margin:0 0 6px}
 .srcbox a{color:var(--live);text-decoration:underline}
+.srcbox .srcs{margin:0;padding-left:18px}
+.srcbox .srcs li{margin:2px 0}
 .srcbox .how{margin:10px 0 0}
 .report{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-weight:700;color:var(--strong);min-height:44px}
 .report:hover{text-decoration:underline}
