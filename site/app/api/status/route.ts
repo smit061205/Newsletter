@@ -14,8 +14,14 @@ export async function GET() {
     sql.query(`select en_status, tag_status, count(*)::int as n from stories group by 1, 2`).catch(() => []),
     sql.query(`select (select count(*) from stories)::int as stories, (select count(*) from issues)::int as issues`).catch(() => [{}]),
   ]);
+  // can the site read its private photo store? (a yes/no and the library's message, never the key)
+  const [one] = await sql.query(`select photo->>'url' as url from stories where photo is not null limit 1`).catch(() => []);
+  const name = (one?.url as string | undefined)?.replace(/^\/media\//, "");
+  const photos = { key: !!process.env.BLOB_READ_WRITE_TOKEN, name: name ?? null,
+    head: name ? await head(name).then((b) => `found (${b.size} bytes)`, (e) => `failed: ${e instanceof Error ? e.message : e}`) : null,
+    get: name ? await get(name, { access: "private" }).then((r) => (r ? "found" : "null"), (e) => `failed: ${e instanceof Error ? e.message : e}`) : null };
   return Response.json({
-    ...counts[0],
+    ...counts[0], photos,
     stories_by_state: waiting,
     usage,
     runs: runs.map((r) => ({
