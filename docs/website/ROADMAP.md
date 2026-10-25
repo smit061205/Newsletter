@@ -1,6 +1,8 @@
 # Capital Kranti website and social media: the roadmap
 
-Written 24 Oct 2026. Status: **planned and agreed in outline; nothing built yet.**
+Written 24 Oct 2026; the engine's purpose, the genuineness check and free AI
+only added 25 Oct (§0.1, §3). Status: **phase A built and live** (HANDOFF §8);
+phases B-D planned.
 This replaces the earlier `ECOSYSTEM_PLAN.md` (on the unmerged `reserve` branch).
 The look is in [DESIGN.md](DESIGN.md), and its sample in [sample/](sample/).
 
@@ -40,6 +42,68 @@ engine makes the day's pages from the day's published stories.
   - the Facebook Page and X exist;
   - Instagram is to be made a Business account, linked to the Page.
 - **Code:** a new **`site/`** folder in this repository (section 1).
+
+### 0.1 The engine's purpose, in the user's words (25 Oct)
+
+The website's engine (built in `site/`, never in the app; CLAUDE.md) does this
+by itself, all day:
+
+1. **Listens** to hundreds of trusted news and official websites; when one
+   releases news, it is picked up within minutes (§2, §3 step 1).
+2. **Checks it is genuine** before anything else (§3.1, the verification loop).
+3. **Ranks it:** a big story becomes the headline; the rest are placed by their
+   tier of importance (§3 step 4).
+4. **Writes and translates** with **free OpenRouter models only** (below):
+   - every story in **Gujarati**;
+   - a **national** story also in **English and Hindi**.
+5. **Posts** to X, Instagram, Facebook and YouTube with a good picture:
+   - the story's own (official) photo when there is one;
+   - otherwise a **generated illustration**, labelled as one (§2).
+6. **Makes a short** for the platforms that take them when the story has video,
+   or makes one from photos and cards for really important news (§5.2).
+7. **Birthdays:** when a minister or leader has a birthday, makes an edited
+   greeting image and writes a **draft** email. It **never sends** it; a person
+   does (§3.3).
+
+**Decided 25 Oct: free AI only.** Every AI step uses OpenRouter's **free**
+models (`:free`), so the AI costs ₹0:
+- the account's allowance is 1,000 free requests a day, 20 a minute; the
+  engine keeps under it (900 a day, as `site/lib/config.ts` does now);
+- the models are tried in order (`WEBSITE.freeModels`), so one going away
+  doesn't stop the engine;
+- when the day's allowance is used up, the rest wait for the next day,
+  **most important first**;
+- no Anthropic models (CLAUDE.md).
+
+This replaces the ₹25 a day paid ceiling (§6.0 item 9). Free models are
+weaker, so the checks in §3.1 carry more weight, not less.
+
+### 0.2 Additions agreed 25 Oct
+
+- **The editor's approval queue,** with a **stop-everything switch**:
+  headline-level stories and every social post wait for one tap at first;
+  small stories go out on their own once the user trusts it.
+- **One story per event:** reports of the same event from many sites are
+  grouped, and how many trusted sources agree counts towards its importance.
+- **Sources and corrections:** every post names its sources; a correction
+  goes everywhere the story went.
+- **More channels:**
+  - WhatsApp Channel and Telegram for breaking news;
+  - web push alerts;
+  - a morning brief and an evening digest.
+- **An events calendar beyond birthdays:**
+  - anniversaries and festivals;
+  - government deadlines (scheme last dates, exam results);
+  - Assembly and Parliament sessions.
+- **Learning from results:**
+  - what readers read and share tunes the ranking;
+  - sources that go quiet or get things wrong are flagged.
+- **A use meter:** free AI requests, uploads and the free plans' limits, per
+  day; the dashboard shows them, with any cost in ₹.
+- **A leaders list:** name, post, birthday, official portrait (rights-cleared)
+  and official email, kept by the editor.
+- **The printed paper later** (phase D) can take the day's ranked stories,
+  read by the app, without the website changing the app.
 
 ### The paper's rules still apply
 
@@ -124,9 +188,8 @@ shows each limit's use, and an alert goes out at 80%.
 - But sign-up asks for a card (to verify, not to charge), new machines are sometimes unavailable, and idle ones can be reclaimed.
 - Keep it as plan B, not the start.
 
-**What still costs money:** the **AI** (writing, captions, the voice for
-shorts). Section 7 has the figures; a daily ceiling of ₹25 keeps the AI
-within what the user can spend, and English translations use a free model.
+**What costs money: nothing, by decision (25 Oct).** All AI is on free models
+(§0.1), and the shorts' voice is a free one (§5.2). Section 7 has the figures.
 X is not posted to automatically (it charges per post), so it costs nothing.
 
 ---
@@ -156,7 +219,7 @@ X is not posted to automatically (it charges per post), so it costs nothing.
   - a licence.
 
   Otherwise a designed card. Never an outlet's photo, and never an AI image passed off as a news photo.
-- **AI images and video** are labelled as AI-made (Meta and YouTube require it) and used only for features and illustrations.
+- **AI images and video** are labelled as AI-made (Meta and YouTube require it). A generated picture is an **illustration**, never made to look like a photo of a real event or a real person's act; it's used when a story has no official photo (§0.1). Made with a free model if OpenRouter offers one, otherwise the story gets a designed card.
 
 ---
 
@@ -168,11 +231,11 @@ X is not posted to automatically (it charges per post), so it costs nothing.
 
    New items go into a queue, with the raw text kept for fact checks.
 2. **Cluster:** items about the same event are grouped (headline and opening similarity plus named people and places, like today's `dedupe`). A new source **updates** the story; it never duplicates it.
-3. **Verify:** the trust rules give each cluster one of three states:
+3. **Verify** (the full loop is §3.1): the trust rules give each cluster one of three states:
    - **confirmed**;
    - **waiting for a second source** (re-checked as sources arrive, dropped after 6 hours);
    - **needs the editor** (sensitive topics).
-4. **Decide:** one cheap AI call per cluster scores how much it matters to Capital Kranti's readers. It sets the **tier**, the **genres**, and the **route**:
+4. **Decide:** one free AI call per cluster scores how much it matters to Capital Kranti's readers. It sets the **tier**, the **genres**, and the **route**:
    - ignore;
    - brief (60-120 words);
    - article;
@@ -186,10 +249,71 @@ X is not posted to automatically (it charges per post), so it costs nothing.
    - text through the one cleaning door (`normalizeText`);
    - no sentence said twice (`quality.ts`).
 
-   A cheap model writes most stories; a stronger one writes the top and breaking ones (OpenRouter, never Anthropic).
+   **Free models write every story** (§0.1, decided 25 Oct); the strongest free model available writes the top and breaking ones (OpenRouter, never Anthropic).
 6. **Publish:** the page is live in seconds; the sitemap, the Google News sitemap and the RSS feeds update. A correction is an edit with a visible "updated" note, never a silent change.
 7. **Social desk:** section 5 takes the published story and makes what its route asks for.
 8. **The evening paper:** section 6, phase D.
+
+### 3.1 Is it genuine? The verification loop (decided 25 Oct)
+
+Every cluster goes round this loop before it is written, and again whenever a
+new source arrives, until it is **confirmed**, **held** or **dropped**. All of it
+runs on free models and plain code (₹0).
+
+1. **Who said it.** Each source has a trust level in the source list (official,
+   established outlet, other). Unknown sites are never used.
+2. **Is it really from them.** The item came from the source's own address or
+   official feed, not a copy. A link the source doesn't host is ignored.
+3. **Is it new.** The date is checked against the source's own date and the
+   archive: old news going round again is caught and dropped.
+4. **Do others agree.**
+   - Official sources stand alone.
+   - Outlets need **two or more independent** ones agreeing on the core facts.
+5. **The claims, one by one.** A free model lists the story's checkable claims
+   (who, what, where, when, how many). Each claim must appear in at least one
+   trusted source's own text; numbers go through `numbersNotIn` as well.
+   A claim no source supports is removed, or the story is held.
+6. **Not already debunked.** Fact-check feeds (PIB Fact Check, and fact-checkers
+   certified by the IFCN that publish RSS) are watched too. A story matching a
+   debunked claim is **blocked**, and the editor is told.
+7. **A second opinion.** A **different** free model from the one that wrote the
+   story reads the story and its sources and answers only: "is everything here
+   supported?" Any "no" holds the story for the editor.
+8. **Pictures.** Only official or our own photos are used (§2). Each picture
+   is checked to be the source's own, not an older one reused. A generated
+   illustration is always labelled.
+9. **After publishing.** The loop keeps watching the story's sources for 24
+   hours. If a source corrects or withdraws it, the story is corrected or taken
+   down at once, and so is every social post (§0.2, corrections).
+
+**Results:** confirmed → publish (sensitive topics still go to the editor);
+waiting → re-checked as sources arrive, dropped after 6 hours; held → the
+editor's queue, with the reason; blocked → never published. The dashboard
+shows each story's checks, and the article's "How we check" box says which
+sources confirmed it.
+
+### 3.2 Languages
+
+- **Gujarati:** every story, written from the sources.
+- **English and Hindi:** also for every **national** story (tier India or
+  World), translated from the Gujarati.
+- Every translation goes through the same number check, and a free model's
+  failed translation leaves the story in Gujarati until the next try. That's
+  how the hourly run's English works today.
+- Hindi is added to the site as a third language (`/hi`), with the same
+  labels.
+
+### 3.3 Birthdays and the events calendar
+
+- **The leaders list** (§0.2) gives each day's birthdays.
+- At 6 AM the engine makes, for each one:
+  - a greeting image from the leader's official portrait in the paper's design;
+  - a **draft** email in Gujarati to their official address.
+- Both go to the editor's queue. **The engine never sends an email;** the editor
+  sends it from their own mailbox. Saved drafts only, no sending permission
+  asked for.
+- The same calendar prepares posts for anniversaries, festivals and government
+  deadlines.
 
 ---
 
@@ -230,7 +354,7 @@ Every page follows DESIGN.md.
   - the AI keys and social account links, entered there and stored on the server, never in the repository;
   - the ₹ rate;
   - posting schedules;
-  - the daily AI ceiling (₹25 to start).
+  - the free AI allowance's daily use (900 requests).
 - **The dashboard:** stories, reach, clicks, and **every cost in ₹**, per day, tier, genre and platform.
 
 ---
@@ -266,7 +390,7 @@ Formats, made from a story by its route:
 ### 5.2 Shorts (video)
 
 1. **Script:** 60-90 words per story (numbers checked), for 4-5 stories.
-2. **Voice:** a Gujarati text-to-speech voice. Compare Google Cloud and Azure Gujarati voices on quality and ₹ before choosing.
+2. **Voice:** a **free** Gujarati text-to-speech voice (25 Oct: free only). Try open voices that run on GitHub's servers (for example AI4Bharat's Indic voices) and let the user pick; a paid voice only if the user later asks. A video found with the story is used only if it's official or licensed; **no fully AI-generated news video.**
 3. **Pictures:** official photos with gentle motion (pan and zoom), animated headlines, and the paper's lower-third.
 4. **Captions** burned in (most watch muted), and **royalty-free music**, quiet.
 5. **Made on the server** with `ffmpeg`, from frames rendered by Chromium.
@@ -345,7 +469,7 @@ and entered by the user; never in chat or the repository.
 | 6 | Keys as Actions secrets | **To do (user):** in Vercel, the new project from this repository with its root directory `site/`, and its Storage tab's Neon database and Blob store connected to it; then two repository secrets copied from the project's environment variables: `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN`. Checked by name (never value) when phase A starts. (No Cloudflare account yet.) | A |
 | 7 | A new OpenRouter key | **To do (user):** a new key in every app's Settings and as the secret `OPENROUTER_API_KEY`; then the old key deleted. | A |
 | 8 | The editor's sign-in | **Both the father and the user, with their Google accounts.** On Vercel this is the site's own Google sign-in (Auth.js, free): **to do (user) in phase B**, a Google sign-in client made in Google Cloud (guided), and the two allowed addresses entered in Vercel's settings, never in the repository. On Cloudflare later, Cloudflare Access may replace it. | B |
-| 9 | A daily AI ceiling | **₹25 a day** (at most ~₹750 a month) for all paid AI of the live news; translations on the free model don't count. At the ceiling, new stories wait for the next day; breaking news is still written. Changeable in Settings. | B |
+| 9 | A daily AI ceiling | **Replaced 25 Oct: free models only, ₹0** (§0.1). The ceiling is the free allowance: 900 requests a day; past it, the rest wait for the next day, most important first. (Was ₹25 a day for paid AI.) | B |
 | 10 | Slow outside steps | **To do (user), soon:** Instagram switched to a Business account linked to the Page; the user an admin of the Facebook Page; signing in to X works. Meta's app review starts once phase A is live (it asks for a live site and privacy policy). | C |
 | 11 | X | **No automatic posting** (X charges programs per post since Feb 2026: about ₹1.3 a plain post, ₹17.6 with a link). The desk prepares a ready post and card for X each day; the user posts by hand. | C |
 | 12 | Writing to PIB | **Not now;** revisit only if PIB blocks the live news. | — |
@@ -355,7 +479,7 @@ and entered by the user; never in chat or the repository.
 1. **First, the test that shapes phase B:** does PIB answer GitHub's servers (section 1.1)? Also how late scheduled runs start.
 2. **Groundwork:** the `site/` folder, its own CI (`site.yml`, run only for `site/**`); the Vercel project, Neon and Blob (section 1.1); a scheduled run that writes to the database; today's `web` project set to skip builds for `site/` changes, and the new one to build only for them.
 3. **The site:** DESIGN.md as components; home, article, section (tiers × genres), latest, search, the e-paper and the archive; the trust pieces on every story; About, editorial policy, how we check news, corrections, contact, terms, privacy.
-4. **Publish from the newsroom** sends the day's stories to the site's API instead of a git push (this also removes the GitHub sign-in problem in HANDOFF §7). Each story gets its tier and genres at publish (one cheap AI call).
+4. ~~Publish from the newsroom sends the day's stories to the site~~ **Dropped 25 Oct:** the app isn't changed for the website (CLAUDE.md). The site loaded 20-22 Oct once (`site-seed.yml`) and collects news itself from phase B; the hourly run gives each story its tier, genres and English with a free model.
 5. **Found by Google:** NewsArticle markup, the sitemaps and news sitemap, RSS per section, share previews.
 6. **Issues 269-271** moved in, if wanted; the old public site redirects to the new one.
 - **Review:** the live site at phone and desktop widths in both themes; a real evening's Publish from the app; the automatic checks green; the desktop app's release unaffected. Released with the newsroom change.
@@ -363,11 +487,13 @@ and entered by the user; never in chat or the repository.
 ### Phase B: live news (stages 2 and 3)
 
 1. **One pipeline with sources that plug in:** watchers → cluster → verify → decide → write → publish (section 3).
-2. **Sources:** PIB's lists every few minutes (or, if PIB refuses GitHub, sent in by the desktop app's hourly collection), the Gujarat CM's office, All India Radio Gujarati, ministries; then other outlets' RSS.
-3. **Rules:** the two-source rule, the originality check against every source, credits and the source box, sensitive and unconfirmed stories held for the editor.
-4. **The editor's side on the phone:** the approval queue, the live desk, Settings (keys, ₹ rate, the daily ceiling), the cost dashboard in ₹.
+2. **Sources:** PIB's lists every few minutes (PIB answers GitHub's servers: tested 25 Oct), the Gujarat CM's office, All India Radio Gujarati, ministries; then other outlets' RSS.
+3. **Rules:** the verification loop (§3.1), the two-source rule, the originality check against every source, credits and the source box, sensitive and unconfirmed stories held for the editor.
+4. **The editor's side on the phone:** the approval queue, the live desk, Settings (keys, ₹ rate, the stop switch), the use dashboard (free AI requests, uploads; any cost in ₹).
 5. The "from other outlets" carousel, the full tiers × genres pages, breaking alerts.
-- **Review:** a day of real running under the daily ceiling: every story number-checked, none matching a source's wording, all credited, world stories kept as briefs, the costs in ₹. Stories go live on their own only after this.
+6. **Languages** (§3.2): Hindi added (`/hi`) for national stories.
+7. **The leaders list and the birthday drafts** (§3.3).
+- **Review:** a day of real running within the free allowance: every story through the verification loop, every story number-checked, none matching a source's wording, all credited, world stories kept as briefs, ₹0 spent. Stories go live on their own only after this.
 
 ### Phase C: social media (stages 4, 5 and 6)
 
@@ -378,6 +504,8 @@ and entered by the user; never in chat or the repository.
 - **Review:** a week of posts on Telegram before the others go on, then each platform's first posts; the cost of each short in ₹; the voice approved.
 
 ### Phase D: the printed paper from the website (stage 7)
+
+**On hold (25 Oct):** this needs the app to read the website's stories, i.e. a change to the app. Only with the user's explicit go-ahead (CLAUDE.md).
 
 Kept on its own: it changes how the printed paper is made.
 - At 8 PM the layout engine takes the day's published stories (Gujarat first) instead of fetching them itself; the desktop app and the website agree on the day's stories; the app still lays out and prints.
@@ -403,13 +531,13 @@ These are in ₹ at the Settings rate, rough, to be measured in phase B.
 |---|---|---|
 | Hosting, database, storage, scheduled runs (Vercel, Neon and Blob free plans for now, section 1.1) | ₹0 | ₹0 |
 | Domain (`capitalkranti.co.in`, already the paper's) | — | the paper's existing renewal |
-| Writing the stories, and the decide, tag and caption calls (cheap models; world stories as briefs) | at most ₹25 (the ceiling) | at most ~₹750 |
+| Writing, checking, translating, tagging and captions (free models only, 25 Oct) | ₹0 | ₹0 |
 | English translations | ₹0 (free model) | ₹0 |
 | Cards | ~₹0 (own server) | ~₹0 |
-| Shorts: voice for 2-4 a day | ₹5-20 | ₹150-600 |
+| Shorts: a free voice | ₹0 | ₹0 |
 | X posting | ₹0 (by hand) | ₹0 |
 | Telegram, Facebook, Instagram, YouTube posting | ₹0 | ₹0 |
-| **To start (phases A-C, without shorts)** | | **at most about ₹750, all of it the AI, held by the ₹25 daily ceiling** |
+| **Total (phases A-C)** | | **₹0**: free plans and free models; the limit is the free allowance (900 AI requests a day), not money |
 
 The dashboard shows the real figures in ₹ per day, tier, genre and platform,
 with the daily ceiling the editor can change.
@@ -433,7 +561,7 @@ with the daily ceiling the editor can change.
 - **An account link expiring:** the dashboard says so at once, with "link again".
 - **Cost creep:**
   - the ₹ dashboard;
-  - cheap models for briefs;
+  - free models only, with the day's allowance spent on the most important stories first;
   - each event written once;
   - a daily ceiling.
 - **Free plans changing or running out:** the limits are written down (section 1.1) and watched on the dashboard; the code avoids depending on one host, so the site can move. The printed paper still works from the desktop app whatever happens.
