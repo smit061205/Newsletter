@@ -1,6 +1,7 @@
 // The website's database (Neon Postgres for now; docs/website/ROADMAP.md §1.1).
 // One idempotent setup, run by the hourly run and before a publish writes:
 // adding a column later is another `alter table ... add column if not exists`.
+import { createHash } from "node:crypto";
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 
 export const SCHEMA = [
@@ -120,6 +121,18 @@ export const SCHEMA = [
    )`,
 ];
 
+// the schema's version, kept in the database: a reader checks it with one
+// query and sets the schema up only when it's behind (25 Oct: a deploy read the
+// engine's new columns before any run had added them, and its build failed)
+const VERSION = createHash("sha256").update(SCHEMA.join("\n")).digest("hex").slice(0, 16);
+
 export async function ensureSchema(sql: NeonQueryFunction<false, false>) {
   for (const statement of SCHEMA) await sql.query(statement);
+  await sql.query(`insert into state (key, value) values ('schema_version', $1) on conflict (key) do update set value = excluded.value`, [VERSION]);
+}
+
+/** Sets the schema up only if the database is behind this code (one query when it isn't). */
+export async function schemaReady(sql: NeonQueryFunction<false, false>) {
+  const rows = await sql.query(`select value from state where key = 'schema_version'`).catch(() => []);
+  if (rows[0]?.value !== VERSION) await ensureSchema(sql);
 }

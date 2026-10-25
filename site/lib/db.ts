@@ -4,13 +4,26 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import type { Correction, English, Genre, Issue, IssuePage, Photo, Source, Story, StorySource, Tier } from "./types.ts";
 import { sample, sampleOn } from "./sample.ts";
+import { schemaReady } from "./schema.ts";
 
 let client: NeonQueryFunction<false, false> | null = null;
-/** The database, or null where there is none (the site's own CI build). */
+let ready: Promise<void> | null = null;
+/** The database, or null where there is none (the site's own CI build). Its
+ * first query in a process waits for the schema to be current (lib/schema.ts),
+ * so a deploy never reads a column no run has added yet. */
 export function db(): NeonQueryFunction<false, false> | null {
   const url = process.env.DATABASE_URL;
   if (!url) return null;
-  client ??= neon(url);
+  if (!client) {
+    const raw = neon(url);
+    const query = raw.query.bind(raw);
+    raw.query = (async (...args: Parameters<typeof query>) => {
+      ready ??= schemaReady({ query } as unknown as NeonQueryFunction<false, false>).catch((e) => { ready = null; throw e; });
+      await ready;
+      return query(...args);
+    }) as typeof raw.query;
+    client = raw;
+  }
   return client;
 }
 

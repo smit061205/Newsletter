@@ -145,7 +145,7 @@ export function copiedShare(story: string, source: string): number {
 }
 
 export interface Claim { claim: string; supported: boolean; where: string }
-export interface Checked { ok: boolean; problems: string[]; claims: Claim[]; model?: string }
+export interface Checked { ok: boolean; problems: string[]; claims: Claim[]; model?: string; busy?: boolean }
 
 const CHECKER = `You are the fact-checking desk of Capital Kranti, a Gujarati newspaper.
 You get a Gujarati news story and the sources it was written from. List every checkable claim in the story
@@ -171,7 +171,7 @@ export async function check(sql: Sql | null, w: Written, src: SourceText[], date
       if (!Array.isArray(x?.claims) || !x.claims.length) return null;
       return x.claims.map((c) => ({ claim: String(c.claim ?? ""), supported: c.supported === true, where: String(c.where ?? "") }));
     });
-  if (!res.ok) return { ok: false, problems: [...problems, `the second check didn't answer (${res.why})`], claims: [] };
+  if (!res.ok) return { ok: false, problems: [...problems, `the second check didn't answer (${res.why})`], claims: [], busy: res.busy || /busy/.test(res.why) };
   const unsupported = res.value.filter((c) => !c.supported);
   for (const c of unsupported) problems.push(`not in the sources: ${c.claim}`);
   return { ok: problems.length === 0, problems, claims: res.value, model: res.model };
@@ -184,9 +184,11 @@ export async function writeChecked(sql: Sql | null, src: SourceText[], level: Le
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await askJson(sql, { system: WRITER(level), user: `EVENT: ${event}\n\n${sourcesBlock(src)}${note}`, role: "writer", temperature: 0.3, maxTokens: 3500 },
       (v) => checkWritten(v));
-    if (!res.ok) return { ok: false as const, why: res.why, stop: res.stop };
+    if (!res.ok) return { ok: false as const, why: res.why, stop: res.stop, retry: res.busy };
     const w = { ...res.value, model: res.model };
     const c = await check(sql, w, src, date);
+    // the checker couldn't run (every Gemma busy): the event waits for the next run, not the editor
+    if (c.busy) return { ok: false as const, why: c.problems.join("; "), retry: true };
     last = { w, c };
     if (c.ok) return { ok: true as const, written: w, checked: c };
     note = `\n\nYOUR LAST VERSION HAD THESE PROBLEMS -- fix every one, using only what the sources say:\n- ${c.problems.join("\n- ")}`;

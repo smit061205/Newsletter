@@ -63,11 +63,11 @@ for (const r of ranked.filter((r) => r.gt.state === "confirmed")) {
   const src = await gather(r.g);
   console.log(`\n${"=".repeat(80)}\n${level.toUpperCase()} (${r.imp}) ${r.g[0].triage.event}\nsources: ${src.map((s) => s.source.name).join(", ")}`);
   const res = await writeChecked(null, src, level, today, r.g[0].triage.event);
-  if (!res.ok && !res.written) { console.log(`not written: ${res.why}`); continue; }
-  const w = res.written!;
-  console.log(`\n[${w.kicker}]\n# ${w.headline}\n## ${w.deck}\n\n${w.body}\n\nwriter: ${w.model}; checker: ${res.checked!.model ?? "-"}`);
-  console.log(`checks: ${res.checked!.ok ? "all passed" : res.checked!.problems.join("; ")}`);
-  console.log(`claims: ${res.checked!.claims.map((c) => `${c.supported ? "✓" : "✗"} ${c.claim}`).join("\n        ")}`);
+  if (!res.ok && !("written" in res && res.written)) { console.log(`not written: ${res.why}`); continue; }
+  const w = res.written;
+  console.log(`\n[${w.kicker}]\n# ${w.headline}\n## ${w.deck}\n\n${w.body}\n\nwriter: ${w.model}; checker: ${res.checked.model ?? "-"}`);
+  console.log(`checks: ${res.checked.ok ? "all passed" : res.checked.problems.join("; ")}`);
+  console.log(`claims: ${res.checked.claims.map((c) => `${c.supported ? "✓" : "✗"} ${c.claim}`).join("\n        ")}`);
   if (r.g[0].triage.sensitive) console.log("→ would be HELD for the editor (sensitive)");
   if (needsTranslation(r.g[0].triage.tier)) {
     const en = await translate(null, w, "en", today);

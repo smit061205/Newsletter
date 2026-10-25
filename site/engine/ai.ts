@@ -1,7 +1,7 @@
-// The engine's AI: OpenRouter's free models only (decided 25 Oct: ₹0; never
-// Anthropic, CLAUDE.md). Which free models exist changes, so each run asks
-// OpenRouter's model list and keeps the ones the site's settings name first
-// (site/lib/config.ts), then any other free model with a long enough context.
+// The engine's AI: OpenRouter's free Gemma models only (decided 25 Oct: free,
+// ₹0, and Gemma; never Anthropic, CLAUDE.md). Which free Gemmas exist changes,
+// so each run asks OpenRouter's model list and keeps the ones the site's
+// settings name first (site/lib/config.ts), then any other free Gemma.
 // Every request is counted against the day's free allowance (shared with the
 // hourly run's translations); past it, nothing more is asked until tomorrow.
 import type { NeonQueryFunction } from "@neondatabase/serverless";
@@ -21,7 +21,7 @@ export const aiUsed = () => usedThisRun;
  * rate-limited upstream", 25 Oct: both Gemma models for half an hour) is set
  * aside for the rest of the run, not retried, and the next one is asked. */
 const resting = new Map<string, number>();
-const REST_MS = 10 * 60_000;
+const REST_MS = 3 * 60_000;
 export const restingModels = () => [...resting.keys()];
 
 /** One request, once: no retrying here (the caller moves to the next model). */
@@ -47,12 +47,14 @@ export async function freeModels(): Promise<string[]> {
     const all = ((await res.json()) as { data: { id: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }[] }).data;
     const free = all.filter((m) => m.id.endsWith(":free") && Number(m.pricing?.prompt ?? 1) === 0 && Number(m.pricing?.completion ?? 1) === 0);
     const ids = new Set(free.map((m) => m.id));
-    const others = free.filter((m) => !named.includes(m.id) && (m.context_length ?? 0) >= 16_000 && !/anthropic|claude|vision|embed|guard/i.test(m.id))
+    // Gemma only (the user's choice, 25 Oct)
+    const others = free.filter((m) => !named.includes(m.id) && /gemma/i.test(m.id) && (m.context_length ?? 0) >= 16_000)
       .sort((a, b) => (b.context_length ?? 0) - (a.context_length ?? 0)).map((m) => m.id);
     models = [...named.filter((id) => ids.has(id)), ...others].slice(0, 10);
   } catch {
     models = named;
   }
+  models = models.filter((m) => /gemma/i.test(m));
   if (!models.length) models = named;
   return models;
 }
@@ -68,7 +70,7 @@ export interface Ask {
   temperature?: number;
   maxTokens?: number;
 }
-export type AiResult<T> = { ok: true; value: T; model: string } | { ok: false; why: string; stop?: boolean };
+export type AiResult<T> = { ok: true; value: T; model: string } | { ok: false; why: string; stop?: boolean; busy?: boolean };
 
 /** One JSON answer from the free models, tried in order until one gives valid JSON that `check` accepts. */
 export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) => T | null): Promise<AiResult<T>> {
@@ -77,9 +79,14 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
   const order = a.role === "checker" && list.length > 1 ? [...list.slice(1), list[0]] : list;
   const whys: string[] = [];
   let why = "no free model answered";
+  // every Gemma busy: wait for the first to rest (up to 90 s), else give up for this run
+  const soonest = Math.min(...order.map((m) => resting.get(m) ?? 0));
+  if (soonest > Date.now() && soonest - Date.now() <= 90_000 && order.every((m) => (resting.get(m) ?? 0) > Date.now())) {
+    await new Promise((r) => setTimeout(r, soonest - Date.now()));
+  }
   const awake = order.filter((m) => (resting.get(m) ?? 0) < Date.now());
   const tryList = awake.filter((m) => m !== a.avoid).concat(a.avoid && awake.includes(a.avoid) && awake.length === 1 ? [a.avoid] : []);
-  if (!tryList.length) return { ok: false, why: "every free model is busy for now" };
+  if (!tryList.length) return { ok: false, why: "every free model is busy for now", busy: true };
   for (const model of tryList) {
     if (sql && (await count(sql, "ai_free", 0)) >= WEBSITE.dailyFreeRequests) return { ok: false, why: "the day's free AI requests are used up", stop: true };
     const wait = last + GAP_MS - Date.now();
@@ -115,7 +122,9 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
     why = `${model}: JSON without what was asked for`;
     whys.push(why);
   }
-  return { ok: false, why: whys.join(" | ") || why };
+  // nothing but busy or missing models: try again next run, it's not the story's fault
+  const busy = whys.length > 0 && whys.every((w) => /: (404|408|429|502|503|504) /.test(w));
+  return { ok: false, why: whys.join(" | ") || why, busy };
 }
 
 /** Requests left today. */

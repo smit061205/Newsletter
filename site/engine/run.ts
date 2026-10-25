@@ -84,13 +84,13 @@ async function write() {
     log(`  writing ${c.id} (${level}, ${imp}): ${c.event}`);
     const res = await writeChecked(sql, src, level, indiaDate(), c.event);
     written++;
-    if (!res.ok && !res.written) {
-      log(`    not written: ${res.why}`);
-      if (res.stop) break;
+    if (!res.ok && !("written" in res && res.written)) {
+      log(`    not written${"retry" in res && res.retry ? " (the free models are busy: next run)" : ""}: ${res.why}`);
+      if (res.stop || ("retry" in res && res.retry)) break;
       continue;
     }
-    const w = res.written!;
-    const checked = res.checked!;
+    const w = res.written;
+    const checked = res.checked;
     const id = `live-${c.id.slice(1)}`;
     // held for the editor: sensitive, or a check not passed (ROADMAP §0.1, decided 25 Oct)
     const holdReason = c.sensitive ? "સંવેદનશીલ સમાચાર" : !checked.ok ? `ચકાસણી: ${checked.problems.slice(0, 3).join("; ")}` : null;
