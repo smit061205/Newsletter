@@ -9,7 +9,7 @@ export async function GET() {
   const sql = db();
   if (!sql) return Response.json({ error: "no database" }, { status: 500 });
   const [runs, usage, waiting, counts] = await Promise.all([
-    sql.query(`select id, scheduled_for, started_at, finished_at, ok, details from runs order by id desc limit 24`).catch(() => []),
+    sql.query(`select id, kind, scheduled_for, started_at, finished_at, ok, details from runs order by id desc limit 24`).catch(() => []),
     sql.query(`select day::text, kind, n from usage where day > (now() at time zone 'Asia/Kolkata')::date - 7 order by day desc, kind`).catch(() => []),
     sql.query(`select en_status, tag_status, count(*)::int as n from stories group by 1, 2`).catch(() => []),
     sql.query(`select (select count(*) from stories)::int as stories, (select count(*) from issues)::int as issues`).catch(() => [{}]),
@@ -19,10 +19,10 @@ export async function GET() {
     stories_by_state: waiting,
     usage,
     runs: runs.map((r) => ({
-      id: r.id, ok: r.ok, scheduled_for: r.scheduled_for, started_at: r.started_at, finished_at: r.finished_at,
+      id: r.id, kind: r.kind, ok: r.ok, scheduled_for: r.scheduled_for, started_at: r.started_at, finished_at: r.finished_at,
       late_minutes: r.scheduled_for ? Math.round((Date.parse(r.started_at) - Date.parse(r.scheduled_for)) / 60000) : null,
       sources: (r.details?.sources ?? []).map((s: { name: string; status: number; items?: number; ms: number }) => ({ name: s.name, status: s.status, items: s.items, ms: s.ms })),
-      stories: r.details?.stories ?? null, error: r.details?.error,
+      stories: r.details?.stories ?? null, done: r.details?.done, error: r.details?.error,
     })),
   }, { headers: { "cache-control": "no-store" } });
 }

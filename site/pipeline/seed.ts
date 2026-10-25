@@ -30,18 +30,26 @@ const upload = async (name: string, data: Buffer | Uint8Array, contentType: stri
 type Seed = Omit<PublishPayload, "stories"> & { stories: (Omit<PublishPayload["stories"][number], "photo"> & { photo: null | { data: string; path: string; width: number; height: number } })[] };
 
 await ensureSchema(sql);
+// the run is recorded (kind "seed"), its error included, so /api/status shows what happened
+const [run] = await sql.query(`insert into runs (kind) values ('seed') returning id`);
+const done: string[] = [];
+let step = "starting";
+try {
 for (const file of readdirSync(path.join(HERE, "seed")).filter((f) => f.endsWith(".json")).sort()) {
   const seed = JSON.parse(readFileSync(path.join(HERE, "seed", file), "utf8")) as Seed;
   const date = seed.issue.date;
+  step = `${date}: checking`;
   const [have] = await sql.query(`select jsonb_array_length(pages) as pages from issues where date = $1`, [date]);
   if (have?.pages > 0) { console.log(`${date}: already on the website`); continue; }
 
+  step = `${date}: uploading photos`;
   const stories: PublishPayload["stories"] = [];
   for (const s of seed.stories) {
     const photo = s.photo ? { url: await upload(s.photo.path, Buffer.from(s.photo.data, "base64"), "image/jpeg"), width: s.photo.width, height: s.photo.height } : null;
     stories.push({ ...s, photo });
   }
   // the e-paper: the printed pages at 1400 px, and a PDF of them
+  step = `${date}: e-paper pages`;
   const dir = path.join(ROOT, "web", "public", "issues", date);
   const pages: PublishPayload["issue"]["pages"] = [];
   const doc = await PDFDocument.create();
@@ -56,8 +64,17 @@ for (const file of readdirSync(path.join(HERE, "seed")).filter((f) => f.endsWith
   const pdfBytes = await doc.save();
   const pdf = pages.length ? await upload(`epaper/${date}/capital-kranti-${date}-${hash(pdfBytes)}.pdf`, pdfBytes, "application/pdf") : null;
   // published that evening, at 8:30 pm India time
+  step = `${date}: saving the stories`;
   await saveIssue(sql, { issue: { ...seed.issue, pages, pdf }, stories }, `${date}T15:00:00.000Z`);
   console.log(`${date}: ${stories.length} stories, ${stories.filter((s) => s.photo).length} photos, ${pages.length} e-paper pages`);
+  done.push(date);
 }
+} catch (e) {
+  const error = `${step}: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`.slice(0, 600);
+  console.error(error);
+  await sql.query(`update runs set finished_at = now(), ok = false, details = $2 where id = $1`, [run.id, JSON.stringify({ done, error })]);
+  process.exit(1);
+}
+await sql.query(`update runs set finished_at = now(), ok = true, details = $2 where id = $1`, [run.id, JSON.stringify({ done })]);
 const refreshed = await fetch("https://capital-kranti.vercel.app/api/refresh", { method: "POST" }).then((r) => r.json()).catch((e) => ({ error: String(e) }));
 console.log(`website refresh: ${JSON.stringify(refreshed)}`);
