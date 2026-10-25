@@ -263,40 +263,67 @@ The desktop app's open items:
 
 The user wants a live website as the heart of the paper, with a social media
 desk (Facebook, Instagram, X, Telegram, YouTube Shorts, WhatsApp) and the
-printed paper as one of its products. It is **planned, not built**.
+printed paper as one of its products. **Phase A is built and live** at
+https://capital-kranti.vercel.app (25 Oct); the user hasn't reviewed it yet.
+
+**The user's rule (25 Oct): website work stays in `site/`, the website's own
+workflows (`.github/workflows/site*.yml`) and `docs/website/`. Never change the
+app's code for the website** (backend, web/newsroom, desktop, shared, publications,
+the root packages), and never tag an app release for website work. A first attempt
+changed Publish and Settings and tagged v1.1.14; it was undone the same day (the app
+is exactly v1.1.13, the tag deleted; the user deletes the leftover v1.1.14 draft
+release on GitHub). Reading the engine's code is fine: the hourly run borrows its
+number check (`backend/src/editorial/rewrite.ts`) without changing it.
 
 **Read first:**
-- `docs/website/ROADMAP.md`: what it does, the newsroom and social pipelines, the four phases to build it in, the up-front checklist (§6.0), costs in ₹, and what's needed from the user.
-- `docs/website/DESIGN.md`: Capital Kranti's own design system (24 Oct): phone first, the printed paper's colours, the ruled grid, containers of cards, the trust pieces on every story; why it no longer copies the Washington Post.
-- `docs/website/sample/capital-kranti-website.html`: the sample of that design. Open it in a browser, on a phone first. It was published as https://claude.ai/artifact/RK4UQHxNmQvWrFZuuksEeY (the earlier Post-style sample, in git history, was https://claude.ai/artifact/EnGn4RLGwG5BQyeo2nMLpq).
+- `site/README.md`: the website's manual (where it runs, how a day gets onto it, working on it).
+- `docs/website/ROADMAP.md`: the plan, the four phases (§6), the user's decisions (§6.0), free hosting and its limits (§1.1), costs in ₹.
+- `docs/website/DESIGN.md`: Capital Kranti's own design system; the approved sample is `docs/website/sample/` (https://claude.ai/artifact/RK4UQHxNmQvWrFZuuksEeY).
 
-**Decided:**
-- **Where:** the code goes in a new **`site/`** folder.
-  - It is **not** in the root workspaces, so its libraries stay out of the desktop app.
-  - It borrows the engine's code by path (PIB reading, the Gujarati text cleaning, the checks).
-- **Running: free hosting, no paid server** (the user has no budget for one). The pipeline runs as scheduled GitHub Actions runs (free for this public repository); for now everything else is on Vercel's free plans (decided 24 Oct): the site as a new Vercel project for `site/`, stories in Neon Postgres, photos in Vercel Blob, the editor's Google sign-in in the site itself, at `capitalkranti.co.in`. It moves to Cloudflare (Workers, D1, R2) before the site carries ads or before phase C; the free limits and the safeguards are in ROADMAP §1.1. The user's other decisions (AI wording, English stories on a free model, a ₹25 daily AI ceiling, X by hand) are in ROADMAP §6.0. ROADMAP §1.1 has the details and the two things to test first. App releases still come only from version tags.
-- **Look:** Capital Kranti's own design system (DESIGN.md, 24 Oct), not a copy of one paper: the Post's ruled grid, the Guardian's containers, BBC Gujarati's phone-first lightness, under the printed paper's purple, navy and cyan. Light or dark follows the phone.
-- **Order (24 Oct): four phases** (ROADMAP §6): A, the website from the evening paper, with Publish sending to it; B, live news from official sources and other outlets; C, the social desk; D, the printed paper made from the website. Within a phase, work goes on without stopping; the user reviews at its end.
+**Decided** (details in ROADMAP §6.0): own design, phone first, the paper's purple, navy and
+cyan, light or dark by the phone; Gujarati first, English labels and stories (stories
+translated by a free OpenRouter model); stories don't mention AI, only their source and the
+number check; free hosting: Vercel (site), Neon (database), Vercel Blob (photos) now,
+Cloudflare before ads or phase C; `capitalkranti.co.in` is the paper's and will point at the
+site; editors sign in with Google (phase B); ₹25 a day AI ceiling; X posted by hand; no letter
+to PIB for now.
 
-**Started (25 Oct):** `site/` exists as a starter: Next.js 16.3.2 with its own
-installs (`site/package-lock.json`, not in the root workspaces), one Gujarati
-"coming soon" page in the design's tokens and fonts, kept out of search engines
-(`robots: noindex`). Its checks are `.github/workflows/site.yml` (only for
-`site/**`); `apps.yml` skips changes only to `site/` or `docs/`. Locally:
-`npm run dev --prefix site` (port 3200). The Vercel project `capital-kranti` (Hobby, the user's account) builds `site/` and serves it at https://capital-kranti.vercel.app; its Neon database `capital-kranti-db` and Blob store `capital-kranti-photos` are connected to it only. Repository secrets added by the user on 25 Oct: `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `OPENROUTER_API_KEY` (`DATABASE_URL_UNPOOLED`, for schema changes, still to add).
+**Where it stands (25 Oct, evening):**
+- **Live:** home, story, section (Gujarat, India, World, seven topics), latest, search,
+  e-paper, past issues, saved, about, editorial policy, how we check, corrections, contact,
+  terms, privacy; Gujarati at the root, English under `/en`; NewsArticle markup, sitemaps,
+  RSS, robots. It is **kept out of search engines** while on the `vercel.app` address
+  (`site/lib/site.ts`, `INDEXABLE`).
+- **Content:** 20-22 Oct (issues 269-271): 70 stories, their photos and e-papers, loaded once
+  by `site-seed.yml` from `site/pipeline/seed/`. Nothing newer: the app's Publish does **not**
+  send to the site (the rule above).
+- **Photos:** the Blob store `capital-kranti-photos` is **private** (as it was created), so
+  the site serves its files itself at `/media/…` (`site/app/media`), cached a year by the CDN.
+  The store is connected to the project (Production, Preview); the site reads it (`/api/status`
+  shows `photos.get: found`). Checked: photos and e-paper pages answer 200.
+- **English:** all 70 stories still wait for their tags and English (`stories_by_state` on
+  `/api/status`): the hourly run's push-triggered runs came before the stories were loaded,
+  and **GitHub hadn't started the hourly schedule yet** (0 scheduled runs by 16:50 UTC, ~2.5 h
+  after the workflow reached `main`). Check `/api/status` again; if still none, start it by
+  hand (GitHub, Actions, `site-run`, Run workflow) or find why the schedule doesn't fire.
+- **The PIB test:** from GitHub's servers, PIB's list and release pages answer (200), as does
+  All India Radio's Gujarati; the CM's office doesn't answer GitHub. How late scheduled runs
+  start is still unmeasured (no scheduled run yet).
+- **Waiting on nothing from the user** except: the v1.1.14 draft release to delete; later,
+  pointing `capitalkranti.co.in` at Vercel (guided), and `DATABASE_URL_UNPOOLED` (optional).
+- `/api/publish` and `/api/publish/file` exist (a day in with the publish key
+  `CK_PUBLISH_KEY`), but nothing sends to them; they need no key until something does.
 
-**Phase A (25 Oct): website only, the app untouched.** The user's rule: work only in
-`site/` and the website's workflows; never change the app's code for the website (a
-first attempt changed Publish and Settings and tagged v1.1.14; it was undone on 25 Oct,
-the app is as v1.1.13, and the v1.1.14 tag removed). `site/README.md` is the manual. The
-site (home, story, section, latest, search, e-paper, archive, saved, the policy pages;
-Gujarati at the root, English under `/en`) reads Neon; the hourly GitHub run tags and
-translates stories with a free model and records whether PIB answers GitHub
-(`/api/status`: PIB and All India Radio do, the CM's office doesn't). Stories reach it
-through the website's own runs (20-22 Oct by `site-seed.yml`; next, PIB collected on GitHub).
-
-**First steps in the new session:**
-1. Read `CLAUDE.md`, this file's §8, and `docs/website/ROADMAP.md` §1 and §6.
-2. Go through the up-front checklist (ROADMAP §6.0) with the user: the decisions, and the accounts they create, with keys saved as Actions secrets by them; never in chat. First test whether PIB answers GitHub's servers (ROADMAP §1.1).
-3. Build phase A, then show the user the live site at phone and desktop widths before moving on.
+**Next:**
+1. See the English versions arrive (above), then review phase A with the user: phone and
+   desktop screenshots of home, a story, a section, the e-paper, English, dark mode.
+2. **New days without the app:** the site collects them itself on GitHub. PIB answers
+   GitHub, so a run in `site/pipeline/` reads PIB's Gujarati list each hour (politely, as
+   `backend/src/ingest/pib.ts` does; it may import its parsers read-only), writes stories
+   in the house style with a cheap model under the ₹25 ceiling (or the free one), checks
+   their numbers, and saves them. That is phase B's live news brought forward; ask the user
+   before starting it, and keep the e-paper question open (the printed pages are made only
+   by the app).
+3. Point `capitalkranti.co.in` at Vercel (the user, guided), then set `SITE_URL` in
+   `site/lib/site.ts` so search engines may index it.
 
