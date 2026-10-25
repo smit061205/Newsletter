@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // two root layouts (Gujarati, English): a web address matching neither gets app/global-not-found.tsx
+  experimental: {
+    globalNotFound: true,
+  },
 };
 
 export default nextConfig;

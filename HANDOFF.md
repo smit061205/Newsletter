@@ -285,6 +285,16 @@ installs (`site/package-lock.json`, not in the root workspaces), one Gujarati
 `site/**`); `apps.yml` skips changes only to `site/` or `docs/`. Locally:
 `npm run dev --prefix site` (port 3200). The Vercel project `capital-kranti` (Hobby, the user's account) builds `site/` and serves it at https://capital-kranti.vercel.app; its Neon database `capital-kranti-db` and Blob store `capital-kranti-photos` are connected to it only. Repository secrets added by the user on 25 Oct: `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `OPENROUTER_API_KEY` (`DATABASE_URL_UNPOOLED`, for schema changes, still to add).
 
+**Phase A built (25 Oct), waiting for the user's review:** `site/README.md` is the
+manual. The site (home, story, section, latest, search, e-paper, archive, saved, the
+policy pages; Gujarati at the root, English under `/en`) reads Neon; the newsroom's
+Publish sends the day's printed stories, photos and e-paper to it
+(`backend/src/publish-site.ts`, the website key `CK_SITE_KEY` in Settings =
+`CK_PUBLISH_KEY` in Vercel); the hourly GitHub run tags and translates new stories with
+a free model and records whether PIB answers GitHub (`/api/status`); 20-22 Oct were
+loaded once by `site-seed.yml`. Still with the user: the website key, pointing
+`capitalkranti.co.in`, and a real Publish from the app.
+
 **First steps in the new session:**
 1. Read `CLAUDE.md`, this file's §8, and `docs/website/ROADMAP.md` §1 and §6.
 2. Go through the up-front checklist (ROADMAP §6.0) with the user: the decisions, and the accounts they create, with keys saved as Actions secrets by them; never in chat. First test whether PIB answers GitHub's servers (ROADMAP §1.1).

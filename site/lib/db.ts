@@ -3,6 +3,7 @@
 // newsroom publishes (app/api/publish), so readers rarely wake the database.
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import type { Correction, English, Genre, Issue, IssuePage, Photo, Source, Story, Tier } from "./types.ts";
+import { sample, sampleOn } from "./sample.ts";
 
 let client: NeonQueryFunction<false, false> | null = null;
 /** The database, or null where there is none (the site's own CI build). */
@@ -51,6 +52,7 @@ const COLUMNS = `id, issue_date, published_at, updated_at, tier, genres, kicker,
 
 /** The newest stories, the latest day's paper first in its printed order. */
 export async function latestStories(limit = 60): Promise<Story[]> {
+  if (sampleOn()) return sample().stories.slice(0, limit);
   const sql = db();
   if (!sql) return [];
   const rows = await sql.query(
@@ -59,6 +61,7 @@ export async function latestStories(limit = 60): Promise<Story[]> {
 }
 
 export async function storyById(id: string): Promise<Story | null> {
+  if (sampleOn()) return sample().stories.find((s) => s.id === id) ?? null;
   const sql = db();
   if (!sql) return null;
   const rows = await sql.query(`select ${COLUMNS} from stories where id = $1`, [id]);
@@ -67,6 +70,7 @@ export async function storyById(id: string): Promise<Story | null> {
 
 /** A section: a tier (gujarat, india, world) or a genre. */
 export async function storiesIn(key: string, limit = 40): Promise<Story[]> {
+  if (sampleOn()) return sample().stories.filter((s) => s.tier === key || s.genres.includes(key as Genre)).slice(0, limit);
   const sql = db();
   if (!sql) return [];
   const rows = await sql.query(
@@ -76,6 +80,7 @@ export async function storiesIn(key: string, limit = 40): Promise<Story[]> {
 }
 
 export async function storiesOn(date: string): Promise<Story[]> {
+  if (sampleOn()) return sample().stories.filter((s) => s.issueDate === date);
   const sql = db();
   if (!sql) return [];
   const rows = await sql.query(`select ${COLUMNS} from stories where issue_date = $1 order by page asc nulls last, rank asc nulls last`, [date]);
@@ -85,6 +90,7 @@ export async function storiesOn(date: string): Promise<Story[]> {
 /** Headlines, summaries and text containing the words (Gujarati has no
  * stemming in Postgres, so a plain match; English matches its translation). */
 export async function search(q: string, limit = 30): Promise<Story[]> {
+  if (sampleOn()) return sample().stories.filter((s) => (s.headline + s.deck + s.body).includes(q.trim())).slice(0, limit);
   const sql = db();
   const words = q.trim().split(/\s+/).filter(Boolean).slice(0, 5);
   if (!sql || !words.length) return [];
@@ -96,18 +102,21 @@ export async function search(q: string, limit = 30): Promise<Story[]> {
 }
 
 export async function latestIssue(): Promise<Issue | null> {
+  if (sampleOn()) return sample().issues[0];
   const sql = db();
   if (!sql) return null;
   const rows = await sql.query(`select * from issues order by date desc limit 1`);
   return rows[0] ? issueOf(rows[0]) : null;
 }
 export async function issueOn(date: string): Promise<Issue | null> {
+  if (sampleOn()) return sample().issues.find((i) => i.date === date) ?? null;
   const sql = db();
   if (!sql) return null;
   const rows = await sql.query(`select * from issues where date = $1`, [date]);
   return rows[0] ? issueOf(rows[0]) : null;
 }
 export async function issueDates(limit = 400): Promise<{ date: string; number: number; stories: number }[]> {
+  if (sampleOn()) return sample().issues.map((i) => ({ date: i.date, number: i.number, stories: i.storyIds.length }));
   const sql = db();
   if (!sql) return [];
   const rows = await sql.query(

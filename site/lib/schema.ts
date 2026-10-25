@@ -46,6 +46,8 @@ export const SCHEMA = [
      ok boolean,
      details jsonb not null default '{}'
    )`,
+  // content_changed_at (a publish, new translations) and refreshed_at (/api/refresh)
+  `create table if not exists state (key text primary key, value text not null)`,
   `create table if not exists usage (
      day date not null,
      kind text not null,                            -- 'upload', 'ai_free', ...
