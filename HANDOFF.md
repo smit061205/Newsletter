@@ -283,7 +283,7 @@ installs (`site/package-lock.json`, not in the root workspaces), one Gujarati
 "coming soon" page in the design's tokens and fonts, kept out of search engines
 (`robots: noindex`). Its checks are `.github/workflows/site.yml` (only for
 `site/**`); `apps.yml` skips changes only to `site/` or `docs/`. Locally:
-`npm run dev --prefix site` (port 3200). The Vercel project points at `site/`.
+`npm run dev --prefix site` (port 3200). The Vercel project `capital-kranti` (Hobby, the user's account) builds `site/` and serves it at https://capital-kranti.vercel.app; its Neon database `capital-kranti-db` and Blob store `capital-kranti-photos` are connected to it only. Repository secrets added by the user on 25 Oct: `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `OPENROUTER_API_KEY` (`DATABASE_URL_UNPOOLED`, for schema changes, still to add).
 
 **First steps in the new session:**
 1. Read `CLAUDE.md`, this file's §8, and `docs/website/ROADMAP.md` §1 and §6.
