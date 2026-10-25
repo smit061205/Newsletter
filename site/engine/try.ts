@@ -26,12 +26,12 @@ for (const s of pick) {
 }
 
 // 2. triage, 40 at a time
-for (let i = 0; i < items.length; i += 40) {
-  const batch = items.slice(i, i + 40);
+for (let i = 0; i < items.length; i += 25) {
+  const batch = items.slice(i, i + 25);
   const input: TriageInput[] = batch.map((it, k) => ({ i: k + 1, source: it.source, lang: it.lang, title: it.title, summary: it.summary,
     factcheck: SOURCES.find((s) => s.id === it.source)?.trust === "factcheck" }));
   const res = await triageBatch(null, input);
-  if (!res.ok) { console.log(`triage failed: ${res.why}`); process.exit(1); }
+  if (!res.ok) { console.log(`triage of a batch failed: ${res.why}`); batch.forEach((it) => { it.triage = { score: 0, tier: "india", genres: [], sensitive: false, event: "", keys: [] }; }); continue; }
   batch.forEach((it, k) => { it.triage = res.value.get(k + 1) ?? { score: 0, tier: "india", genres: [], sensitive: false, event: "", keys: [] }; });
 }
 

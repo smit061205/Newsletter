@@ -88,7 +88,6 @@ export const SOURCES: SourceDef[] = [
   o("us-treasury", "US Treasury", "https://home.treasury.gov/system/files/126/ofac.xml", "en", "world", ["home.treasury.gov"], "us-gov"),
   o("us-fed", "US Federal Reserve", "https://www.federalreserve.gov/feeds/press_all.xml", "en", "world", ["www.federalreserve.gov"], "us-gov"),
   o("nasa", "NASA", "https://www.nasa.gov/news-release/feed/", "en", "world", ["www.nasa.gov"], "us-gov"),
-  o("us-cdc", "US CDC", "https://tools.cdc.gov/api/v2/resources/media/132608.rss", "en", "world", ["www.cdc.gov", "tools.cdc.gov"], "us-gov"),
   govuk("uk-pm", "UK Prime Minister's Office", "prime-ministers-office-10-downing-street"),
   govuk("uk-fcdo", "UK Foreign Office", "foreign-commonwealth-development-office"),
   govuk("uk-treasury", "HM Treasury", "hm-treasury"),
@@ -126,7 +125,6 @@ export const SOURCES: SourceDef[] = [
   o("ph-pco", "Philippine Presidential Communications Office", "https://pco.gov.ph/feed/", "en", "world", ["pco.gov.ph"]),
   o("eg-sis", "Egypt State Information Service", "https://www.sis.gov.eg/rss.aspx?lang=en-us", "en", "world", ["www.sis.gov.eg"]),
   o("ng-statehouse", "Nigeria State House", "https://statehouse.gov.ng/feed/", "en", "world", ["statehouse.gov.ng"]),
-  o("ke-pres", "President of Kenya", "https://www.president.go.ke/feed/", "en", "world", ["www.president.go.ke"]),
 
   // ---- Gujarati outlets ----
   n("divya-bhaskar", "દિવ્ય ભાસ્કર", "https://www.divyabhaskar.co.in/rss-v1--category-1048.xml", "gu", "gujarat", ["www.divyabhaskar.co.in", "divyabhaskar.co.in"], "db-corp"),
@@ -136,7 +134,6 @@ export const SOURCES: SourceDef[] = [
   n("news18-gu", "ન્યૂઝ18 ગુજરાતી", "https://gujarati.news18.com/rss/khabar/gujarat/gujarat.xml", "gu", "gujarat", ["gujarati.news18.com"], "network18"),
   n("tv9-gu", "ટીવી9 ગુજરાતી", "https://tv9gujarati.com/feed", "gu", "gujarat", ["tv9gujarati.com"], "tv9"),
   n("abp-asmita", "એબીપી અસ્મિતા", "https://gujarati.abplive.com/home/feed", "gu", "gujarat", ["gujarati.abplive.com"], "abp"),
-  n("zee-gu", "ઝી 24 કલાક", "https://zeenews.india.com/gujarati/rss/gujarat.xml", "gu", "gujarat", ["zeenews.india.com"], "zee"),
   n("iamgujarat", "આઈ એમ ગુજરાત", "https://www.iamgujarat.com/rssfeedsdefault.cms", "gu", "gujarat", ["www.iamgujarat.com"], "times-group"),
   n("deshgujarat", "DeshGujarat", "https://www.deshgujarat.com/feed/", "en", "gujarat", ["www.deshgujarat.com"], "deshgujarat"),
 
@@ -145,7 +142,6 @@ export const SOURCES: SourceDef[] = [
   n("bbc-hi", "BBC हिंदी", "https://feeds.bbci.co.uk/hindi/rss.xml", "hi", "india", ["www.bbc.com", "www.bbc.co.uk"], "bbc"),
   n("amar-ujala", "अमर उजाला", "https://www.amarujala.com/rss/breaking-news.xml", "hi", "india", ["www.amarujala.com"], "amar-ujala"),
   n("jagran", "दैनिक जागरण", "https://www.jagran.com/rss/news/national.xml", "hi", "india", ["www.jagran.com"], "jagran"),
-  n("live-hindustan", "लाइव हिन्दुस्तान", "https://feed.livehindustan.com/rss/3127", "hi", "india", ["www.livehindustan.com"], "ht-media"),
 
   // ---- Indian English outlets ----
   n("the-hindu", "The Hindu", "https://www.thehindu.com/news/national/feeder/default.rss", "en", "india", ["www.thehindu.com"], "the-hindu"),
@@ -175,6 +171,9 @@ export const SOURCES: SourceDef[] = [
   n("nhk", "NHK World", "https://www3.nhk.or.jp/nhkworld/en/news/rss.xml", "en", "world", ["www3.nhk.or.jp"], "nhk"),
   n("cna", "CNA (Singapore)", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml", "en", "world", ["www.channelnewsasia.com"], "mediacorp"),
   n("scmp", "South China Morning Post", "https://www.scmp.com/rss/91/feed", "en", "world", ["www.scmp.com"], "scmp"),
+
+  // (left out, 25 Oct: feeds not updated in weeks -- Live Hindustan, the US CDC, Kenya's
+//  president, Zee 24 Kalak)
 
   // ---- fact-checkers (IFCN signatories, and the government's own) ----
   f("pib-factcheck", "PIB Fact Check", "https://factcheck.pib.gov.in/rss.xml", "en", ["factcheck.pib.gov.in"]),

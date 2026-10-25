@@ -1,5 +1,5 @@
-// Steps 2 and 4 in one pass (ROADMAP §3): a free model reads new items 40 at
-// a time (one request for 40 headlines keeps hundreds of sources within the
+// Steps 2 and 4 in one pass (ROADMAP §3): a free model reads new items 25 at
+// a time (one request for 25 headlines keeps hundreds of sources within the
 // free allowance) and gives each its importance to Capital Kranti's readers,
 // its tier and genres, whether it's sensitive, one English line naming the
 // event, and English keywords. The keywords group items about one event into
@@ -10,7 +10,7 @@ import { sourceById } from "./sources.ts";
 import type { Genre, Tier } from "../lib/types.ts";
 
 type Sql = NeonQueryFunction<false, false>;
-const BATCH = 40;
+const BATCH = 25;
 const TIERS: Tier[] = ["gujarat", "india", "world"];
 const GENRES: Genre[] = ["farm", "economy", "tech", "health", "sport", "education", "entertainment"];
 
@@ -55,15 +55,15 @@ function checkBatch(n: number) {
         debunk: String(x.debunk ?? "").slice(0, 300) || undefined,
       });
     }
-    // most of the batch answered, or it's not trusted
-    return out.size >= Math.ceil(n * 0.8) ? out : null;
+    // most of the batch answered (a long answer cut short keeps what it finished), or it's not trusted
+    return out.size >= Math.ceil(n * 0.6) ? out : null;
   };
 }
 
 /** One batch through a free model (no database). */
 export async function triageBatch(sql: Sql | null, batch: TriageInput[]) {
   const user = batch.map((b) => `${b.i}. [${b.source}${b.factcheck ? ", factcheck" : ""}, ${b.lang}] ${b.title}${b.summary ? ` -- ${b.summary.slice(0, 220)}` : ""}`).join("\n");
-  return askJson(sql, { system: SYSTEM, user, maxTokens: 6000 }, checkBatch(batch.length));
+  return askJson(sql, { system: SYSTEM, user, maxTokens: 8000 }, checkBatch(batch.length));
 }
 
 /** Every untriaged item, newest first, as far as the run's share of the allowance goes. */

@@ -4,6 +4,7 @@
 // stopped, copied wording is caught, and items about one event group together.
 // Run: node --experimental-strip-types site/engine/selftest.ts
 import assert from "node:assert/strict";
+import { readJson } from "./ai.ts";
 import { ownItem } from "./collect.ts";
 import { parseFeed, pageText } from "./feed.ts";
 import { copiedShare, gate, importance, levelOf, type ClusterItem } from "./newsroom.ts";
@@ -94,5 +95,10 @@ test("importance: Gujarat news weighs more; more independent sources raise it", 
 test("every source has an id, a group, and its own hosts; ids are unique", () => {
   assert.equal(new Set(SOURCES.map((s) => s.id)).size, SOURCES.length);
   for (const s of SOURCES) assert.ok(s.group && s.hosts.length && (s.url.startsWith("pib:") || s.url.startsWith("http")), s.id);
+});
+test("a model's JSON is read from a fence, and a cut-off list keeps its finished entries", () => {
+  assert.deepEqual(readJson("```json\n{\"a\":1}\n```"), { a: 1 });
+  assert.deepEqual(readJson('Here: {"items":[{"i":1},{"i":2},{"i":3,"x"'), { items: [{ i: 1 }, { i: 2 }] });
+  assert.equal(readJson("no json at all"), undefined);
 });
 console.log(`\n${n} checks passed (${SOURCES.length} sources listed)`);

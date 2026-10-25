@@ -75,6 +75,7 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
   if (!KEY) return { ok: false, why: "no OPENROUTER_API_KEY", stop: true };
   const list = await freeModels();
   const order = a.role === "checker" && list.length > 1 ? [...list.slice(1), list[0]] : list;
+  const whys: string[] = [];
   let why = "no free model answered";
   const awake = order.filter((m) => (resting.get(m) ?? 0) < Date.now());
   const tryList = awake.filter((m) => m !== a.avoid).concat(a.avoid && awake.includes(a.avoid) && awake.length === 1 ? [a.avoid] : []);
@@ -88,28 +89,59 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
     if (sql) await count(sql, "ai_free");
     const res = await call(model, {
       temperature: a.temperature ?? 0.2, max_tokens: a.maxTokens ?? 3000, response_format: { type: "json_object" },
+      // thinking models spend their tokens thinking first: keep it short so the answer fits
+      reasoning: { effort: "low", exclude: true },
       messages: [{ role: "system", content: a.system }, { role: "user", content: a.user }],
     }, 120);
     if (!res.ok) {
       why = `${model}: ${res.status} ${(await res.text()).slice(0, 160)}`;
+      whys.push(why);
       // the day's free allowance is the account's: a 429 that says so stops the run's AI
       if (res.status === 429 && /per-day|free-models-per-day/i.test(why)) return { ok: false, why, stop: true };
       // busy, gone, or too slow: set aside for a while, ask the next
       if ([404, 408, 429, 502, 503, 504].includes(res.status)) resting.set(model, Date.now() + REST_MS);
       continue;
     }
-    const text = ((await res.json()) as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content ?? "";
-    const json = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
-    let parsed: unknown;
-    try { parsed = JSON.parse(json); } catch { why = `${model}: not the JSON asked for`; continue; }
+    const answer = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
+    const text = answer.choices?.[0]?.message?.content ?? "";
+    const parsed = readJson(text);
+    if (parsed === undefined) {
+      why = `${model}: not the JSON asked for (${text.length} chars${answer.choices?.[0]?.finish_reason ? `, ${answer.choices[0].finish_reason}` : ""}): ${text.slice(0, 80).replace(/\s+/g, " ")}`;
+      whys.push(why);
+      continue;
+    }
     const value = check(parsed);
     if (value !== null) return { ok: true, value, model };
     why = `${model}: JSON without what was asked for`;
+    whys.push(why);
   }
-  return { ok: false, why };
+  return { ok: false, why: whys.join(" | ") || why };
 }
 
 /** Requests left today. */
 export async function aiLeft(sql: Sql): Promise<number> {
   return WEBSITE.dailyFreeRequests - (await count(sql, "ai_free", 0));
+}
+
+/** The JSON in a model's answer: the whole of it, or inside a code fence, or
+ * the outermost braces; a list cut off part-way is closed after its last
+ * complete entry (a long answer that hit its length). Undefined if none. */
+export function readJson(text: string): unknown {
+  const tries: string[] = [];
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) tries.push(fence[1]);
+  const start = text.indexOf("{");
+  if (start >= 0) tries.push(text.slice(start, text.lastIndexOf("}") + 1), text.slice(start));
+  for (const t of tries) {
+    try { return JSON.parse(t); } catch { /* next */ }
+  }
+  // cut off: keep everything up to the last complete "}," inside the first list, then close it
+  if (start >= 0) {
+    const body = text.slice(start);
+    const list = body.indexOf("[");
+    for (let end = body.lastIndexOf("}"); end > list && list >= 0; end = body.lastIndexOf("}", end - 1)) {
+      try { return JSON.parse(`${body.slice(0, end + 1)}]}`); } catch { /* shorter */ }
+    }
+  }
+  return undefined;
 }
