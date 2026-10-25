@@ -1,10 +1,10 @@
 "use client";
-// જાહેરાત / Ads: book an ad -- its image, its size, its page, where along the
-// page's foot, and its days -- with its room drawn on the page to scale; the
+// જાહેરાત / Ads: book an ad -- its image, its size, its page, where on the page
+// (tapped on the page drawn to scale, or a quick choice), and its days; the
 // day's bookings as cards (moved to another page or place, or removed), and the
 // sample ads that print on a day with nothing booked (each on or off, or all).
 import { useCallback, useEffect, useState } from "react";
-import { call, media, type AdPlace, type AdRow, type PageLayout } from "../api";
+import { call, media, type AdAt, type AdRow, type PageLayout } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { num, shortDate } from "../ui/format";
@@ -31,7 +31,8 @@ export default function Ads() {
   const [autoHeight, setAutoHeight] = useState(true);
   const [heightCm, setHeightCm] = useState(10);
   const [page, setPage] = useState(4);
-  const [place, setPlace] = useState<AdPlace>("right");
+  // (none chosen: the foot of the page, on the right)
+  const [spot, setSpot] = useState<AdAt | null>(null);
   const [from, setFrom] = useState(date);
   const [to, setTo] = useState(date);
   const [weekdays, setWeekdays] = useState<number[]>([]);
@@ -59,6 +60,10 @@ export default function Ads() {
   const height = autoHeight && aspect ? round1(widthOf(cols) * aspect) : heightCm;
   const tooTall = !!band && height > room;
   const pages = layout?.pages.map((p) => p.page) ?? [1, 2, 3, 4];
+  // (a place chosen before a wider or taller size: kept on the page)
+  const at = !layout || !band ? { col: 0, topCm: 0 } : spot
+    ? { col: Math.min(spot.col, Math.max(0, layout.columns - cols)), topCm: round1(Math.max(0, Math.min(spot.topCm, room - height))) }
+    : presetAt("bottomRight", layout, band, cols, height);
 
   const pick = (f: File | undefined | null) => {
     setError("");
@@ -72,7 +77,7 @@ export default function Ads() {
     if (tooTall) return setError(t("ads.tooTall", { cm: num(lang, room) }));
     setSaving(true);
     try {
-      const got = await call<{ booked: string[] }>("/api/ads", { json: { name: file.name, base64: await toBase64(file), cols, heightCm: height, page, place, from, to, weekdays } });
+      const got = await call<{ booked: string[] }>("/api/ads", { json: { name: file.name, base64: await toBase64(file), cols, heightCm: height, page, at, from, to, weekdays } });
       toast(t("ads.booked", { n: num(lang, got.booked.length) }));
       setFile(null);
       // the day's paper is made already: the ad reaches its page when it's laid out again
@@ -90,8 +95,8 @@ export default function Ads() {
       load();
     } catch (e) { setError((e as Error).message); }
   };
-  // a booking to another page or place along the foot (every day it runs)
-  const move = async (id: string, change: { page?: number; place?: AdPlace }) => {
+  // a booking to another page or another place on it (every day it runs)
+  const move = async (id: string, change: { page?: number; at?: AdAt }) => {
     try {
       await call(`/api/ads/${encodeURIComponent(id)}`, { method: "PATCH", json: change });
       toast(t("ads.moved"));
@@ -117,7 +122,6 @@ export default function Ads() {
   const sampleAds = (ads ?? []).filter((a) => a.sample);
   const samplesOn = status?.samplesOn ?? true;
   const days = t("weekdays").split(",");
-  const PLACES: AdPlace[] = ["left", "middle", "right"];
 
   return (
     <div className={s.inner}>
@@ -158,11 +162,14 @@ export default function Ads() {
               <span className={s.label}>{t("ads.page")}</span>
               <div className={s.segmented}>{pages.map((p) => <button type="button" key={p} aria-pressed={page === p} onClick={() => setPage(p)}>{num(lang, p)}</button>)}</div>
               <span className={s.label}>{t("ads.place")}</span>
-              <div className={s.segmented}>{PLACES.map((p) => <button type="button" key={p} aria-pressed={place === p} onClick={() => setPlace(p)}>{t(`ads.place.${p}`)}</button>)}</div>
+              <div className={s.presets}>{PRESETS.map((p) => {
+                const got = layout && band ? presetAt(p, layout, band, cols, height) : null;
+                return <button type="button" key={p} aria-pressed={!!got && sameAt(got, at)} onClick={() => got && setSpot(got)}>{t(`ads.place.${p}`)}</button>;
+              })}</div>
             </div>
             <div className={s.field} style={{ alignItems: "center" }}>
-              <PagePreview layout={layout} page={page} cols={cols} height={height} tooTall={tooTall} preview={preview} place={place} />
-              <span className={s.faint}>{t("ads.preview")}</span>
+              <PagePreview layout={layout} page={page} cols={cols} height={height} tooTall={tooTall} preview={preview} at={at} onPick={setSpot} width={170} />
+              <span className={s.faint} style={{ maxWidth: 170, textAlign: "center" }}>{t("ads.preview")}</span>
             </div>
           </div>
           <p className={s.faint} style={{ margin: 0 }}>{t("ads.where")}</p>
@@ -194,10 +201,8 @@ export default function Ads() {
                       <button type="button" key={p} aria-pressed={a.page === p} onClick={() => a.page !== p && move(a.id, { page: p })}>{num(lang, p)}</button>
                     ))}</div>
                     <span className={s.label}>{t("ads.place")}</span>
-                    <select className={s.select} value={a.place ?? "right"} onChange={(e) => move(a.id, { place: e.target.value as AdPlace })} aria-label={t("ads.place")}>
-                      {PLACES.map((p) => <option key={p} value={p}>{t(`ads.place.${p}`)}</option>)}
-                    </select>
                   </div>
+                  <BookedPlace ad={a} layout={layout} move={(to) => move(a.id, { at: to })} />
                   <div><span /><Button kind="quiet" icon={Icon.trash()} onClick={() => remove(a.id)}>{t("ads.remove")}</Button></div>
                 </div>
               ))}
@@ -234,28 +239,76 @@ export default function Ads() {
 /** A length on the laid-out page (300 dots an inch) in centimetres. */
 const pxToCm = (px: number) => (px / 300) * 2.54;
 
-/** The page to scale: the header, the columns, and the new ad where the
- * layout puts it (the foot of the page, on the right). */
-function PagePreview({ layout, page, cols, height, tooTall, preview, place }:
-  { layout: PageLayout | null; page: number; cols: number; height: number; tooTall: boolean; preview: string; place: AdPlace }) {
-  if (!layout) return <div className={s.adPage} />;
+/** The quick choices of place. */
+const PRESETS = ["topLeft", "topRight", "center", "bottomLeft", "bottomMiddle", "bottomRight"] as const;
+type Preset = (typeof PRESETS)[number];
+type Band = PageLayout["pages"][number];
+const sameAt = (a: AdAt, b: AdAt) => a.col === b.col && Math.abs(a.topCm - b.topCm) < 0.05;
+/** An ad's width in columns, from its width in cm. */
+const colsOfCm = (layout: PageLayout, cm: number) => Math.max(1, Math.round((cm + layout.gutterCm) / (layout.columnCm + layout.gutterCm)));
+
+/** Where a quick choice puts an ad of `cols` columns, `height` cm tall. */
+function presetAt(p: Preset, layout: PageLayout, band: Band, cols: number, height: number): AdAt {
+  const span = Math.max(0, layout.columns - cols);
+  const room = Math.max(0, band.bottomCm - band.topCm - height);
+  const col = p.endsWith("Left") ? 0 : p.endsWith("Right") ? span : Math.floor(span / 2);
+  const topCm = p.startsWith("top") ? 0 : p === "center" ? Math.round(room) / 2 : room;
+  return { col, topCm: round1(topCm) };
+}
+
+/** A booking's place on its page: tapped on a small page, or a quick choice. */
+function BookedPlace({ ad, layout, move }: { ad: AdRow; layout: PageLayout | null; move: (at: AdAt) => void }) {
+  const { t } = useApp();
+  if (!layout) return null;
+  const band = layout.pages.find((p) => p.page === ad.page) ?? layout.pages[0];
+  const h = pxToCm(ad.height);
+  const cols = colsOfCm(layout, pxToCm(ad.width));
+  // (one booked before places on the page: along the foot, at its side)
+  const at = ad.at ?? presetAt(ad.place === "left" ? "bottomLeft" : ad.place === "middle" ? "bottomMiddle" : "bottomRight", layout, band, cols, h);
+  return (
+    <div className={s.adPlace}>
+      <PagePreview layout={layout} page={ad.page} cols={cols} height={h} tooTall={false} preview={media(ad.url)} at={at} onPick={move} width={84} />
+      <select className={s.select} value={PRESETS.find((p) => sameAt(presetAt(p, layout, band, cols, h), at)) ?? ""} aria-label={t("ads.place")}
+              onChange={(e) => e.target.value && move(presetAt(e.target.value as Preset, layout, band, cols, h))}>
+        <option value="" disabled>{t("ads.tapToMove")}</option>
+        {PRESETS.map((p) => <option key={p} value={p}>{t(`ads.place.${p}`)}</option>)}
+      </select>
+    </div>
+  );
+}
+
+/** The page to scale: the header, the columns, and the ad where it goes.
+ * Tapped, the ad goes there: centred on the tap, on whole columns and half
+ * centimetres, inside the room for news. */
+function PagePreview({ layout, page, cols, height, tooTall, preview, at, onPick, width: boxWidth }:
+  { layout: PageLayout | null; page: number; cols: number; height: number; tooTall: boolean; preview: string; at: AdAt;
+    onPick?: (at: AdAt) => void; width?: number }) {
+  if (!layout) return <div className={s.adPage} style={{ width: boxWidth }} />;
   const band = layout.pages.find((p) => p.page === page) ?? layout.pages[0];
   const W = layout.widthCm, H = layout.heightCm;
   const pct = (v: number, of: number) => `${(v / of) * 100}%`;
+  const pitch = layout.columnCm + layout.gutterCm;
   const width = cols * layout.columnCm + (cols - 1) * layout.gutterCm;
-  const h = Math.min(height, band.bottomCm - band.topCm);
-  // (its columns, as the layout picks them for the place: from the left, the middle or the right)
-  const span = layout.columns - cols;
-  const c0 = place === "left" ? 0 : place === "middle" ? Math.floor(span / 2) : span;
-  const left = layout.leftCm + c0 * (layout.columnCm + layout.gutterCm);
+  const room = band.bottomCm - band.topCm;
+  const h = Math.min(height, room);
+  const left = layout.leftCm + at.col * pitch;
+  const top = band.topCm + Math.min(at.topCm, room - h);
+  const pick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!onPick) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * W, y = ((e.clientY - r.top) / r.height) * H;
+    const col = Math.max(0, Math.min(layout.columns - cols, Math.round((x - layout.leftCm - width / 2) / pitch)));
+    const topCm = Math.max(0, Math.min(room - h, Math.round((y - band.topCm - h / 2) * 2) / 2));
+    onPick({ col, topCm: round1(topCm) });
+  };
   return (
-    <div className={s.adPage} style={{ aspectRatio: `${W} / ${H}` }}>
+    <div className={s.adPage} style={{ aspectRatio: `${W} / ${H}`, width: boxWidth, cursor: onPick ? "crosshair" : undefined }} onClick={pick}>
       <span className={s.adHead} style={{ height: pct(band.topCm, H) }} />
       {Array.from({ length: layout.columns }, (_, c) => (
-        <span key={c} className={s.adCol} style={{ left: pct(layout.leftCm + c * (layout.columnCm + layout.gutterCm), W), width: pct(layout.columnCm, W),
-                                                    top: pct(band.topCm, H), height: pct(band.bottomCm - band.topCm, H) }} />
+        <span key={c} className={s.adCol} style={{ left: pct(layout.leftCm + c * pitch, W), width: pct(layout.columnCm, W),
+                                                    top: pct(band.topCm, H), height: pct(room, H) }} />
       ))}
-      <span className={s.adBox} data-bad={tooTall} style={{ width: pct(width, W), height: pct(h, H), left: pct(left, W), top: pct(band.bottomCm - h, H),
+      <span className={s.adBox} data-bad={tooTall} style={{ width: pct(width, W), height: pct(h, H), left: pct(left, W), top: pct(top, H),
                                                           backgroundImage: preview ? `url(${preview})` : undefined }} />
     </div>
   );

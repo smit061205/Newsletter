@@ -23,8 +23,15 @@ export type Tree =
   /** a hole by an ad no story fits: a short item written to its size, or the paper's message panel */
   | { kind: "fill"; cols: number }
   | { kind: "stack"; cols: number; children: Tree[] }
-  | { kind: "row"; cols: number; children: Tree[] };
+  | { kind: "row"; cols: number; children: Tree[] }
+  /** its child made `height` (px) tall, to FIX_GIVE: the stories above an ad the editor put
+   * part-way down the page fill the room down to it, so the ad stays where it was put */
+  | { kind: "fix"; cols: number; height: number; child: Tree };
 
+/** How far (pt) a fixed block may come out from its height: an ad the editor put part-way
+ * down a page moves this much at most (7 mm), so the stories over it can end level
+ * (their settings make only some heights: 2 mm found none, 22 Oct's page 3). */
+const FIX_GIVE = 20;
 /** Extra gap a stack may put between two blocks (pt): the rule stays halfway. */
 const GAP_STRETCH = 3;
 /** A filler block: at least this tall (px), and what one costs (more than any story's setting). */
@@ -67,6 +74,7 @@ export function signature(t: Tree): string {
     case "story": return `s${t.story}:${t.cols}`;
     case "ad": return `a${t.ad}`;
     case "fill": return `f:${t.cols}`;
+    case "fix": return `X${Math.round(t.height)}(${signature(t.child)})`;
     default: return `${t.kind === "stack" ? "S" : "R"}(${t.children.map(signature).join(",")})`;
   }
 }
@@ -133,6 +141,14 @@ export class Solver {
         const lo = Math.ceil(FILL_MIN / PT);
         for (let h = lo; h < H && h * PT <= (this.input.fillMax ?? FILL_MAX); h++) cost[h] = FILL_COST + (h * t.cols) / 40;
         out = { cost };
+        break;
+      }
+      case "fix": {
+        const child = this.solve(t.child);
+        const cost = new Float64Array(H).fill(INF);
+        const h = Math.floor(t.height / PT);
+        for (let k = Math.max(0, h - FIX_GIVE); k <= h + FIX_GIVE && k < H; k++) cost[k] = child.cost[k] + Math.abs(k - h) * STRETCH_COST * 5;
+        out = { cost, children: [child] };
         break;
       }
       case "row": {
@@ -204,6 +220,9 @@ export class Solver {
       case "fill":
         out.push({ kind: "fill", cols: t.cols, col, y, height });
         return;
+      case "fix":
+        this.place(t.child, s.children![0], col, y, height, h, out);
+        return;
       case "row": {
         let c = col;
         t.children.forEach((child, i) => {
@@ -228,9 +247,12 @@ export class Solver {
         // in px: each child its buckets' share of the height (the exact
         // height's spare fraction goes to the first one)
         const gaps = parts.reduce((t2, p) => t2 + p.gap, 0);
-        const sizes = parts.map((p, i) => (t.children[i].kind === "ad" ? this.input.ads[(t.children[i] as { ad: number }).ad].height : p.h * PT));
+        // (an ad keeps its height, a fixed part its whole points: the spare goes to the first other child)
+        const sizes = parts.map((p, i) => (t.children[i].kind === "ad" ? this.input.ads[(t.children[i] as { ad: number }).ad].height
+          : p.h * PT));
         const spare = height - gaps * PT - sizes.reduce((a, b) => a + b, 0);
-        sizes[Math.max(0, t.children.findIndex((c) => c.kind !== "ad"))] += spare;
+        const free = t.children.findIndex((c) => c.kind !== "ad" && c.kind !== "fix");
+        sizes[free >= 0 ? free : Math.max(0, t.children.findIndex((c) => c.kind !== "ad"))] += spare;
         let cy = y;
         t.children.forEach((child, i) => {
           cy += parts[i].gap * PT;

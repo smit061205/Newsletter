@@ -92,6 +92,9 @@ export interface Ad {
   pinned?: boolean;
   /** where along the foot of its page the editor wants it (the layout keeps it there); none: the layout's choice, on the right */
   place?: "left" | "middle" | "right";
+  /** where on the page the editor put it: its first column (0 = left) and its top, in cm under
+   * the top of the page's news; none: along the foot (`place`) */
+  at?: { col: number; topCm: number };
 }
 
 export interface Edit {

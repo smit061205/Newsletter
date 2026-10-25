@@ -511,18 +511,23 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           }
           return send(res, 200, { on: store.setting("samplesOn", true), off: store.setting<string[]>("samplesOff", []) });
         }
-        // a booking moved: another page, or another place along its foot (every day it runs)
+        // a booking moved: another page, another place along its foot, or anywhere on the page (every day it runs)
         if (req.method === "PATCH" && parts[2]) {
           const id = decodeURIComponent(parts[2]);
-          const body = (await readJson(req)) as { page?: number; place?: Ad["place"] };
+          const body = (await readJson(req)) as { page?: number; place?: Ad["place"]; at?: Ad["at"] | null };
           if (body.page !== undefined && !(body.page >= 1 && body.page <= profile.issue.pages)) return send(res, 400, { error: `the paper has pages 1 to ${profile.issue.pages}` });
           if (body.place !== undefined && !["left", "middle", "right"].includes(body.place)) return send(res, 400, { error: "the place is left, middle or right" });
           const rows = store.db.prepare("select id, json from ads where id = ? or id like ?").all(id, `${id}@%`) as { id: string; json: string }[];
           if (!rows.length) return send(res, 404, { error: "no such ad" });
           for (const r of rows) {
             const ad = JSON.parse(r.json) as Ad;
-            store.db.prepare("update ads set json = ? where id = ?").run(JSON.stringify({ ...ad, ...(body.page ? { page: body.page } : {}),
-              ...(body.place ? { place: body.place } : {}), x: 0, y: 0, pinned: false }), r.id);
+            const page = body.page ?? ad.page;
+            // (a place along the foot clears a place on the page, and the other way round)
+            const at = body.at === null || body.place ? undefined : body.at ?? ad.at;
+            const place = body.at ? undefined : body.place ?? ad.place;
+            const { at: _a, place: _p, ...rest } = ad;
+            const moved = await placeAd({ ...rest, page, ...(place ? { place } : {}) }, at);
+            store.db.prepare("update ads set json = ? where id = ?").run(JSON.stringify(moved), r.id);
           }
           return send(res, 200, { moved: rows.length });
         }
@@ -678,6 +683,8 @@ interface AdBooking {
   name: string; base64: string; cols: number; heightCm: number; page: number;
   /** where along the foot of the page (the layout's choice, on the right, if none) */
   place?: Ad["place"];
+  /** or anywhere on the page: its first column and its top (cm under the top of the news) */
+  at?: Ad["at"];
   dates?: string[]; weekdays?: number[]; from?: string; to?: string;
 }
 
@@ -715,11 +722,37 @@ async function bookAd(store: Store, b: AdBooking): Promise<{ booked: string[] }>
     const { referenceAds } = await import("./layout/stories.ts");
     const standIns = new Set(referenceAds("").map((a) => a.id));
     for (const a of ads) if (standIns.has(a.id) || a.url.startsWith("/chrome/ads/")) store.db.prepare("delete from ads where id = ? and date = ?").run(a.id, date);
-    const ad: Ad = { id: `${id}`, date, page: b.page, x: 0, y: 0, width, height, url: `/media/ads/${file}`, pinned: false,
-                     ...(b.place && ["left", "middle", "right"].includes(b.place) ? { place: b.place } : {}) };
+    const ad = await placeAd({ id: `${id}`, date, page: b.page, x: 0, y: 0, width, height, url: `/media/ads/${file}`, pinned: false,
+                               ...(!b.at && b.place && ["left", "middle", "right"].includes(b.place) ? { place: b.place } : {}) }, b.at);
     store.db.prepare("insert or replace into ads (id, date, json) values (?, ?, ?)").run(`${id}@${date}`, date, JSON.stringify(ad));
   }
   return { booked: [...days].sort() };
+}
+
+/** An ad put where the editor chose: at a column and a height on its page, it
+ * stays there and the stories are laid round it (layout/designs.ts). One whose
+ * foot reaches the page's foot is an ad along the foot (`place`); none chosen,
+ * the layout places it (layout/ads.ts). */
+async function placeAd(ad: Ad, at: Ad["at"] | undefined): Promise<Ad> {
+  const free: Ad = { ...ad, x: 0, y: 0, pinned: false };
+  if (!at) return free;
+  const { GRID, PT } = await import("./layout/typography.ts");
+  const { chromeFor } = await import("./chrome/chrome.ts");
+  const band = await chromeFor(ad.page, profile.issue.pages, ad.date, 1);
+  const cols = Math.max(1, Math.min(GRID.columns, Math.round((ad.width + GRID.gutter) / GRID.pitch)));
+  const col = Math.max(0, Math.min(GRID.columns - cols, Math.round(at.col)));
+  const cm = (72 * PT) / 2.54;
+  // (a few millimetres under the top is the top; one too low for the page comes up to its foot)
+  let y = band.bodyTop + Math.max(0, at.topCm) * cm;
+  if (y - band.bodyTop < 0.8 * cm) y = band.bodyTop;
+  y = Math.min(y, band.bodyBottom - ad.height);
+  const kept = { col, topCm: Math.round(((y - band.bodyTop) / cm) * 10) / 10 };
+  if (band.bodyBottom - (y + ad.height) < 2 * cm) {
+    // at the foot: along it, at the side it's nearest
+    const place = col === 0 ? "left" : col + cols === GRID.columns ? "right" : "middle";
+    return { ...free, place, at: kept };
+  }
+  return { ...ad, x: GRID.left + col * GRID.pitch, y, pinned: true, at: kept };
 }
 
 let version: string | null = null;
