@@ -56,6 +56,8 @@ export const ProfileSchema = z.object({
     /** an issue known to exist, to count numbers from: every day is one issue */
     referenceDate: z.string(),
     referenceNumber: z.number().int().positive(),
+    /** the paper made in the evening is the next day's: it prints that date, and that day's number */
+    datedNextDay: z.boolean().optional(),
     pages: z.number().int().positive(),
   }),
   page: z.object({ width: pt.positive(), height: pt.positive() }),

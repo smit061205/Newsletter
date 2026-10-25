@@ -20,6 +20,7 @@
  "issue": {
   "referenceDate": "2026-08-08",
   "referenceNumber": 196,
+  "datedNextDay": true,
   "pages": 4
  },
  "page": {
