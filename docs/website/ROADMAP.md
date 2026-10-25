@@ -486,6 +486,13 @@ and entered by the user; never in chat or the repository.
 
 ### Phase B: live news (stages 2 and 3)
 
+**Status (25 Oct):** the engine is built in `site/engine/` (site/README.md, "The news
+engine"): sources, triage and clustering, the verification loop (§3.1), Gujarati
+writing by importance, English and Hindi (§3.2), publish or hold, Telegram approvals,
+24-hour watch. Tested by dry runs on GitHub (`site-engine-try.yml`); it runs every 15
+minutes (`site-engine.yml`) once merged. Still to do in this phase: Hindi on the site
+(`/hi`), the editor's page on the site, the leaders list and birthday drafts (§3.3).
+
 1. **One pipeline with sources that plug in:** watchers → cluster → verify → decide → write → publish (section 3).
 2. **Sources:** PIB's lists every few minutes (PIB answers GitHub's servers: tested 25 Oct), the Gujarat CM's office, All India Radio Gujarati, ministries; then other outlets' RSS.
 3. **Rules:** the verification loop (§3.1), the two-source rule, the originality check against every source, credits and the source box, sensitive and unconfirmed stories held for the editor.
