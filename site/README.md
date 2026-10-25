@@ -45,6 +45,18 @@ CK_SAMPLE=1 npm run dev --prefix site     # http://localhost:3200, with 22 Oct's
 npm run build --prefix site               # what Vercel and site.yml run
 ```
 
+**Claude Code on the website: open it in this `site/` folder**, not the repository's
+top. Then `site/.claude/settings.json` applies: its hook (`.claude/hooks/guard.mjs`)
+refuses any edit or writing command outside `site/`, `docs/website/`, the
+`site*.yml` workflows and the shared notes (`CLAUDE.md`, `HANDOFF.md`), and git
+commands that sweep the whole repository (`git add -A`, `git commit -a`, `git stash`,
+`git reset --hard`; use `git add .` here). A session opened at the top folder (the
+app's) never loads it. Best in its own copy of the repository, so it never shares
+a working folder with an app session: `git worktree add ../NewsPaper_Site main`
+once, then open `NewsPaper_Site/site`. On GitHub, `site-guard.yml` fails any commit
+that changes the website and the app together, and any website branch (`site/…`,
+`site-…`) that changes the app.
+
 `lib/` is the data and words, `components/` the design system's parts, `views/` the
 pages, and `app/` the routes: Gujarati at the root (`app/(gu)`), English under `/en`
 (`app/(en)/en`), each a thin file over the same view.
