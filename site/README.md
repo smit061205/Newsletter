@@ -10,7 +10,7 @@ app never carries it.
 
 | What | Where | Keys |
 |---|---|---|
-| The site | Vercel project `capital-kranti` (root directory `site/`) | `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN` (from its Storage tab), `CK_PUBLISH_KEY` (made by the user) |
+| The site | Vercel project `capital-kranti` (root directory `site/`) | `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN` (from its Storage tab) |
 | Stories, issues, runs | Neon Postgres `capital-kranti-db` | |
 | Photos, e-paper pages and PDFs | Vercel Blob `capital-kranti-photos` | |
 | The hourly run | GitHub Actions `site-run.yml` | repository secrets `DATABASE_URL`, `OPENROUTER_API_KEY` |
@@ -18,13 +18,19 @@ app never carries it.
 
 ## How a day gets onto the site
 
-1. The newsroom's **Publish** (`backend/src/publish-site.ts`) sends each story's photo and
-   the e-paper's pages and PDF to `/api/publish/file`, then the day's stories to
-   `/api/publish`, with the website key (`CK_SITE_KEY` in the app = `CK_PUBLISH_KEY` here).
-2. The site saves them (`lib/write.ts`) and renews its pages at once.
+**The app is not changed for the website** (the user's rule, 25 Oct): work stays in
+`site/` and the website's own workflows. The engine's code is only *read* (the
+hourly run borrows its number check, `backend/src/editorial/rewrite.ts`).
+
+1. Stories come in through the website's own runs: for now the days published before
+   it existed (`pipeline/seed.ts`, from `pipeline/seed/<date>.json`); next, the site
+   collecting PIB itself on GitHub (PIB answers GitHub's servers: `/api/status`).
+   `/api/publish` and `/api/publish/file` take a day with the publish key
+   (`CK_PUBLISH_KEY`), but nothing sends to them yet.
+2. The site saves them (`lib/write.ts`) and renews its pages (`/api/refresh`).
 3. The hourly run (`pipeline/run.ts`) gives each new story its section and English
-   version with a free model from the paper's profile (`website.freeModels`), numbers
-   checked against the Gujarati, then asks `/api/refresh` to renew the pages.
+   version with a free model (`lib/config.ts`), numbers checked against the Gujarati,
+   then asks `/api/refresh` to renew the pages.
 
 The free plans' ceilings are kept by the code: at most `CK_DAILY_UPLOADS` (50) uploads a
 day, 900 free AI requests a day, pages kept ready and renewed only when something changed.

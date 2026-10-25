@@ -1,4 +1,6 @@
-// The newsroom's Publish (backend/src/publish-site.ts): the day's stories and
+// A day's stories and e-paper sent in with the publish key (CK_PUBLISH_KEY). Nothing
+// sends to it yet: the app is left unchanged (25 Oct), and stories reach the site
+// another way (site/README.md). Kept for a sender the user agrees to later: the day's stories and
 // e-paper in, then every page refreshed so readers see them at once.
 import { revalidatePath } from "next/cache";
 import { authorized, refuse } from "@/lib/auth.ts";

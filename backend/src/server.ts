@@ -186,7 +186,7 @@ export function settingsOf(store: Store) {
     inrUpdated: store.setting("inrUpdated", ""),
     notify: store.setting("notify", true),
     /** the public website, for "Open the website" */
-    siteUrl: store.setting("siteUrl", "") || profile.website.url,
+    siteUrl: store.setting("siteUrl", ""),
     /** the sister papers (editorial/copies.ts): their names and languages */
     editions: store.setting<Edition[]>("editions", DEFAULT_EDITIONS),
     /** make them by themselves once the evening paper is made */
@@ -379,33 +379,16 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         if (req.method === "POST" && parts[3] === "publish") {
           const got = store.latestIssue(date);
           if (!got) return send(res, 404, { error: `no issue built for ${date}` });
-          // the new website (its key, entered once in Settings); the old one too while it
-          // still runs (a checkout's Git, or the app's one-time GitHub sign-in)
-          const toSite = envHas("CK_SITE_KEY");
-          const toOld = existsSync(path.join(ROOT, ".git")) || !!process.env.GITHUB_TOKEN;
-          if (!toSite && !toOld) {
-            return send(res, 400, { error: "The website isn't connected yet. Open Settings, enter the website key (once), then publish again." });
+          // the app (no Git) publishes through the one-time GitHub sign-in
+          if (!existsSync(path.join(ROOT, ".git")) && !process.env.GITHUB_TOKEN) {
+            return send(res, 400, { error: "The website isn't connected yet. Open Settings and press Connect (once), then publish again." });
           }
+          const { publishIssue } = await import("./publish.ts");
           const lines: string[] = [];
-          const say = (l: string) => { lines.push(l); log(l); };
           const body = (await readJson(req)) as { force?: boolean };
-          let site = null, published = null;
-          if (toSite) {
-            const { publishToSite } = await import("./publish-site.ts");
-            site = await publishToSite(store, date, { log: say, force: !!body.force });
-          }
-          if (toOld) {
-            const { publishIssue } = await import("./publish.ts");
-            try {
-              published = await publishIssue(store, date, { log: say, push: true, force: !!body.force });
-            } catch (e) {
-              // the old site is on its way out: its failure never fails a publish the new site took
-              if (!site) throw e;
-              say(`the old website wasn't updated: ${e instanceof Error ? e.message : e}`);
-            }
-          }
+          const published = await publishIssue(store, date, { log: (l) => { lines.push(l); log(l); }, push: true, force: !!body.force });
           store.approve(date, got.version);
-          return send(res, 200, { date, version: got.version, status: "approved", site, published, log: lines });
+          return send(res, 200, { date, version: got.version, status: "approved", published, log: lines });
         }
       }
       if (req.method === "GET" && url.pathname === "/reader") return send(res, 200, readerPage(req), "text/html; charset=utf-8");
@@ -579,7 +562,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         return send(res, 200, {
           today: day, now: time, ...s, nextRun: s.autoRun ? `${store.setting("lastScheduledRun", "") === day || time >= s.runAt ? "tomorrow" : "today"} ${s.runAt}` : null,
           running: currentJob(), lastJob: store.jobs(undefined, 1)[0] ?? null,
-          openrouterKey: envHas("OPENROUTER_API_KEY"), siteKey: envHas("CK_SITE_KEY"),
+          openrouterKey: envHas("OPENROUTER_API_KEY"),
           issue: latest ? { version: latest.version, status: latest.status, ready: (latest.report as { ready?: boolean }).ready,
                             issueNumber: (latest.report as { issueNumber?: number }).issueNumber } : null,
           version: gitVersion(),
@@ -587,9 +570,9 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         });
       }
       if (parts[0] === "api" && parts[1] === "settings") {
-        if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY"), siteKey: envHas("CK_SITE_KEY") });
+        if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
         if (req.method === "POST") {
-          const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string; siteKey?: string; lang?: string;
+          const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string; lang?: string;
                                                    onboarded?: boolean; inrPerUsd?: number; inrAuto?: boolean; notify?: boolean; siteUrl?: string;
                                                    editions?: Edition[]; editionsAuto?: boolean };
           if (body.editions !== undefined) {
@@ -628,12 +611,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             if (!/^sk-or-[A-Za-z0-9_-]{20,}$/.test(body.openrouterKey.trim())) return send(res, 400, { error: "that doesn't look like an OpenRouter key (sk-or-...)" });
             await setEnv("OPENROUTER_API_KEY", body.openrouterKey.trim());
           }
-          if (body.siteKey) {
-            // the website's publish key (site/lib/auth.ts): a long random string, the same in Vercel's settings
-            if (!/^[A-Za-z0-9_-]{24,200}$/.test(body.siteKey.trim())) return send(res, 400, { error: "the website key is a long string of letters and digits (24 or more)" });
-            await setEnv("CK_SITE_KEY", body.siteKey.trim());
-          }
-          return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY"), siteKey: envHas("CK_SITE_KEY") });
+          return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
         }
       }
       if (parts[0] === "api" && parts[1] === "papers") return await papersApi(req, res, parts, url);

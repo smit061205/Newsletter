@@ -34,7 +34,7 @@ export interface Story {
 export interface IssuePage { number: number; url: string; width: number; height: number }
 export interface Issue { date: string; number: number; pages: IssuePage[]; pdf: string | null; publishedAt: string; storyIds: string[] }
 
-/** What the newsroom's Publish sends (backend/src/publish-site.ts). */
+/** What /api/publish takes (nothing sends it yet: site/README.md). */
 export interface PublishPayload {
   issue: { date: string; number: number; pages: IssuePage[]; pdf: string | null };
   stories: {

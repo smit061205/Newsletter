@@ -4,12 +4,12 @@
 //   2. asks PIB, the CM's office and All India Radio for a page each, as the
 //      engine would (the "does PIB answer GitHub" test), and records what came back;
 //   3. gives each new story its section (Gujarat, India, World) and topics,
-//      and writes its English version, with a free model from the paper's
-//      profile; every number in the English is checked against the Gujarati.
+//      and writes its English version, with a free model named in
+//      site/lib/config.ts; every number in the English is checked against the Gujarati.
 // Run: node --experimental-strip-types site/pipeline/run.ts   (DATABASE_URL, OPENROUTER_API_KEY)
 import { neon } from "@neondatabase/serverless";
 import { numbersNotIn, openRouter } from "../../backend/src/editorial/rewrite.ts";
-import { profile } from "../../backend/src/profile.ts";
+import { WEBSITE } from "../lib/config.ts";
 import { ensureSchema } from "../lib/schema.ts";
 import { count, touched } from "../lib/write.ts";
 import type { English, Genre, Tier } from "../lib/types.ts";
@@ -100,17 +100,17 @@ function parse(text: string): Tagged | null {
   }
 }
 
-/** One story through the free models, in the profile's order; a second try names the numbers that went wrong. */
+/** One story through the free models, in the order site/lib/config.ts lists them; a second try names the numbers that went wrong. */
 async function tagAndTranslate(gu: { kicker: string; headline: string; deck: string; body: string; caption: string }, date: string) {
   const source = [gu.kicker, gu.headline, gu.deck, gu.body, gu.caption].join("\n\n");
   let note = "";
-  for (const model of profile.website.freeModels) {
+  for (const model of WEBSITE.freeModels) {
     for (let attempt = 0; attempt < 2; attempt++) {
-      if ((await count(sql, "ai_free")) > profile.website.dailyFreeRequests) return { stop: "the day's free AI requests are used up" } as const;
+      if ((await count(sql, "ai_free")) > WEBSITE.dailyFreeRequests) return { stop: "the day's free AI requests are used up" } as const;
       const res = await openRouter({
         method: "POST",
         headers: { authorization: `Bearer ${KEY}`, "content-type": "application/json",
-                   "http-referer": profile.website.url, "x-title": "Capital Kranti website" },
+                   "http-referer": WEBSITE.url, "x-title": "Capital Kranti website" },
         body: JSON.stringify({
           model, temperature: 0.2, response_format: { type: "json_object" },
           messages: [{ role: "system", content: SYSTEM },
@@ -181,7 +181,7 @@ try {
 }
 await sql.query(`update runs set finished_at = now(), ok = $2, details = $3 where id = $1`, [run.id, ok, JSON.stringify(details)]);
 // the website renews its kept-ready pages if anything changed (it checks)
-const refreshed = await fetch(`${profile.website.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) })
+const refreshed = await fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) })
   .then((r) => r.json()).catch((e) => ({ error: String(e) }));
 log(`website refresh: ${JSON.stringify(refreshed)}`);
 if (!ok) process.exit(1);

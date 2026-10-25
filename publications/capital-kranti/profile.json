@@ -207,14 +207,5 @@
     ],
     "maxMessages": 1,
     "maxHouseAds": 1
-  },
-  "website": {
-    "url": "https://capital-kranti.vercel.app",
-    "freeModels": [
-      "google/gemma-4-31b-it:free",
-      "google/gemma-4-26b-a4b-it:free"
-    ],
-    "dailyFreeRequests": 900,
-    "dailyUploads": 50
   }
 }
