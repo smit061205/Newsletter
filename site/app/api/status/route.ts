@@ -1,6 +1,7 @@
 // How the website is doing, in public figures only: the hourly runs (how late
 // GitHub started them, whether the sources answered), today's use of the free
 // plans' ceilings, and the stories waiting for their English.
+import { get, head } from "@vercel/blob";
 import { db } from "@/lib/db.ts";
 
 export const dynamic = "force-dynamic";
