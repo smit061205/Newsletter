@@ -15,10 +15,11 @@ export default function SettingsPage() {
   const { status, refresh } = useStatus();
   const [x, setX] = useState<Settings | null>(null);
   const [key, setKey] = useState("");
+  const [siteKey, setSiteKey] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => { call<Settings>("/api/settings").then(setX).catch((e) => setError(e.message)); }, []);
-  const save = async (change: Omit<Partial<Settings>, "openrouterKey"> & { openrouterKey?: string }) => {
+  const save = async (change: Omit<Partial<Settings>, "openrouterKey" | "siteKey"> & { openrouterKey?: string; siteKey?: string }) => {
     setError("");
     try {
       setX(await call<Settings>("/api/settings", { json: change }));
@@ -81,6 +82,13 @@ export default function SettingsPage() {
           <p className={s.muted}>{t("settings.site.body")}</p>
           <input className={s.input} type="url" placeholder="https://…" value={x.siteUrl} onChange={(e) => setX({ ...x, siteUrl: e.target.value })}
                  onBlur={(e) => e.target.value !== (status?.siteUrl ?? "") && save({ siteUrl: e.target.value })} aria-label={t("settings.site")} />
+          <span className={s.label}>{t("settings.siteKey")}</span>
+          <p className={s.muted}>{x.siteKey ? t("settings.siteKey.set") : t("settings.siteKey.unset")}</p>
+          <form className={s.row} onSubmit={(e) => { e.preventDefault(); if (siteKey) save({ siteKey }).then(() => setSiteKey("")); }}>
+            <input className={s.input} style={{ flex: 1, minWidth: 200 }} type="password" autoComplete="off" placeholder={x.siteKey ? "••••••••" : ""}
+                   value={siteKey} onChange={(e) => setSiteKey(e.target.value)} aria-label={t("settings.siteKey")} />
+            <Button kind="primary" type="submit" disabled={!siteKey}>{t("settings.save")}</Button>
+          </form>
         </section>
 
         <ConnectCard />

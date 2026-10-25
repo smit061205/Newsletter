@@ -11,7 +11,7 @@ import { neon } from "@neondatabase/serverless";
 import { numbersNotIn, openRouter } from "../../backend/src/editorial/rewrite.ts";
 import { profile } from "../../backend/src/profile.ts";
 import { ensureSchema } from "../lib/schema.ts";
-import { count } from "../lib/write.ts";
+import { count, touched } from "../lib/write.ts";
 import type { English, Genre, Tier } from "../lib/types.ts";
 
 const sql = neon(required("DATABASE_URL"));
@@ -157,6 +157,7 @@ async function stories() {
       failed++;
     }
   }
+  if (done || failed) await touched(sql);
   return { done, failed, waiting: rows.length - done - failed };
 }
 
@@ -179,4 +180,8 @@ try {
   log(`failed: ${details.error}`);
 }
 await sql.query(`update runs set finished_at = now(), ok = $2, details = $3 where id = $1`, [run.id, ok, JSON.stringify(details)]);
+// the website renews its kept-ready pages if anything changed (it checks)
+const refreshed = await fetch(`${profile.website.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) })
+  .then((r) => r.json()).catch((e) => ({ error: String(e) }));
+log(`website refresh: ${JSON.stringify(refreshed)}`);
 if (!ok) process.exit(1);

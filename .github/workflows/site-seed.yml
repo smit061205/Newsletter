@@ -1,0 +1,36 @@
+# Loads the days published before the website existed into it (site/pipeline/seed.ts):
+# runs when the seed files change; a day already there is left alone.
+name: site-seed
+on:
+  push:
+    branches: [main]
+    paths: ["site/pipeline/seed/**", "site/pipeline/seed.ts", ".github/workflows/site-seed.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: site-seed
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install
+        run: npm ci --no-audit --no-fund --prefix site
+      - name: Seed
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+        run: node --experimental-strip-types --no-warnings site/pipeline/seed.ts
+      # the website's new build may still be deploying: renew its pages once it's up
+      - name: Refresh the website
+        run: |
+          sleep 240
+          curl -s -X POST https://capital-kranti.vercel.app/api/refresh || true

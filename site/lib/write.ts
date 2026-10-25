@@ -43,6 +43,13 @@ export async function saveIssue(sql: NeonQueryFunction<false, false>, p: Publish
      on conflict (date) do update set number = excluded.number, pages = excluded.pages, pdf = excluded.pdf,
        published_at = excluded.published_at, story_ids = excluded.story_ids`,
     [p.issue.date, p.issue.number, JSON.stringify(p.issue.pages), p.issue.pdf, when, ids]);
+  await touched(sql);
+}
+
+/** Notes that what readers see has changed, so the next /api/refresh renews the kept-ready pages. */
+export async function touched(sql: NeonQueryFunction<false, false>) {
+  await sql.query(`insert into state (key, value) values ('content_changed_at', now()::text)
+                   on conflict (key) do update set value = excluded.value`);
 }
 
 /** Adds to today's count of something limited (uploads to the free photo
