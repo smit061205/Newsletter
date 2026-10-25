@@ -9,7 +9,7 @@ import path from "node:path";
 import { IssueRenderSchema, type Element, type IssueRender, type TextElement } from "@ck/shared/contract";
 import { printIssue } from "@ck/shared/pdf";
 import { assetFile, OUT_DIR, PLOT_ORIGIN } from "./config.ts";
-import { chromeFor } from "./chrome/chrome.ts";
+import { chromeFor, printedDate } from "./chrome/chrome.ts";
 import { Measurer } from "./layout/measure.ts";
 
 import { planDay } from "./editorial/plan.ts";
@@ -113,7 +113,8 @@ export const pageImageDir = (date: string) => path.join(OUT_DIR, "pages", profil
 /** Issue numbers count every day from the profile's reference issue. */
 export function issueNumberFor(date: string): number {
   const { referenceDate, referenceNumber } = profile.issue;
-  const days = Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${referenceDate}T00:00:00Z`)) / 86_400_000);
+  // (the number of the date it carries: the next day's, for a paper made the evening before)
+  const days = Math.round((Date.parse(`${printedDate(date)}T00:00:00Z`) - Date.parse(`${referenceDate}T00:00:00Z`)) / 86_400_000);
   return referenceNumber + days;
 }
 
