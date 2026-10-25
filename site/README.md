@@ -15,6 +15,9 @@ app never carries it.
 | Photos, e-paper pages and PDFs | Vercel Blob `capital-kranti-photos` (a **private** store: the site serves its files itself at `/media/…`, cached for a year by the CDN) | |
 | The hourly run | GitHub Actions `site-run.yml` | repository secrets `DATABASE_URL`, `OPENROUTER_API_KEY` |
 | Loading 20-22 Oct | GitHub Actions `site-seed.yml` (once) | `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN` |
+| **The news engine** (every 15 min) | GitHub Actions `site-engine.yml` (`engine/run.ts`) | `DATABASE_URL`, `OPENROUTER_API_KEY`, `BLOB_READ_WRITE_TOKEN`; for approvals `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` |
+| The engine's checks and dry run | GitHub Actions `site-engine-try.yml` (on every engine change, any branch) | `OPENROUTER_API_KEY` (stores nothing) |
+| The editor's Telegram buttons, instantly (optional) | `/api/telegram` on the site | Vercel: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS`, `TELEGRAM_WEBHOOK_SECRET` (else each engine run collects the presses) |
 
 ## How a day gets onto the site
 
@@ -37,12 +40,45 @@ day, 900 free AI requests a day, pages kept ready and renewed only when somethin
 `/api/status` shows the hourly runs (how late GitHub started them, whether PIB answered),
 today's use, and stories waiting for their English.
 
+## The news engine (`engine/`, ROADMAP §0.1 and §3)
+
+Every 15 minutes (`run.ts`), with **free OpenRouter models only** (₹0; `ai.ts` asks
+OpenRouter which free models exist, the ones named in `lib/config.ts` first, and
+sets a busy one aside for 10 minutes rather than retrying it):
+
+1. **Watch** (`collect.ts`, `sources.ts`): 126 sources by their RSS/Atom feeds, PIB by
+   its lists (the app's parsers, read-only). Politely: robots.txt, a pause per site,
+   "nothing new" by ETag. A source that refuses us (401/403/451/robots) is switched off,
+   never worked around; `probe.ts` checks them all from GitHub.
+2. **Triage** (`triage.ts`): new items 40 to a request: importance 0-10 for our readers,
+   tier, genres, sensitive or not, one English line and keywords. The keywords group
+   items about one event into a cluster, across Gujarati, Hindi and English.
+3. **Genuine?** (`newsroom.ts`, `gate`): fresh (not old news recirculating), not debunked
+   by a fact-checker, and from an official source or two independent outlets (two of one
+   owner count once). Otherwise it waits up to 6 hours for a second source, then drops.
+4. **Write** (`newsroom.ts`): the most important confirmed events first, in Gujarati, its
+   length by importance (lead/top 300-450 words, normal 150-250, brief 60-100), from the
+   sources' facts only. Checked: numbers by code (`numbersNotIn`), no sentence twice, no
+   copied wording, then every claim by a **different** free model. One rewrite naming
+   the problems; national and world stories get English and Hindi (numbers checked).
+5. **Publish** (`publish.ts`): live at once; **held** for the editor when sensitive or a
+   check failed, sent to Telegram with ✅/❌ (`lib/telegram.ts`). Photos only from official
+   sources. Each run renews the pages.
+6. **Watch after**: for 24 hours, a source correcting or withdrawing takes the story down
+   (held) and tells the editor; new sources are added to its source box.
+
+`try.ts` does all of it on real news and prints the stories, storing nothing;
+`selftest.ts` checks the pure parts (feeds, the gate, grouping, copy detection).
+
 ## Working on it
 
 ```bash
 npm install --prefix site
 CK_SAMPLE=1 npm run dev --prefix site     # http://localhost:3200, with 22 Oct's stories (no keys needed)
 npm run build --prefix site               # what Vercel and site.yml run
+npx --prefix site tsc -p site/engine      # the engine's typecheck (it's outside the Next build)
+node --experimental-strip-types site/engine/selftest.ts
+OPENROUTER_API_KEY=... node --experimental-strip-types site/engine/try.ts 3   # a dry run on real news
 ```
 
 **Claude Code on the website: open it in this `site/` folder**, not the repository's

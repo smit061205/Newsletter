@@ -8,10 +8,11 @@
 //      site/lib/config.ts; every number in the English is checked against the Gujarati.
 // Run: node --experimental-strip-types site/pipeline/run.ts   (DATABASE_URL, OPENROUTER_API_KEY)
 import { neon } from "@neondatabase/serverless";
-import { numbersNotIn, openRouter } from "../../backend/src/editorial/rewrite.ts";
+import { numbersNotIn } from "../../backend/src/editorial/rewrite.ts";
+import { askJson } from "../engine/ai.ts";
 import { WEBSITE } from "../lib/config.ts";
 import { ensureSchema } from "../lib/schema.ts";
-import { count, touched } from "../lib/write.ts";
+import { touched } from "../lib/write.ts";
 import type { English, Genre, Tier } from "../lib/types.ts";
 
 const sql = neon(required("DATABASE_URL"));
@@ -100,36 +101,22 @@ function parse(text: string): Tagged | null {
   }
 }
 
-/** One story through the free models, in the order site/lib/config.ts lists them; a second try names the numbers that went wrong. */
+/** One story through the free models (the engine's: a busy one is set aside, the
+ * next asked; engine/ai.ts); a second try names the numbers that went wrong. */
 async function tagAndTranslate(gu: { kicker: string; headline: string; deck: string; body: string; caption: string }, date: string) {
   const source = [gu.kicker, gu.headline, gu.deck, gu.body, gu.caption].join("\n\n");
   let note = "";
-  for (const model of WEBSITE.freeModels) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if ((await count(sql, "ai_free")) > WEBSITE.dailyFreeRequests) return { stop: "the day's free AI requests are used up" } as const;
-      const res = await openRouter({
-        method: "POST",
-        headers: { authorization: `Bearer ${KEY}`, "content-type": "application/json",
-                   "http-referer": WEBSITE.url, "x-title": "Capital Kranti website" },
-        body: JSON.stringify({
-          model, temperature: 0.2, response_format: { type: "json_object" },
-          messages: [{ role: "system", content: SYSTEM },
-                     { role: "user", content: JSON.stringify({ kicker: gu.kicker, headline: gu.headline, deck: gu.deck, body: gu.body, caption: gu.caption }) + note }],
-        }),
-      }, 120);
-      // the free models allow 20 requests a minute
-      await new Promise((r) => setTimeout(r, 3500));
-      if (!res.ok) { log(`    ${model}: ${res.status} ${(await res.text()).slice(0, 120)}`); break; }
-      const text = ((await res.json()) as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content ?? "";
-      const got = parse(text);
-      if (!got) { log(`    ${model}: an answer that isn't the JSON asked for`); continue; }
-      const en = [got.en.kicker, got.en.headline, got.en.deck, got.en.body, got.en.caption].join("\n\n");
-      const wrong = numbersNotIn(en, source, date);
-      if (!wrong.length) return { ok: got, model } as const;
-      log(`    ${model}: numbers not in the Gujarati: ${wrong.join(", ")}`);
-      note = `\n\nYour last translation had numbers that are not in the Gujarati: ${wrong.join(", ")}. Translate again and keep every number exactly as the Gujarati has it.`;
-      if (attempt === 1) return { tagsOnly: got, model } as const;
-    }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await askJson<Tagged>(sql, { system: SYSTEM, user: JSON.stringify({ kicker: gu.kicker, headline: gu.headline, deck: gu.deck, body: gu.body, caption: gu.caption }) + note },
+      (v) => parse(JSON.stringify(v)));
+    if (!res.ok) { log(`    ${res.why}`); return res.stop ? ({ stop: res.why } as const) : ({ failed: true } as const); }
+    const got = res.value;
+    const en = [got.en.kicker, got.en.headline, got.en.deck, got.en.body, got.en.caption].join("\n\n");
+    const wrong = numbersNotIn(en, source, date);
+    if (!wrong.length) return { ok: got, model: res.model } as const;
+    log(`    ${res.model}: numbers not in the Gujarati: ${wrong.join(", ")}`);
+    note = `\n\nYour last translation had numbers that are not in the Gujarati: ${wrong.join(", ")}. Translate again and keep every number exactly as the Gujarati has it.`;
+    if (attempt === 1) return { tagsOnly: got, model: res.model } as const;
   }
   return { failed: true } as const;
 }
@@ -138,17 +125,19 @@ async function stories() {
   if (!KEY) { log("no OPENROUTER_API_KEY: stories wait for their tags and English"); return { done: 0, failed: 0 }; }
   const rows = await sql.query(
     `select id, issue_date::text as date, kicker, headline, deck, body, caption from stories
-      where en_status = 'pending' or tag_status = 'pending' order by issue_date desc, page asc nulls last, rank asc nulls last limit 60`);
+      where status = 'published' and (en_status = 'pending' or tag_status = 'pending') order by issue_date desc, page asc nulls last, rank asc nulls last limit 60`);
   let done = 0, failed = 0;
   for (const r of rows) {
+    // stop in good time (the workflow allows 30 minutes); the rest wait for the next hour
+    if (Date.now() - started.getTime() > 20 * 60_000) { log("  out of time: the rest wait for the next hour"); break; }
     log(`  ${r.id}: ${String(r.headline).slice(0, 60)}`);
     const out = await tagAndTranslate(r as never, r.date as string);
-    if ("stop" in out) { log(`  ${out.stop}: the rest wait for tomorrow`); break; }
-    if ("ok" in out) {
+    if (out.stop) { log(`  ${out.stop}: the rest wait for tomorrow`); break; }
+    if (out.ok) {
       await sql.query(`update stories set tier = $2, genres = $3, tag_status = 'done', en = $4, en_status = 'done' where id = $1`,
         [r.id, out.ok.tier, out.ok.genres, JSON.stringify(out.ok.en)]);
       done++;
-    } else if ("tagsOnly" in out) {
+    } else if (out.tagsOnly) {
       // the sections are sound; the English isn't, so the story stays Gujarati in English (with a note)
       await sql.query(`update stories set tier = $2, genres = $3, tag_status = 'done', en_status = 'failed' where id = $1`,
         [r.id, out.tagsOnly.tier, out.tagsOnly.genres]);
