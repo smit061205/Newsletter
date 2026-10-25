@@ -20,10 +20,12 @@ export interface DesignStory {
   area: (cols: number) => number;
 }
 
-/** An ad at the foot of its columns [c0, c1). */
+/** An ad in its columns [c0, c1), its top `y` from the top of the story area: at their
+ * foot, or wherever the editor put it (layout/engine.ts). */
 export interface DesignAd { index: number; c0: number; c1: number; y: number; height: number }
 
-interface Region { c0: number; c1: number; height: number; ads: DesignAd[]; items: number[] }
+/** A part of the page: its columns, its top (from the story area's) and height, its ads and stories. */
+interface Region { c0: number; c1: number; top: number; height: number; ads: DesignAd[]; items: number[] }
 
 /** Up to `count` different designs for a page of `cols` columns `height` tall. */
 export function designs(stories: DesignStory[], ads: DesignAd[], cols: number, height: number, rng: () => number,
@@ -31,15 +33,16 @@ export function designs(stories: DesignStory[], ads: DesignAd[], cols: number, h
   const out = new Map<string, Tree>();
   const items = stories.map((_, i) => i);
   for (let n = 0; n < attempts && out.size < count; n++) {
-    const t = grow({ c0: 0, c1: cols, height, ads, items }, stories, rng);
+    const t = grow({ c0: 0, c1: cols, top: 0, height, ads, items }, stories, rng);
     if (t && fills(t) <= 2) out.set(key(t), t);
   }
   return [...out.values()];
 }
 
 const key = (t: Tree): string => (t.kind === "story" ? `s${t.story}:${t.cols}` : t.kind === "ad" ? `a${t.ad}` : t.kind === "fill" ? `f${t.cols}`
-  : `${t.kind}(${t.children.map(key).join(",")})`);
-const fills = (t: Tree): number => (t.kind === "fill" ? 1 : t.kind === "stack" || t.kind === "row" ? t.children.reduce((a, c) => a + fills(c), 0) : 0);
+  : t.kind === "fix" ? `x${Math.round(t.height)}(${key(t.child)})` : `${t.kind}(${t.children.map(key).join(",")})`);
+const fills = (t: Tree): number => (t.kind === "fill" ? 1 : t.kind === "fix" ? fills(t.child)
+  : t.kind === "stack" || t.kind === "row" ? t.children.reduce((a, c) => a + fills(c), 0) : 0);
 
 /** A child's blocks taken into its parent when they're the same kind (a stack in a stack is one stack). */
 function join(kind: "stack" | "row", cols: number, parts: Tree[]): Tree {
@@ -67,6 +70,10 @@ function grow(r: Region, stories: DesignStory[], rng: () => number): Tree | null
       const f = full.reduce((p, a) => (a.y > p.y ? a : p));
       const rest = r.ads.filter((a) => a !== f);
       const leaf: Tree = { kind: "ad", ad: f.index, cols };
+      // an ad put part-way down (the editor's place): the stories over it fill the room
+      // down to it exactly (a fixed block), the rest go under it
+      const under = r.top + r.height - (f.y + f.height);
+      if (under >= 30) return around(r, f, rest, leaf, stories, rng);
       // an ad with nothing over it: the ad alone (it must end level by itself), or a filler over it
       if (!r.items.length && !rest.length) return rng() < 0.5 ? leaf : join("stack", cols, [{ kind: "fill", cols }, leaf]);
       const above = grow({ ...r, height: r.height - f.height - GAP.betweenStories, ads: rest }, stories, rng);
@@ -80,11 +87,29 @@ function grow(r: Region, stories: DesignStory[], rng: () => number): Tree | null
     }
     // stories across the top, the ads' columns below; or cut down beside an ad
     // (the first story's side as wide as it may be)
-    const cuts: number[] = [];
-    for (let c = r.c0 + 1; c < r.c1; c++) if (!r.ads.some((a) => a.c0 < c && c < a.c1)) cuts.push(c);
+    // (not a side narrower than any story may be, unless an ad fills it: a strip
+    // no story can take is a filler the whole page down)
+    const narrowest = Math.min(...r.items.map((i) => Math.min(...stories[i].widths)));
+    const fits = (c0: number, c1: number) => c1 - c0 >= narrowest || r.ads.some((a) => a.c0 === c0 && a.c1 === c1);
+    const all: number[] = [];
+    for (let c = r.c0 + 1; c < r.c1; c++) if (!r.ads.some((a) => a.c0 < c && c < a.c1)) all.push(c);
+    const sound = all.filter((c) => fits(r.c0, c) && fits(c, r.c1));
+    const cuts = sound.length ? sound : all;
     const first = stories[r.items[0]].widths;
     const good = cuts.filter((c) => first.includes(c - r.c0) || first.includes(r.c1 - c));
-    if (r.items.length >= 2 && (!good.length || rng() < 0.4)) return stackTop(r, stories, rng);
+    // (stories across the top only over ads at the foot: one the editor put higher
+    // up stays where it is, the region cut down beside it)
+    const atFoot = r.ads.every((a) => a.y + a.height >= r.top + r.height - 1);
+    if (!atFoot && rng() < 0.5) {
+      // or cut straight across at the top or the foot of an ad put higher up: the
+      // stories over the cut set exactly to the room down to it
+      const lines = r.ads.filter((a) => a.y + a.height < r.top + r.height - 1)
+        .flatMap((a) => [a.y, a.y + a.height + GAP.betweenStories])
+        .filter((y) => y - GAP.betweenStories - r.top >= 30 && r.top + r.height - y >= 30
+          && !r.ads.some((a) => a.y < y - 1 && a.y + a.height > y - GAP.betweenStories + 1));
+      if (lines.length) return cutAcross(r, lines[Math.floor(rng() * lines.length)], stories, rng);
+    }
+    if (atFoot && r.items.length >= 2 && (!good.length || rng() < 0.4)) return stackTop(r, stories, rng);
     if (!cuts.length) return no("no cut beside the ads");
     return rowAt(r, (good.length ? good : cuts)[Math.floor(rng() * (good.length || cuts.length))], stories, rng);
   }
@@ -134,9 +159,9 @@ function stackTop(r: Region, stories: DesignStory[], rng: () => number, fixed?: 
   const topHeight = top.reduce((a, s) => a + stories[s].area(Math.min(cols, Math.max(...stories[s].widths))), 0) / spanOf(cols);
   const rest = r.height - topHeight - GAP.betweenStories;
   if (rest < 60) return no("stack: no room under");
-  const a = grow({ c0: r.c0, c1: r.c1, height: topHeight, ads: [], items: top }, stories, rng);
+  const a = grow({ c0: r.c0, c1: r.c1, top: r.top, height: topHeight, ads: [], items: top }, stories, rng);
   if (!a) return null;
-  const b = grow({ ...r, height: rest, items: r.items.slice(k) }, stories, rng);
+  const b = grow({ ...r, top: r.top + topHeight + GAP.betweenStories, height: rest, items: r.items.slice(k) }, stories, rng);
   return b ? join("stack", cols, [a, b]) : null;
 }
 
@@ -164,9 +189,65 @@ function rowAt(r: Region, c: number, stories: DesignStory[], rng: () => number, 
   }
   const parts: Tree[] = [];
   for (const s of sides) {
-    const t = grow({ c0: s.c0, c1: s.c1, height: r.height, ads: s.ads, items: s.items }, stories, rng);
+    const t = grow({ c0: s.c0, c1: s.c1, top: r.top, height: r.height, ads: s.ads, items: s.items }, stories, rng);
     if (!t) return null;
     parts.push(t);
   }
   return join("row", r.c1 - r.c0, parts);
+}
+
+/** A region round an ad the editor put part-way down it (the ad across the
+ * region): stories over it, set exactly to the room down to it; the ad; the
+ * rest under it. The stories go over it in their order while there's room
+ * (a little give either way, so designs differ), the others under it. */
+function around(r: Region, f: DesignAd, rest: DesignAd[], leaf: Tree, stories: DesignStory[], rng: () => number): Tree | null {
+  const cols = r.c1 - r.c0;
+  const overH = f.y - r.top - GAP.betweenStories;
+  const top = f.y + f.height + GAP.betweenStories;
+  const underH = r.top + r.height - top;
+  const adsOver = rest.filter((a) => a.y + a.height <= f.y + 1);
+  const adsUnder = rest.filter((a) => a.y >= f.y + f.height - 1);
+  const items = { over: [] as number[], under: [] as number[] };
+  if (overH >= 30) {
+    const room = overH * spanOf(cols) - adsOver.reduce((t, a) => t + spanOf(a.c1 - a.c0) * (a.height + GAP.betweenStories), 0);
+    let used = 0;
+    for (const i of r.items) {
+      const area = stories[i].area(Math.min(cols, Math.max(...stories[i].widths)));
+      if (!items.under.length && used + area / 2 < room * (0.85 + 0.3 * rng())) { items.over.push(i); used += area; }
+      else items.under.push(i);
+    }
+  } else items.under.push(...r.items);
+  const parts: Tree[] = [];
+  if (overH >= 30) {
+    const over = grow({ c0: r.c0, c1: r.c1, top: r.top, height: overH, ads: adsOver, items: items.over }, stories, rng);
+    if (!over) return null;
+    parts.push({ kind: "fix", cols, height: overH, child: over });
+  }
+  parts.push(leaf);
+  const under = grow({ c0: r.c0, c1: r.c1, top, height: underH, ads: adsUnder, items: items.under }, stories, rng);
+  if (!under) return null;
+  parts.push(under);
+  return join("stack", cols, parts);
+}
+
+/** A region cut straight across at `y` (no ad crossing it): the part over the
+ * cut set exactly to its room (its stories, in their order, while there's
+ * room, a little give either way), the rest under it. */
+function cutAcross(r: Region, y: number, stories: DesignStory[], rng: () => number): Tree | null {
+  const cols = r.c1 - r.c0;
+  const overH = y - GAP.betweenStories - r.top;
+  const adsOver = r.ads.filter((a) => a.y + a.height <= y - GAP.betweenStories + 1);
+  const adsUnder = r.ads.filter((a) => a.y >= y - 1);
+  const room = overH * spanOf(cols) - adsOver.reduce((t, a) => t + spanOf(a.c1 - a.c0) * (a.height + GAP.betweenStories), 0);
+  const over: number[] = [], under: number[] = [];
+  let used = 0;
+  for (const i of r.items) {
+    const area = stories[i].area(Math.min(cols, Math.max(...stories[i].widths)));
+    if (!under.length && used + area / 2 < room * (0.85 + 0.3 * rng())) { over.push(i); used += area; }
+    else under.push(i);
+  }
+  const a = grow({ c0: r.c0, c1: r.c1, top: r.top, height: overH, ads: adsOver, items: over }, stories, rng);
+  if (!a) return null;
+  const b = grow({ c0: r.c0, c1: r.c1, top: y, height: r.top + r.height - y, ads: adsUnder, items: under }, stories, rng);
+  return b ? join("stack", cols, [{ kind: "fix", cols, height: overH, child: a }, b]) : null;
 }

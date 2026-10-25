@@ -39,9 +39,11 @@ export interface StoryRow {
   dropped: boolean; edited: boolean; page: number | null; cols: number | null; fullWidth?: boolean;
 }
 export type AdPlace = "left" | "middle" | "right";
+/** Where on its page an ad goes: its first column (0 = left) and its top, in cm under the top of the news. */
+export interface AdAt { col: number; topCm: number }
 export interface AdRow { id: string; date: string; page: number; width: number; height: number; url: string;
-  /** where along the foot of its page (a booking); a sample: whether it's printed */
-  place?: AdPlace; inUse: boolean;
+  /** where along the foot of its page (a booking), or anywhere on it; a sample: whether it's printed */
+  place?: AdPlace; at?: AdAt; inUse: boolean;
   /** a stand-in from the reference issue, not a booking */
   sample: boolean;
   /** every day the booking runs */

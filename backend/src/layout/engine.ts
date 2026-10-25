@@ -15,6 +15,7 @@ import type { Element } from "@ck/shared/contract";
 import { ladderOf, type Rung } from "../editorial/ladder.ts";
 import type { Ad, Release, Store, Story } from "../store.ts";
 import { Blocks, type Option } from "./blocks.ts";
+import { spanWidth } from "./module.ts";
 import { designs, type DesignAd, type DesignStory } from "./designs.ts";
 import { FILL_MAX, FILL_MIN, realise, Solver, spanOf, type Block, type Tree } from "./guillotine.ts";
 import { fillInTurn, type FillContext } from "./fill.ts";
@@ -306,8 +307,12 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   const t0 = Date.now();
   const none = { page: null, diagnosis: { short: 0, long: 0 } };
   if (!stories.length) return none;
-  if (ads.some((a) => a.pinned !== false)) {
-    log(`  page ${n}: an ad booked at a fixed place: the old engine lays it out`);
+  // an ad the editor put at a place of their own: laid round, if it sits on the columns
+  // (one booked off them, from an old issue, the old engine lays out)
+  const offGrid = (a: Ad) => Math.abs(a.x - (GRID.left + Math.round((a.x - GRID.left) / GRID.pitch) * GRID.pitch)) > 3
+    || Math.abs(a.width - spanWidth(colsOf(a))) > 3;
+  if (ads.some((a) => a.pinned !== false && offGrid(a))) {
+    log(`  page ${n}: an ad booked off the columns: the old engine lays it out`);
     return none;
   }
   const ranks = stories.map((s, i) => rankOf(s, i === 0));
@@ -341,11 +346,13 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   for (const arranged of adLayouts(ads, band)) {
     const boxes: DesignAd[] = arranged.map((a, index) => {
       const c0 = Math.round((a.x - GRID.left) / GRID.pitch);
-      return { index, c0, c1: c0 + colsOf(a), y: a.y, height: a.height };
+      return { index, c0, c1: c0 + colsOf(a), y: a.y - band.top, height: a.height };
     });
     const solver = new Solver({ options, ads: arranged, height, ...(shortBy > 0 ? { fillMax: FILL_MAX * 2 } : {}) });
     // (each round tries more designs than the one before)
-    const trees = designs(ds, boxes, GRID.columns, height, rng, 300 * (round + 1), 6000 * (round + 1));
+    // (an ad the editor put part-way down: far fewer designs work round it, so many more are drawn)
+    const more = boxes.some((b) => b.y + b.height < height - 1) ? 8 : 1;
+    const trees = designs(ds, boxes, GRID.columns, height, rng, 300 * (round + 1), 6000 * (round + 1) * more);
     tried += trees.length;
     for (const t of trees) {
       const cost = solver.cost(t);
@@ -434,6 +441,8 @@ const colsOf = (a: Ad) => Math.max(1, Math.min(GRID.columns, Math.round((a.width
  * columns over the short ones that few stories fit: 22 Oct, page 4.) */
 export function adLayouts(ads: Ad[], band: Band): Ad[][] {
   if (!ads.length) return [ads];
+  // (an ad the editor put at a place of their own: the page's ads as they are)
+  if (ads.some((a) => a.pinned !== false)) return [ads];
   const out = new Map<string, Ad[]>();
   // (an ad the editor put somewhere stays there: arrangements that move it are left out)
   const placedAt = new Map(ads.filter((a) => a.place).map((a) => [a.id, Math.round(a.x)]));
@@ -487,6 +496,7 @@ function sigOf(t: Tree, stories: Story[]): string {
     case "story": return `${stories[t.story].id}:${t.cols}`;
     case "ad": return `ad${t.ad}`;
     case "fill": return `fill${t.cols}`;
+    case "fix": return `X(${sigOf(t.child, stories)})`;
     default: return `${t.kind === "stack" ? "S" : "R"}(${t.children.map((c) => sigOf(c, stories)).join(",")})`;
   }
 }
