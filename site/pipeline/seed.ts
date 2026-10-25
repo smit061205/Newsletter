@@ -21,10 +21,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 const sql = neon(process.env.DATABASE_URL ?? "");
 const hash = (b: Uint8Array) => createHash("sha256").update(b).digest("hex").slice(0, 10);
+// the photo store is private: the site serves its files at /media/<name> (app/media)
 const upload = async (name: string, data: Buffer | Uint8Array, contentType: string) => {
-  const blob = await put(name, Buffer.from(data), { access: "public", contentType, addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 31_536_000 });
+  await put(name, Buffer.from(data), { access: "private", contentType, addRandomSuffix: false, allowOverwrite: true });
   await count(sql, "upload");
-  return blob.url;
+  return `/media/${name}`;
 };
 
 type Seed = Omit<PublishPayload, "stories"> & { stories: (Omit<PublishPayload["stories"][number], "photo"> & { photo: null | { data: string; path: string; width: number; height: number } })[] };

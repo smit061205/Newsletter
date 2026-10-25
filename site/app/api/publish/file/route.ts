@@ -18,14 +18,14 @@ export async function POST(req: Request) {
   // photos/<date>/<name>.jpg, epaper/<date>/<name>.(jpg|pdf)
   const m = name.match(/^(photos|epaper)\/\d{4}-\d{2}-\d{2}\/[a-z0-9-]+\.(jpg|jpeg|png|pdf)$/);
   if (!m) return Response.json({ error: "a file path like photos/2026-10-25/p2326794-1a2b3c.jpg" }, { status: 400 });
+  // the photo store is private: the site serves its files at /media/<name> (app/media)
   const existing = await head(name).catch(() => null);
-  if (existing) return Response.json({ url: existing.url, reused: true });
+  if (existing) return Response.json({ url: `/media/${name}`, reused: true });
   const today = await count(sql, "upload", 0);
   if (today >= DAILY_UPLOADS) return Response.json({ error: `today's ${DAILY_UPLOADS} uploads are used (the free photo store's ceiling)` }, { status: 429 });
   const body = await req.arrayBuffer();
   if (!body.byteLength || body.byteLength > 4_000_000) return Response.json({ error: "a file between 1 byte and 4 MB" }, { status: 413 });
-  const blob = await put(name, body, { access: "public", contentType: TYPES[m[2]], addRandomSuffix: false, allowOverwrite: true,
-                                        cacheControlMaxAge: 31_536_000 });
+  await put(name, body, { access: "private", contentType: TYPES[m[2]], addRandomSuffix: false, allowOverwrite: true });
   await count(sql, "upload");
-  return Response.json({ url: blob.url });
+  return Response.json({ url: `/media/${name}` });
 }

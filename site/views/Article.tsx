@@ -18,7 +18,7 @@ export function articleJsonLd(s: Story, lang: Lang) {
     "@context": "https://schema.org", "@type": "NewsArticle",
     headline: w.headline.slice(0, 110), description: w.deck || undefined, inLanguage: lang === "en" && w.translated ? "en" : "gu",
     datePublished: s.publishedAt, dateModified: s.updatedAt,
-    image: s.photo ? [s.photo.url] : undefined,
+    image: s.photo ? [new URL(s.photo.url, SITE_URL).href] : undefined,
     mainEntityOfPage: `${SITE_URL}${href(lang, `/news/${s.id}`)}`,
     articleSection: sectionName(s.tier, lang),
     author: { "@type": "Organization", name: PAPER[lang].name, url: SITE_URL },

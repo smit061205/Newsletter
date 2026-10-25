@@ -12,7 +12,7 @@ export function rss(stories: Story[], lang: Lang, title?: string) {
     const link = `${SITE_URL}${href(lang, `/news/${s.id}`)}`;
     return `<item><title>${x(e?.headline || s.headline)}</title><link>${link}</link><guid isPermaLink="true">${link}</guid>` +
       `<pubDate>${new Date(s.publishedAt).toUTCString()}</pubDate><category>${x(sectionName(s.tier, lang))}</category>` +
-      `<description>${x(e?.deck || s.deck)}</description>${s.photo ? `<enclosure url="${x(s.photo.url)}" type="image/jpeg" length="0"/>` : ""}</item>`;
+      `<description>${x(e?.deck || s.deck)}</description>${s.photo ? `<enclosure url="${x(new URL(s.photo.url, SITE_URL).href)}" type="image/jpeg" length="0"/>` : ""}</item>`;
   }).join("");
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>${x(title ?? PAPER[lang].name)}</title>` +
     `<link>${SITE_URL}${href(lang, "/")}</link><description>${x(PAPER[lang].tagline)}</description><language>${lang === "gu" ? "gu-IN" : "en-IN"}</language>${items}</channel></rss>`;
