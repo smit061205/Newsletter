@@ -9,8 +9,9 @@
 //     the newsroom's Settings shows, once; anyone else is ignored;
 //   - every message is answered in Gujarati, so he knows it arrived;
 //   - a photo finds its article: sent within half an hour of one, it's that
-//     one's; else the AI looks at it (writing on banners, boards) and matches
-//     it if it's sure; else the bot asks him, his recent articles as buttons.
+//     one's (the AI looking too when he sent others: if it's sure of another,
+//     he's asked); else the AI looks at it (writing on banners, boards) and
+//     matches it if it's sure; else the bot asks him, his recent articles as buttons.
 //     Nothing is guessed: a photo nobody placed stays out of the paper;
 //   - at paper time (pipeline.ts fetch) what no paper has taken yet becomes
 //     the day's releases, written up like any other (editorial/rewrite.ts),
@@ -213,11 +214,17 @@ export async function placePhotos(store: Store, log: (s: string) => void, now = 
 async function placeOne(store: Store, p: InboxItem, group: InboxItem[], arts: ReturnType<typeof articles>, all: InboxItem[], log: (s: string) => void) {
   const mine = arts.filter((a) => a.chat === p.chat && !all.find((x) => x.id === a.ids[0])?.usedOn);
   const near = mine.filter((a) => Math.abs(a.at - p.at) <= NEAR);
+  const recent = mine.filter((a) => Math.abs(a.at - p.at) <= RECENT);
   let pick = near.length === 1 ? near[0] : null;
-  if (!pick) {
-    const recent = mine.filter((a) => Math.abs(a.at - p.at) <= RECENT);
-    if (recent.length) pick = await byLooking(p, group, recent, log);
-  }
+  if (pick && recent.length > 1) {
+    // the time says one article, but he sent others too (a burst, or a photo of an earlier
+    // one sent late): the AI looks as well, and if it's sure of another, he's asked
+    const seen = await byLooking(p, group, recent, log);
+    if (seen && seen !== pick) {
+      log(`Telegram: a photo's time and what's in it point to different articles: he's asked`);
+      return ask(store, group, log);
+    }
+  } else if (!pick && recent.length) pick = await byLooking(p, group, recent, log);
   if (pick) {
     for (const x of group) store.putInbox({ ...x, pairedTo: pick.ids[0] });
     await api("sendMessage", { chat_id: p.chat, text: SAY.joined(titleOf(pick.text)),
