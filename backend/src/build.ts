@@ -289,6 +289,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
       log(`  ${section === "રાષ્ટ્રીય" ? "national" : "world"} news kept in: ${best.map((s) => s.id).join(", ")}`);
     }
+    // what the editor sent the paper's Telegram bot: never ranked below 2 by the plan
+    // (26 Oct: always in the paper; the layout never holds one back while another can be)
+    pool = pool.map((s) => (s.source.startsWith("telegram:") && !rankedByEditor.has(s.id) && s.priority > 2 ? { ...s, priority: 2 } : s))
+      .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
     // feature articles print like the news: no kicker, no special title (24 Oct, the editor's wish)
     pool = pool.map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s));
     let rewordCost = 0;
