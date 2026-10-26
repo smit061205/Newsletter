@@ -5,7 +5,7 @@
 name: site-engine-try
 on:
   push:
-    paths: ["site/engine/**", "site/lib/**", ".github/workflows/site-engine*.yml"]
+    paths: ["site/engine/**", ".github/workflows/site-engine*.yml"]
   workflow_dispatch:
     inputs:
       stories:
