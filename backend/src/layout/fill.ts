@@ -80,11 +80,13 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   // before anything written: 25 Oct wrote a cooking tip with eight stories held)
   {
     let best: { s: Story; mod: Module } | null = null;
-    for (const s of ctx.held.slice(0, 12)) {
+    // (down to its first sentence alone, 10 words or more: 26 Oct's copies wrote
+    // 20-word items with 35 stories held -- a cut had to keep two sentences and 15 words)
+    for (const s of ctx.held.slice(0, 30)) {
       const sentences = s.bodies.long.split(/(?<=[.।!?])\s+/);
-      for (let k = sentences.length; k >= 2; k--) {
+      for (let k = sentences.length; k >= 1; k--) {
         const body = sentences.slice(0, k).join(" ");
-        if (words(body) < 15) break;
+        if (words(body) < 10) break;
         const mod = await buildModule({ ...s, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0);
         if (!Number.isFinite(mod.height) || mod.height > h + 0.5) continue;
         const heads = mod.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length;
