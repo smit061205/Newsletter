@@ -14,7 +14,7 @@
 //      if none is exact (its gap reported). No other engine lays out a page.
 import type { Element } from "@ck/shared/contract";
 import { ladderOf, type Rung } from "../editorial/ladder.ts";
-import type { Ad, Release, Store, Story } from "../store.ts";
+import { alwaysPrinted, type Ad, type Release, type Store, type Story } from "../store.ts";
 import { Blocks, type Option } from "./blocks.ts";
 import { spanWidth } from "./module.ts";
 import { designs, type DesignAd, type DesignStory } from "./designs.ts";
@@ -76,9 +76,9 @@ export function seeded(seed: number): () => number {
 
 interface Sized { story: Story; min: number; mid: number; max: number }
 
-/** News the editor sent the paper's Telegram bot: always printed (26 Oct, the
- * editor's wish): never the story held back while another can be. */
-const sent = (s: Sized) => s.story.source?.startsWith("telegram:") ?? false;
+/** News the editor sent the paper's Telegram bot, and a copy's fixed article:
+ * always printed (26 Oct, the editor's wish): never the story held back while another can be. */
+const sent = (s: Sized) => alwaysPrinted(s.story);
 /** the story to hold back first: not one he sent, then the least important */
 const toHold = (a: Sized, b: Sized) => Number(sent(a)) - Number(sent(b)) || b.story.priority - a.story.priority;
 /** the held story to bring back first: one he sent, then the most important */

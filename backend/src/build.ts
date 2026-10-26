@@ -30,7 +30,7 @@ import { acquireBrowser, releaseBrowser } from "./browser.ts";
 import { spanWidth } from "./layout/module.ts";
 import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
-import { storyIdOf, type Progress, type Store, type Story } from "./store.ts";
+import { alwaysPrinted, storyIdOf, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
   /** the page review left to run after the paper is saved (reviewLater): the paper is ready a minute sooner */
@@ -64,6 +64,8 @@ export interface CopyOpts {
   store?: Store;
   /** the stories come in another language (`reword` translates them): not filtered by language until then */
   translate?: boolean;
+  /** an article in this copy only, printed word for word with its title and photo (editorial/copies.ts) */
+  extra?: Story;
 }
 
 /** The sample ads (the paper's own stand-ins for a day with nothing booked) as
@@ -291,7 +293,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     }
     // what the editor sent the paper's Telegram bot: never ranked below 2 by the plan
     // (26 Oct: always in the paper; the layout never holds one back while another can be)
-    pool = pool.map((s) => (s.source.startsWith("telegram:") && !rankedByEditor.has(s.id) && s.priority > 2 ? { ...s, priority: 2 } : s))
+    pool = pool.map((s) => (alwaysPrinted(s) && !rankedByEditor.has(s.id) && s.priority > 2 ? { ...s, priority: 2 } : s))
       .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
     // feature articles print like the news: no kicker, no special title (24 Oct, the editor's wish)
     pool = pool.map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s));
@@ -306,7 +308,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       // with enough chance that every copy comes out its own
       const spread = c.shuffle === "anywhere" ? 4 : 2.5;
       const lead = c.lead && got.pool.some((s) => s.id === c.lead) ? c.lead : got.pool[0]?.id;
-      const keyed = got.pool.map((s) => ({ s, k: c.shuffle === "keepLead" && s.id === lead ? -Infinity : s.priority + c.rng() * spread }));
+      // (the copy's fixed article, as given: never reworded)
+      const list = c.extra ? [...got.pool, c.extra] : got.pool;
+      const keyed = list.map((s) => ({ s, k: c.shuffle === "keepLead" && s.id === lead ? -Infinity : s.priority + c.rng() * spread }));
       pool = keyed.sort((a, b) => a.k - b.k).map((x) => x.s) as typeof pool;
     }
     log(`planning ${date} (issue ${issueNumber}): ${pool.length} stories, ${ads.length} ads, ${total} pages`);

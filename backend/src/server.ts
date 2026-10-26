@@ -345,16 +345,35 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           }
           if (req.method === "GET") return send(res, 200, copiesOf(date));
           if (req.method === "POST") {
-            const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string; lang?: string };
+            const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string; lang?: string;
+                                                    extra?: { body?: string; deck?: string; titles?: string[]; photos?: ({ name: string; base64: string } | { url: string })[] } };
             if (body.lang !== undefined && !["gu", "hi", "ur"].includes(body.lang)) return send(res, 400, { error: "the language is gu, hi or ur" });
             const count = Math.round(Number(body.count));
-            if (!(count >= 1 && count <= 20)) return send(res, 400, { error: "make between 1 and 20 copies" });
+            if (!(count >= 1 && count <= 50)) return send(res, 400, { error: "make between 1 and 50 copies" });
             if (!["headline", "headlineDeck", "all"].includes(body.reword ?? "")) return send(res, 400, { error: "what to reword: headline, headlineDeck or all" });
             if (!["keepLead", "anywhere", "samePage"].includes(body.shuffle ?? "")) return send(res, 400, { error: "how far stories move: keepLead, anywhere or samePage" });
             if (currentCopies()) return send(res, 409, { error: "copies or the other papers are being made: wait for them to finish" });
             if (currentJob()?.date === date) return send(res, 409, { error: "the day's paper is being made: make copies when it's done" });
             if (!store.latestIssue(date)) return send(res, 404, { error: `no paper made for ${date} yet` });
-            makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", lang: body.lang as "gu" | undefined, log })
+            // an article in every copy, word for word: its titles, and its photos saved with the day's
+            let extra: { body: string; deck: string; titles: string[]; photos: string[] } | undefined;
+            if (body.extra) {
+              const titles = (body.extra.titles ?? []).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
+              const text = (body.extra.body ?? "").trim();
+              if (!text || !titles.length) return send(res, 400, { error: "the article needs its text and at least one title" });
+              if ((body.lang ?? "gu") !== "gu") return send(res, 400, { error: "the article goes in Gujarati copies only" });
+              const dir = path.join(MEDIA_DIR, date);
+              await mkdir(dir, { recursive: true });
+              const photos: string[] = [];
+              for (const [i, p] of (body.extra.photos ?? []).slice(0, 6).entries()) {
+                if ("url" in p) { if (/^\/media\/[\w./-]+$/.test(p.url) && !p.url.includes("..")) photos.push(p.url); continue; }
+                const name = `fixed-${i + 1}-${p.name.replace(/[^A-Za-z0-9._-]/g, "_")}`;
+                await writeFile(path.join(dir, name), Buffer.from(p.base64, "base64"));
+                photos.push(`/media/${date}/${name}`);
+              }
+              extra = { body: text, deck: (body.extra.deck ?? "").replace(/\s+/g, " ").trim(), titles: titles.slice(0, 6), photos };
+            }
+            makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", lang: body.lang as "gu" | undefined, extra, log })
               .catch((e) => log(`copies stopped: ${e instanceof Error ? e.message : e}`));
             return send(res, 202, copiesOf(date));
           }

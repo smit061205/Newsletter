@@ -17,7 +17,7 @@ import { setDisplay, type DisplaySpec } from "./display.ts";
 import { normalizeStory } from "./text.ts";
 import { profile } from "../profile.ts";
 import { BODY, CAPTION, DECK, GAP, GRID, HEADLINE, KICKER, PHOTO, PT } from "./typography.ts";
-import type { Story } from "../store.ts";
+import { wordForWord, type Story } from "../store.ts";
 
 export type Variant = "long" | "medium" | "short";
 
@@ -309,8 +309,10 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     if (k && photo) {
       const pw = spanWidth(k);
       const ph = pw * photo.height / photo.width; // natural shape: nothing cropped
-      if (ph < PHOTO.minHeight) continue; // a postage stamp
-      if (photo.width / (pw / 300) < PHOTO.minPpi) continue; // would print soft
+      // (a customer's photo prints even small or a little soft: it's what he paid for -- the newsroom warns of a small one)
+      const theirs = wordForWord(story);
+      if (ph < PHOTO.minHeight && !theirs) continue; // a postage stamp
+      if (photo.width / (pw / 300) < (theirs ? PHOTO.minPpi * 0.6 : PHOTO.minPpi)) continue; // would print soft
       const px = w - pw;
       const img: ImageElement = { id: `${aid}-photo`, kind: "image", articleId: aid, x: r1(px), y: r1(cursor),
                                   width: r1(pw), height: r1(ph), url: story.photo!, fit: "cover" };
@@ -343,7 +345,8 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     const tops = Array.from({ length: cols }, (_, i) => (k && i >= cols - k ? photoBottom : cursor));
     const { lines: body, bottom, caps } = level(tops);
     const height = Math.max(bottom, k ? photoFoot : cursor);
-    if (k && photo && spanWidth(k) * (spanWidth(k) * photo.height / photo.width) > maxShare * w * height) continue;
+    // (a customer's article always shows its photo, however short its text)
+    if (k && photo && !wordForWord(story) && spanWidth(k) * (spanWidth(k) * photo.height / photo.width) > maxShare * w * height) continue;
     // the text beside a photo must reach (about) its foot: a photo taller
     // than its story's text leaves a hole beside it -- try a smaller one
     if (k && k < cols && photoFoot - bottom > 1.5 * pitch) continue;
