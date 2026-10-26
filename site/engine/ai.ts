@@ -19,8 +19,8 @@ const GOOGLE = "https://generativelanguage.googleapis.com/v1beta";
 const isGoogle = (m: string) => m.startsWith("google:");
 /** extra length for Gemma's thinking, on top of the answer's own */
 const GOOGLE_THINKING_ROOM = 8192;
-/** how much Gemma may think: set from what aiprobe.ts found the model accepts (none = its default) */
-const GOOGLE_THINKING: Record<string, unknown> | null = process.env.CK_GOOGLE_THINKING ? JSON.parse(process.env.CK_GOOGLE_THINKING) : null;
+/** how much each Gemma may think, as aiprobe.ts found it accepts (none = its default) */
+const thinkingOf = (model: string) => WEBSITE.googleThinking[model.slice(7)] ?? null;
 /** which daily allowance a model's requests count against */
 const counter = (m: string) => (isGoogle(m) ? "ai_google" : "ai_free");
 const ceiling = (m: string) => (isGoogle(m) ? WEBSITE.dailyGoogleRequests : WEBSITE.dailyFreeRequests);
@@ -52,7 +52,7 @@ async function callGoogle(model: string, a: { system: string; user: string; temp
         // and the thinking kept short where the model takes the setting (26 Oct: 3,500 tokens went on
         // thinking and the answer came back empty)
         generationConfig: { temperature: a.temperature, maxOutputTokens: a.maxTokens + GOOGLE_THINKING_ROOM,
-                            ...(GOOGLE_THINKING ? { thinkingConfig: GOOGLE_THINKING } : {}) },
+                            ...(thinkingOf(model) ? { thinkingConfig: thinkingOf(model) } : {}) },
       }),
     });
     const text = await res.text();
@@ -149,7 +149,8 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
     await new Promise((r) => setTimeout(r, soonest - Date.now()));
   }
   const awake = order.filter((m) => (resting.get(m) ?? 0) < Date.now());
-  const tryList = awake.filter((m) => m !== a.avoid).concat(a.avoid && awake.includes(a.avoid) && awake.length === 1 ? [a.avoid] : []);
+  // the model to avoid (the writer) only as the last resort: a check by the same model is better than none
+  const tryList = [...awake.filter((m) => m !== a.avoid), ...(a.avoid && awake.includes(a.avoid) ? [a.avoid] : [])];
   if (!tryList.length) return { ok: false, why: "every free model is busy for now", busy: true };
   for (const model of tryList) {
     // a route whose day's allowance is used up is skipped; when every route is, the run's AI stops

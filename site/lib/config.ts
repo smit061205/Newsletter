@@ -6,7 +6,10 @@ export const WEBSITE = {
   freeModels: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free"],
   // Gemma through Google's own API with the paper's free key (GOOGLE_AI_KEY), tried first;
   // the daily ceiling stays under the free tier's (about 1,500 a day per Gemma, 26 Oct)
-  googleModels: ["gemma-4-31b-it", "gemma-4-26b-a4b-it"],
+  // (26 Oct, measured by engine/aiprobe.ts: the 26b answers a story in 7 s when told to think
+  // minimally, 100 s otherwise; the 31b refuses that setting and is slower, so it checks)
+  googleModels: ["gemma-4-26b-a4b-it", "gemma-4-31b-it"],
+  googleThinking: { "gemma-4-26b-a4b-it": { thinkingLevel: "minimal" } } as Record<string, Record<string, unknown>>,
   dailyGoogleRequests: 1400,
   dailyFreeRequests: 900,
   dailyUploads: 50,
