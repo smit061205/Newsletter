@@ -39,6 +39,20 @@ export default function Chrome(p: ChromeProps) {
   const [size, setSize] = useState("1");
   const [away, setAway] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  // results as the reader types (app/api/search), a moment after they stop
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<{ id: string; headline: string; when: string }[] | null>(null);
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) { setFound(null); return; }
+    const ctl = new AbortController();
+    const k = setTimeout(() => {
+      fetch(`/api/search?lang=${p.lang}&q=${encodeURIComponent(term)}`, { signal: ctl.signal })
+        .then((r) => r.json()).then((d: { stories: { id: string; headline: string; when: string }[] }) => setFound(d.stories)).catch(() => {});
+    }, 250);
+    return () => { clearTimeout(k); ctl.abort(); };
+  }, [query, p.lang]);
+  const storyLink = (id: string) => `${p.lang === "gu" ? "" : `/${p.lang}`}/news/${id}`;
   const q = useRef<HTMLInputElement>(null);
   const w = p.words;
 
@@ -91,8 +105,17 @@ export default function Chrome(p: ChromeProps) {
       <aside className="sheet" hidden={!open} aria-label={w.menu}>
         <div className="x"><b>{p.name}</b><button type="button" className="ib" aria-label={w.close} onClick={() => setOpen(false)}><CloseIcon /></button></div>
         <form className="search" role="search" action={p.links.search} method="get" onSubmit={() => setOpen(false)}>
-          <SearchIcon /><input ref={q} id="q" name="q" type="search" placeholder={w.searchPlaceholder} aria-label={w.searchPlaceholder} autoComplete="off" />
+          <SearchIcon /><input ref={q} id="q" name="q" type="search" placeholder={w.searchPlaceholder} aria-label={w.searchPlaceholder} autoComplete="off"
+                               value={query} onChange={(e) => setQuery(e.target.value)} />
         </form>
+        {found && (
+          <div className="results" aria-live="polite">
+            {found.map((r) => (
+              <Link key={r.id} href={storyLink(r.id)} onClick={() => setOpen(false)}><span className="h4">{r.headline}</span><small>{r.when}</small></Link>
+            ))}
+            {found.length > 0 && <Link className="more" href={`${p.links.search}?q=${encodeURIComponent(query.trim())}`} onClick={() => setOpen(false)}>{w.search} <Chev /></Link>}
+          </div>
+        )}
         <Link className="srow" href={p.links.home} onClick={() => setOpen(false)}>{w.home}</Link>
         <Link className="srow" href={p.links.latest} onClick={() => setOpen(false)}>{w.latestTitle}</Link>
         {p.sections.map((s) => (
