@@ -82,6 +82,8 @@ export async function stackLines(m: Measurer, lines: Line[], id: string, aid: st
       x: r1(x), y: r1(top), width: r1(w), height: r1(pitch),
       ...elementText([l], m.isLegacy(font)), font, size: r1(size), lineHeight: r1(pitch), color: INK,
       align: (l.width >= 0.96 * w ? "justify-all" : "left") as TextElement["align"],
+      // a line still wider than its box (one long word) squeezed into it, never over the next column
+      ...(l.width > w ? { hScale: Math.round((w / l.width) * 10000) / 10000 } : {}),
     };
   });
   return { elements, bottom: baseline + ink[ink.length - 1].descent };

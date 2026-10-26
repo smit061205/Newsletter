@@ -76,6 +76,14 @@ export function seeded(seed: number): () => number {
 
 interface Sized { story: Story; min: number; mid: number; max: number }
 
+/** News the editor sent the paper's Telegram bot: always printed (26 Oct, the
+ * editor's wish): never the story held back while another can be. */
+const sent = (s: Sized) => s.story.source?.startsWith("telegram:") ?? false;
+/** the story to hold back first: not one he sent, then the least important */
+const toHold = (a: Sized, b: Sized) => Number(sent(a)) - Number(sent(b)) || b.story.priority - a.story.priority;
+/** the held story to bring back first: one he sent, then the most important */
+const toBring = (a: Sized, b: Sized) => Number(sent(b)) - Number(sent(a)) || a.story.priority - b.story.priority;
+
 /** The stories shared out over the pages: each page's list, most important first. */
 export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<string, number>; rng?: () => number }): { pages: Sized[][]; held: Sized[] } {
   const pages: Sized[][] = rooms.map(() => []);
@@ -104,7 +112,7 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
         + (feature ? (k === 0 ? -0.5 : 0.05 * k) : 0.08 * (rooms.length - 1 - k))
         - (pages[k].some((o) => related(o.story, s.story)) ? 0.3 : 0) + (opts.rng ? (opts.rng() - 0.5) * 0.12 : 0);
       p = rooms.map((_, k) => k).reduce((a, b) => (score(b) > score(a) ? b : a));
-      if (rooms[p] - used[p] < s.min * 0.6) { held.push(s); continue; }
+      if (rooms[p] - used[p] < s.min * 0.6 && !sent(s)) { held.push(s); continue; }
     }
     pages[p].push(s);
     used[p] += s.mid;
@@ -117,14 +125,14 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
     if (short < 0 && long < 0) break;
     if (long >= 0) {
       // the least important story that isn't the page's first goes where there's room, else is held
-      const s = [...pages[long]].slice(1).sort((a, b) => b.story.priority - a.story.priority || a.mid - b.mid)[0];
+      const s = [...pages[long]].slice(1).sort((a, b) => toHold(a, b) || a.mid - b.mid)[0];
       if (!s) break;
       pages[long] = pages[long].filter((x) => x !== s);
       const to = rooms.findIndex((r, k) => k !== long && sum(k, "max") + s.mid < r * 1.05);
       if (to >= 0) pages[to].push(s); else held.push(s);
       continue;
     }
-    const spare = held.sort((a, b) => a.story.priority - b.story.priority)[0];
+    const spare = held.sort(toBring)[0];
     if (spare) { held.splice(held.indexOf(spare), 1); pages[short].push(spare); continue; }
     const from = rooms.findIndex((r, k) => k !== short && pages[k].length > 1 && sum(k, "min") < r * 0.9);
     if (from < 0) break;
@@ -247,7 +255,7 @@ export async function layOut(args: {
       // the page can take): a reserve story that runs in one or two columns
       if (d.short === 0 && d.long === 0 && narrowed.has(i) && shares[i].length > 1) {
         // a narrow story didn't help (26 Oct): the least important one held back
-        const s = shares[i].slice(1).sort((a, b) => b.story.priority - a.story.priority || b.mid - a.mid)[0];
+        const s = shares[i].slice(1).sort((a, b) => toHold(a, b) || b.mid - a.mid)[0];
         shares[i] = shares[i].filter((x) => x !== s);
         held.push(s);
         log(`  page ${i + 1}: still no design: ${s.story.id} held back`);
@@ -272,7 +280,7 @@ export async function layOut(args: {
       }
       if (d.short > d.long || (round >= 1 && isShort && !shortBy.has(i))) {
         // too little copy for the page: a held story, else the smallest from a page that has the most to spare
-        const spare = held.sort((a, b) => a.story.priority - b.story.priority || b.mid - a.mid)[0];
+        const spare = held.sort((a, b) => toBring(a, b) || b.mid - a.mid)[0];
         if (spare) {
           held.splice(held.indexOf(spare), 1);
           shares[i].push(spare);
@@ -293,7 +301,7 @@ export async function layOut(args: {
           log(`  page ${i + 1}: short of copy: ${s.story.id} moved here from page ${from + 1}`);
         }
       } else if (d.long > d.short && shares[i].length > 1) {
-        const s = shares[i].slice(1).sort((a, b) => b.story.priority - a.story.priority || a.mid - b.mid)[0];
+        const s = shares[i].slice(1).sort((a, b) => toHold(a, b) || a.mid - b.mid)[0];
         shares[i] = shares[i].filter((x) => x !== s);
         held.push(s);
         log(`  page ${i + 1}: more copy than room: ${s.story.id} held back`);

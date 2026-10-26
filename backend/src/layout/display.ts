@@ -49,14 +49,18 @@ export interface DisplayBlock {
   fill: number;
 }
 
-interface Measured { word: string; width: number; letters: number; runs: Run[] }
+/** (glue: the second part of a word broken after a dash -- no space before it) */
+interface Measured { word: string; width: number; letters: number; runs: Run[]; glue?: boolean }
+
+/** the spaces between words i..j-1 (none before a glued part) */
+const gaps = (words: Measured[], i: number, j: number) => words.slice(i + 1, j).filter((x) => !x.glue).length;
 
 /** The best way to break `words` (measured at size 1) into `n` lines that can
  * each be fitted to `w` at `size`: the most even lines, no lone last word. */
 function breaksFor(words: Measured[], space: number, size: number, w: number, n: number, lastFree = false): number[] | null {
   const k = words.length;
   if (n > k) return null;
-  const nat = (i: number, j: number) => (words.slice(i, j).reduce((a, x) => a + x.width, 0) + (j - i - 1) * space) * size;
+  const nat = (i: number, j: number) => (words.slice(i, j).reduce((a, x) => a + x.width, 0) + gaps(words, i, j) * space) * size;
   const stretchable = (i: number, j: number) => nat(i, j) * HMAX + (words.slice(i, j).reduce((a, x) => a + x.letters, 0) + j - i - 2) * LS_MAX * size * HMAX;
   // cost[j][l]: best cost to set words[0..j) in l lines
   const INF = Number.POSITIVE_INFINITY;
@@ -74,6 +78,7 @@ function breaksFor(words: Measured[], space: number, size: number, w: number, n:
         // how far the line's scale is from 1, both ways alike (a free last line: how short it falls)
         let c = free ? (width < 0.35 * w ? 1 : 0) : Math.log(w / width) ** 2;
         if (l === n && j - i === 1 && n > 1) c += 0.5; // a lone last word
+        if (words[i].glue) c += 0.3; // a word broken after its dash: only where it must be
         if (cost[i][l - 1] + c < cost[j][l]) {
           cost[j][l] = cost[i][l - 1] + c;
           from[j][l] = i;
@@ -136,7 +141,7 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
   if (!t) return null;
   const REF = 100;
   const measured = await m.words(t, spec.font, REF);
-  const words: Measured[] = measured.words.map((x) => ({ word: x.word, width: x.width / REF, letters: x.letters, runs: x.runs }));
+  const words: Measured[] = measured.words.map((x) => ({ word: x.word, width: x.width / REF, letters: x.letters, runs: x.runs, glue: x.glue }));
   const space = measured.space / REF;
 
   // the largest size (in 0.5pt steps) at which the text can be set; for
@@ -144,7 +149,7 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
   let chosen: { size: number; starts: number[] } | null = null;
   if (spec.align !== "fit") {
     for (let size = spec.max; size >= spec.min - 0.01 && !chosen; size -= PT / 2) {
-      const natural = (words.reduce((a, x) => a + x.width, 0) + (words.length - 1) * space) * size;
+      const natural = (words.reduce((a, x) => a + x.width, 0) + gaps(words, 0, words.length) * space) * size;
       if (natural * HMIN <= w) chosen = { size, starts: [0] };
     }
   } else {
@@ -172,17 +177,18 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
     const ws = words.slice(i, j);
     const runs: Run[] = [];
     ws.forEach((x, wi) => {
-      if (wi) runs.push({ text: measured.spaceText });
+      if (wi && !x.glue) runs.push({ text: measured.spaceText });
       runs.push(...x.runs);
     });
-    const natural = (ws.reduce((a, x) => a + x.width, 0) + (ws.length - 1) * space) * size;
+    const spaces = gaps(words, i, j);
+    const natural = (ws.reduce((a, x) => a + x.width, 0) + spaces * space) * size;
     // (a script never letter-spaced -- Hindi, Urdu: measure.ts gives its words
     // no letters -- takes none at its spaces either: letter spacing applies to
     // every character on the page, and a Hindi heading ran 65-127 px over)
     const letters = ws.some((x) => x.letters > 0) ? ws.reduce((a, x) => a + x.letters, 0) + ws.length - 2 : 0;
-    const line: Line = { text: ws.map((x) => x.word).join(" "), runs, para: 0, start: k === 0, end: k === starts.length - 1,
-                         width: natural, spaces: ws.length - 1, letters, spaceWidth: space * size };
-    return { line, natural, letters, spaces: ws.length - 1 };
+    const line: Line = { text: ws.map((x, wi) => (wi && !x.glue ? " " : "") + x.word).join(""), runs, para: 0, start: k === 0, end: k === starts.length - 1,
+                         width: natural, spaces, letters, spaceWidth: space * size };
+    return { line, natural, letters, spaces };
   });
 
   // the width a line is set to: a kerned script (Hindi, Urdu) prints a hair

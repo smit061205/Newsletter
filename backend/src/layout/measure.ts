@@ -92,6 +92,13 @@ export function topFor(baseline: number, fontAscent: number, fontDescent: number
 const LEGACY_TAKEN = /(["#$&*<>@[\\\]^_{|}~]+)/;
 const LATIN_TOKEN = /[A-Za-z0-9]+(?:[.,:\-\/%&+'’][A-Za-z0-9]+)*|[^A-Za-z0-9]+/g;
 
+/** A long word joined by dashes ("જયપુર–ટાટાનગર–સંતરાગાછી", 26 Oct: a headline
+ * line ran into the next column) may break after a dash, its parts glued. */
+export function dashParts(tok: string): string[] {
+  if (tok.length <= 10) return [tok];
+  return tok.split(/(?<=[–—])(?=\S)|(?<=[^\d\s-]-)(?=[^\d\s-])/);
+}
+
 /** Merge neighbouring runs in the same font. */
 export function mergeRuns(runs: Run[]): Run[] {
   const out: Run[] = [];
@@ -357,7 +364,7 @@ export class Measurer {
       paras: r.paras.map((p) => p.split(/\s+/).filter(Boolean).flatMap((tok) =>
         (tok.length > 14 && /^[\w.@\-+:/%?=&#~]+$/.test(tok) && /[A-Za-z]{2}/.test(tok) && /[@./]/.test(tok)
           ? tok.split(/(?<=[@/])(?=[^/])|(?<=\.)(?=\w)/)
-          : tok.length > 10 && tok.includes("/") ? tok.split(/(?<=\/)(?=[^/])/) : [tok]).map((w, k) => ({
+          : tok.length > 10 && tok.includes("/") ? tok.split(/(?<=\/)(?=[^/])/) : dashParts(tok)).map((w, k) => ({
           word: w, glue: k > 0, runs: this.shape(w, r.font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? r.font) })),
         })))),
     }));
@@ -426,20 +433,20 @@ export class Measurer {
   /** The words of `text` as printed in `font` at `size`: each word's runs,
    * width and letter count, and the space between words. For display lines,
    * set and fitted by layout/display.ts. */
-  async words(text: string, font: string, size: number): Promise<{ words: (Word & { word: string; runs: Run[] })[]; space: number; spaceText: string }> {
+  async words(text: string, font: string, size: number): Promise<{ words: (Word & { word: string; runs: Run[]; glue?: boolean })[]; space: number; spaceText: string }> {
     // Hindi and Urdu: kerned, and never letter-spaced (see breakLines)
     const unspaced = /[\u0600-\u06FF\u0750-\u077F\u0900-\u097F]/.test(text);
     const req = {
       size, hScale: 1, base: family(font), space: this.shape(" ", font)[0].text, kern: unspaced,
-      paras: [text.split(/\s+/).filter(Boolean).map((w) => ({
-        word: w, runs: this.shape(w, font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? font) })),
-      }))],
+      paras: [text.split(/\s+/).filter(Boolean).flatMap((tok) => dashParts(tok).map((w, k) => ({
+        word: w, glue: k > 0, runs: this.shape(w, font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? font) })),
+      })))],
     };
     const [m] = await this.measureWords([req]);
     if (unspaced) for (const w of m.paras[0]) w.letters = 0;
     return {
       space: m.space, spaceText: req.space,
-      words: m.paras[0].map((w, i) => ({ ...w, word: req.paras[0][i].word,
+      words: m.paras[0].map((w, i) => ({ ...w, word: req.paras[0][i].word, ...(req.paras[0][i].glue ? { glue: true } : {}),
                                           runs: req.paras[0][i].runs.map((x) => (x.font ? { text: x.text, font: x.font } : { text: x.text })) })),
     };
   }
