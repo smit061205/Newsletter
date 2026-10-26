@@ -2,11 +2,11 @@
 // stories yet simply don't show (phase A has only the evening paper's).
 import Link from "next/link";
 import type { Lang, Story } from "../lib/types.ts";
-import { latestIssue, latestStories } from "../lib/db.ts";
+import { latestIssue, latestStories, moreOnSubject, mostRead } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
 import { dateText, num, todayInIndia } from "../lib/format.ts";
-import { Cmp, Head, Join, LatestList, Lead, Std, words } from "../components/cards.tsx";
+import { Cmp, Head, Join, LatestList, Lead, MostRead, Std, words } from "../components/cards.tsx";
 import { Chev } from "../components/icons.tsx";
 import Frame from "../components/Frame.tsx";
 
@@ -65,6 +65,8 @@ export default async function Home({ lang }: { lang: Lang }) {
     .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
   const lead = recentLive[0] ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
   // the six under the lead: photo stories in the first row, so the row lines up
+  // under the lead, its subject's other stories; in the rail, what readers open most
+  const [more, most] = await Promise.all([lead ? moreOnSubject(lead.id) : [], mostRead(5)]);
   const six = today.filter((s) => s !== lead).slice(0, 6).sort((a, b) => Number(!!b.photo) - Number(!!a.photo));
   const shown = new Set([lead, ...six].filter(Boolean).map((s) => s!.id));
   // the latest list beside them: newest first, without the stories already at the top
@@ -80,7 +82,7 @@ export default async function Home({ lang }: { lang: Lang }) {
           <div className="dateline"><span>{dateText(day!, lang, true)}</span><span className="upd">{t(lang, "updated")}</span></div>
           <div className="ctr g topg" style={{ marginTop: 16 }}>
             <div>
-              <Lead s={lead} lang={lang} />
+              <Lead s={lead} lang={lang} more={more} />
               {six.length > 0 && (
                 <div className="g cards c3 six" style={{ marginTop: "var(--gut)", paddingTop: "var(--gut)", borderTop: "1px solid var(--rule)" }}>
                   {/* photos only in a full first row (photo stories come first), so every row's headlines line up */}
@@ -89,9 +91,11 @@ export default async function Home({ lang }: { lang: Lang }) {
               )}
             </div>
             <aside className="rail vr"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={8} />
+              {most.length >= 3 && <div className="ctr"><Head label={t(lang, "mostRead")} /><MostRead stories={most} lang={lang} /></div>}
               <div style={{ marginTop: 20 }}><Join lang={lang} /></div></aside>
           </div>
           <section className="ctr phone-latest"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={6} /></section>
+          {most.length >= 3 && <section className="ctr phone-latest"><Head label={t(lang, "mostRead")} /><MostRead stories={most} lang={lang} /></section>}
           <section className="ctr phone-latest"><Join lang={lang} /></section>
           {wide.map((b) => <WideBox key={b.k} k={b.k} list={b.list} lang={lang} />)}
           {small.length > 0 && <div className="ctr g cards c3 smalls">{small.map((b) => <SmallBox key={b.k} k={b.k} list={b.list} lang={lang} />)}</div>}

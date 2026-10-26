@@ -114,18 +114,21 @@ export const POLICY: Record<string, Record<Lang, Page>> = {
     gu: { title: "ગોપનીયતા", paras: [
       "આ વેબસાઇટ વાંચવા માટે ખાતું કે સાઇન-ઇન જરૂરી નથી. અમે તમારી માહિતી વેચતા નથી અને જાહેરાત માટે તમને ટ્રૅક કરતા નથી.",
       "તમારો દેખાવ (લાઇટ/ડાર્ક), અક્ષરનું કદ અને સાચવેલા સમાચાર ફક્ત તમારા પોતાના બ્રાઉઝરમાં રહે છે; અમારી પાસે આવતા નથી.",
+      "\"સૌથી વધુ વંચાયેલા\" યાદી માટે અમે ફક્ત ગણીએ છીએ કે દરેક સમાચાર કેટલી વાર ખૂલ્યા; કોણે ખોલ્યા તે નહીં. તમારા બ્રાઉઝરમાં ફક્ત એટલું યાદ રહે છે કે કયા સમાચાર ગણાઈ ગયા, જેથી એક જ વ્યક્તિ બે વાર ન ગણાય.",
       "વેબસાઇટ ચલાવતી સેવા (Vercel) સુરક્ષા માટે થોડા સમય માટે સામાન્ય ટેકનિકલ લૉગ રાખે છે.",
       "પ્રશ્ન હોય તો લખો: " + PAPER.email + ".",
     ] },
     en: { title: "Privacy", paras: [
       "You don’t need an account or sign-in to read this website. We don’t sell your information and don’t track you for advertising.",
       "Your appearance (light or dark), text size and saved stories stay in your own browser only; they never reach us.",
+      "For the \"most read\" list we only count how many times each story is opened, never who opened it. Your browser remembers which stories it has already counted, so one reader isn’t counted twice.",
       "The service that runs the website (Vercel) keeps ordinary technical logs for a short time, for security.",
       "Questions? Write to " + PAPER.email + ".",
     ] },
     hi: { title: "गोपनीयता", paras: [
       "इस वेबसाइट को पढ़ने के लिए खाता या साइन-इन ज़रूरी नहीं है। हम आपकी जानकारी नहीं बेचते और विज्ञापन के लिए आपको ट्रैक नहीं करते।",
       "आपका रूप (लाइट/डार्क), अक्षर का आकार और सहेजे गए समाचार केवल आपके अपने ब्राउज़र में रहते हैं; हम तक नहीं आते।",
+      "\"सबसे ज़्यादा पढ़े गए\" सूची के लिए हम केवल गिनते हैं कि हर समाचार कितनी बार खुला; किसने खोला, यह नहीं। आपका ब्राउज़र बस यह याद रखता है कि कौन-से समाचार गिने जा चुके, ताकि एक पाठक दो बार न गिना जाए।",
       "वेबसाइट चलाने वाली सेवा (Vercel) सुरक्षा के लिए थोड़े समय तक सामान्य तकनीकी लॉग रखती है।",
       "कोई प्रश्न? लिखें: " + PAPER.email + "।",
     ] },

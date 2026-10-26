@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
   // two root layouts (Gujarati, English): a web address matching neither gets app/global-not-found.tsx
+  // the service worker is always fetched fresh, so a new release reaches every phone
+  async headers() {
+    return [{ source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }, { key: "Content-Type", value: "application/javascript; charset=utf-8" }] }];
+  },
   experimental: {
     globalNotFound: true,
   },

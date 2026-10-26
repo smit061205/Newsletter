@@ -9,6 +9,7 @@ import { PAPER } from "../lib/site.ts";
 import { num } from "../lib/format.ts";
 import Chrome from "./Chrome.tsx";
 import NavProgress from "./NavProgress.tsx";
+import ServiceWorker from "./ServiceWorker.tsx";
 import ToTop from "./ToTop.tsx";
 
 export interface FrameProps {
@@ -47,6 +48,7 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
         <main className="wrap" id="main" tabIndex={-1}>{children}</main>
       </ViewTransition>
       <ToTop label={t(lang, "toTop")} />
+      <ServiceWorker />
       <div className="wrap">
         <footer>
           <Link className="wm" href={L("/")}><b>{PAPER.gu.name}</b></Link>
