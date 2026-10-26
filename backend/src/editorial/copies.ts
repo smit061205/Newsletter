@@ -75,6 +75,29 @@ export interface Batch {
   parts?: Record<string, { share: number; what: string }>;
   /** the time meter: how long the wording took, and each one's layout (seconds) */
   times?: { name: string; seconds: number }[];
+  /** copies: an article in every copy (a customer's), word for word */
+  extra?: Extra;
+}
+
+/** An article printed in every copy, word for word (26 Oct: an order of 25
+ * copies, each with one of the customer's titles and photos): its text, and
+ * the titles and photos the copies go through -- every title with every photo,
+ * in turn (copy 1: title 1 with photo 1, copy 2: title 1 with photo 2, ...). */
+export interface Extra { body: string; titles: string[]; photos: string[]; deck?: string }
+
+/** Copy n's title and photo (n from 1). */
+export function extraFor(e: Extra, n: number): { title: string; photo: string | null } {
+  const photos = e.photos.length || 1;
+  const k = (n - 1) % (e.titles.length * photos);
+  return { title: e.titles[Math.floor(k / photos)], photo: e.photos[k % photos] ?? null };
+}
+
+/** The fixed article as copy n prints it: a story of its own, kept whole (store.ts wordForWord). */
+function extraStory(e: Extra, n: number, date: string): Story {
+  const { title, photo } = extraFor(e, n);
+  const body = e.body.split(/\n+/).map((p) => p.trim()).filter(Boolean).join("\n\n");
+  return { id: "z-fixed", releaseId: null, date, kicker: "", headline: title.trim(), deck: (e.deck ?? "").trim(), bodies: { long: body, medium: body, short: body },
+           priority: 2, page: null, photo, photos: photo ? [photo] : [], caption: "", source: "fixed:copy", model: "as-is", needsReview: false };
 }
 /** Kept for the newsroom (api.ts CopiesRun). */
 export type CopiesRun = Batch;
@@ -223,6 +246,8 @@ interface SetSpec {
   date: string;
   items: { n: number; id?: string; name?: string; pdf: string; seed: number }[];
   reword: Reword; shuffle: Shuffle; translate: boolean;
+  /** the article in every copy, word for word */
+  extra?: Extra;
   /** each story's page and the lead in the day's paper */
   pageOf: [string, number][]; lead?: string;
   /** placements already used (the day's paper, earlier copies): none may repeat */
@@ -285,7 +310,8 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
         progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0),
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
         copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, reword, pdfPath: item.pdf,
-                translate: spec.translate, ...(spec.reword === "all" && !spec.translate ? { store: own } : {}) },
+                translate: spec.translate, ...(spec.reword === "all" && !spec.translate ? { store: own } : {}),
+                ...(spec.extra ? { extra: extraStory(spec.extra, n, spec.date) } : {}) },
       });
       spent += built.report.cost;
       const sig = built.report.placed.map((p) => `${p.story}:${p.page}:${p.cols}`).sort().join(",");
@@ -601,17 +627,18 @@ async function layOutUnique(store: Store, tasks: Task[], seen: string[], say: Sa
 }
 
 /** Make `count` copies of the day's paper, in `lang` (in the background). */
-export async function makeCopies(store: Store, date: string, opts: { count: number; reword: Reword; shuffle: Shuffle; lang?: Lang; log: Say }): Promise<Batch> {
+export async function makeCopies(store: Store, date: string, opts: { count: number; reword: Reword; shuffle: Shuffle; lang?: Lang; extra?: Extra; log: Say }): Promise<Batch> {
   const lang = opts.lang ?? (profile.language.lang as Lang);
   const day = dayOf(store, date);
   const batch: Batch = { kind: "copies", date, count: opts.count, reword: opts.reword, shuffle: opts.shuffle, lang, status: "running",
-                         startedAt: new Date().toISOString(), done: 0, files: [], cost: 0, log: [] };
+                         startedAt: new Date().toISOString(), done: 0, files: [], cost: 0, log: [], ...(opts.extra ? { extra: opts.extra } : {}) };
   return runBatch(batch, copiesDir(date), async (say) => {
     await rm(copiesDir(date), { recursive: true, force: true });
     await mkdir(copiesDir(date), { recursive: true });
     const translate = lang !== profile.language.lang;
     say(`${opts.count} cop${opts.count === 1 ? "y" : "ies"} in ${LANG_NAME[lang]}`);
-    const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead };
+    const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead, ...(opts.extra ? { extra: opts.extra } : {}) };
+    if (opts.extra) say(`the fixed article in every copy: ${opts.extra.titles.length} title(s) x ${Math.max(1, opts.extra.photos.length)} photo(s), in turn`);
     const tasks: Task[] = Array.from({ length: opts.count }, (_, i) => ({
       lang, label: `copy ${i + 1}`, spec: base, seen: day.seen,
       item: { n: i + 1, pdf: copyFile(date, i + 1), seed: i + 1 + (translate ? 1000 * LANGS.indexOf(lang) : 0) },

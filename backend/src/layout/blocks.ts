@@ -11,7 +11,7 @@
 // a little more space under the headline and the sub-heading (2.5pt each, as
 // the gap closer did), and the body's line pitch up to 2% looser.
 import { atRung, type Rung } from "../editorial/ladder.ts";
-import type { Story } from "../store.ts";
+import { wordForWord, type Story } from "../store.ts";
 import type { Measurer } from "./measure.ts";
 import { buildModule, type Module, type PhotoMode } from "./module.ts";
 import { headlineHeavy, spansFor } from "./pack.ts";
@@ -124,7 +124,8 @@ export class Blocks {
         }
       }
     }
-    return out.sort((a, b) => a.height - b.height);
+    // a customer's article always shows its photo: a width where it can't is no option for it
+    return (wordForWord(story) && story.photo ? out.filter((o) => !o.module.photoDropped) : out).sort((a, b) => a.height - b.height);
   }
 
   /** The heights a story can take at its widths (px), for planning a page: [shortest, longest]. */

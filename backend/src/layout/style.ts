@@ -17,6 +17,7 @@ import { normalizeText } from "./text.ts";
 import { BODY, GRID, PT } from "./typography.ts";
 import { profile } from "../profile.ts";
 import { repeats } from "../editorial/quality.ts";
+import { wordForWord } from "../store.ts";
 
 // Hindi and Urdu lines justify in their word spaces alone (never letter-
 // spaced: layout/measure.ts), so their papers set looser word spacing: their
@@ -117,6 +118,8 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
   // every story: a headline, a smaller sub-heading, then smaller body text
   const structure = plans.flatMap((p) => p.placed.filter((x) => {
     const mod = x.module;
+    // (a customer's article given without a sub-heading prints without one: its words are his)
+    if (wordForWord(mod.story) && !mod.story.deck.trim()) return !(mod.headSize > 0 && mod.bodyLines > 0);
     return !(mod.headSize > 0 && mod.deckSize > 0 && mod.bodyLines > 0
              && mod.headSize >= mod.deckSize * 1.25 - 0.01 && mod.deckSize >= BODY.size * 1.15 - 0.01);
   }).map((x) => `p${p.page} ${x.module.story.id}${x.module.deckSize ? "" : " (no sub-heading)"}`));

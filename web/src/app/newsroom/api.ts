@@ -67,7 +67,9 @@ export interface CopiesRun { kind: "copies" | "editions"; date: string; count: n
   /** how far it has got, 0-1, page by page; and each copy's own progress and what it's doing */
   share?: number; parts?: Record<string, { share: number; what: string }>;
   /** the time meter: the wording, and each one's layout (seconds) */
-  times?: { name: string; seconds: number }[] }
+  times?: { name: string; seconds: number }[];
+  /** an article in every copy, word for word: its titles and photos taken in turn */
+  extra?: { body: string; deck?: string; titles: string[]; photos: string[] } }
 
 /** A batch's share done (0-1), and minutes left from how fast it has gone so far (or `guess` before it knows). */
 export function batchProgress(run: CopiesRun, guess: number): { share: number; minutes: number } {

@@ -15,7 +15,7 @@
 import { fitLength, paragraphs } from "./rewrite.ts";
 import { repeats, settable, wordCount } from "./quality.ts";
 import { inPaperLanguage } from "../layout/stories.ts";
-import type { Release, Store, Story } from "../store.ts";
+import { wordForWord, type Release, type Store, type Story } from "../store.ts";
 
 export interface Rung {
   body: string;
@@ -54,6 +54,8 @@ const MORE_IN_RELEASE = 1.25;
  * one already written (a copy, a translated paper). */
 export async function ladderOf(store: Store, story: Story, release: Release | undefined,
                                opts: { longer: boolean | "cached"; log?: (s: string) => void }): Promise<{ rungs: Rung[]; cost: number }> {
+  // a customer's article: its own words, whole -- never cut nor lengthened
+  if (wordForWord(story)) return { rungs: [{ body: story.bodies.long, words: wordCount(story.bodies.long), from: "long" }], cost: 0 };
   let cost = 0;
   const bases: Rung[] = [];
   const own = (["long", "medium", "short"] as const).map((v) => ({ body: story.bodies[v], words: wordCount(story.bodies[v]), from: v }));
