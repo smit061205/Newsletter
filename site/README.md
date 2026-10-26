@@ -75,6 +75,7 @@ sets a busy one aside for 10 minutes rather than retrying it):
 ```bash
 npm install --prefix site
 CK_SAMPLE=1 npm run dev --prefix site     # http://localhost:3200, with 22 Oct's stories (no keys needed)
+node site/test/a11y.mjs http://localhost:3200     # the accessibility check CI runs (WCAG 2 AA; serious problems fail it)
 npm run build --prefix site               # what Vercel and site.yml run
 npx --prefix site tsc -p site/engine      # the engine's typecheck (it's outside the Next build)
 node --experimental-strip-types site/engine/selftest.ts

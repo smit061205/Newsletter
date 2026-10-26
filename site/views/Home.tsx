@@ -11,19 +11,46 @@ import { Chev } from "../components/icons.tsx";
 import Frame from "../components/Frame.tsx";
 
 const inSection = (s: Story, key: string) => s.tier === key || s.genres.includes(key as never);
+const BELOW = ["gujarat", "india", "farm", "economy", "tech", "health", "sport", "education", "entertainment"];
 
-function SecBox({ stories, k, lang, shown }: { stories: Story[]; k: string; lang: Lang; shown: Set<string> }) {
-  // a story already at the top of the page isn't repeated below it
-  const list = stories.filter((s) => inSection(s, k) && !shown.has(s.id)).sort((a, b) => Number(!!b.photo) - Number(!!a.photo));
-  if (!list.length) return null;
+// The sections below the top, after the Post's front page: a section with
+// plenty of news gets a full-width row (its best photo story, then two columns
+// of headlines); sections with a few stories share a row, three to a row on a
+// desktop. A story shows once on the page, in the first section it belongs to.
+function sectionBoxes(stories: Story[], shown: Set<string>) {
+  const used = new Set(shown);
+  const boxes: { k: string; list: Story[] }[] = [];
+  for (const k of BELOW) {
+    const list = stories.filter((s) => inSection(s, k) && !used.has(s.id)).slice(0, 7)
+      .sort((a, b) => Number(!!b.photo) - Number(!!a.photo));
+    if (!list.length) continue;
+    list.forEach((s) => used.add(s.id));
+    boxes.push({ k, list });
+  }
+  return { wide: boxes.filter((b) => b.list.length >= 4), small: boxes.filter((b) => b.list.length < 4) };
+}
+
+function WideBox({ k, list, lang }: { k: string; list: Story[]; lang: Lang }) {
+  const [first, ...rest] = list;
+  return (
+    <section className="ctr wide">
+      <Head label={sectionName(k, lang)} to={href(lang, `/section/${k}`)} />
+      <div className="wbody">
+        <div><Std s={first} lang={lang} sec={false} /></div>
+        <div className="stack">{rest.slice(0, 3).map((s) => <Cmp key={s.id} s={s} lang={lang} />)}</div>
+        {rest.length > 3 && <div className="stack">{rest.slice(3, 6).map((s) => <Cmp key={s.id} s={s} lang={lang} />)}</div>}
+      </div>
+    </section>
+  );
+}
+
+function SmallBox({ k, list, lang }: { k: string; list: Story[]; lang: Lang }) {
   const [first, ...rest] = list;
   return (
     <section className="secbox">
       <Head label={sectionName(k, lang)} to={href(lang, `/section/${k}`)} />
-      <div className={`body${rest.length ? "" : " solo"}`}>
-        <div><Std s={first} lang={lang} sec={false} /></div>
-        {rest.length > 0 && <div className="cmps">{rest.slice(0, 3).map((s) => <Cmp key={s.id} s={s} lang={lang} />)}</div>}
-      </div>
+      <Std s={first} lang={lang} sec={false} />
+      {rest.length > 0 && <div className="stack">{rest.map((s) => <Cmp key={s.id} s={s} lang={lang} />)}</div>}
     </section>
   );
 }
@@ -37,13 +64,14 @@ export default async function Home({ lang }: { lang: Lang }) {
   const recentLive = stories.filter((s) => s.origin === "live" && Date.now() - Date.parse(s.publishedAt) < 12 * 3600_000 && (s.importance ?? 0) >= 7.5)
     .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
   const lead = recentLive[0] ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
-  const six = today.filter((s) => s !== lead).slice(0, 6);
+  // the six under the lead: photo stories in the first row, so the row lines up
+  const six = today.filter((s) => s !== lead).slice(0, 6).sort((a, b) => Number(!!b.photo) - Number(!!a.photo));
   const shown = new Set([lead, ...six].filter(Boolean).map((s) => s!.id));
   // the latest list beside them: newest first, without the stories already at the top
   const byTime = stories.filter((s) => !shown.has(s.id))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || (a.page ?? 9) - (b.page ?? 9) || (a.rank ?? 99) - (b.rank ?? 99));
   const world = stories.filter((s) => s.tier === "world" && !shown.has(s.id)).slice(0, 4);
-  const pairs: [string, string][] = [["gujarat", "india"], ["farm", "economy"], ["tech", "health"], ["sport", "education"]];
+  const { wide, small } = sectionBoxes(stories, shown);
 
   return (
     <Frame lang={lang} path="/" active="home">
@@ -64,9 +92,8 @@ export default async function Home({ lang }: { lang: Lang }) {
           </div>
           <section className="ctr phone-latest"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={6} /></section>
           <section className="ctr phone-latest"><Join lang={lang} /></section>
-          {pairs.map(([a, b]) => (
-            <div key={a} className="ctr pair"><SecBox stories={stories} k={a} lang={lang} shown={shown} /><SecBox stories={stories} k={b} lang={lang} shown={shown} /></div>
-          ))}
+          {wide.map((b) => <WideBox key={b.k} k={b.k} list={b.list} lang={lang} />)}
+          {small.length > 0 && <div className="ctr g cards c3 smalls">{small.map((b) => <SmallBox key={b.k} k={b.k} list={b.list} lang={lang} />)}</div>}
           {world.length > 0 && (
             <section className="ctr"><Head label={sectionName("world", lang)} to={href(lang, "/section/world")} />
               <div className="g cards c4">{world.map((s) => (

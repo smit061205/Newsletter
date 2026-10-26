@@ -161,15 +161,20 @@ a.h:active{opacity:.85}
 .more{display:inline-flex;align-items:center;gap:2px;font-weight:700;font-size:15px;color:var(--brand);padding-block:12px}
 .more svg.i{transition:transform .2s ease}.more:hover svg.i,.head a:hover svg.i{transform:translateX(3px)}.head svg.i{transition:transform .2s ease}
 
-/* section pairs: stacked on a phone, lead | list on a tablet, two sections side by side on a desktop */
-.pair{display:grid;gap:40px var(--gut)}
-.secbox .body{display:grid;gap:var(--gut)}
-.secbox .body > *{position:relative;min-width:0}
-.secbox .cmps > a + a,.stack > a + a{border-top:1px solid var(--rule)}
-.secbox .cmps > a,.stack > a{padding-block:12px}.secbox .cmps > a:first-child,.stack > a:first-child{padding-top:0}
-@media (max-width:739px){ .secbox .body > .cmps{border-top:1px solid var(--rule);padding-top:12px} }
-@media (min-width:740px){ .secbox .body:not(.solo){grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .secbox .body > .cmps::before{content:"";position:absolute;top:0;bottom:0;left:calc(var(--gut) / -2);border-left:1px solid var(--rule)} }
-@media (min-width:1024px){ .pair{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .pair > .secbox + .secbox{position:relative} .pair > .secbox + .secbox::before{content:"";position:absolute;top:0;bottom:0;left:calc(var(--gut) / -2);border-left:1px solid var(--rule)} }
+/* sections: a wide row (photo story | two columns of headlines) or small boxes three to a row */
+.secbox .stack,.wbody .stack{display:grid}
+.secbox .stack > a + a,.stack > a + a{border-top:1px solid var(--rule)}
+.stack > a{padding-block:12px}.wbody .stack > a:first-child{padding-top:0}
+.secbox .stack{margin-top:12px;border-top:1px solid var(--rule)}
+.wbody{display:grid;gap:var(--gut)}
+.wbody > *{position:relative;min-width:0}
+@media (max-width:739px){ .wbody > .stack{border-top:1px solid var(--rule);padding-top:12px} }
+@media (max-width:1023px){ .wbody > .stack + .stack{display:none} }
+@media (min-width:740px){ .wbody{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .wbody > .stack::before{content:"";position:absolute;top:0;bottom:0;left:calc(var(--gut) / -2);border-left:1px solid var(--rule)} }
+@media (min-width:1024px){ .wbody{grid-template-columns:minmax(0,6fr) minmax(0,3fr) minmax(0,3fr)} .wbody .std .h3{font-size:24px;line-height:1.35} }
+.smalls{row-gap:48px}
+.smalls > *::after{display:none!important}
+.smalls > .secbox .std .dek{display:none}
 
 /* strips: shorts and e-paper pages */
 .strip{display:grid;grid-auto-flow:column;grid-auto-columns:44%;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding-bottom:4px}
