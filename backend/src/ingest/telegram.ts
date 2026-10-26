@@ -30,8 +30,11 @@ import type { InboxItem, Release, Store } from "../store.ts";
 const ID_BASE = 7_000_000_000;
 /** A photo this near an article (seconds, either side) is its photo. */
 const NEAR = 30 * 60;
-/** Messages this near each other (seconds) from one person are one article (a long one comes in parts). */
+/** Messages this near each other (seconds) from one person may be one article in parts: a long one
+ * Telegram split (it cuts at 4,096 letters), or a headline sent on its own, then its text. */
 const PARTS = 3 * 60;
+/** A message this long was cut by Telegram: the next one is its rest. */
+const SPLIT = 3500;
 /** A photo is placed once it has waited this long (seconds): its article may come after it. */
 const SETTLE = NEAR;
 /** Articles a photo may go with: the last day's. */
@@ -85,13 +88,42 @@ export function articles(items: InboxItem[]): { ids: number[]; chat: number; at:
   const out: { ids: number[]; chat: number; at: number; last: number; text: string }[] = [];
   for (const it of items.filter((x) => x.kind === "text")) {
     const prev = out.findLast((a) => a.chat === it.chat);
-    if (prev && it.at - prev.last <= PARTS && !prev.ids.some((id) => items.find((x) => x.id === id)?.usedOn !== it.usedOn)) {
+    // (only a message found to be the one before's rest, when it came: continuing())
+    if (prev && it.cont && it.at - prev.last <= PARTS && !prev.ids.some((id) => items.find((x) => x.id === id)?.usedOn !== it.usedOn)) {
       prev.ids.push(it.id);
       prev.text += `\n\n${it.text}`;
       prev.last = it.at;
     } else out.push({ ids: [it.id], chat: it.chat, at: it.at, last: it.at, text: it.text });
   }
   return out.map(({ last: _, ...a }) => a);
+}
+
+/** Is `text` (just in) the rest of `before` (his message before it, a moment ago), or news of its own?
+ * By their shape where that's plain; else the AI reads both (none: its own). */
+async function continuing(before: string, text: string, log: (s: string) => void): Promise<boolean> {
+  if (before.length >= SPLIT) return true; // Telegram cut it
+  const lines = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines(before).length === 1 && before.length <= 150) return true; // a headline, then its text
+  const [first, ...rest] = lines(text);
+  if (rest.length && first.length <= 120) return false; // a headline of its own over its text
+  const key = env("OPENROUTER_API_KEY");
+  if (!key) return false;
+  const res = await openRouter({
+    method: "POST",
+    headers: { authorization: `Bearer ${key}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
+    body: JSON.stringify({
+      model: env("OPENROUTER_MODEL") ?? profile.editorial.workhorseModel, temperature: 0,
+      response_format: { type: "json_schema", json_schema: { name: "rest", strict: true, schema: {
+        type: "object", additionalProperties: false, required: ["rest"],
+        properties: { rest: { type: "boolean", description: "true if the second message continues the same news as the first" } } } } },
+      messages: [{ role: "user", content: `A reporter sent two messages a moment apart. Is the second the rest of the same news item as the first, or a different news item?\n\nFIRST:\n${before.slice(-1500)}\n\nSECOND:\n${text.slice(0, 1500)}` }],
+    }),
+  }, 30);
+  if (!res.ok) { log(`Telegram: couldn't tell if a message continues the one before (OpenRouter ${res.status}): kept apart`); return false; }
+  try {
+    const data = (await res.json()) as { choices: { message: { content: string } }[] };
+    return !!JSON.parse(data.choices[0].message.content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")).rest;
+  } catch { return false; }
 }
 
 /** One message in: kept, answered. */
@@ -139,7 +171,10 @@ async function take(store: Store, u: TgUpdate, log: (s: string) => void) {
   }
   if (!text) return;
   if (onlyLink(text)) return void await api("sendMessage", { chat_id: m.chat.id, text: SAY.link, reply_to_message_id: m.message_id });
-  store.putInbox({ ...base, kind: "text", text });
+  // his message just before, a moment ago: this may be its rest
+  const before = store.inbox(true).findLast((x) => x.kind === "text" && x.chat === m.chat.id);
+  const cont = !!before && m.date - before.at <= PARTS && await continuing(before.text, text, log);
+  store.putInbox({ ...base, kind: "text", text, ...(cont ? { cont } : {}) });
   await api("sendMessage", { chat_id: m.chat.id, text: SAY.got, reply_to_message_id: m.message_id });
 }
 
@@ -207,24 +242,32 @@ export async function placePhotos(store: Store, log: (s: string) => void, now = 
     if (done.has(key)) continue;
     done.add(key);
     // (one photo that can't be placed now -- the internet gone -- doesn't hold up the others: it's tried again next time)
-    try { await placeOne(store, p, group, arts, all, log); } catch (e) { log(`Telegram: a photo not placed yet (${e instanceof Error ? e.message : e})`); }
+    try { await placeOne(store, p, group, arts, all, log, now === Number.POSITIVE_INFINITY); } catch (e) { log(`Telegram: a photo not placed yet (${e instanceof Error ? e.message : e})`); }
   }
 }
 
-async function placeOne(store: Store, p: InboxItem, group: InboxItem[], arts: ReturnType<typeof articles>, all: InboxItem[], log: (s: string) => void) {
+async function placeOne(store: Store, p: InboxItem, group: InboxItem[], arts: ReturnType<typeof articles>, all: InboxItem[], log: (s: string) => void,
+                        final: boolean) {
   const mine = arts.filter((a) => a.chat === p.chat && !all.find((x) => x.id === a.ids[0])?.usedOn);
   const near = mine.filter((a) => Math.abs(a.at - p.at) <= NEAR);
   const recent = mine.filter((a) => Math.abs(a.at - p.at) <= RECENT);
-  let pick = near.length === 1 ? near[0] : null;
-  if (pick && recent.length > 1) {
-    // the time says one article, but he sent others too (a burst, or a photo of an earlier
-    // one sent late): the AI looks as well, and if it's sure of another, he's asked
-    const seen = await byLooking(p, group, recent, log);
-    if (seen && seen !== pick) {
-      log(`Telegram: a photo's time and what's in it point to different articles: he's asked`);
-      return ask(store, group, log);
-    }
-  } else if (!pick && recent.length) pick = await byLooking(p, group, recent, log);
+  // (the AI has already looked at it against these, and none was it: it waits for his next article)
+  if (!final && recent.length && p.notOf && recent.every((a) => p.notOf!.includes(a.ids[0]))) return;
+  let pick: (typeof recent)[number] | null = near.length === 1 ? near[0] : null;
+  // the AI looks too (when there's one): the time can mislead -- a photo sent
+  // between two articles, or before its own (26 Oct)
+  const seen = recent.length ? await byLooking(p, group, recent, log) : null;
+  if (seen === "none") {
+    // surely none of his articles so far: its own may be on the way -- it waits for
+    // his next one (and at paper time, he's asked)
+    if (!final) { for (const x of group) store.putInbox({ ...x, notOf: recent.map((a) => a.ids[0]) }); return; }
+    return ask(store, group, log);
+  }
+  if (seen && pick && seen !== pick) {
+    log(`Telegram: a photo's time and what's in it point to different articles: he's asked`);
+    return ask(store, group, log);
+  }
+  pick = seen ?? pick;
   if (pick) {
     for (const x of group) store.putInbox({ ...x, pairedTo: pick.ids[0] });
     await api("sendMessage", { chat_id: p.chat, text: SAY.joined(titleOf(pick.text)),
@@ -247,8 +290,8 @@ async function byLooking(p: InboxItem, group: InboxItem[], recent: ReturnType<ty
       model, temperature: 0, usage: { include: true },
       response_format: { type: "json_schema", json_schema: { name: "match", strict: true, schema: {
         type: "object", additionalProperties: false, required: ["article", "sure"],
-        properties: { article: { type: "integer", description: "the number of the article the photo shows, 0 if none" },
-                      sure: { type: "boolean", description: "true only if the photo clearly belongs to that article (writing on a banner, the place, the people named)" } },
+        properties: { article: { type: "integer", description: "the number of the article the photo shows, 0 if none of them" },
+                      sure: { type: "boolean", description: "true only if you are certain: the photo clearly belongs to that article (writing on a banner, the place, the people named), or, with 0, clearly to none of them" } },
       } } },
       messages: [{ role: "user", content: [
         { type: "text", text: `A newspaper reporter sent this photo${group.length > 1 ? ` (one of ${group.length})` : ""}${p.text ? ` with the note "${p.text}"` : ""}. ` +
@@ -261,7 +304,8 @@ async function byLooking(p: InboxItem, group: InboxItem[], recent: ReturnType<ty
   try {
     const data = (await res.json()) as { choices: { message: { content: string } }[] };
     const out = JSON.parse(data.choices[0].message.content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")) as { article: number; sure: boolean };
-    return out.sure && out.article >= 1 && out.article <= recent.length ? recent[out.article - 1] : null;
+    if (!out.sure) return null;
+    return out.article >= 1 && out.article <= recent.length ? recent[out.article - 1] : "none";
   } catch { return null; }
 }
 
