@@ -69,7 +69,7 @@ export default function SettingsPage() {
           <p className={s.muted}>{t("settings.tg.body")}</p>
           {x.telegram?.token && (x.telegram.bot
             ? <p>{t("settings.tg.bot", { bot: `@${x.telegram.bot}` })}</p>
-            : <Note tone="bad">{t("settings.tg.bad")}</Note>)}
+            : x.telegram.busy ? <Note tone="warn">{t("settings.tg.busy")}</Note> : <Note tone="bad">{t("settings.tg.bad")}</Note>)}
           {x.telegram?.token && x.telegram.bot && (<>
             {x.telegram.chats.map((c) => (
               <div key={c.id} className={s.row}><span style={{ flex: 1 }}>✓ {c.name}</span>

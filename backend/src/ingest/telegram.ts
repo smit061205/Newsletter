@@ -345,10 +345,25 @@ interface TgUpdate {
   callback_query?: { id: string; data?: string; message?: { message_id: number; chat: { id: number } } };
 }
 
-/** The bot's name, if the token works. */
-export async function botName(): Promise<string | null> {
-  if (!token()) return null;
-  return api<{ username: string }>("getMe").then((r) => r.username, () => null);
+let known: { token: string; name: string } | null = null;
+/** The bot's name if the token works, null if Telegram turns the token down,
+ * "busy" if Telegram couldn't be asked just now (too many asks, no internet):
+ * a new bot's first minutes answered "too many requests" and Settings called
+ * the key wrong. */
+export async function botName(): Promise<string | null | "busy"> {
+  const t = token();
+  if (!t) return null;
+  if (known?.token === t) return known.name;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${t}/getMe`, { method: "POST", signal: AbortSignal.timeout(15_000) });
+    if (res.status === 401 || res.status === 404) return null;
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: { username: string } };
+    if (!data.ok || !data.result) return "busy";
+    known = { token: t, name: data.result.username };
+    return known.name;
+  } catch {
+    return "busy";
+  }
 }
 
 let polling = false;

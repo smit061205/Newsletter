@@ -209,7 +209,8 @@ async function telegramOf(store: Store) {
   if (!envHas("TELEGRAM_BOT_TOKEN")) return { token: false };
   const { botName, telegramState } = await import("./ingest/telegram.ts");
   const { code, chats } = telegramState(store);
-  return { token: true, bot: await botName(), code, chats, waiting: store.inbox(true).length };
+  const bot = await botName();
+  return { token: true, bot: bot === "busy" ? null : bot, busy: bot === "busy", code, chats, waiting: store.inbox(true).length };
 }
 
 /** What became of each of the day's releases. */
