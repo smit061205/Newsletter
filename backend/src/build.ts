@@ -221,7 +221,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   try {
     for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m, { blank: !!opts.copy }));
     // the ads the layout may place go to the foot of their page (layout/ads.ts)
-    ads = chrome.flatMap((c, i) => arrangeAds(ads.filter((a) => a.page === i + 1), { top: c.bodyTop, bottom: c.bodyBottom }));
+    {
+      const booked = ads;
+      ads = chrome.flatMap((c, i) => arrangeAds(ads.filter((a) => a.page === i + 1), { top: c.bodyTop, bottom: c.bodyBottom }));
+      // (an ad with no room on its page: said, not dropped quietly)
+      for (const a of booked) if (a.page <= total && !ads.some((x) => x.id === a.id)) log(`  ad ${a.id} has no room on page ${a.page}: left out`);
+    }
     // content-sized pages (layout/pack.ts): every page packed in turn from the
     // stories not placed yet, most important first
     const edits = store.edits(date);
