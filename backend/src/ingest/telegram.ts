@@ -103,8 +103,11 @@ export function articles(items: InboxItem[]): { ids: number[]; chat: number; at:
 async function continuing(before: string, text: string, log: (s: string) => void): Promise<boolean> {
   if (before.length >= SPLIT) return true; // Telegram cut it
   const lines = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean);
-  if (lines(before).length === 1 && before.length <= 150) return true; // a headline, then its text
   const [first, ...rest] = lines(text);
+  if (/^\*[^*]+\*$/.test(first ?? "")) return false; // starts with its own headline in bold (WhatsApp's *...*)
+  // a headline, then its text (not a one-line news item of its own, which ends
+  // in a full stop: 26 Oct joined the next article to one)
+  if (lines(before).length === 1 && before.length <= 150 && !/[.।!?]\s*$/.test(before.trim())) return true;
   if (rest.length && first.length <= 120) return false; // a headline of its own over its text
   const key = env("OPENROUTER_API_KEY");
   if (!key) return false;
@@ -236,14 +239,21 @@ export async function placePhotos(store: Store, log: (s: string) => void, now = 
   const arts = articles(all);
   const waiting = all.filter((x) => x.kind === "photo" && x.pairedTo === undefined && !x.asked && !x.usedOn && now - x.at >= SETTLE);
   const done = new Set<string>();
+  const jobs: InboxItem[] = [];
   for (const p of waiting) {
-    const group = p.album ? all.filter((x) => x.album === p.album) : [p];
     const key = p.album ?? String(p.id);
-    if (done.has(key)) continue;
-    done.add(key);
+    if (!done.has(key)) { done.add(key); jobs.push(p); }
+  }
+  // several looked at together (26 Oct: 17 forwarded at once took two minutes one by one)
+  const next = async (): Promise<void> => {
+    const p = jobs.shift();
+    if (!p) return;
+    const group = p.album ? all.filter((x) => x.album === p.album) : [p];
     // (one photo that can't be placed now -- the internet gone -- doesn't hold up the others: it's tried again next time)
     try { await placeOne(store, p, group, arts, all, log, now === Number.POSITIVE_INFINITY); } catch (e) { log(`Telegram: a photo not placed yet (${e instanceof Error ? e.message : e})`); }
-  }
+    return next();
+  };
+  await Promise.all(Array.from({ length: 6 }, next));
 }
 
 async function placeOne(store: Store, p: InboxItem, group: InboxItem[], arts: ReturnType<typeof articles>, all: InboxItem[], log: (s: string) => void,
