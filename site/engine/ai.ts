@@ -120,6 +120,8 @@ export interface Ask {
   role?: "writer" | "checker";
   /** a model to avoid (the one that wrote what's being checked) */
   avoid?: string;
+  /** ask only this model (aiprobe.ts) */
+  only?: string;
   temperature?: number;
   maxTokens?: number;
 }
@@ -130,7 +132,7 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
   if (!KEY && !GOOGLE_KEY) return { ok: false, why: "no GOOGLE_AI_KEY or OPENROUTER_API_KEY", stop: true };
   const list = await freeModels();
   // the checker starts from the second model of the best route, so it differs from the writer
-  const order = a.role === "checker" && list.length > 1 ? [list[1], list[0], ...list.slice(2)] : list;
+  const order = a.only ? [a.only] : a.role === "checker" && list.length > 1 ? [list[1], list[0], ...list.slice(2)] : list;
   const whys: string[] = [];
   let why = "no free model answered";
   // every Gemma busy: wait for the first to rest (up to 90 s), else give up for this run
@@ -168,7 +170,7 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
       if (res.status === 429 && /per-?day|free-models-per-day|PerDay/i.test(why)) { resting.set(model, Date.now() + 24 * 3600_000); continue; }
       // busy, gone, or too slow: set aside for a while, ask the next
       // ("rate-limited upstream" asks to retry shortly: a minute; anything else longer)
-      if ([404, 408, 429, 502, 503, 504].includes(res.status)) resting.set(model, Date.now() + (res.status === 429 ? 60_000 : REST_MS));
+      if ([404, 408, 429, 500, 502, 503, 504].includes(res.status)) resting.set(model, Date.now() + (res.status === 429 ? 60_000 : REST_MS));
       continue;
     }
     const answer = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
@@ -185,7 +187,7 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
     whys.push(why);
   }
   // nothing but busy or missing models: try again next run, it's not the story's fault
-  const busy = whys.length > 0 && whys.every((w) => /: (404|408|429|502|503|504) /.test(w));
+  const busy = whys.length > 0 && whys.every((w) => /: (404|408|429|500|502|503|504) /.test(w));
   return { ok: false, why: whys.join(" | ") || why, busy };
 }
 
