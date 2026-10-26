@@ -18,6 +18,7 @@ const gu = {
   "date.next": "પછીનો દિવસ",
   "date.today": "આજે",
   "engine.down": "કેપિટલ ક્રાંતિ એન્જિન જવાબ નથી આપતું. એપ ફરી ખોલો અથવા કમ્પ્યુટર ફરી શરૂ કરો.",
+  "pdf.failed": "PDF ખૂલી નહીં. ફરી પ્રયત્ન કરો; વારંવાર આમ થાય તો કમ્પ્યુટરમાં થોડી જગ્યા ખાલી કરો.",
   "engine.retry": "ફરી પ્રયત્ન કરો",
 
   "today.none.title": "આ દિવસનું છાપું હજી બન્યું નથી",
@@ -473,6 +474,7 @@ const en: Record<StringKey, string> = {
   "date.next": "Next day",
   "date.today": "Today",
   "engine.down": "The Capital Kranti engine isn't answering. Open the app again, or restart the computer.",
+  "pdf.failed": "The PDF didn't open. Try again; if it keeps happening, free some space on the computer.",
   "engine.retry": "Try again",
 
   "today.none.title": "This day's paper isn't made yet",

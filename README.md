@@ -433,18 +433,18 @@ For a story with a given **rank** (1 = lead … 5 = brief), **column span k**, *
 - **Result:** exact `width`, `height` and `elements`, positioned at (0, 0); `place()` moves them onto the page.
 
 ### 8.3 The layout engine (`layout/engine.ts`, the default since Oct 2026)
-The profile's `editorial.layoutEngine` ("v2", the default; "v1" the old packer below), or `CK_ENGINE` for a test. Each page is planned whole and solved exactly; there's no AI in the layout loop.
+Every page is laid out by this engine (the old packer below no longer lays out a page: 26 Oct 2026). Each page is planned whole and solved exactly; there's no AI in the layout loop.
 1. **Lengths** (`editorial/ladder.ts`): every length a story may print at, before layout starts: its own three (the rewrite's long, medium, short), each cut a sentence at a time from its end (as a desk cuts a story: news runs most important first), down to a brief. On a day short of copy, the AI writes one longer version of each story whose release has more facts (`fitLength`, cached; never over the release's own length). Every length passes `editorial/quality.ts`: it never says a thing twice, every letter prints in the paper's fonts.
 2. **Settings** (`blocks.ts`): each story at every width it may take (a brief 1-3 columns, a lesser story 1-7, a lead 3-7), every length, every photo layout, and a smaller headline where the rank's is too heavy: its exact height and how much it can stretch (header spacing, pitch +2%). Settings that break a desk rule are dropped (a display line under 97%, a headline over 30% of the story, a brief under a headline of over 4 lines, a loose body). Measuring is cached (`measure.ts`), so a story measured once costs nothing more.
 3. **Pages** (`assign()`): the stories shared over the pages by the room each has (its band less its ads), most important first, the front page's lead on it and the front page filled first, related stories apart. A story with no room is held (listed as left out).
 4. **Designs** (`designs.ts`): for each page, hundreds of ways of cutting its story area straight across or down (a guillotine) into one block per story, each block a width its story may take, the ads at the foot in their own blocks. The ads are tried in several tidy arrangements (`adLayouts()`). Where a strip by an ad suits no story, a **filler** block (at most two a page).
 5. **Exact heights** (`guillotine.ts`): each design solved over every story's settings, in whole points: blocks side by side end level, stacked blocks add up (with the 8pt gap and its rule), the whole fills the band to its foot. A design with no exact solution is dropped; the cheapest (copy kept, photos kept, natural spacing) is set out, and judged as a reader sees it (headline sizes follow importance; level neighbours get a column rule).
 6. **Fillers** (`fill.ts`): a held story as a brief; else a "જાણવા જેવું" item written to its size in the paper's language (two stacked where one leaves room); else the paper's message panel or house ad (once each a paper).
-7. **No design fills a page:** more designs, then a story moved in (held, or from a page with copy to spare) or held back, up to four rounds. Still none: the old engine (8.4, 8.5) lays out that page from its stories.
+7. **No design fills a page:** more designs, then a story moved in (held, or from a page with copy to spare) or held back; a page no design can be made for at all gets a narrow story once, then stories held back. From the fourth round on, a filler slot and, failing an exact design, the nearest one (its gap reported). A story that can't be set at its rank (a short story topping a page, its headline over 30% of it) is set a rank lower (`Blocks.settable`). An ad booked off the columns is set on the nearest ones. No other engine lays out a page.
 
 A copy (`editorial/copies.ts`) runs the same engine with its own seed: other page spreads and designs, the lengths already made (the day's longer versions reused, nothing new written), so a copy takes about half a minute and almost no AI.
 
-### 8.4 Page packing, the old engine (`layout/pack.ts`)
+### 8.4 Page packing, the old engine (`layout/pack.ts`; no longer lays out pages, its helpers still used)
 - **Fixed blocks:** chrome and ads. Ads are placed first (`ads.ts`): a booking may pin its position; any other ad (the 8 August stand-ins included) is snapped to whole columns, shape kept, and stacked up from the foot of the page, so stories get one unbroken area. Each column's "free y" skips over ads (`settle`).
 - **Skyline:** take the lowest, leftmost open stretch of columns and try candidate stories × spans (`spansFor(rank)`) × photo modes × variants. Keep the longest variant that fits under the next obstacle.
 - **The lead:** the first story placed on each page is that page's lead (rank 1).
@@ -454,7 +454,7 @@ A copy (`editorial/copies.ts`) runs the same engine with its own seed: other pag
 - **Page budgets** (`build.ts`): the day's copy at natural size, divided between pages in proportion to their free room. That stops page 1 from taking everything. A budget is a preference: when only an over-budget story fits a stretch, it goes in rather than leaving a hole. No headline in one column except briefs.
 - **Rules between stacked stories:** an 8 pt gap and a 0.75 pt rule (`renderPlaced`).
 
-### 8.5 Gap closing, the old engine (`layout/fit.ts`)
+### 8.5 Gap closing, the old engine (`layout/fit.ts`; no longer used to lay out, its fillers still are)
 - For each placed story, `room()` measures the space down to the next element below in its columns: a story, an ad, a house ad, or the foot of the band.
 - If more than one line is free, it tries, in order:
   0. display before copy: a landscape photo across the whole story;

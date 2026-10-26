@@ -134,8 +134,23 @@ export function PdfViewer({ url, title, fileName, onClose }: { url: string; titl
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let u = "";
-    fetch(url).then((r) => (r.ok ? r.blob() : Promise.reject())).then((b) => { u = URL.createObjectURL(b); setLocal(u); }).catch(() => setFailed(true));
-    return () => { if (u) URL.revokeObjectURL(u); };
+    let gone = false;
+    // read into memory, then made a local copy: Response.blob() keeps a big
+    // file in the browser's disk store, which refuses it when the disk is
+    // nearly full (the 17 MB CorelDRAW PDF on a 99%-full Mac, 26 Oct);
+    // tried three times before giving up
+    const get = async () => {
+      for (let i = 0; i < 3; i++) {
+        try {
+          const r = await fetch(url);
+          if (r.ok) return new Blob([await r.arrayBuffer()], { type: "application/pdf" });
+        } catch { /* again */ }
+        await new Promise((ok) => setTimeout(ok, 1000));
+      }
+      throw new Error("no PDF");
+    };
+    get().then((b) => { if (gone) return; u = URL.createObjectURL(b); setLocal(u); }).catch(() => !gone && setFailed(true));
+    return () => { gone = true; if (u) URL.revokeObjectURL(u); };
   }, [url]);
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -161,7 +176,7 @@ export function PdfViewer({ url, title, fileName, onClose }: { url: string; titl
         </div>
       </div>
       {local ? <iframe ref={frame} src={local} title={title} />
-        : <div className={s.empty}>{failed ? <Note tone="bad">{t("engine.down")}</Note> : <Skeleton h={8} w={180} />}</div>}
+        : <div className={s.empty}>{failed ? <Note tone="bad">{t("pdf.failed")}</Note> : <Skeleton h={8} w={180} />}</div>}
     </div>
   );
 }
