@@ -57,8 +57,9 @@ export function Lead({ s, lang }: { s: Story; lang: Lang }) {
   );
 }
 
-export function Std({ s, lang, sec = true, morph = false }: { s: Story; lang: Lang; sec?: boolean; morph?: boolean }) {
+export function Std({ s, lang, sec = true, morph = false, photo = true }: { s: Story; lang: Lang; sec?: boolean; morph?: boolean; photo?: boolean }) {
   const w = words(s, lang);
+  if (!photo) s = { ...s, photo: null };
   return (
     <Link className="h std" href={storyHref(s, lang)}>
       <Photo s={s} lang={lang} morph={morph} />

@@ -5,7 +5,7 @@ import type { Lang, Story } from "../lib/types.ts";
 import { latestIssue, latestStories } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
-import { dateText, num } from "../lib/format.ts";
+import { dateText, num, todayInIndia } from "../lib/format.ts";
 import { Cmp, Head, Join, LatestList, Lead, Std, words } from "../components/cards.tsx";
 import { Chev } from "../components/icons.tsx";
 import Frame from "../components/Frame.tsx";
@@ -83,7 +83,8 @@ export default async function Home({ lang }: { lang: Lang }) {
               <Lead s={lead} lang={lang} />
               {six.length > 0 && (
                 <div className="g cards c3 six" style={{ marginTop: "var(--gut)", paddingTop: "var(--gut)", borderTop: "1px solid var(--rule)" }}>
-                  {six.map((s) => <Std key={s.id} s={s} lang={lang} morph />)}
+                  {/* photos only in a full first row (photo stories come first), so every row's headlines line up */}
+                  {six.map((s, i) => <Std key={s.id} s={s} lang={lang} morph photo={i < 3 && six.slice(0, 3).every((x) => x.photo)} />)}
                 </div>
               )}
             </div>
@@ -102,11 +103,11 @@ export default async function Home({ lang }: { lang: Lang }) {
             </section>
           )}
           {issue && issue.pages.length > 0 && (
-            <section className="ctr"><Head label={t(lang, "epTitle")} to={href(lang, "/epaper")} />
+            <section className="ctr"><Head label={t(lang, issue.date === todayInIndia() ? "epTitle" : "epLast")} to={href(lang, "/epaper")} />
               <div className="strip">{issue.pages.map((p) => (
                 <Link key={p.number} href={href(lang, "/epaper")}><span className="epg"><img src={p.url} alt={`${t(lang, "page")} ${num(p.number, lang)}`} loading="lazy" decoding="async" /></span>
                   <div className="epcap">{t(lang, "page")} {num(p.number, lang)}</div></Link>))}</div>
-              <Link className="more" href={href(lang, "/epaper")}>{t(lang, "epRead")} <Chev /></Link>
+              <Link className="more" href={href(lang, "/epaper")}>{t(lang, issue.date === todayInIndia() ? "epRead" : "epReadLast")} <Chev /></Link>
             </section>
           )}
         </>

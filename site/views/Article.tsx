@@ -103,7 +103,8 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
           </div>
           {after.length > 0 && (
             <section className="ctr"><Head label={t(lang, "related")} to={href(lang, `/section/${s.tier}`)} />
-              <div className="g cards c3 relgrid">{after.map((x) => <Std key={x.id} s={x} lang={lang} />)}</div></section>
+              <div className="g cards c3 relgrid">{/* photos only when every card has one, so the headlines line up */}
+                {after.map((x) => <Std key={x.id} s={x} lang={lang} photo={after.every((y) => y.photo)} />)}</div></section>
           )}
           <section className="ctr"><Join lang={lang} /></section>
         </article>
