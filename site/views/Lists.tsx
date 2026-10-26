@@ -6,7 +6,7 @@ import type { Lang } from "../lib/types.ts";
 import { issueDates, issueOn, latestIssue, latestStories, search, storiesIn, storiesOn } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
 import { isSection, sectionName } from "../lib/sections.ts";
-import { dateText, num } from "../lib/format.ts";
+import { dateText, num, todayInIndia } from "../lib/format.ts";
 import { Lead, River, Std } from "../components/cards.tsx";
 import Frame from "../components/Frame.tsx";
 import Saved from "../components/Saved.tsx";
@@ -58,7 +58,8 @@ export async function Epaper({ date, lang }: { date?: string; lang: Lang }) {
   if (date && !issue) notFound();
   return (
     <Frame lang={lang} path={date ? `/epaper/${date}` : "/epaper"} active="epaper">
-      <div className="sechead"><h1>{t(lang, "epTitle")}</h1></div>
+      {/* "today's paper" only when it is today's; an older one is "the latest", or plainly the e-paper of its date */}
+      <div className="sechead"><h1>{date ? t(lang, "epaper") : !issue || issue.date === todayInIndia() ? t(lang, "epTitle") : t(lang, "epLast")}</h1></div>
       {!issue ? <p className="empty">{t(lang, "noEpaper")}</p> : (
         <>
           <p className="note" style={{ margin: 0 }}>{dateText(issue.date, lang, true)} · {t(lang, "issue")} {num(issue.number, lang)}</p>

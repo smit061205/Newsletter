@@ -53,6 +53,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .ib{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;color:var(--strong)}
 .ib{transition:background-color .15s ease,transform .15s ease}.ib:hover{background:var(--surface)}.ib:active{transform:scale(.92)}
 .ib.lbl{width:auto;padding:0 14px 0 10px;border-radius:999px;display:none;gap:6px;grid-auto-flow:column;font-weight:600}
+/* the header's outer icons line up with the page's edges (their round hover stays outside it) */
+.bar .l > .ib:first-child,.bar .l > .ib.menu-plain{margin-left:-12px}.bar .l > .ib.lbl{margin-left:-10px}@media (max-width:739px){ .bar .r > .ib{margin-right:-12px} }
 .wm{display:flex;align-items:baseline;gap:12px;color:var(--brand);white-space:nowrap}
 .wm b{font-family:var(--ui);font-weight:800;font-stretch:112%;font-size:27px;line-height:1;letter-spacing:.2px}
 .wm i{display:none;font-style:normal;font-size:14px;color:var(--muted)}
@@ -61,7 +63,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 @media (min-width:1024px){ .bar{height:68px} .top.scrolled .bar{height:58px} .wm b{font-size:34px;transition:font-size .25s ease} .top.scrolled .wm b{font-size:30px} .wm i{display:inline} .ib.lbl{display:grid} .ib.menu-plain{display:none} .epill{display:inline-block} }
 @media (min-width:740px) and (max-width:1023px){ .epill{display:inline-block} }
 
-.secs{display:flex;gap:4px 22px;overflow-x:auto;scrollbar-width:none;white-space:nowrap;border-bottom:1px solid var(--rule);font-weight:600;font-size:15px;color:var(--strong)}
+/* the section row's rule runs exactly as wide as the page's content, like every rule below it */
+.secs{display:flex;gap:4px 22px;overflow-x:auto;scrollbar-width:none;white-space:nowrap;background:linear-gradient(var(--rule),var(--rule)) content-box bottom/100% 1px no-repeat;font-weight:600;font-size:15px;color:var(--strong)}
 .secs::-webkit-scrollbar{display:none}
 .secs a{position:relative;padding-block:13px 11px;transition:color .15s ease}
 .secs a::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:3px 3px 0 0;background:var(--brand);transform:scaleX(0);transition:transform .25s cubic-bezier(.2,.7,.2,1)}
@@ -148,6 +151,7 @@ a.h:active{opacity:.85}
 /* on a phone the six under the lead are compact; wider, they become standard cards with photos */
 .six .std .ph,.six .std .phw,.six .std .dek{display:none}
 @media (min-width:740px){ .six .std .ph,.six .std .phw,.six .std .dek{display:block} .six .std .thumb{display:none} }
+@media (min-width:740px) and (max-width:1023px){ .six > :nth-child(3) .phw{display:none} }
 .six .std{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px}
 @media (min-width:740px){ .six .std{display:block} }
 .thumb{display:none;width:88px;height:88px;object-fit:cover;filter:var(--photo);border-radius:var(--r);background:var(--surface)}
@@ -215,7 +219,7 @@ a.h:active{opacity:.85}
 
 /* ---------- article ---------- */
 .artg{display:grid;gap:48px;padding-top:20px}
-@media (min-width:1024px){ .artg{grid-template-columns:minmax(0,680px) minmax(0,300px);justify-content:center;gap:64px} }
+@media (min-width:1024px){ .artg{grid-template-columns:minmax(0,720px) minmax(0,300px);justify-content:space-between;gap:64px} }
 .artg > aside{display:none}
 @media (min-width:1024px){ .artg > aside{display:block;position:relative} .artg > aside::before{content:"";position:absolute;top:0;bottom:0;left:-32px;border-left:1px solid var(--rule)} .artg > aside > div{position:sticky;top:90px} }
 .crumbs{display:inline-flex;gap:6px;align-items:center;font-size:14px;font-weight:700;color:var(--brand);min-height:40px}
