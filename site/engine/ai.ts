@@ -1,17 +1,27 @@
-// The engine's AI: OpenRouter's free Gemma models only (decided 25 Oct: free,
-// ₹0, and Gemma; never Anthropic, CLAUDE.md). Which free Gemmas exist changes,
-// so each run asks OpenRouter's model list and keeps the ones the site's
-// settings name first (site/lib/config.ts), then any other free Gemma.
-// Every request is counted against the day's free allowance (shared with the
-// hourly run's translations); past it, nothing more is asked until tomorrow.
+// The engine's AI: free Gemma models only (decided 25 Oct: free, ₹0, and Gemma;
+// never Anthropic, CLAUDE.md), by two routes, best first:
+//   1. Google's own Gemini API with the paper's free AI Studio key (GOOGLE_AI_KEY):
+//      its own free quota, so not the crowd's (added 26 Oct, after OpenRouter's
+//      shared free Gemma was "rate-limited upstream" for five hours straight);
+//   2. OpenRouter's free Gemma (OPENROUTER_API_KEY), shared by all its users.
+// Which Gemmas each route has changes, so each run asks both for their list and
+// keeps the ones the site's settings name first (site/lib/config.ts). A model is
+// named "google:<id>" or by its OpenRouter id. Every request is counted against
+// its route's daily allowance (shared with the hourly run's translations).
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import { WEBSITE } from "../lib/config.ts";
 import { count } from "../lib/write.ts";
 
 type Sql = NeonQueryFunction<false, false>;
 const KEY = process.env.OPENROUTER_API_KEY ?? "";
-/** the free models allow 20 requests a minute */
-const GAP_MS = 3200;
+const GOOGLE_KEY = process.env.GOOGLE_AI_KEY ?? "";
+const GOOGLE = "https://generativelanguage.googleapis.com/v1beta";
+const isGoogle = (m: string) => m.startsWith("google:");
+/** which daily allowance a model's requests count against */
+const counter = (m: string) => (isGoogle(m) ? "ai_google" : "ai_free");
+const ceiling = (m: string) => (isGoogle(m) ? WEBSITE.dailyGoogleRequests : WEBSITE.dailyFreeRequests);
+/** the free routes allow 20-30 requests a minute */
+const GAP_MS = 2500;
 
 let models: string[] | null = null;
 let last = 0;
@@ -23,6 +33,30 @@ export const aiUsed = () => usedThisRun;
 const resting = new Map<string, number>();
 const REST_MS = 3 * 60_000;
 export const restingModels = () => [...resting.keys()];
+
+/** One request to Google, once, its answer returned in OpenRouter's shape. Gemma
+ * on the Gemini API takes no system instruction and no JSON mode, so the
+ * instructions lead the prompt and the JSON is read from the text. */
+async function callGoogle(model: string, a: { system: string; user: string; temperature: number; maxTokens: number }, seconds: number): Promise<Response> {
+  try {
+    const res = await fetch(`${GOOGLE}/models/${model.slice(7)}:generateContent`, {
+      method: "POST", signal: AbortSignal.timeout(seconds * 1000),
+      headers: { "x-goog-api-key": GOOGLE_KEY, "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: `${a.system}\n\n---\n\n${a.user}` }] }],
+        generationConfig: { temperature: a.temperature, maxOutputTokens: a.maxTokens },
+      }),
+    });
+    const text = await res.text();
+    if (!res.ok) return new Response(text, { status: res.status });
+    const g = JSON.parse(text) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[] };
+    const c = g.candidates?.[0];
+    const content = (c?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("");
+    return new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: c?.finishReason?.toLowerCase() }] }), { status: 200 });
+  } catch (e) {
+    return new Response(`no answer in ${seconds}s (${e instanceof Error ? e.message : e})`, { status: 504 });
+  }
+}
 
 /** One request, once: no retrying here (the caller moves to the next model). */
 async function call(model: string, body: Record<string, unknown>, seconds: number): Promise<Response> {
@@ -38,9 +72,26 @@ async function call(model: string, body: Record<string, unknown>, seconds: numbe
   }
 }
 
-/** The free models to use, best first: never a paid one (the id ends ":free" and its price is 0). */
+/** Google's Gemmas for this key, the site's named ones first, then other big enough ones. */
+async function googleModels(): Promise<string[]> {
+  if (!GOOGLE_KEY) return [];
+  try {
+    const res = await fetch(`${GOOGLE}/models?pageSize=200`, { headers: { "x-goog-api-key": GOOGLE_KEY }, signal: AbortSignal.timeout(20_000) });
+    const all = ((await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] }).models ?? [];
+    const ids = all.filter((m) => /gemma/i.test(m.name) && (m.supportedGenerationMethods ?? []).includes("generateContent")).map((m) => m.name.replace(/^models\//, ""));
+    const big = (id: string) => Number(id.match(/(\d+)b/)?.[1] ?? 0) >= 12;
+    const named = WEBSITE.googleModels.filter((id) => ids.includes(id));
+    return [...named, ...ids.filter((id) => !named.includes(id) && big(id))].slice(0, 4).map((id) => `google:${id}`);
+  } catch {
+    return WEBSITE.googleModels.map((id) => `google:${id}`);
+  }
+}
+
+/** The free models to use, best first: Google's (the paper's own quota), then
+ * OpenRouter's free ones (never a paid one: the id ends ":free" and its price is 0). */
 export async function freeModels(): Promise<string[]> {
   if (models) return models;
+  const google = await googleModels();
   const named = [...WEBSITE.freeModels];
   try {
     const res = await fetch("https://openrouter.ai/api/v1/models", { signal: AbortSignal.timeout(20_000) });
@@ -56,6 +107,8 @@ export async function freeModels(): Promise<string[]> {
   }
   models = models.filter((m) => /gemma/i.test(m));
   if (!models.length) models = named;
+  if (!KEY) models = [];
+  models = [...google, ...models];
   return models;
 }
 
@@ -74,9 +127,10 @@ export type AiResult<T> = { ok: true; value: T; model: string } | { ok: false; w
 
 /** One JSON answer from the free models, tried in order until one gives valid JSON that `check` accepts. */
 export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) => T | null): Promise<AiResult<T>> {
-  if (!KEY) return { ok: false, why: "no OPENROUTER_API_KEY", stop: true };
+  if (!KEY && !GOOGLE_KEY) return { ok: false, why: "no GOOGLE_AI_KEY or OPENROUTER_API_KEY", stop: true };
   const list = await freeModels();
-  const order = a.role === "checker" && list.length > 1 ? [...list.slice(1), list[0]] : list;
+  // the checker starts from the second model of the best route, so it differs from the writer
+  const order = a.role === "checker" && list.length > 1 ? [list[1], list[0], ...list.slice(2)] : list;
   const whys: string[] = [];
   let why = "no free model answered";
   // every Gemma busy: wait for the first to rest (up to 90 s), else give up for this run
@@ -88,13 +142,20 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
   const tryList = awake.filter((m) => m !== a.avoid).concat(a.avoid && awake.includes(a.avoid) && awake.length === 1 ? [a.avoid] : []);
   if (!tryList.length) return { ok: false, why: "every free model is busy for now", busy: true };
   for (const model of tryList) {
-    if (sql && (await count(sql, "ai_free", 0)) >= WEBSITE.dailyFreeRequests) return { ok: false, why: "the day's free AI requests are used up", stop: true };
+    // a route whose day's allowance is used up is skipped; when every route is, the run's AI stops
+    if (sql && (await count(sql, counter(model), 0)) >= ceiling(model)) {
+      whys.push(`${model}: its route's free requests for today are used up`);
+      if (await aiLeft(sql) <= 0) return { ok: false, why: "the day's free AI requests are used up", stop: true };
+      continue;
+    }
     const wait = last + GAP_MS - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     last = Date.now();
     usedThisRun++;
-    if (sql) await count(sql, "ai_free");
-    const res = await call(model, {
+    if (sql) await count(sql, counter(model));
+    const res = isGoogle(model)
+      ? await callGoogle(model, { system: a.system, user: a.user, temperature: a.temperature ?? 0.2, maxTokens: a.maxTokens ?? 3000 }, 120)
+      : await call(model, {
       temperature: a.temperature ?? 0.2, max_tokens: a.maxTokens ?? 3000, response_format: { type: "json_object" },
       // thinking models spend their tokens thinking first: keep it short so the answer fits
       reasoning: { effort: "low", exclude: true },
@@ -103,8 +164,8 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
     if (!res.ok) {
       why = `${model}: ${res.status} ${(await res.text()).slice(0, 160)}`;
       whys.push(why);
-      // the day's free allowance is the account's: a 429 that says so stops the run's AI
-      if (res.status === 429 && /per-day|free-models-per-day/i.test(why)) return { ok: false, why, stop: true };
+      // a day's allowance used up (OpenRouter's account, or a Google model's per-day quota): that model rests till tomorrow
+      if (res.status === 429 && /per-?day|free-models-per-day|PerDay/i.test(why)) { resting.set(model, Date.now() + 24 * 3600_000); continue; }
       // busy, gone, or too slow: set aside for a while, ask the next
       // ("rate-limited upstream" asks to retry shortly: a minute; anything else longer)
       if ([404, 408, 429, 502, 503, 504].includes(res.status)) resting.set(model, Date.now() + (res.status === 429 ? 60_000 : REST_MS));
@@ -128,9 +189,11 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
   return { ok: false, why: whys.join(" | ") || why, busy };
 }
 
-/** Requests left today. */
+/** Free requests left today, over the routes this run has. */
 export async function aiLeft(sql: Sql): Promise<number> {
-  return WEBSITE.dailyFreeRequests - (await count(sql, "ai_free", 0));
+  const google = GOOGLE_KEY ? Math.max(0, WEBSITE.dailyGoogleRequests - (await count(sql, "ai_google", 0))) : 0;
+  const open = KEY ? Math.max(0, WEBSITE.dailyFreeRequests - (await count(sql, "ai_free", 0))) : 0;
+  return google + open;
 }
 
 /** The JSON in a model's answer: the whole of it, or inside a code fence, or

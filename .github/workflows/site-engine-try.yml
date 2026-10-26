@@ -38,4 +38,5 @@ jobs:
       - name: Dry run (stores nothing)
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GOOGLE_AI_KEY: ${{ secrets.GOOGLE_AI_KEY }}
         run: node --experimental-strip-types --no-warnings site/engine/try.ts ${{ github.event.inputs.stories || '3' }}

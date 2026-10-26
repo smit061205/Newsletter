@@ -4,6 +4,10 @@
 export const WEBSITE = {
   url: "https://capital-kranti.vercel.app",
   freeModels: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free"],
+  // Gemma through Google's own API with the paper's free key (GOOGLE_AI_KEY), tried first;
+  // the daily ceiling stays under the free tier's (about 1,500 a day per Gemma, 26 Oct)
+  googleModels: ["gemma-4-31b-it", "gemma-4-26b-a4b-it"],
+  dailyGoogleRequests: 1400,
   dailyFreeRequests: 900,
   dailyUploads: 50,
 };

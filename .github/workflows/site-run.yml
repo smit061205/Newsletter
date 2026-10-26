@@ -37,5 +37,6 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GOOGLE_AI_KEY: ${{ secrets.GOOGLE_AI_KEY }}
           CK_EVENT: ${{ github.event_name }}
         run: node --experimental-strip-types --no-warnings site/pipeline/run.ts
