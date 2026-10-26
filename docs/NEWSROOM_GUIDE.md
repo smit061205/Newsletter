@@ -5,7 +5,6 @@
 
 એક ક્લિકે એપ લો *(Download the app with one click)*:
 - Mac (M1 કે નવું / Apple silicon): [Capital-Kranti-mac-arm64.dmg](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-mac-arm64.dmg)
-- Mac (Intel): [Capital-Kranti-mac-x64.dmg](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-mac-x64.dmg)
 - Windows: [Capital-Kranti-Setup.exe](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-Setup.exe)
 
 જૂની એપ પહેલાં કાઢવાની નથી: નવી એપ ખોલતાં જ જૂનાં છાપાં અને સેટિંગ્સ પોતે લઈ લે છે અને જૂની એપ કાઢી નાખે છે.
