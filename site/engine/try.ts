@@ -26,8 +26,8 @@ for (const s of pick) {
 }
 
 // 2. triage, 40 at a time
-for (let i = 0; i < items.length; i += 25) {
-  const batch = items.slice(i, i + 25);
+for (let i = 0; i < items.length; i += 12) {
+  const batch = items.slice(i, i + 12);
   const input: TriageInput[] = batch.map((it, k) => ({ i: k + 1, source: it.source, lang: it.lang, title: it.title, summary: it.summary,
     factcheck: SOURCES.find((s) => s.id === it.source)?.trust === "factcheck" }));
   const res = await triageBatch(null, input);

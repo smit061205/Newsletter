@@ -17,6 +17,10 @@ const KEY = process.env.OPENROUTER_API_KEY ?? "";
 const GOOGLE_KEY = process.env.GOOGLE_AI_KEY ?? "";
 const GOOGLE = "https://generativelanguage.googleapis.com/v1beta";
 const isGoogle = (m: string) => m.startsWith("google:");
+/** extra length for Gemma's thinking, on top of the answer's own */
+const GOOGLE_THINKING_ROOM = 8192;
+/** how much Gemma may think: set from what aiprobe.ts found the model accepts (none = its default) */
+const GOOGLE_THINKING: Record<string, unknown> | null = process.env.CK_GOOGLE_THINKING ? JSON.parse(process.env.CK_GOOGLE_THINKING) : null;
 /** which daily allowance a model's requests count against */
 const counter = (m: string) => (isGoogle(m) ? "ai_google" : "ai_free");
 const ceiling = (m: string) => (isGoogle(m) ? WEBSITE.dailyGoogleRequests : WEBSITE.dailyFreeRequests);
@@ -44,7 +48,11 @@ async function callGoogle(model: string, a: { system: string; user: string; temp
       headers: { "x-goog-api-key": GOOGLE_KEY, "content-type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: `${a.system}\n\n---\n\n${a.user}` }] }],
-        generationConfig: { temperature: a.temperature, maxOutputTokens: a.maxTokens },
+        // Gemma 4 thinks before it answers, and its thinking counts against the length: room for both,
+        // and the thinking kept short where the model takes the setting (26 Oct: 3,500 tokens went on
+        // thinking and the answer came back empty)
+        generationConfig: { temperature: a.temperature, maxOutputTokens: a.maxTokens + GOOGLE_THINKING_ROOM,
+                            ...(GOOGLE_THINKING ? { thinkingConfig: GOOGLE_THINKING } : {}) },
       }),
     });
     const text = await res.text();
@@ -156,7 +164,7 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
     usedThisRun++;
     if (sql) await count(sql, counter(model));
     const res = isGoogle(model)
-      ? await callGoogle(model, { system: a.system, user: a.user, temperature: a.temperature ?? 0.2, maxTokens: a.maxTokens ?? 3000 }, 120)
+      ? await callGoogle(model, { system: a.system, user: a.user, temperature: a.temperature ?? 0.2, maxTokens: a.maxTokens ?? 3000 }, 200)
       : await call(model, {
       temperature: a.temperature ?? 0.2, max_tokens: a.maxTokens ?? 3000, response_format: { type: "json_object" },
       // thinking models spend their tokens thinking first: keep it short so the answer fits

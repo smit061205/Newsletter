@@ -1,5 +1,5 @@
-// Steps 2 and 4 in one pass (ROADMAP §3): a free model reads new items 25 at
-// a time (one request for 25 headlines keeps hundreds of sources within the
+// Steps 2 and 4 in one pass (ROADMAP §3): a free model reads new items 12 at
+// a time (one request for 12 headlines keeps hundreds of sources within the
 // free allowance) and gives each its importance to Capital Kranti's readers,
 // its tier and genres, whether it's sensitive, one English line naming the
 // event, and English keywords. The keywords group items about one event into
@@ -10,7 +10,7 @@ import { sourceById } from "./sources.ts";
 import type { Genre, Tier } from "../lib/types.ts";
 
 type Sql = NeonQueryFunction<false, false>;
-const BATCH = 25;
+const BATCH = 12;
 const TIERS: Tier[] = ["gujarat", "india", "world"];
 const GENRES: Genre[] = ["farm", "economy", "tech", "health", "sport", "education", "entertainment"];
 
