@@ -47,8 +47,12 @@ export interface InboxItem {
   photo?: string;
   /** photos sent together as one album */
   album?: string;
+  /** a text: the rest of his message just before it (one article sent in parts) */
+  cont?: boolean;
   /** a photo: the text item it goes with; 0: with none (he said so) */
   pairedTo?: number;
+  /** a photo: the articles the AI looked at it against and found it wasn't (it waits for his next) */
+  notOf?: number[];
   /** a photo: the bot's question about it, waiting for his answer (its message id) */
   asked?: number;
   /** the paper it went into (its day), once it has */
