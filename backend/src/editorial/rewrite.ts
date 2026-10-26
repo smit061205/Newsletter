@@ -93,6 +93,8 @@ export function priorityOf(r: Release): number {
     if (/રાષ્ટ્રપતિ|राष्ट्रपति/.test(o) || r.photos.length) return 3;
     return 4;
   }
+  // (the paper's own reporter's news, sent to its Telegram bot: never a filler)
+  if (r.source === "telegram") return 2;
   const o = r.office + " " + r.headline;
   if (/મુખ્યમંત્રી/.test(o)) return 1;
   if (/ગાંધીનગર|રાજ્યપાલ|લોકભવન|વિભાગ/.test(o)) return 2;
@@ -293,7 +295,7 @@ export async function rewriteOne(r: Release, model: string, key: string, togethe
     id: storyIdOf(r), releaseId: r.id, date: r.date,
     kicker: out.kicker, headline: out.headline, deck: out.deck,
     bodies: { long: out.body_long, medium: out.body_medium, short: out.body_short },
-    priority: out.priority, page: out.page,
+    priority: r.source === "telegram" ? Math.min(out.priority, 2) : out.priority, page: out.page,
     photo: r.photos[0] ?? null, caption: out.caption,
     source: r.url, model, needsReview: true,
     ...(unknown.length ? { factCheck: `numbers not in the release: ${unknown.join(", ")}` } : {}),

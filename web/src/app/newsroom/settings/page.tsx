@@ -18,7 +18,8 @@ export default function SettingsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => { call<Settings>("/api/settings").then(setX).catch((e) => setError(e.message)); }, []);
-  const save = async (change: Omit<Partial<Settings>, "openrouterKey"> & { openrouterKey?: string }) => {
+  const [tg, setTg] = useState("");
+  const save = async (change: Omit<Partial<Settings>, "openrouterKey" | "telegram"> & { openrouterKey?: string; telegramToken?: string; telegramRemove?: number }) => {
     setError("");
     try {
       setX(await call<Settings>("/api/settings", { json: change }));
@@ -60,6 +61,27 @@ export default function SettingsPage() {
             <input className={s.input} style={{ flex: 1, minWidth: 200 }} type="password" autoComplete="off" placeholder={x.openrouterKey ? "••••••••" : "sk-or-…"}
                    value={key} onChange={(e) => setKey(e.target.value)} aria-label={t("settings.key")} />
             <Button kind="primary" type="submit" disabled={!key}>{t("settings.save")}</Button>
+          </form>
+        </section>
+
+        <section className={s.card}>
+          <h2 className={s.cardTitle}>{t("settings.tg")}</h2>
+          <p className={s.muted}>{t("settings.tg.body")}</p>
+          {x.telegram?.token && (x.telegram.bot
+            ? <p>{t("settings.tg.bot", { bot: `@${x.telegram.bot}` })}</p>
+            : <Note tone="bad">{t("settings.tg.bad")}</Note>)}
+          {x.telegram?.token && x.telegram.bot && (<>
+            {x.telegram.chats.map((c) => (
+              <div key={c.id} className={s.row}><span style={{ flex: 1 }}>✓ {c.name}</span>
+                <Button onClick={() => save({ telegramRemove: c.id })}>{t("settings.tg.remove")}</Button></div>
+            ))}
+            <p className={s.muted}>{t(x.telegram.chats.length ? "settings.tg.more" : "settings.tg.first", { code: x.telegram.code })}</p>
+            {x.telegram.waiting > 0 && <p className={s.faint}>{t("settings.tg.waiting", { n: num(lang, x.telegram.waiting) })}</p>}
+          </>)}
+          <form className={s.row} onSubmit={(e) => { e.preventDefault(); if (tg) save({ telegramToken: tg }).then(() => setTg("")); }}>
+            <input className={s.input} style={{ flex: 1, minWidth: 200 }} type="password" autoComplete="off"
+                   placeholder={x.telegram?.token ? "••••••••" : "123456:ABC…"} value={tg} onChange={(e) => setTg(e.target.value)} aria-label={t("settings.tg")} />
+            <Button kind="primary" type="submit" disabled={!tg}>{t("settings.save")}</Button>
           </form>
         </section>
 

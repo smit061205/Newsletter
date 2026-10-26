@@ -112,6 +112,7 @@ Not sure which Mac? Apple menu → About This Mac: "Chip: Apple M…" is Apple s
 | Layout engine: modules, packer, gap closing, level columns, tight photos | Done |
 | Release gates (1–7, S1–S7, **F** every letter in its font, **P** print preflight) | Done |
 | **News: PIB** (Gujarati from PIB Ahmedabad; Hindi from PIB Delhi, translated when short) | Done (`ingest/pib.ts`, `editorial/translate.ts`) |
+| **News from the editor's Telegram** (his own news and photos, sent to the paper's bot through the day) | Done (`ingest/telegram.ts`) |
 | AI: rewrite, round-ups, length fitting, **editorial plan**, page review | Done (`editorial/`) |
 | **One pipeline as jobs** (fetch → rewrite → top-up → features → build), 8 PM, live log, retry | Done (`pipeline.ts`) |
 | **Newsroom website** (Today, News, Stories, Pages, Ads, Papers, Settings) | Done (`web/src/app/newsroom/`, only where `NEWSROOM=1`) |
@@ -229,6 +230,7 @@ backend/
   src/build.ts              the whole issue build + release gates
   src/chrome/chrome.ts      masthead / running headers / footer with the day's fields
   src/fonts/bharati.ts      Unicode Gujarati -> Bharati Gopika glyph codes
+  src/ingest/telegram.ts    the paper's Telegram bot: the editor's own news and photos, photos matched to articles
   src/ingest/gujaratInfo.ts Playwright reader for gujaratinformation.gujarat.gov.in
                             (blocked from servers -- see 11)
   src/editorial/rewrite.ts  OpenRouter rewrite + fitLength() + fact check
@@ -532,6 +534,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
   - A release: `PressReleaseIframePage.aspx?PRID=n` (ministry, headline, date line, paragraphs, photos, and the PRIDs of its other language versions).
 - **Round-ups:** near-identical releases from one office (the PM's congratulations to each medal winner) become one story (`groupSimilar` in `rewrite.ts`).
 - **The Hindi top-up** (`editorial/translate.ts`): when the Gujarati copy fills less than the profile's `fillTarget` (110%), the Hindi list (less what PIB also issued in Gujarati, by language links or by the same names and figures, and less greetings) is ranked by the AI for Gujarat's readers, then translated one by one until the pages are full (no spending ceiling unless the profile sets `dailyBudgetUsd`). Numbers are checked against the Hindi (Devanagari digits, "9 हज़ार", "2 लाख" understood).
+- **The editor's own news, by Telegram** (`backend/src/ingest/telegram.ts`): the paper's bot (made with @BotFather; its token in Settings, kept in settings.env as `TELEGRAM_BOT_TOKEN`). The engine long-polls `getUpdates` while it runs and keeps every message in the `inbox` table at once (Telegram keeps them a day). Only people who sent the bot the 6-digit code Settings shows count. Text from one person within 3 minutes is one article; a photo is matched to an article sent within 30 minutes of it, else by a vision model reading it (only when sure), else the bot asks him with his recent articles as buttons (the newsroom's Stories → sources tab can attach it too). At paper time (the fetch step, today's paper only) everything no paper has taken becomes the day's releases (`source: "telegram"`, story ids `t…`, priority 2 at least), written up and number-checked like any release; what comes later goes into the next paper. A link alone isn't followed: the bot asks for the text.
 - **The state's Information Department** (gujaratinformation.gujarat.gov.in) blocks automated browsers; **don't get around that.** The `/reader` bookmark (one page at a time, read by a person) and `POST /api/releases` still work; `ingest/gujaratInfo.ts` is kept for if access is ever allowed.
 
 ---

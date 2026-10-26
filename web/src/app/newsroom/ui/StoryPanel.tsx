@@ -117,7 +117,7 @@ export function StoryPanel({ story, onClose, onChanged }: { story: StoryRow; onC
             <div key={o.id} className={s.field} style={{ marginTop: 10 }}>
               <strong lang={o.lang}>{o.headline}</strong>
               <p className={s.original} lang={o.lang}>{o.body}</p>
-              <a href={o.url} target="_blank" rel="noreferrer">{t("sources.open")} ↗</a>
+              {/^https?:/.test(o.url) && <a href={o.url} target="_blank" rel="noreferrer">{t("sources.open")} ↗</a>}
             </div>
           ))}
         </details>

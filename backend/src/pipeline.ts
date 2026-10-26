@@ -122,6 +122,13 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       // both in: an item that is the same news as a PIB release that came in alongside it goes
       const official = async () => {
         await Promise.all([officialRun, foreignRun]);
+        // what the editor sent the paper's Telegram bot since the last paper (today's paper only:
+        // an earlier day's, made again, doesn't take what's new)
+        if (!past) {
+          const { ingestTelegram } = await import("./ingest/telegram.ts");
+          await timed("Telegram", () => ingestTelegram(store, date, { log: say }))
+            .catch((e: unknown) => { if (stopping) throw e; say(`the Telegram news couldn't be taken (${e instanceof Error ? e.message : e})`); });
+        }
         if (profile.language.lang !== "gu") return;
         const { dropTwinsOfPib } = await import("./ingest/official.ts");
         dropTwinsOfPib(store, date, say);

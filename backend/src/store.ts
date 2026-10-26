@@ -20,7 +20,7 @@ export interface Release {
   fetchedAt: string;
   /** where it came from: the state's Information Department (the default, for older rows), PIB,
    * the Gujarat CM's office or All India Radio's Gujarati news (ingest/official.ts) */
-  source?: "gujinfo" | "pib" | "cmo" | "air" | "un";
+  source?: "gujinfo" | "pib" | "cmo" | "air" | "un" | "telegram";
   /** its language: Gujarati (the default), or Hindi or English, which are translated */
   lang?: "gu" | "hi" | "en";
   /** PIB: the ministry that issued it */
@@ -29,8 +29,31 @@ export interface Release {
   langVersions?: number[];
 }
 
-/** The story made from a release: "p<PRID>" for PIB's, "c…" the CM's office's, "a…" All India Radio's, "u…" UN News's, "r<id>" the state's. */
-export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
+/** The story made from a release: "p<PRID>" for PIB's, "c…" the CM's office's, "a…" All India Radio's, "u…" UN News's,
+ * "t…" one sent to the paper's Telegram bot, "r<id>" the state's. */
+export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u", telegram: "t" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
+
+/** A message sent to the paper's Telegram bot (ingest/telegram.ts): news text, or a photo for it. */
+export interface InboxItem {
+  /** Telegram's update number (one per message, in order) */
+  id: number;
+  chat: number;
+  from: string;
+  /** when it was sent (seconds since 1970) */
+  at: number;
+  kind: "text" | "photo";
+  text: string;
+  /** a photo: where it's kept (/media/telegram/...) */
+  photo?: string;
+  /** photos sent together as one album */
+  album?: string;
+  /** a photo: the text item it goes with; 0: with none (he said so) */
+  pairedTo?: number;
+  /** a photo: the bot's question about it, waiting for his answer (its message id) */
+  asked?: number;
+  /** the paper it went into (its day), once it has */
+  usedOn?: string;
+}
 
 export interface Story {
   id: string;
@@ -126,6 +149,7 @@ export class Store {
       create table if not exists fitted (key text primary key, json text);
       create table if not exists jobs (id integer primary key autoincrement, date text, json text);
       create table if not exists settings (key text primary key, json text);
+      create table if not exists inbox (id integer primary key, date text, json text);
     `);
   }
 
@@ -136,6 +160,13 @@ export class Store {
     return this.db.prepare(`select json from ${table} where date = ? order by rowid`).all(date)
       .map((r) => JSON.parse((r as { json: string }).json) as T);
   }
+
+  /** The Telegram inbox, oldest first (`unused`: only what no paper has taken yet). */
+  inbox(unused = false): InboxItem[] {
+    return this.db.prepare(`select json from inbox ${unused ? "where date = ''" : ""} order by id`).all()
+      .map((r) => JSON.parse((r as { json: string }).json) as InboxItem);
+  }
+  putInbox(item: InboxItem) { this.put("inbox", item.id, item.usedOn ?? "", item); }
 
   hasRelease(id: number) {
     return !!this.db.prepare("select 1 from releases where id = ?").get(id);
