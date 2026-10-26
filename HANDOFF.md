@@ -261,79 +261,93 @@ The desktop app's open items:
 
 ## 8. The website: start here in a new session
 
-The user wants a live website as the heart of the paper, with a social media
-desk (Facebook, Instagram, X, Telegram, YouTube Shorts, WhatsApp) and the
-printed paper as one of its products. **Phase A is built and live** at
-https://capital-kranti.vercel.app (25 Oct); the user hasn't reviewed it yet.
+*(Rewritten 26 Oct, evening, when the website moved from a cloud session to a local one.
+Everything below is on `main`, at or after commit `f0bb961`.)*
 
-**The user's rule (25 Oct): website work stays in `site/`, the website's own
-workflows (`.github/workflows/site*.yml`) and `docs/website/`. Never change the
-app's code for the website** (backend, web/newsroom, desktop, shared, publications,
-the root packages), and never tag an app release for website work. A first attempt
-changed Publish and Settings and tagged v1.1.14; it was undone the same day (the app
-is exactly v1.1.13, the tag deleted; the user deletes the leftover v1.1.14 draft
-release on GitHub). Reading the engine's code is fine: the hourly run borrows its
-number check (`backend/src/editorial/rewrite.ts`) without changing it.
+The user wants a live website as the heart of the paper. It has its own news engine, and
+later a social media desk. It is live at https://capital-kranti.vercel.app.
 
-**Read first:**
-- `site/README.md`: the website's manual (where it runs, how a day gets onto it, working on it).
-- `docs/website/ROADMAP.md`: the plan, the four phases (§6), the user's decisions (§6.0), free hosting and its limits (§1.1), costs in ₹.
-- `docs/website/DESIGN.md`: Capital Kranti's own design system; the approved sample is `docs/website/sample/` (https://claude.ai/artifact/RK4UQHxNmQvWrFZuuksEeY).
+**The user's rules for website work (25–26 Oct):**
+- Touch only `site/`, `.github/workflows/site*.yml` and `docs/website/`, plus these notes
+  (`CLAUDE.md`, `HANDOFF.md`).
+- Never change the app's code, and never tag an app release for website work. The site may
+  *import* `backend/src/ingest/pib.ts` and `backend/src/editorial/rewrite.ts` read-only.
+- **Open Claude Code in `site/`.** There a hook (`site/.claude/`) refuses edits outside the
+  allowed paths, and `site-guard.yml` fails any website branch that touches the app. The
+  local app session and the website session must not share a working copy: use a separate
+  clone or `git worktree add ../Newsletter-site main`.
+- Free AI only (₹0): Gemma models. Never Anthropic models; never paid ones.
+- Don't get around any site's bot blocking. Never commit keys. Costs are shown in ₹.
+- Inspiration, not imports: take ideas from WPDS, the Guardian and the BBC, never their
+  components (`docs/website/UIUX.md`).
+- When a round is finished and checked, merge it to `main` and push. That's how it has been
+  done: `git merge --no-ff` from the work branch, after the `site` workflow passes. Vercel
+  deploys `main`.
 
-**Decided** (details in ROADMAP §6.0): own design, phone first, the paper's purple, navy and
-cyan, light or dark by the phone; Gujarati first, English labels and stories (stories
-translated by a free OpenRouter model); stories don't mention AI, only their source and the
-number check; free hosting: Vercel (site), Neon (database), Vercel Blob (photos) now,
-Cloudflare before ads or phase C; `capitalkranti.co.in` is the paper's and will point at the
-site; editors sign in with Google (phase B); ₹25 a day AI ceiling; X posted by hand; no letter
-to PIB for now.
+**Read first:** `site/README.md` (the manual: running it, the engine, the workflows and
+keys), `docs/website/ROADMAP.md` (the plan; §0.1 the engine's purpose, §3.1 the
+verification loop), `docs/website/UIUX.md` (the UI choices and where each lives), and
+`docs/website/DESIGN.md`.
 
-**Where it stands (25 Oct, evening):**
-- **Live:** home, story, section (Gujarat, India, World, seven topics), latest, search,
-  e-paper, past issues, saved, about, editorial policy, how we check, corrections, contact,
-  terms, privacy; Gujarati at the root, English under `/en`; NewsArticle markup, sitemaps,
-  RSS, robots. It is **kept out of search engines** while on the `vercel.app` address
-  (`site/lib/site.ts`, `INDEXABLE`).
-- **Content:** 20-22 Oct (issues 269-271): 70 stories, their photos and e-papers, loaded once
-  by `site-seed.yml` from `site/pipeline/seed/`. Nothing newer: the app's Publish does **not**
-  send to the site (the rule above).
-- **Photos:** the Blob store `capital-kranti-photos` is **private** (as it was created), so
-  the site serves its files itself at `/media/…` (`site/app/media`), cached a year by the CDN.
-  The store is connected to the project (Production, Preview); the site reads it (`/api/status`
-  shows `photos.get: found`). Checked: photos and e-paper pages answer 200.
-- **English:** all 70 stories still wait for their tags and English (`stories_by_state` on
-  `/api/status`): the hourly run's push-triggered runs came before the stories were loaded,
-  and **GitHub hadn't started the hourly schedule yet** (0 scheduled runs by 16:50 UTC, ~2.5 h
-  after the workflow reached `main`). Check `/api/status` again; if still none, start it by
-  hand (GitHub, Actions, `site-run`, Run workflow) or find why the schedule doesn't fire.
-- **The PIB test:** from GitHub's servers, PIB's list and release pages answer (200), as does
-  All India Radio's Gujarati; the CM's office doesn't answer GitHub. How late scheduled runs
-  start is still unmeasured (no scheduled run yet).
-- **Waiting on nothing from the user** except: the v1.1.14 draft release to delete; later,
-  pointing `capitalkranti.co.in` at Vercel (guided), and `DATABASE_URL_UNPOOLED` (optional).
-- `/api/publish` and `/api/publish/file` exist (a day in with the publish key
-  `CK_PUBLISH_KEY`), but nothing sends to them; they need no key until something does.
+**Where it stands (26 Oct, evening):**
+- **The news engine runs every 15 minutes** (`site-engine.yml`, started 26 Oct after the
+  user approved two dry-run stories).
+  - It reads 122 sources politely and triages them in batches of 12. It groups reports of
+    the same event, then gates each one: fresh, not debunked, official or confirmed by two
+    independent outlets, and a 6-hour wait.
+  - It ranks by importance. Gemma writes in Gujarati, every number and claim is checked, and
+    national and world news gets English and Hindi.
+  - It publishes confirmed, non-sensitive stories itself and holds the rest for Telegram.
+  - Code: `site/engine/`. AI calls: `site/engine/ai.ts`.
+- **AI:**
+  - The user's Google AI Studio key (`GOOGLE_AI_KEY`, Gemma 4 free tier) comes first.
+    gemma-4-26b-a4b-it writes, with `thinkingLevel: "minimal"` (7 s rather than 100 s);
+    gemma-4-31b-it checks.
+  - OpenRouter's free Gemmas are the fallback, but they are usually "rate-limited upstream".
+  - Google sometimes answers 500/503 ("high demand"). A story that fails is retried on the
+    next run.
+  - Models and limits: `site/lib/config.ts`.
+- **The first real run** (26 Oct, 11:40 UTC) went cleanly. 68 of 122 sources answered and
+  there was nothing new yet; 15 sources refuse programs and are left off. **The first
+  scheduled hour has not been checked yet: do that first.** Read the latest `site-engine`
+  runs' logs (GitHub, Actions): items collected, triaged, written, published or held.
+- **Telegram approvals are off** until the user adds the secrets `TELEGRAM_BOT_TOKEN` and
+  `TELEGRAM_CHAT_IDS`. Until then, held stories wait in the database (`status = 'held'`).
+- **Dry runs** (store nothing): `site-engine-try.yml`, with input `stories` and an optional
+  `probe`.
+- **The site:**
+  - Pages: home, story, sections, latest, search, e-paper, past issues, saved, policy pages.
+    Gujarati at `/`, English at `/en`, Hindi at `/hi`.
+  - Design: Washington Post-style tokens and motion (loading bar, reading bar, skeletons,
+    page transitions). The lead is sized by importance (the Guardian's boost levels: 7.5,
+    9.5, 11). Sections are a wide row or small boxes three to a row, and a story shows once
+    per page.
+  - Story pages: a byline block, the photo full screen, read-also and related stories.
+  - Also: an e-paper reader, instant search, and a BBC-style focus ring.
+  - **New on 26 Oct:** most read (`reads` table; `/api/read`, one count per browser), an
+    installable app with offline reading (`app/manifest.ts`, `public/sw.js`, production
+    only), and "more on this" (stories sharing three engine key words).
+  - Rules: lines and header icons line up with the page's edges. A row shows photos only
+    when all its cards have one. An older printed paper is called "the latest", never
+    "today's".
+- **Checks:**
+  - `site.yml` builds the site and runs `site/test/a11y.mjs` (axe, WCAG 2 AA, phone and
+    desktop, light and dark; a serious problem fails it).
+  - The engine has `npx --prefix site tsc -p site/engine` and
+    `node --experimental-strip-types site/engine/selftest.ts`.
+- **To work on the site:** run `CK_SAMPLE=1 npm run dev --prefix site`. It opens on
+  http://localhost:3200 with 22 Oct's sample stories and needs no keys. Check layout at
+  390, 800, 1440 and 2000 px wide; the user's screen is about 2000 px.
 
-- **The news engine (25 Oct, evening; a cloud session):** built in `site/engine/` (site/README.md,
-  "The news engine"; ROADMAP §0.1, §3, §3.1): 122 sources every 15 minutes, free OpenRouter
-  models only (₹0), the genuineness loop, Gujarati stories by importance, English and Hindi for
-  national and world news, publish or hold for the editor on Telegram. The user's decisions:
-  confirmed non-sensitive stories go live by themselves; approvals on Telegram now and a site page
-  later; world news in all three languages. Dry runs: `site-engine-try.yml` (stores nothing).
-  Free models are often "rate-limited upstream" (both Gemmas for half an hour on 25 Oct), so the
-  engine rotates through up to ten of them. Website sessions are fenced into `site/`
-  (`site/.claude/`, `site-guard.yml`); open Claude Code in `site/` for website work.
-
-**Next:**
-1. See the English versions arrive (above), then review phase A with the user: phone and
-   desktop screenshots of home, a story, a section, the e-paper, English, dark mode.
-2. **New days without the app:** the site collects them itself on GitHub. PIB answers
-   GitHub, so a run in `site/pipeline/` reads PIB's Gujarati list each hour (politely, as
-   `backend/src/ingest/pib.ts` does; it may import its parsers read-only), writes stories
-   in the house style with a cheap model under the ₹25 ceiling (or the free one), checks
-   their numbers, and saves them. That is phase B's live news brought forward; ask the user
-   before starting it, and keep the e-paper question open (the printed pages are made only
-   by the app).
-3. Point `capitalkranti.co.in` at Vercel (the user, guided), then set `SITE_URL` in
-   `site/lib/site.ts` so search engines may index it.
-
+**Next (the user's list, in order):**
+1. Check the engine's first scheduled hours and show the user the first stories that went
+   live. Fix what the logs show (only in `site/`).
+2. The user adds the Telegram secrets; then test an approval end to end.
+3. Keep polishing the UI from the user's screenshots. They care about alignment, a
+   professional feel, motion and the reading experience. They compare the site to the
+   Washington Post.
+4. Later: the editor page on the site (Google sign-in); leaders' birthdays (an edited image
+   and a draft email, **never sent**; ROADMAP §3.3); point `capitalkranti.co.in` at Vercel,
+   then set `SITE_URL` so search engines may index it.
+5. **Much later, only when the user says:** the social media desk (X, Instagram, Facebook,
+   YouTube Shorts). The user explicitly put it after the website and the content pipeline.
