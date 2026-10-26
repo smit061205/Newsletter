@@ -1,4 +1,5 @@
 // Section, latest, search, e-paper and archive pages (DESIGN.md §3.6-3.7).
+import EpaperViewer from "../components/EpaperViewer.tsx";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Lang } from "../lib/types.ts";
@@ -65,13 +66,8 @@ export async function Epaper({ date, lang }: { date?: string; lang: Lang }) {
             {issue.pdf && <a className="tool" href={issue.pdf} target="_blank" rel="noopener">{t(lang, "pdf")}</a>}
             <Link className="tool" href={href(lang, "/archive")}>{t(lang, "archive")}</Link>
           </div>
-          <div className="g cards c4">
-            {issue.pages.map((p) => (
-              <a key={p.number} href={p.url} target="_blank" rel="noopener"><span className="epg">
-                <img src={p.url} width={p.width} height={p.height} alt={`${t(lang, "page")} ${num(p.number, lang)}`} loading="lazy" decoding="async" /></span>
-                <div className="epcap">{t(lang, "page")} {num(p.number, lang)}</div></a>
-            ))}
-          </div>
+          <EpaperViewer pages={issue.pages.map((p) => ({ ...p, label: `${t(lang, "page")} ${num(p.number, lang)}` }))}
+            lang={lang} words={{ open: t(lang, "epOpen"), close: t(lang, "close2"), prev: t(lang, "prev"), next: t(lang, "next"), zoom: t(lang, "zoomIn") }} />
           <p className="note">{t(lang, "epNote")}</p>
         </>
       )}

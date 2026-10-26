@@ -5,12 +5,16 @@
 name: site-engine-try
 on:
   push:
-    paths: ["site/engine/**", "site/lib/**", ".github/workflows/site-engine*.yml"]
+    paths: ["site/engine/**", ".github/workflows/site-engine*.yml"]
   workflow_dispatch:
     inputs:
       stories:
         description: "How many events to write in the dry run"
         default: "3"
+      probe:
+        description: "Also time each AI route on real-sized work (aiprobe.ts)"
+        type: boolean
+        default: false
 
 jobs:
   try:
@@ -35,6 +39,12 @@ jobs:
         run: node --experimental-strip-types --no-warnings site/engine/selftest.ts
       - name: Every source, from GitHub's servers
         run: node --experimental-strip-types --no-warnings site/engine/probe.ts
+      - name: The free AI routes on real-sized work
+        if: ${{ github.event.inputs.probe == 'true' }}
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GOOGLE_AI_KEY: ${{ secrets.GOOGLE_AI_KEY }}
+        run: node --experimental-strip-types --no-warnings site/engine/aiprobe.ts
       - name: Dry run (stores nothing)
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
