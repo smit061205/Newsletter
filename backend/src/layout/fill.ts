@@ -1,12 +1,14 @@
-// A filler block (layout/guillotine.ts): a hole beside an ad that no story
-// of the page fits, filled with real copy where there is any --
+// A filler block (layout/guillotine.ts): a gap -- beside an ad, or where a
+// page is short -- that no story of the page fits, filled with real copy where there is any --
 //   1. a story held back from the pages, set as a brief to the hole's size,
 //      else cut to it (whole sentences off its end);
+//   1c. else a held story shortened by the AI to its size, from its release's facts;
 //   2. a "જાણવા જેવું" item written by the AI to its size (editorial/features.ts);
 //   3. the paper's message panel or house ad (once each in a paper: profile fillers).
 import type { Element } from "@ck/shared/contract";
 import { writeBrief } from "../editorial/features.ts";
-import type { Store, Story } from "../store.ts";
+import { newsBrief } from "../editorial/rewrite.ts";
+import { wordForWord, type Release, type Store, type Story } from "../store.ts";
 import type { Blocks } from "./blocks.ts";
 import { houseAd, messageFiller, type FillerCount } from "./fit.ts";
 import { stretchTo } from "./guillotine.ts";
@@ -43,7 +45,7 @@ export function fillInTurn(...args: Parameters<typeof fillHole>): ReturnType<typ
 
 export async function fillHole(page: number, col: number, cols: number, y: number, h: number, ctx: FillContext, avoid: string[],
                                smallestHead = Infinity):
-  Promise<{ placed: PlacedModule[]; elements: Element[] } | null> {
+  Promise<{ placed: PlacedModule[]; elements: Element[]; left: number } | null> {
   const placed: PlacedModule[] = [];
   const elements: Element[] = [];
   let top = y, left = h;
@@ -57,7 +59,8 @@ export async function fillHole(page: number, col: number, cols: number, y: numbe
     left = h - (top - y);
   }
   // what's left under the last item is under a line and a half, or nothing went in
-  return placed.length || elements.length ? { placed, elements } : null;
+  // (`left`: room under the last item another couldn't take)
+  return placed.length || elements.length ? { placed, elements, left: Math.max(0, left) } : null;
 }
 
 async function fillOne(page: number, col: number, cols: number, y: number, h: number, ctx: FillContext, avoid: string[], n: number,
@@ -73,7 +76,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
     if (!fit || !ctx.held.includes(s)) continue;
     ctx.held.splice(ctx.held.indexOf(s), 1);
     const mod = await stretchTo(fit.module, h, ctx.m);
-    ctx.log(`  page ${page}: ${s.id} set as a brief by an ad`);
+    ctx.log(`  page ${page}: ${s.id} set as a brief in a gap`);
     return { placed: { module: mod, col, x: colX(col), y } };
   }
   // 1b. a held story cut to the hole, whole sentences off its end (real news
@@ -99,8 +102,47 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
     if (best && ctx.held.includes(best.s)) {
       ctx.held.splice(ctx.held.indexOf(best.s), 1);
       const mod = await stretchTo(best.mod, h, ctx.m);
-      ctx.log(`  page ${page}: ${best.s.id} cut to ${words(best.mod.story.bodies.long)} words for a hole by an ad`);
+      ctx.log(`  page ${page}: ${best.s.id} cut to ${words(best.mod.story.bodies.long)} words for a gap`);
       return { placed: { module: mod, col, x: colX(col), y } };
+    }
+  }
+  // 1c. a held story made a brief by the AI to the gap's size -- a short headline,
+  // sub-heading and body, from its release's facts only (26 Oct's copies left
+  // six-line gaps white with 35 stories held: every one's headline and
+  // sub-heading alone were taller than the gap, and a tip is no news)
+  if (h >= 5 * pitch) {
+    const size = { head: cols === 1 ? 3 : cols === 2 ? 5 : 7, deck: cols === 1 ? 4 : cols === 2 ? 7 : 10 };
+    for (const s of ctx.held.filter((x) => !wordForWord(x)).slice(0, 3)) {
+      const release = (s.releaseId ? ctx.store.release(s.releaseId) : null)
+        ?? ({ id: 0, date: s.date, headline: s.headline, subhead: s.deck, body: s.bodies.long } as unknown as Release);
+      let target = Math.max(10, Math.round((h / pitch - 4) * cols * 5));
+      let mod: Module | null = null;
+      for (let attempt = 0; attempt < 2 && !mod; attempt++) {
+        const got = await newsBrief(ctx.store, s, release, { ...size, words: target }, { log: ctx.log });
+        if (!got) break;
+        ctx.cost += got.cost;
+        // a hair long: whole sentences off its end
+        const sentences = got.story.bodies.long.split(/(?<=[.।!?])\s+/);
+        let tried: Module | null = null;
+        for (let k = sentences.length; k >= 1; k--) {
+          const body = sentences.slice(0, k).join(" ");
+          if (words(body) < 8) break;
+          tried = await buildModule({ ...got.story, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0);
+          if (Number.isFinite(tried.height) && tried.height <= h + 0.5) break;
+        }
+        const heads = tried ? tried.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length : 0;
+        if (tried && tried.height <= h + 0.5 && (tried.displayFill >= 0.97 || cols === 1) && heads <= 4
+            && tried.headlineHeight <= 0.45 * tried.height && close(tried)) mod = tried;
+        else if (tried && Number.isFinite(tried.height)) {
+          // the next try's length from what this one measured
+          const perLine = words(tried.story.bodies.long) / Math.max(1, tried.bodyLines);
+          target = Math.max(8, Math.round(words(tried.story.bodies.long) + Math.floor((h - tried.height) / pitch) * cols * perLine * 0.9));
+        } else break;
+      }
+      if (!mod || !ctx.held.includes(s)) continue;
+      ctx.held.splice(ctx.held.indexOf(s), 1);
+      ctx.log(`  page ${page}: ${s.id} made a ${words(mod.story.bodies.long)}-word brief by the AI for a gap`);
+      return { placed: { module: await stretchTo(mod, h, ctx.m), col, x: colX(col), y } };
     }
   }
   // 2. an item written to its size, its length from what a first try measured
@@ -149,7 +191,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
     if (best && close(best)) {
       ctx.written.push(best.story.headline);
       const mod = await stretchTo(best, h, ctx.m);
-      ctx.log(`  page ${page}: "${best.story.headline}", a ${words(best.story.bodies.long)}-word item written for a hole by an ad`);
+      ctx.log(`  page ${page}: "${best.story.headline}", a ${words(best.story.bodies.long)}-word item written for a gap`);
       return { placed: { module: mod, col, x: colX(col), y } };
     }
   }

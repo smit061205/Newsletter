@@ -116,6 +116,16 @@ export const editionFile = (date: string, id: string) => path.join(editionsDir(d
 const LAYOUT_GATES = ["1", "2", "W"];
 /** Tries per copy when a layout check fails (a copy placed like another is always tried again). */
 const TRIES = 2;
+/** How far a try is from clean: each failed layout check, then what it is that failed --
+ * a line over another or past its column worst, then an empty stretch, then a line a
+ * hair short (26 Oct: two tries that each failed once kept the first, a line over the
+ * next column's text, over the second's line 4 px short of its box). 0 is clean. */
+function badness(r: Awaited<ReturnType<typeof buildIssue>>["report"]): number {
+  const failed = r.gates.filter((g) => !g.pass && LAYOUT_GATES.includes(g.gate.split(" ")[0])).length;
+  if (!failed) return 0;
+  const how = r.warnings.reduce((a, w) => a + (w.kind === "white-space" ? 5 : w.kind === "line-fit" && !/past/.test(w.detail) ? 1 : 10), 0);
+  return failed * 1000 + how;
+}
 
 let running: Batch | null = null;
 /** The copies or sister papers being made now, if any. */
@@ -321,7 +331,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
       const sig = built.report.placed.map((p) => `${p.story}:${p.page}:${p.cols}`).sort().join(",");
       const at = (e: object) => { const b = e as { x?: number; y?: number; x1?: number; y1?: number }; return [Math.round(b.x ?? b.x1 ?? 0), Math.round(b.y ?? b.y1 ?? 0)]; };
       const layout = JSON.stringify(built.issue.pages.map((p) => p.elements.filter((e) => e.articleId).map((e) => [e.articleId, ...at(e)])));
-      const fails = built.report.gates.filter((g) => !g.pass && LAYOUT_GATES.includes(g.gate.split(" ")[0])).length;
+      const fails = badness(built.report);
       const repeat = seen.has(sig) || seen.has(layout);
       if (repeat) say(`  ${item.name ?? `copy ${n}`} came out like an earlier one: laying it out again`);
       else if (!made || fails < made.fails) {
