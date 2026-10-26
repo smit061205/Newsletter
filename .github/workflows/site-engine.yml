@@ -4,8 +4,8 @@
 # only, and puts them on the website, or holds them for the editor on Telegram.
 name: site-engine
 on:
-  # paused until a dry run's stories have been read and approved (26 Oct); to start the engine,
-  # put back:  schedule: [{ cron: "4,19,34,49 * * * *" }]
+  # started 26 Oct, after the dry run's stories were read and approved
+  schedule: [{ cron: "4,19,34,49 * * * *" }]
   workflow_dispatch:
 
 concurrency:
