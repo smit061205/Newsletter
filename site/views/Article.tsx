@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Lang, Story } from "../lib/types.ts";
-import { latestStories, storiesIn, storyById } from "../lib/db.ts";
+import { latestStories, moreOnSubject, mostRead, storiesIn, storyById } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
 import { dateText, minutes, num, paragraphs, timeText } from "../lib/format.ts";
 import { PAPER, SITE_URL } from "../lib/site.ts";
-import { Cmp, Head, Join, LatestList, Std, words } from "../components/cards.tsx";
+import { Cmp, Head, Join, LatestList, MoreOn, MostRead, Std, words } from "../components/cards.tsx";
+import CountRead from "../components/CountRead.tsx";
 import { Check, Chev, Flag } from "../components/icons.tsx";
 import ArticleTools from "../components/ArticleTools.tsx";
 import ReadProgress from "../components/ReadProgress.tsx";
@@ -33,13 +34,13 @@ export function articleJsonLd(s: Story, lang: Lang) {
 export default async function Article({ id, lang }: { id: string; lang: Lang }) {
   const s = await storyById(id);
   if (!s) notFound();
-  const [related, latest] = await Promise.all([storiesIn(s.tier, 6), latestStories(12)]);
+  const [related, latest, more, most] = await Promise.all([storiesIn(s.tier, 6), latestStories(12), moreOnSubject(s.id), mostRead(5)]);
   const w = words(s, lang);
   const url = `${SITE_URL}${href(lang, `/news/${s.id}`)}`;
   const changed = s.updatedAt && Date.parse(s.updatedAt) - Date.parse(s.publishedAt) > 5 * 60_000;
   const toolWords = Object.fromEntries((["share", "shareShort", "copy", "copied", "save", "saved", "savedToast", "unsavedToast", "size"] as const)
     .map((k) => [k, t(lang, k)])) as Parameters<typeof ArticleTools>[0]["words"];
-  const others = related.filter((x) => x.id !== s.id);
+  const others = related.filter((x) => x.id !== s.id && !more.some((m) => m.id === x.id));
   const paras = paragraphs(w.body);
   // a long story carries one related story inside it, after its third paragraph (as news sites do)
   const inline = paras.length >= 5 ? others.find((x) => x.photo) ?? others[0] : undefined;
@@ -50,6 +51,7 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
     <Frame lang={lang} path={`/news/${s.id}`} section={s.tier} bottomBar={false}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd(s, lang)).replace(/</g, "\\u003c") }} />
       <ReadProgress target=".art" />
+      <CountRead id={s.id} />
       <div className="artg">
         <article className="art" lang={w.translated || lang === "gu" ? lang : "gu"}>
           <Link className="crumbs" href={href(lang, `/section/${s.tier}`)}>{sectionName(s.tier, lang)} <Chev /></Link>
@@ -92,6 +94,7 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
               </div>
             ))}
           </div>
+          {more.length > 0 && <MoreOn stories={more} lang={lang} />}
           <div className="srcbox">
             <h2>{t(lang, "srcTitle")}</h2>
             {s.sources.length > 1 ? (
@@ -108,7 +111,8 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
           )}
           <section className="ctr"><Join lang={lang} /></section>
         </article>
-        <aside><div><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={latest.filter((x) => x.id !== s.id)} lang={lang} n={7} /></div></aside>
+        <aside><div><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={latest.filter((x) => x.id !== s.id)} lang={lang} n={7} />
+          {most.filter((x) => x.id !== s.id).length >= 3 && <div className="ctr"><Head label={t(lang, "mostRead")} /><MostRead stories={most.filter((x) => x.id !== s.id)} lang={lang} /></div>}</div></aside>
       </div>
     </Frame>
   );

@@ -180,6 +180,20 @@ a.h:active{opacity:.85}
 .more{display:inline-flex;align-items:center;gap:2px;font-weight:700;font-size:15px;color:var(--brand);padding-block:12px}
 .more svg.i{transition:transform .2s ease}.more:hover svg.i,.head a:hover svg.i{transform:translateX(3px)}.head svg.i{transition:transform .2s ease}
 
+/* most read: big numbers in the brand colour; more on this: a short list under a story */
+.mostread{list-style:none;margin:0;padding:0;counter-reset:none}
+.mostread li + li{border-top:1px solid var(--rule)}
+.mostread a{display:grid;grid-template-columns:36px minmax(0,1fr);gap:10px;align-items:baseline;padding-block:12px}
+.mostread .n{font-family:var(--serif);font-weight:700;font-size:28px;line-height:1;color:var(--brand)}
+.rail .ctr{margin-top:32px}
+.moreon{margin-top:16px;padding-top:12px;border-top:1px solid var(--rule)}
+.moreon b{display:block;font-size:13px;font-weight:700;color:var(--brand);margin-bottom:6px}
+.moreon ul{margin:0;padding:0;list-style:none}
+.moreon li{position:relative;padding:6px 0 6px 16px;font-family:var(--serif);font-weight:600;font-size:16px;line-height:1.45}
+.moreon li::before{content:"";position:absolute;left:0;top:15px;width:6px;height:6px;border-radius:50%;background:var(--brand)}
+.moreon a{color:var(--strong)}.moreon a:hover{color:var(--brand)}
+.art .moreon{margin-block:32px 0}
+
 /* sections: a wide row (photo story | two columns of headlines) or small boxes three to a row */
 .secbox .stack,.wbody .stack{display:grid}
 .secbox .stack > a + a,.stack > a + a{border-top:1px solid var(--rule)}

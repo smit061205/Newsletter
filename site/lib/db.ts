@@ -96,6 +96,44 @@ export async function storiesIn(key: string, limit = 40): Promise<Story[]> {
   return rows.map(storyOf);
 }
 
+/** One more opening of a published story today (India's day). */
+export async function countRead(id: string) {
+  const sql = db();
+  if (!sql) return;
+  await sql.query(
+    `insert into reads (story_id, day, n) select id, (now() at time zone 'Asia/Kolkata')::date, 1 from stories where id = $1 and status = 'published'
+     on conflict (story_id, day) do update set n = reads.n + 1`, [id]);
+}
+
+/** The stories opened most since yesterday morning (India's days). */
+export async function mostRead(limit = 5): Promise<Story[]> {
+  if (sampleOn()) return sample().stories.slice(8, 8 + limit);
+  const sql = db();
+  if (!sql) return [];
+  const rows = await sql.query(
+    `select ${COLUMNS} from stories s
+       join (select story_id, sum(n) as total from reads where day >= (now() at time zone 'Asia/Kolkata')::date - 1 group by story_id) r on r.story_id = s.id
+      where s.status = 'published' order by r.total desc, s.published_at desc limit $1`, [limit]);
+  return rows.map(storyOf);
+}
+
+/** Other stories of the last week on the same subject: their events share at
+ * least three of the engine's key words with this one's (a story from the
+ * printed paper has none, so it has none). */
+export async function moreOnSubject(id: string, limit = 3): Promise<Story[]> {
+  if (sampleOn()) return [];
+  const sql = db();
+  if (!sql) return [];
+  const rows = await sql.query(
+    `with me as (select keys from clusters where story_id = $1 limit 1)
+     select ${COLUMNS} from (
+       select s.*, cardinality(array(select unnest(c.keys) intersect select unnest(me.keys))) as shared
+         from stories s join clusters c on c.story_id = s.id cross join me
+        where s.id <> $1 and s.status = 'published' and s.published_at > now() - interval '7 days') x
+      where shared >= 3 order by shared desc, published_at desc limit $2`, [id, limit]);
+  return rows.map(storyOf);
+}
+
 export async function storiesOn(date: string): Promise<Story[]> {
   if (sampleOn()) return sample().stories.filter((s) => s.issueDate === date);
   const sql = db();

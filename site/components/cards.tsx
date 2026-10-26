@@ -4,7 +4,7 @@ import { ViewTransition } from "react";
 import type { Lang, Story } from "../lib/types.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
-import { timeText } from "../lib/format.ts";
+import { num, timeText } from "../lib/format.ts";
 import TimeAgo from "./TimeAgo.tsx";
 import { Chev } from "./icons.tsx";
 
@@ -46,16 +46,19 @@ export const boostOf = (s: Story): Boost => {
   return i >= 11 ? "giga" : i >= 9.5 ? "mega" : i >= 7.5 ? "boost" : "default";
 };
 
-export function Lead({ s, lang }: { s: Story; lang: Lang }) {
+export function Lead({ s, lang, more = [] }: { s: Story; lang: Lang; more?: Story[] }) {
   const w = words(s, lang);
   return (
     <article className={`lead b-${boostOf(s)}`}>
-      <Link className="h txt" href={storyHref(s, lang)}>
-        {w.kicker && <span className="kick">{w.kicker}</span>}
-        <h2 className="display">{w.headline}</h2>
-        {w.deck && <p className="dek">{w.deck}</p>}
-        <Meta s={s} lang={lang} />
-      </Link>
+      <div className="txt">
+        <Link className="h" href={storyHref(s, lang)}>
+          {w.kicker && <span className="kick">{w.kicker}</span>}
+          <h2 className="display">{w.headline}</h2>
+          {w.deck && <p className="dek">{w.deck}</p>}
+          <Meta s={s} lang={lang} />
+        </Link>
+        {more.length > 0 && <MoreOn stories={more} lang={lang} />}
+      </div>
       {s.photo && (
         <div className="pic">
           <Link href={storyHref(s, lang)} tabIndex={-1}><Photo s={s} lang={lang} eager morph /></Link>
@@ -99,6 +102,28 @@ export function LatestList({ stories, lang, n }: { stories: Story[]; lang: Lang;
       </ul>
       <Link className="more" href={href(lang, "/latest")}>{t(lang, "allLatest")} <Chev /></Link>
     </>
+  );
+}
+
+/** Most read: numbered, as the BBC and the Post show it. */
+export function MostRead({ stories, lang }: { stories: Story[]; lang: Lang }) {
+  return (
+    <ol className="mostread">
+      {stories.map((s, i) => (
+        <li key={s.id}><Link className="h" href={storyHref(s, lang)}><span className="n" aria-hidden="true">{num(i + 1, lang)}</span>
+          <h3 className="h4">{words(s, lang).headline}</h3></Link></li>
+      ))}
+    </ol>
+  );
+}
+
+/** Headlines on the same subject, under a story (the Guardian's "supporting content"). */
+export function MoreOn({ stories, lang }: { stories: Story[]; lang: Lang }) {
+  return (
+    <div className="moreon">
+      <b>{t(lang, "moreOn")}</b>
+      <ul>{stories.map((s) => <li key={s.id}><Link href={storyHref(s, lang)}>{words(s, lang).headline}</Link></li>)}</ul>
+    </div>
   );
 }
 

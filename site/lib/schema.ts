@@ -110,6 +110,13 @@ export const SCHEMA = [
      story_id text
    )`,
   `create index if not exists clusters_state on clusters (state, score desc)`,
+  // how many times each story was opened, per day (for "most read"; nothing about who)
+  `create table if not exists reads (
+     story_id text not null,
+     day date not null,
+     n int not null default 0,
+     primary key (story_id, day)
+   )`,
   // what was sent to the editor's phone, and what came back
   `create table if not exists approvals (
      story_id text primary key,

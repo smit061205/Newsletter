@@ -14,7 +14,7 @@ Rules that come with it:
 - An older printed paper is called "the latest", never "today's".
 - CI's accessibility check (`site/test/a11y.mjs`, WCAG 2 AA) fails on any serious problem.
 
-Next from the same study, not built yet:
-- "most read", once the site counts readers;
-- an offline page and an installable app (BBC's service worker);
-- links to the same event's other stories under the lead (the Guardian's "supporting content").
+Built 26 Oct, from the same study:
+- **Most read** (BBC, Post): `reads` counts each story's openings per day, only a number and never who. `CountRead` sends one count per browser and story. The front page's rail and the story page show the top five once three stories have reads.
+- **Installable app and offline reading** (BBC): `app/manifest.ts` and `public/sw.js`. Pages come from the network first, then from the copy of the last visit. When neither works, a small Gujarati offline page lists the stories this phone can still open. Site files and the last 120 photos are kept. The worker runs only on the real site.
+- **More on this** (the Guardian's supporting content): up to three stories of the last week whose events share three of the engine's key words. It shows under the lead and inside a story. Stories from the printed paper have no key words, so they get none.
