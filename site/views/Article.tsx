@@ -10,6 +10,8 @@ import { PAPER, SITE_URL } from "../lib/site.ts";
 import { Cmp, Head, Join, LatestList, words } from "../components/cards.tsx";
 import { Check, Chev, Flag } from "../components/icons.tsx";
 import ArticleTools from "../components/ArticleTools.tsx";
+import ReadProgress from "../components/ReadProgress.tsx";
+import { ViewTransition } from "react";
 import Frame from "../components/Frame.tsx";
 
 export function articleJsonLd(s: Story, lang: Lang) {
@@ -41,6 +43,7 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
   return (
     <Frame lang={lang} path={`/news/${s.id}`} section={s.tier} bottomBar={false}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd(s, lang)).replace(/</g, "\\u003c") }} />
+      <ReadProgress target=".art" />
       <div className="artg">
         <article className="art" lang={w.translated || lang === "gu" ? lang : "gu"}>
           <Link className="crumbs" href={href(lang, `/section/${s.tier}`)}>{sectionName(s.tier, lang)} <Chev /></Link>
@@ -61,7 +64,9 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
           <ArticleTools id={s.id} url={url} headline={w.headline} words={toolWords} />
           {s.photo && (
             <figure>
-              <img className="ph" src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline} />
+              <ViewTransition name={`photo-${s.id}`} share="morph" default="none">
+                <span className="phw"><img className="ph" src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline} /></span>
+              </ViewTransition>
               {w.caption && <figcaption>{w.caption} ({t(lang, "photo")}: {s.source?.name ?? "PIB"})</figcaption>}
             </figure>
           )}

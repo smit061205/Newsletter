@@ -1,12 +1,15 @@
 // Every page's frame (DESIGN.md §3.1): the header and menu (Chrome), the
 // section scroller, the page, the footer.
 import Link from "next/link";
+import { Suspense, ViewTransition } from "react";
 import type { Lang } from "../lib/types.ts";
 import { href, t } from "../lib/i18n.ts";
 import { SECTIONS, sectionName } from "../lib/sections.ts";
 import { PAPER } from "../lib/site.ts";
 import { num } from "../lib/format.ts";
 import Chrome from "./Chrome.tsx";
+import NavProgress from "./NavProgress.tsx";
+import ToTop from "./ToTop.tsx";
 
 export interface FrameProps {
   lang: Lang;
@@ -28,6 +31,7 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
   return (
     <>
       <a className="skip" href="#main">{t(lang, "skip")}</a>
+      <Suspense fallback={null}><NavProgress /></Suspense>
       <Chrome
         lang={lang} name={PAPER.gu.name} tagline={PAPER[lang].tagline} words={words} bottomBar={bottomBar} active={active}
         paths={{ gu: href("gu", path), en: href("en", path), hi: href("hi", path) }}
@@ -38,7 +42,11 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
       <nav className="wrap secs" aria-label={t(lang, "sections")}>
         {SECTIONS.map((k) => <Link key={k} href={L(`/section/${k}`)} className={section === k ? "on" : undefined}>{sectionName(k, lang)}</Link>)}
       </nav>
-      <main className="wrap" id="main" tabIndex={-1}>{children}</main>
+      {/* the page's content crossfades into the next one (the header and footer stay put) */}
+      <ViewTransition enter="page-in" exit="page-out" default="none">
+        <main className="wrap" id="main" tabIndex={-1}>{children}</main>
+      </ViewTransition>
+      <ToTop label={t(lang, "toTop")} />
       <div className="wrap">
         <footer>
           <Link className="wm" href={L("/")}><b>{PAPER.gu.name}</b></Link>

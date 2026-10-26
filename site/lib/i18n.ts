@@ -21,6 +21,7 @@ const WORDS = {
     noEnglish: "", topics: "વિષયો",
     f1: "કેપિટલ ક્રાંતિ", f2: "વિભાગો", f3: "મેળવો", f4: "નિયમો", fAbout: "અમારા વિશે", fPolicy: "સંપાદકીય નીતિ", fHow: "અમે સમાચાર કેવી રીતે ચકાસીએ છીએ",
     fFix: "સુધારા", fContact: "સંપર્ક", fTerms: "ઉપયોગના નિયમો", fPrivacy: "ગોપનીયતા", fRss: "RSS",
+    toTop: "ઉપર જાઓ", live: "હમણાં",
     empty: "હજી સમાચાર મુકાયા નથી. આજે સાંજે ફરી જુઓ.", notFoundTitle: "આ પાનું મળ્યું નહીં", notFoundText: "આ સમાચાર કે પાનું અહીં નથી. હોમ પરથી શોધો.",
   },
   en: {
@@ -41,6 +42,7 @@ const WORDS = {
     noEnglish: "This story’s English version isn’t ready yet, so it is shown in Gujarati.", topics: "Topics",
     f1: "Capital Kranti", f2: "Sections", f3: "Get it", f4: "Policies", fAbout: "About us", fPolicy: "Editorial policy", fHow: "How we check the news",
     fFix: "Corrections", fContact: "Contact", fTerms: "Terms of use", fPrivacy: "Privacy", fRss: "RSS",
+    toTop: "Back to top", live: "Just in",
     empty: "No stories yet. Look again this evening.", notFoundTitle: "Page not found", notFoundText: "This story or page isn’t here. Try the home page.",
   },
   hi: {
@@ -61,6 +63,7 @@ const WORDS = {
     noEnglish: "इस समाचार का हिंदी संस्करण अभी तैयार नहीं है, इसलिए यह गुजराती में दिखाया गया है।", topics: "विषय",
     f1: "कैपिटल क्रांति", f2: "विभाग", f3: "पाएँ", f4: "नियम", fAbout: "हमारे बारे में", fPolicy: "संपादकीय नीति", fHow: "हम समाचार कैसे जाँचते हैं",
     fFix: "सुधार", fContact: "संपर्क", fTerms: "उपयोग के नियम", fPrivacy: "गोपनीयता", fRss: "RSS",
+    toTop: "ऊपर जाएँ", live: "अभी-अभी",
     empty: "अभी कोई समाचार नहीं है। थोड़ी देर बाद फिर देखें।", notFoundTitle: "यह पन्ना नहीं मिला", notFoundText: "यह समाचार या पन्ना यहाँ नहीं है। होम से खोजें।",
   },
 } as const;

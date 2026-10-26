@@ -1,5 +1,6 @@
 // The cards and container heads of DESIGN.md §3.2-3.3, as server components.
 import Link from "next/link";
+import { ViewTransition } from "react";
 import type { Lang, Story } from "../lib/types.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
@@ -24,13 +25,16 @@ function Meta({ s, lang, sec = true }: { s: Story; lang: Lang; sec?: boolean }) 
   );
 }
 
-function Photo({ s, lang, cls = "ph", eager = false }: { s: Story; lang: Lang; cls?: string; eager?: boolean }) {
+function Photo({ s, lang, cls = "ph", eager = false, morph = false }: { s: Story; lang: Lang; cls?: string; eager?: boolean; morph?: boolean }) {
   if (!s.photo) return null;
   const w = words(s, lang);
   const img = <img className={cls} src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline}
                    loading={eager ? "eager" : "lazy"} decoding="async" />;
   // the standard photo sits in a frame that shimmers while it loads and lets it zoom gently on hover
-  return cls === "ph" ? <span className="phw">{img}</span> : img;
+  if (cls !== "ph") return img;
+  const framed = <span className="phw">{img}</span>;
+  // the photo grows into the story's own photo when the story opens (one name per story on a page)
+  return morph ? <ViewTransition name={`photo-${s.id}`} share="morph" default="none">{framed}</ViewTransition> : framed;
 }
 
 export function Lead({ s, lang }: { s: Story; lang: Lang }) {
@@ -45,7 +49,7 @@ export function Lead({ s, lang }: { s: Story; lang: Lang }) {
       </Link>
       {s.photo && (
         <div className="pic">
-          <Link href={storyHref(s, lang)} tabIndex={-1}><Photo s={s} lang={lang} eager /></Link>
+          <Link href={storyHref(s, lang)} tabIndex={-1}><Photo s={s} lang={lang} eager morph /></Link>
           {w.caption && <p className="cap">{w.caption} ({t(lang, "photo")}: {s.source?.name ?? "PIB"})</p>}
         </div>
       )}
@@ -53,11 +57,11 @@ export function Lead({ s, lang }: { s: Story; lang: Lang }) {
   );
 }
 
-export function Std({ s, lang, sec = true }: { s: Story; lang: Lang; sec?: boolean }) {
+export function Std({ s, lang, sec = true, morph = false }: { s: Story; lang: Lang; sec?: boolean; morph?: boolean }) {
   const w = words(s, lang);
   return (
     <Link className="h std" href={storyHref(s, lang)}>
-      <Photo s={s} lang={lang} />
+      <Photo s={s} lang={lang} morph={morph} />
       <div><h3 className="h3">{w.headline}</h3>{w.deck && <p className="dek">{w.deck}</p>}<Meta s={s} lang={lang} sec={sec} /></div>
       {s.photo && <Photo s={s} lang={lang} cls="thumb" />}
     </Link>

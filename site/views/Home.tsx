@@ -55,7 +55,7 @@ export default async function Home({ lang }: { lang: Lang }) {
               <Lead s={lead} lang={lang} />
               {six.length > 0 && (
                 <div className="g cards c3 six" style={{ marginTop: "var(--gut)", paddingTop: "var(--gut)", borderTop: "1px solid var(--rule)" }}>
-                  {six.map((s) => <Std key={s.id} s={s} lang={lang} />)}
+                  {six.map((s) => <Std key={s.id} s={s} lang={lang} morph />)}
                 </div>
               )}
             </div>

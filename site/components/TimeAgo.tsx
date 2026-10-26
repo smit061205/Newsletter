@@ -6,14 +6,21 @@
 import { useEffect, useState } from "react";
 import type { Lang } from "../lib/types.ts";
 import { ago } from "../lib/format.ts";
+import { t } from "../lib/i18n.ts";
 
 export default function TimeAgo({ iso, lang, fallback }: { iso: string; lang: Lang; fallback: string }) {
   const [text, setText] = useState(fallback);
+  const [fresh, setFresh] = useState(false);
   useEffect(() => {
-    const tick = () => setText(ago(iso, lang) ?? fallback);
+    const tick = () => { setText(ago(iso, lang) ?? fallback); setFresh(Date.now() - Date.parse(iso) < 3600_000); };
     tick();
     const k = setInterval(tick, 60_000);
     return () => clearInterval(k);
   }, [iso, lang, fallback]);
-  return <time dateTime={iso} suppressHydrationWarning>{text}</time>;
+  // a story from the last hour carries a pulsing mark
+  return (
+    <time dateTime={iso} suppressHydrationWarning className={fresh ? "fresh" : undefined}>
+      {fresh && <span className="livedot" aria-label={t(lang, "live")} />}{text}
+    </time>
+  );
 }

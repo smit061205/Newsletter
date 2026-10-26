@@ -73,7 +73,7 @@ export default function Chrome(p: ChromeProps) {
 
   return (
     <>
-      <header className={`top${scrolled ? " scrolled" : ""}`}>
+      <header className={`top${scrolled ? " scrolled" : ""}`} style={{ viewTransitionName: "site-header" }}>
         <div className="wrap bar">
           <div className="l">
             <button type="button" className="ib menu-plain" aria-label={w.menu} onClick={() => openMenu(false)}><MenuIcon /></button>
