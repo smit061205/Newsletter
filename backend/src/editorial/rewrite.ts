@@ -449,6 +449,74 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
   return { body, cost: data.usage?.cost ?? 0, ...(factCheck ? { factCheck } : {}) };
 }
 
+const NEWS_BRIEF_SCHEMA = {
+  name: "news_brief",
+  strict: true,
+  schema: {
+    type: "object", additionalProperties: false, required: ["headline", "deck", "body"],
+    properties: {
+      headline: { type: "string", description: "The headline, in the words asked for" },
+      deck: { type: "string", description: "The sub-heading, in the words asked for" },
+      body: { type: "string", description: "One paragraph of the asked length" },
+    },
+  },
+};
+
+/** The story as a brief for a small gap on the page (layout/fill.ts): a
+ * headline of at most `head` words, a sub-heading of at most `deck` and a body
+ * of about `words`, from the release's facts only, its numbers checked. Cached
+ * per story and size. Null without an API key, or when it can't be trusted. */
+export async function newsBrief(store: Store, story: Story, release: Release, size: { words: number; head: number; deck: number },
+                                opts: { log?: (s: string) => void } = {}): Promise<{ story: Story; cost: number } | null> {
+  const key = `newsbrief|${story.id}|${size.head}|${size.deck}|${size.words}`;
+  const make = (b: { headline: string; deck: string; body: string }): Story => {
+    const body = paragraphs(b.body).join(" ");
+    return { ...story, kicker: "", headline: b.headline.trim(), deck: b.deck.trim(), bodies: { long: body, medium: body, short: body } };
+  };
+  const cached = store.fitted(key);
+  if (cached) return cached.body ? { story: make(JSON.parse(cached.body)), cost: 0 } : null;
+  if (process.env.CK_FAKE_AI === "1") {
+    const cut = (t: string, n: number) => t.split(/\s+/).slice(0, n).join(" ");
+    const b = { headline: cut(story.headline, size.head), deck: cut(story.deck || story.headline, size.deck), body: fakeFit(release, size.words) };
+    return inPaperLanguage(make(b)) ? { story: make(b), cost: 0 } : null;
+  }
+  const apiKey = env("OPENROUTER_API_KEY");
+  if (!apiKey) return null;
+  fits++;
+  const model = env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
+  const res = await openRouter({
+    method: "POST",
+    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
+    body: JSON.stringify({
+      model, temperature: 0.2, usage: { include: true },
+      response_format: { type: "json_schema", json_schema: NEWS_BRIEF_SCHEMA },
+      messages: [
+        { role: "system", content: SYSTEM + `\nNow you are making this story a brief for a small space on the page: a headline of at most ${size.head} words, ` +
+          `a sub-heading of at most ${size.deck} words, and a body of about ${size.words} words (never more than ${Math.round(size.words * 1.1)}), ` +
+          "one paragraph, the most important facts first. Use ONLY facts from the release below -- never invent anything. Return JSON {headline, deck, body}." },
+        { role: "user", content: `RELEASE:\n${paragraphs(release.body).join("\n\n")}\n\nCURRENT STORY:\n${story.headline}\n${story.deck}\n${story.bodies.long}` },
+      ],
+    }),
+  }, 120);
+  if (!res.ok) {
+    opts.log?.(`  ${story.id}: brief failed (OpenRouter ${res.status})`);
+    return null;
+  }
+  const data = (await res.json()) as { choices: { message: { content: string } }[]; usage?: { cost?: number } };
+  let b: { headline: string; deck: string; body: string };
+  try {
+    b = JSON.parse(data.choices[0].message.content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, ""));
+  } catch {
+    return null;
+  }
+  // in the paper's language, every number in the release, and not saying the same thing twice
+  const unknown = numbersNotIn(`${b.headline} ${b.deck} ${b.body}`, `${release.headline} ${release.subhead} ${release.body}`, release.date);
+  const ok = inPaperLanguage(make(b)) && !unknown.length && !repeats(b.body);
+  if (!ok) opts.log?.(`  ${story.id}: brief not used (${unknown.length ? `numbers not in the release: ${unknown.join(", ")}` : "not in the paper's language, or repeats itself"})`);
+  store.putFitted(key, { body: ok ? JSON.stringify(b) : "", model });
+  return ok ? { story: make(b), cost: data.usage?.cost ?? 0 } : null;
+}
+
 const DECK_SCHEMA = {
   name: "deck",
   strict: true,

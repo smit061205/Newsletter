@@ -414,7 +414,7 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   let best: { page: EnginePage; cost: number; fills: Extract<Block, { kind: "fill" }>[] } | null = null;
   let looked = 0;
   for (const { t, cost, solver, ads: arranged, short } of candidates) {
-    if (looked >= 12) break;
+    if (looked >= (n === 1 ? 120 : 12)) break;
     const sig = sigOf(t, stories);
     if (avoid?.has(sig)) continue;
     looked++;
@@ -430,6 +430,9 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
         if (tombstoned(a, b)) b.ruleLeft = true; // a column rule between them, as a desk does
       }
     }
+    // the front page: at most one article beside the lead (a stack of them
+    // down its side looks bad, the editor, 27 Oct 2026)
+    if (n === 1) penalty += 200 * Math.max(0, besideLead(placed, got.fills, stories[0]) - 1);
     const total = cost + penalty;
     if (!best || total < best.cost) {
       const elements = renderPlaced(placed);
@@ -449,7 +452,7 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     for (const f of best.fills) {
       const smallest = Math.min(...page.placed.filter((p) => p.module.headSize > 0).map((p) => p.module.headSize));
       const got = await fillInTurn(n, f.col, f.cols, f.y, f.height, fill, avoid, smallest);
-      if (!got) { log(`  page ${n}: nothing found for a ${f.cols}-column hole by an ad (${(f.height / PT).toFixed(0)}pt)`); continue; }
+      if (!got) { log(`  page ${n}: nothing found for a ${f.cols}-column gap (${(f.height / PT).toFixed(0)}pt)`); continue; }
       page.placed.push(...got.placed);
       extra.push(...got.elements);
     }
@@ -465,6 +468,17 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   log(`  page ${n}: ${candidates.length} of ${tried} designs fill it; ${best ? `cost ${best.cost.toFixed(2)}` : "none unlike the earlier ones"} ` +
       `(${secs(t0)}s: settings ${((t1 - t0) / 1000).toFixed(1)}s)`);
   return { page: best?.page ?? null, diagnosis: { short: 0, long: 0 } };
+}
+
+/** How many articles (stories and filler gaps) stand beside the lead, level with it. */
+function besideLead(placed: PlacedModule[], fills: Extract<Block, { kind: "fill" }>[], lead: Story | undefined): number {
+  const l = placed.find((p) => p.module.story.id === lead?.id);
+  if (!l) return 0;
+  const [x0, x1, y0, y1] = [l.x, l.x + l.module.width, l.y, l.y + l.module.height];
+  const level = (top: number, h: number) => Math.min(y1, top + h) - Math.max(y0, top) > 20 * PT;
+  const apart = (x: number, w: number) => x + w <= x0 + 1 || x >= x1 - 1;
+  return placed.filter((p) => p !== l && apart(p.x, p.module.width) && level(p.y, p.module.height)).length +
+    fills.filter((f) => { const x = GRID.left + f.col * GRID.pitch; return apart(x, spanWidth(f.cols)) && level(f.y, f.height); }).length;
 }
 
 /** An ad's width in columns. */
