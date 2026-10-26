@@ -17,7 +17,7 @@ import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
 import { fitCalls, isSpeechText, numbersNotIn, speechTwin, writeDeck } from "./editorial/rewrite.ts";
-import { closeGaps, type FillerCount } from "./layout/fit.ts";
+import type { FillerCount } from "./layout/fit.ts";
 import { layOut, type EngineResult } from "./layout/engine.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
 import { removed } from "./layout/text.ts";
@@ -28,7 +28,7 @@ import { styleChecks } from "./layout/style.ts";
 import { buildFingerprint } from "./fingerprint.ts";
 import { acquireBrowser, releaseBrowser } from "./browser.ts";
 import { spanWidth } from "./layout/module.ts";
-import { BODY, DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE, PT } from "./layout/typography.ts";
+import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
 import { storyIdOf, type Progress, type Store, type Story } from "./store.ts";
 
@@ -323,91 +323,43 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     fitsBefore = fitCalls();
     const placed: { page: number; story: Story; variant: string; cols: number; rank: number }[] = [];
     const gaps: { page: number; col: number; y0: number; y1: number }[] = [];
-    const plans: PagePlan[] = [];
     const bands = chrome.map((c) => ({ top: c.bodyTop, bottom: c.bodyBottom }));
-    // the layout engine (layout/engine.ts): every page designed and solved
-    // exactly; a page it can't lay out goes to the old engine below
-    const engine = (process.env.CK_ENGINE ?? profile.editorial.layoutEngine) === "v2" ? "v2" : "v1";
-    let v2: EngineResult | null = null;
+    // the layout engine (layout/engine.ts): every page designed and solved exactly
+    // (the old packer, and its AI gap closing, no longer lay out a page: 26 Oct)
     // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
     const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
-    if (engine === "v2") {
-      v2 = await layOut({
-        pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy,
-        seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
-        ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
-        date, fillers, log,
-        // (the stories' lengths, then each page as it's laid out -- in the newsroom's words)
-        progress: (done, of, what) => opts.progress?.(what === "pages"
-          ? { done: total + done, total: total * 2 + 1, label: "planning", item: String(Math.min(total, done + 1)) }
-          : { done, total: of, label: "lengths" }),
-      });
-      spent += v2.cost;
-      factChecks.push(...v2.factChecks);
-      pool = v2.leftOut as typeof pool;
-    }
-    for (let n = 1; n <= total; n++) {
-      if (v2?.pages[n - 1]) continue;
-      opts.progress?.({ done: n - 1, total: total * 2 + 1, label: "planning", item: String(n) });
-      const pageAds = ads.filter((a) => a.page === n);
-      // (a page the new engine couldn't lay out: the old one, from that page's stories and the ones held back)
-      const fromV2 = v2 ? [...v2.assigned[n - 1], ...pool] as typeof pool : null;
-      // what's left of the copy, over what's left of the room
-      const leftRoom = room.slice(n - 1).reduce((a, b) => a + b, 0);
-      const leftCopy = (await Promise.all(pool.map((s, i) => packer.naturalArea(s, i === 0)))).reduce((a, b) => a + b, 0);
-      // a copy that keeps each story on its page packs each page from its own stories
-      const samePage = opts.copy?.shuffle === "samePage";
-      const pagePool = fromV2 ?? (samePage ? pool.filter((s) => (opts.copy!.pageOf.get(s.id) ?? total) === n) : pool);
-      const budget = n === total || samePage || fromV2 ? Infinity : room[n - 1] * Math.min(1.05, leftCopy / leftRoom);
-      // what the later pages need kept for them: most of their room (length
-      // fitting grows the stories into the rest)
-      const reserve = samePage || fromV2 ? 0 : room.slice(n).reduce((a, b) => a + b, 0) * 0.7;
-      const plan = await packer.packPage(n, pagePool, bands[n - 1], pageAds,
-                                         { leadFirst: true, budget, reserve, maxCols: MAX_STORY_COLS,
-                                           ...(opts.copy ? { jitter: opts.copy.rng } : {}) });
-      plans.push(plan);
-      pool = pool.filter((s) => !plan.placed.some((p) => p.module.story.id === s.id));
-      log(`  page ${n}${fromV2 ? " (old engine)" : ""}: ${plan.placed.length} stories, white space ${(plan.waste * 100).toFixed(1)}%: ` +
-          plan.placed.map((p) => `${p.module.story.id}(${p.module.cols}col ${p.module.variant}` +
-            `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" "));
-    }
+    const v2: EngineResult = await layOut({
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy,
+      seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
+      ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
+      date, fillers, log,
+      // (the stories' lengths, then each page as it's laid out -- in the newsroom's words)
+      progress: (done, of, what) => opts.progress?.(what === "pages"
+        ? { done: total + done, total: total * 2 + 1, label: "planning", item: String(Math.min(total, done + 1)) }
+        : { done, total: of, label: "lengths" }),
+    });
+    spent += v2.cost;
+    factChecks.push(...v2.factChecks);
+    pool = v2.leftOut as typeof pool;
     timing.planning = Date.now() - timing.start;
     const t1 = Date.now();
-    // close the gaps: grow stories into them, then briefs and the house ad (layout/fit.ts)
     for (let n = 1; n <= total; n++) {
-      const done = v2?.pages[n - 1];
-      if (done) {
-        const body: Element[] = [
-          ...done.ads.map((ad) => ({ id: `ad-${ad.id}`, kind: "image" as const, articleId: `ad-${ad.id}`, x: ad.x, y: ad.y,
-                                     width: ad.width, height: ad.height, url: ad.url, fit: "fill" as const })),
-          ...done.elements,
-        ];
-        pagesOut.set(n, profile.language.direction === "rtl" ? mirrored(body, PAGE.width) : body);
-        for (const p of done.placed) placed.push({ page: n, story: p.module.story, variant: p.module.variant, cols: p.module.cols, rank: p.module.rank });
-        gaps.push(...findGaps(done.blocks, bands[n - 1]).map((g) => ({ page: n, ...g })));
-        finalPlans.push({ page: n, placed: done.placed, elements: done.elements, waste: 0, gaps: [] });
-        log(`  page ${n}: ${done.placed.map((p) => `${p.module.story.id}(${p.module.cols}col, ${p.module.story.bodies.long.split(/\s+/).length}w` +
-            `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" ")}`);
-        continue;
-      }
-      const plan = plans.find((p) => p.page === n)!;
-      opts.progress?.({ done: total + n - 1, total: total * 2 + 1, label: "finishing", item: String(n) });
       const pageAds = ads.filter((a) => a.page === n);
-      const fit = await closeGaps(plan, { band: bands[n - 1], ads: pageAds,
-                                         store: opts.copy?.store ?? store, date, releases, m, leftOut: pool, fillers, say: (l) => log(`  p${n}${l}`) });
-      spent += fit.cost;
-      factChecks.push(...fit.factChecks);
-      pool = pool.filter((s) => !fit.used.includes(s));
+      // (a page no try could lay out: its ads alone, the rest reported as white space -- not seen in practice)
+      const done = v2.pages[n - 1] ?? { page: n, placed: [], ads: pageAds, elements: [], design: "",
+        blocks: pageAds.map((a) => ({ id: a.id, kind: "rect" as const, x: a.x, y: a.y, width: a.width, height: a.height })) };
+      if (!v2.pages[n - 1]) log(`  page ${n}: not laid out`);
       const body: Element[] = [
-        ...pageAds.map((ad) => ({ id: `ad-${ad.id}`, kind: "image" as const, articleId: `ad-${ad.id}`, x: ad.x, y: ad.y,
-                                  width: ad.width, height: ad.height, url: ad.url, fit: "fill" as const })),
-        ...fit.elements,
+        ...done.ads.map((ad) => ({ id: `ad-${ad.id}`, kind: "image" as const, articleId: `ad-${ad.id}`, x: ad.x, y: ad.y,
+                                   width: ad.width, height: ad.height, url: ad.url, fit: "fill" as const })),
+        ...done.elements,
       ];
       pagesOut.set(n, profile.language.direction === "rtl" ? mirrored(body, PAGE.width) : body);
-      for (const p of fit.plan.placed) placed.push({ page: n, story: p.module.story, variant: p.module.variant, cols: p.module.cols, rank: p.module.rank });
-      // what's empty on the finished page, wherever it is (layout/occupancy.ts)
-      gaps.push(...findGaps(fit.blocks, bands[n - 1]).map((g) => ({ page: n, ...g })));
-      finalPlans.push(fit.plan);
+      for (const p of done.placed) placed.push({ page: n, story: p.module.story, variant: p.module.variant, cols: p.module.cols, rank: p.module.rank });
+      gaps.push(...findGaps(done.blocks, bands[n - 1]).map((g) => ({ page: n, ...g })));
+      finalPlans.push({ page: n, placed: done.placed, elements: done.elements, waste: 0, gaps: [] });
+      log(`  page ${n}: ${done.placed.map((p) => `${p.module.story.id}(${p.module.cols}col, ${p.module.story.bodies.long.split(/\s+/).length}w` +
+          `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" ")}`);
     }
     timing.fitting = Date.now() - t1;
     result = { pages: pagesOut, placed, gaps, leftOut: pool, plans: finalPlans, spent: spent + rewordCost, factChecks };
@@ -455,7 +407,6 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
                                                y: Math.round(g.y0 * pt * 10) / 10 }));
   const checks = whiteSpace.map((g) => ({ page: g.page, kind: "white-space", detail: `column ${g.col}: ${g.height}pt left empty` }));
   // ---- the release gates: the issue is ready only when every one passes
-  const pitch = BODY.pitch;
   const tombstones: string[] = [];
   const hierarchy: string[] = [];
   const headShare: string[] = [];

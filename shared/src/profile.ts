@@ -140,7 +140,7 @@ export const ProfileSchema = z.object({
     fillTarget: z.number().positive().default(1.35),
     /** a ceiling on a day's top-up AI spend (US$), if the paper wants one; none by default: the top-up stops when the pages are full */
     dailyBudgetUsd: z.number().positive().optional(),
-    /** the layout engine: "v2" (designs solved exactly, layout/engine.ts) or "v1" (packed, then gaps closed) */
+    /** no longer read: every page is laid out by layout/engine.ts (the old "v1" packer was taken out, 26 Oct; kept so older profiles still load) */
     layoutEngine: z.enum(["v1", "v2"]).default("v2"),
   }),
 });

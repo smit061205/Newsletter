@@ -10,7 +10,8 @@
 //      block per story and ad (layout/designs.ts), each solved exactly
 //      (layout/guillotine.ts); the cheapest that keeps the desk's rules wins;
 //   4. a page with no exact design: a story moved between pages, and the
-//      pages tried again; still none: the old engine lays out that page.
+//      pages tried again; then with room for a filler, and the nearest design
+//      if none is exact (its gap reported). No other engine lays out a page.
 import type { Element } from "@ck/shared/contract";
 import { ladderOf, type Rung } from "../editorial/ladder.ts";
 import type { Ad, Release, Store, Story } from "../store.ts";
@@ -172,7 +173,7 @@ export async function layOut(args: {
 
   // 2. the stories over the pages, by their sizes at their usual width
   const sizeOf = async (s: Story, lead: boolean): Promise<Sized | null> => {
-    const range = await blocks.range(s, rankOf(s, lead));
+    const range = await blocks.range(s, await blocks.settable(s, rankOf(s, lead)));
     if (!range.length) return null;
     const usual = range[Math.floor(range.length / 2)];
     const w = spanOf(usual.cols);
@@ -209,7 +210,9 @@ export async function layOut(args: {
   const fill: FillContext = { store: args.store, date: args.date, m, blocks, held: [], fillers: args.fillers, written: [], turn: Promise.resolve(), cost: 0, log };
   const tried = new Map<number, string>(); // page -> its stories when last tried
   let pagesDone = 0;
-  for (let round = 0; round < 4; round++) {
+  // (a page no design was made for at all: a narrow story added once, then stories held back)
+  const narrowed = new Set<number>();
+  for (let round = 0; round < ROUNDS; round++) {
     const todo = shares.map((_, i) => i).filter((i) => !pages[i] && tried.get(i) !== shares[i].map((s) => s.story.id).join() + round);
     if (!todo.length) break;
     const diag = new Map<number, Diagnosis>();
@@ -221,9 +224,9 @@ export async function layOut(args: {
       // the stories -- whatever its ads leave, the page is made exactly here
       // (a held story as a brief, an item written to its size), never handed
       // to the old engine, which left the copies' white space (24 Oct)
-      const slot = shortBy.get(i) ?? (round === 3 ? (FILL_MAX / 2) * spanOf(1) : 0);
+      const slot = shortBy.get(i) ?? (round >= LAST ? (FILL_MAX / 2) * spanOf(1) : 0);
       const got = await solvePage(n, shares[i].map((s) => s.story), args.bands[i], pageAds(n), blocks, m,
-                                  seeded(args.seed * 31 + n + round * 7919), args.avoid, log, round, fill, slot, round === 3);
+                                  seeded(args.seed * 31 + n + round * 7919), args.avoid, log, Math.min(round, LAST), fill, slot, round >= LAST);
       pages[i] = got.page;
       diag.set(i, got.diagnosis);
       if (got.page) args.progress?.(++pagesDone, total, "pages");
@@ -238,7 +241,16 @@ export async function layOut(args: {
       const isShort = sum(i, "mid") < rooms[i];
       // no design could be made at all (narrow strips by the ads no story of
       // the page can take): a reserve story that runs in one or two columns
+      if (d.short === 0 && d.long === 0 && narrowed.has(i) && shares[i].length > 1) {
+        // a narrow story didn't help (26 Oct): the least important one held back
+        const s = shares[i].slice(1).sort((a, b) => b.story.priority - a.story.priority || b.mid - a.mid)[0];
+        shares[i] = shares[i].filter((x) => x !== s);
+        held.push(s);
+        log(`  page ${i + 1}: still no design: ${s.story.id} held back`);
+        continue;
+      }
       if (d.short === 0 && d.long === 0) {
+        narrowed.add(i);
         let narrow: Sized | undefined;
         for (const s of [...held].sort((a, b) => a.mid - b.mid)) {
           const rank = rankOf(s.story, false);
@@ -293,6 +305,10 @@ export async function layOut(args: {
   return { pages, leftOut: held.map((s) => s.story), cost, assigned: shares.map((p) => p.map((s) => s.story)), factChecks };
 }
 
+/** Rounds of tries for a page; from LAST on, a filler slot and the nearest design if none is exact. */
+const ROUNDS = 8;
+const LAST = 3;
+
 /** Why a page found no design: how many designs came out too short for it, and too tall. */
 interface Diagnosis { short: number; long: number }
 
@@ -307,15 +323,20 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   const t0 = Date.now();
   const none = { page: null, diagnosis: { short: 0, long: 0 } };
   if (!stories.length) return none;
-  // an ad the editor put at a place of their own: laid round, if it sits on the columns
-  // (one booked off them, from an old issue, the old engine lays out)
-  const offGrid = (a: Ad) => Math.abs(a.x - (GRID.left + Math.round((a.x - GRID.left) / GRID.pitch) * GRID.pitch)) > 3
-    || Math.abs(a.width - spanWidth(colsOf(a))) > 3;
-  if (ads.some((a) => a.pinned !== false && offGrid(a))) {
-    log(`  page ${n}: an ad booked off the columns: the old engine lays it out`);
-    return none;
-  }
-  const ranks = stories.map((s, i) => rankOf(s, i === 0));
+  // an ad the editor put at a place of their own: laid round it. One booked off
+  // the columns (from an old issue) is set on the nearest ones, its picture
+  // drawn to their width
+  ads = ads.map((a) => {
+    if (a.pinned === false) return a;
+    const c0 = Math.max(0, Math.min(GRID.columns - 1, Math.round((a.x - GRID.left) / GRID.pitch)));
+    const cols = Math.max(1, Math.min(GRID.columns - c0, colsOf(a)));
+    const x = GRID.left + c0 * GRID.pitch, width = spanWidth(cols);
+    if (Math.abs(a.x - x) <= 3 && Math.abs(a.width - width) <= 3) return a;
+    log(`  page ${n}: ad ${a.id} set on the columns nearest it`);
+    return { ...a, x, width };
+  });
+  // (a story that can't be set at its rank, a rank lower: blocks.settable)
+  const ranks = await Promise.all(stories.map((s, i) => blocks.settable(s, rankOf(s, i === 0))));
   // every story's settings at every width it may take (measured once, shared by all designs)
   const table = new Map<string, Option[]>();
   for (const [i, s] of stories.entries()) {

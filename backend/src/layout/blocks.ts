@@ -74,6 +74,16 @@ export class Blocks {
     return Array.from({ length: Math.max(0, to - from + 1) }, (_, i) => from + i).filter((k) => k <= most);
   }
 
+  /** The rank a story is set at: its own, else lower until some width has a
+   * setting (a short story at the top of a page can't carry a lead's
+   * headline over 30% of it: 26 Oct's page 3 had no design at all). */
+  async settable(story: Story, rank: number): Promise<number> {
+    for (let r = rank; r < 5; r++) {
+      for (const cols of this.widths(story, r)) if ((await this.options(story, r, cols)).length) return r;
+    }
+    return 5;
+  }
+
   /** Every acceptable setting of `story` at `cols` columns, shortest first. */
   options(story: Story, rank: number, cols: number): Promise<Option[]> {
     const key = `${story.id}|${rank}|${cols}`;
