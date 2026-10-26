@@ -38,6 +38,7 @@ export default function Chrome(p: ChromeProps) {
   const [theme, setTheme] = useState("auto");
   const [size, setSize] = useState("1");
   const [away, setAway] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const q = useRef<HTMLInputElement>(null);
   const w = p.words;
 
@@ -48,6 +49,13 @@ export default function Chrome(p: ChromeProps) {
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
   }, [open]);
+  // the header settles (smaller, with a shadow) once the page moves
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 8);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
   useEffect(() => {
     if (!p.bottomBar) return;
     let last = window.scrollY;
@@ -65,7 +73,7 @@ export default function Chrome(p: ChromeProps) {
 
   return (
     <>
-      <header className="top">
+      <header className={`top${scrolled ? " scrolled" : ""}`}>
         <div className="wrap bar">
           <div className="l">
             <button type="button" className="ib menu-plain" aria-label={w.menu} onClick={() => openMenu(false)}><MenuIcon /></button>

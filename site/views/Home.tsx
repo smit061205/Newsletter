@@ -38,8 +38,10 @@ export default async function Home({ lang }: { lang: Lang }) {
     .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
   const lead = recentLive[0] ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
   const six = today.filter((s) => s !== lead).slice(0, 6);
-  const byTime = [...stories].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || (a.page ?? 9) - (b.page ?? 9) || (a.rank ?? 99) - (b.rank ?? 99));
   const shown = new Set([lead, ...six].filter(Boolean).map((s) => s!.id));
+  // the latest list beside them: newest first, without the stories already at the top
+  const byTime = stories.filter((s) => !shown.has(s.id))
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || (a.page ?? 9) - (b.page ?? 9) || (a.rank ?? 99) - (b.rank ?? 99));
   const world = stories.filter((s) => s.tier === "world" && !shown.has(s.id)).slice(0, 4);
   const pairs: [string, string][] = [["gujarat", "india"], ["farm", "economy"], ["tech", "health"], ["sport", "education"]];
 

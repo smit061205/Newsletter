@@ -36,6 +36,33 @@ export function timeText(iso: string, lang: Lang) {
   return `${part} ${num(`${h12}:${mm}`, lang)}`;
 }
 
+/** "૧૨ મિનિટ પહેલાં" / "12 min ago" / "12 मिनट पहले" within 12 hours, "ગઈકાલે" for
+ * yesterday, else the date (null: just now handled as minutes). The reader's clock decides. */
+export function ago(iso: string, lang: Lang): string | null {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (!Number.isFinite(s) || s < -300) return null;
+  const n = (x: number) => num(Math.max(1, Math.floor(x)), lang);
+  if (s < 3600) return { gu: `${n(s / 60)} મિનિટ પહેલાં`, en: `${n(s / 60)} min ago`, hi: `${n(s / 60)} मिनट पहले` }[lang];
+  if (s < 12 * 3600) return { gu: `${n(s / 3600)} કલાક પહેલાં`, en: `${n(s / 3600)} h ago`, hi: `${n(s / 3600)} घंटे पहले` }[lang];
+  const day = (d: Date) => new Date(d.getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
+  const today = day(new Date()), then = day(new Date(iso));
+  if (then === today) return timeText(iso, lang);
+  const yesterday = day(new Date(Date.now() - 86400_000));
+  if (then === yesterday) return { gu: "ગઈકાલે", en: "Yesterday", hi: "कल" }[lang];
+  return shortDate(iso, lang);
+}
+
+const SHORT_GU = ["જાન્યુ.", "ફેબ્રુ.", "માર્ચ", "એપ્રિલ", "મે", "જૂન", "જુલાઈ", "ઓગ.", "સપ્ટે.", "ઓક્ટો.", "નવે.", "ડિસે."];
+const SHORT_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const SHORT_HI = ["जन.", "फ़र.", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अग.", "सित.", "अक्टू.", "नव.", "दिस."];
+/** "૨૨ ઓક્ટો." (the year only when it isn't this one). */
+export function shortDate(iso: string, lang: Lang) {
+  const t = ist(iso);
+  const m = (lang === "gu" ? SHORT_GU : lang === "hi" ? SHORT_HI : SHORT_EN)[t.m];
+  const year = t.y !== ist(new Date().toISOString()).y ? ` ${num(t.y, lang)}` : "";
+  return `${num(t.d, lang)} ${m}${year}`;
+}
+
 /** Today in India, YYYY-MM-DD. */
 export const todayIst = () => new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
 
