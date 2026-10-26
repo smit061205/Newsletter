@@ -49,6 +49,8 @@ export function sameNewsIn(r: Pick<Release, "headline" | "body">, gujarati: Rele
 // a message on an occasion, not news: a congratulation, condolence, greeting or tribute
 const GREETING = /बधाई|शुभकामना|श्रद्धांजलि|शोक|नमन|स्मरण किया|पुण्यतिथि|जयंती पर|अभिनंदन|सुभाषित|congratulat|condol|greet|tribute|homage|wishes|birth anniversary|death anniversary/i;
 const LANGUAGE = { hi: "HINDI", en: "ENGLISH" } as const;
+/** National releases (PIB, Delhi) translated into every paper, however full it is. */
+const NATIONAL_MIN = 3;
 type Foreign = keyof typeof LANGUAGE;
 
 const RANK_SCHEMA = {
@@ -150,7 +152,7 @@ export async function readForeign(store: Store, date: string, log: (s: string) =
  * paper (24 Oct, the editor) -- all at once. Returns what it cost. */
 async function worldNews(store: Store, date: string, key: string, log: (s: string) => void): Promise<number> {
   const done = new Set(store.stories(date).map((s) => s.id));
-  const todo = store.releases(date).filter((r) => r.source === "air" && r.lang === "en" && !done.has(storyIdOf(r)));
+  const todo = store.releases(date).filter((r) => (r.source === "air" || r.source === "un") && r.lang === "en" && !done.has(storyIdOf(r)));
   if (!todo.length) return 0;
   let cost = 0;
   await Promise.all(todo.map(async (r) => {
@@ -196,7 +198,10 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
     worldRun = key ? worldNews(store, date, key, log) : Promise.resolve(0);
     const before = ctx.share();
     log(`the day's Gujarati copy fills ${(before * 100).toFixed(0)}% of the pages (wanted: ${(target * 100).toFixed(0)}%)`);
-    if (before >= target && !opts.force) return { before, after: before, translated: 0, cost: 0 };
+    // a few of the day's national releases from Delhi in every paper, however full
+    // it is (26 Oct, the editor): the best ranked, up to NATIONAL_MIN in all
+    const owed = Math.max(0, NATIONAL_MIN - store.stories(date).filter((s) => s.translatedFrom && s.id.startsWith("p")).length);
+    if (before >= target && !opts.force && !owed) return { before, after: before, translated: 0, cost: 0 };
     if (!key) {
       log("no OPENROUTER_API_KEY in backend/.env: no translations");
       return { before, after: before, translated: 0, cost: 0 };
@@ -230,11 +235,11 @@ export async function topUp(store: Store, date: string, opts: { log: (s: string)
     // (one by one, politely) unless the hourly collection has it already
     const order = ranked.order.filter((prid) => !done.has(prid));
     let k = 0;
-    while (k < order.length && ctx.share() < target) {
+    while (k < order.length && (ctx.share() < target || translated < owed)) {
       const ceiling = profile.editorial.dailyBudgetUsd;
       if (ceiling !== undefined && cost >= ceiling) { log(`  the day's AI budget ($${ceiling}) is spent: stopping`); break; }
       const perStory = ctx.content / Math.max(1, store.stories(date).length);
-      const need = Math.max(1, Math.ceil(((target - ctx.share()) * ctx.room) / Math.max(1, perStory)));
+      const need = Math.max(1, owed - translated, Math.ceil(((target - ctx.share()) * ctx.room) / Math.max(1, perStory)));
       const batch: Release[] = [];
       while (batch.length < need && k < order.length) {
         const prid = order[k++];
