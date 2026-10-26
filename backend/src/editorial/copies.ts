@@ -477,6 +477,9 @@ export async function copiesIn(store: Store, specFile: string) {
       // the editorial plan (the stories rank as in the day's paper), the length
       // fits, briefs, rewordings and translations: none paid for twice
       store.db.exec("insert or ignore into fitted select * from src.fitted");
+      // the editor's choice of sample ads (none at all, or not these): 26 Oct's
+      // copies printed seven sample ads with them switched off
+      store.db.exec("insert or replace into settings select * from src.settings where key in ('samplesOn', 'samplesOff')");
     } finally { store.db.exec("detach database src"); }
     let last = 0;
     await layOutHere(store, spec, (l) => console.log(`[copies] ${l}`), (f) => console.log(`@@file ${JSON.stringify(f)}`),
