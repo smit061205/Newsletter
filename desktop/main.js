@@ -376,6 +376,27 @@ function windowsUpdater() {
   });
   return (winUpdater = autoUpdater);
 }
+/** The newest release's version and its zip for this Mac (null while it's still being built).
+ * GitHub's API first; it allows 60 asks an hour per internet connection, so when it says
+ * no (403/429: 26 Oct, the check failed with the internet on), the public release pages. */
+async function latestRelease() {
+  const opts = { headers: { "user-agent": "CapitalKranti" }, signal: AbortSignal.timeout(20_000) };
+  const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, opts);
+  const zipOf = (name) => name.endsWith(`mac-${process.arch}.zip`);
+  if (r.ok) {
+    const rel = await r.json();
+    const asset = (rel.assets || []).find((a) => zipOf(a.name));
+    return { v: String(rel.tag_name || "").replace(/^v/, ""), zipUrl: asset ? asset.browser_download_url : null };
+  }
+  if (r.status !== 403 && r.status !== 429) throw new Error(`GitHub answered ${r.status}`);
+  const page = await fetch(`https://github.com/${REPO}/releases/latest`, { ...opts, redirect: "manual" });
+  const tag = (page.headers.get("location") || "").match(/\/releases\/tag\/(v[\w.-]+)$/)?.[1];
+  if (!tag) throw new Error(`GitHub answered ${r.status}, and its releases page ${page.status}`);
+  const files = await (await fetch(`https://github.com/${REPO}/releases/expanded_assets/${tag}`, opts)).text();
+  const zip = [...files.matchAll(/href="([^"]*\/releases\/download\/[^"]+)"/g)].map((m) => m[1]).find(zipOf);
+  return { v: tag.replace(/^v/, ""), zipUrl: zip ? `https://github.com${zip}` : null };
+}
+
 /** Look for a newer release. `from`: "start" (quiet unless one is ready), "menu" (says the outcome), "newsroom" (the newsroom shows it). */
 async function checkForUpdates(from = "start") {
   if (update.state === "checking" || update.state === "downloading") return update;
@@ -390,16 +411,13 @@ async function checkForUpdates(from = "start") {
       }
       return update;
     }
-    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { "user-agent": "CapitalKranti" }, signal: AbortSignal.timeout(20_000) });
-    if (!r.ok) throw new Error(`GitHub answered ${r.status}`);
-    const rel = await r.json();
-    const v = String(rel.tag_name || "").replace(/^v/, "");
+    const { v, zipUrl } = await latestRelease();
     if (!v || !newer(v, app.getVersion())) {
       setUpdate({ state: "none", latest: v });
       if (from === "menu") dialog.showMessageBox({ message: "Capital Kranti is up to date." });
       return update;
     }
-    const asset = (rel.assets || []).find((a) => a.name.endsWith(`mac-${process.arch}.zip`));
+    const asset = zipUrl ? { name: zipUrl.split("/").pop(), browser_download_url: zipUrl } : null;
     // a release whose installers are still being built: none to fetch yet
     if (!isMac || !asset || !app.isPackaged) { setUpdate({ state: "none", latest: v, building: true }); return update; }
     // macOS without notarisation: download the new app, check it, swap it in on restart
