@@ -165,14 +165,12 @@ CK_PUBLICATION=dev-test DATA_DIR=/tmp/ck-test node --experimental-strip-types --
 
 1. Push the code to `main`.
 2. Push a new version tag from `main`: `git tag vX.Y.Z && git push origin vX.Y.Z` (from 23 Oct, every finished improvement is released this way; CLAUDE.md).
-3. The **release** workflow creates the release and builds three installers and attaches them to it in about 30 minutes:
+3. The **release** workflow creates the release and builds two installers and attaches them to it in about 30 minutes:
    - Mac Apple silicon on `macos-14`;
-   - Mac Intel on `macos-15-intel`;
    - Windows on `windows-latest`.
 
 The installer names never change, so these links always serve the newest release:
 - `…/releases/latest/download/Capital-Kranti-mac-arm64.dmg`
-- `…/releases/latest/download/Capital-Kranti-mac-x64.dmg`
 - `…/releases/latest/download/Capital-Kranti-Setup.exe`
 
 Installed apps update themselves from Releases:
@@ -210,7 +208,7 @@ Then run the engine from *inside the packed app*, as the workflow's "packed app"
   - First open on current macOS: **System Settings → Privacy & Security → Open Anyway** (right-click → Open no longer works). Removing that needs an Apple Developer account (US$99/yr) for notarisation; on Windows a code-signing certificate removes SmartScreen.
 - **Moving from the old install:** the old app's engine survives its own `--stop` and kept serving port 4000, so the new app used it. The app now **stops whatever else listens on 4000/3000** (`freePorts()` in `desktop/main.js`).
 - **The Dock** stores apps as file URLs (`file:///Applications/Capital%20Kranti.app/`). Read and edit it with `defaults export` and `PlistBuddy`, one entry at a time.
-- **GitHub retired `macos-13`**, so the Intel build runs on `macos-15-intel`.
+- **No Intel Mac build** since 26 Oct 2026 (the user's request); an Intel install already out there stops getting updates.
 - **Test what ships.** Earlier checks ran the engine before packing and so missed packing bugs. The workflow now checks the packed app: its signature, its contents, and that its engine starts.
 - **Release builds use the workflow from the tagged commit,** so a fix needs a **new** release; re-running an old one won't pick it up.
 - **Check the real thing, not a proxy.** For example: the PDF's *content* position, not just its page size; the console 404s, investigated rather than hidden (they were real: the newsroom asked for issues before they existed, and photos had no engine route).

@@ -27,10 +27,9 @@ Download it with one click, in the browser (always the newest version):
 | Computer | Download |
 |---|---|
 | Mac with Apple silicon (M1 and later) | [Capital-Kranti-mac-arm64.dmg](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-mac-arm64.dmg) |
-| Mac with an Intel processor | [Capital-Kranti-mac-x64.dmg](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-mac-x64.dmg) |
 | Windows PC | [Capital-Kranti-Setup.exe](https://github.com/smit061205/Newsletter/releases/latest/download/Capital-Kranti-Setup.exe) |
 
-Not sure which Mac? Apple menu → About This Mac: "Chip: Apple M…" is Apple silicon, "Processor: Intel…" is Intel. Everything is also on the [Releases page](https://github.com/smit061205/Newsletter/releases/latest).
+Macs with an Intel processor are no longer built for (26 Oct 2026). Everything is also on the [Releases page](https://github.com/smit061205/Newsletter/releases/latest).
 
 **Replacing the earlier install:** don't uninstall it first. Install the new app and open it: it moves the earlier setup's issues, settings and key in, then removes the old app by itself.
 
