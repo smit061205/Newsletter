@@ -274,8 +274,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     planEntries = planned?.plan ?? [];
     // a few of the day's biggest national and world stories always in the
     // paper (24 Oct: the editor asked for them), the best ranked of each kind
-    // raised to where the pages take them -- All India Radio says which is which
-    const kind = (s: Story) => releases.get(s.id)?.ministry;
+    // raised to where the pages take them -- All India Radio says which is which;
+    // PIB's releases from Delhi, translated, are national news
+    const kind = (s: Story) => (s.translatedFrom && s.id.startsWith("p") ? "રાષ્ટ્રીય" : releases.get(s.id)?.ministry);
     for (const [section, want] of [["રાષ્ટ્રીય", 3], ["આંતરરાષ્ટ્રીય", 2]] as const) {
       const best = pool.filter((s) => kind(s) === section && !rankedByEditor.has(s.id)).sort((a, b) => a.priority - b.priority).slice(0, want);
       if (!best.length) continue;

@@ -20,7 +20,7 @@ export interface Release {
   fetchedAt: string;
   /** where it came from: the state's Information Department (the default, for older rows), PIB,
    * the Gujarat CM's office or All India Radio's Gujarati news (ingest/official.ts) */
-  source?: "gujinfo" | "pib" | "cmo" | "air";
+  source?: "gujinfo" | "pib" | "cmo" | "air" | "un";
   /** its language: Gujarati (the default), or Hindi or English, which are translated */
   lang?: "gu" | "hi" | "en";
   /** PIB: the ministry that issued it */
@@ -29,8 +29,8 @@ export interface Release {
   langVersions?: number[];
 }
 
-/** The story made from a release: "p<PRID>" for PIB's, "c…" the CM's office's, "a…" All India Radio's, "r<id>" the state's. */
-export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
+/** The story made from a release: "p<PRID>" for PIB's, "c…" the CM's office's, "a…" All India Radio's, "u…" UN News's, "r<id>" the state's. */
+export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
 
 export interface Story {
   id: string;

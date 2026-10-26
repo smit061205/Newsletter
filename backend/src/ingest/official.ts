@@ -9,6 +9,9 @@
 //        among the national; and its English service's world news (the
 //        Gujarati one has little or none), up to WORLD_MAX a day, translated
 //        by the top-up (editorial/translate.ts worldNews)
+//   un   UN News (news.un.org): the world news of the day from its English
+//        feed, up to UN_MAX, translated the same way. UN News invites reuse
+//        with credit; its photos are others' (left out)
 //
 // Each item is stored as a release in the paper's language, so the rewrite
 // writes it up like a PIB release; one that is the same news as a release
@@ -28,13 +31,14 @@ const PAUSE_MS = 400;
 const AT_ONCE = 3;
 const MAX_PAGES = 120; // a day's ceiling for both, whatever happens
 
-export type OfficialSource = "cmo" | "air";
+export type OfficialSource = "cmo" | "air" | "un";
 /** Release ids: far above PIB's PRIDs, so the two never meet in the store. */
-const ID_BASE: Record<OfficialSource, number> = { cmo: 3_000_000_000, air: 4_000_000_000 };
+const ID_BASE: Record<OfficialSource, number> = { cmo: 3_000_000_000, air: 4_000_000_000, un: 6_000_000_000 };
 /** All India Radio's English posts (numbered apart from its Gujarati ones). */
 const AIR_EN_BASE = 5_000_000_000;
 const WORLD_MAX = 4;
-export const OFFICE: Record<OfficialSource, string> = { cmo: "મુખ્યમંત્રી કાર્યાલય, ગુજરાત", air: "આકાશવાણી સમાચાર" };
+const UN_MAX = 2;
+export const OFFICE: Record<OfficialSource, string> = { cmo: "મુખ્યમંત્રી કાર્યાલય, ગુજરાત", air: "આકાશવાણી સમાચાર", un: "યુએન સમાચાર" };
 
 // each site its own pace (the two are read side by side, each politely)
 const last = new Map<string, number>();
@@ -119,6 +123,24 @@ async function airWorldList(date: string): Promise<Item[]> {
   return out;
 }
 
+/** UN News: the day's stories from its English feed (dated in India's time), the first few. */
+async function unList(date: string): Promise<Item[]> {
+  const xml = await get("https://news.un.org/feed/subscribe/en/news/all/rss.xml");
+  if (!xml) return [];
+  const out: Item[] = [];
+  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const url = m[1].match(/<guid[^>]*>(https:\/\/news\.un\.org\/en\/story\/[^<]+)<\/guid>/)?.[1];
+    const when = Date.parse(m[1].match(/<pubDate>([^<]+)<\/pubDate>/)?.[1] ?? "");
+    const nid = Number(url?.match(/\/(\d+)$/)?.[1]);
+    if (!url || !nid || !Number.isFinite(when)) continue;
+    if (new Date(when + 5.5 * 3_600_000).toISOString().slice(0, 10) !== date) continue;
+    out.push({ source: "un", id: ID_BASE.un + nid, url, headline: text(m[1].match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? ""), date,
+               section: AIR_SECTION.international, lang: "en" });
+    if (out.length >= UN_MAX) break;
+  }
+  return out;
+}
+
 /** All India Radio: the day's archive, page by page. */
 async function airList(date: string): Promise<Item[]> {
   const [y, m, d] = date.split("-");
@@ -169,16 +191,26 @@ export function parseAir(html: string, id: number): Page | null {
            paras, photo };
 }
 
-/** Every item of `date` from both sources not stored yet, with its photo. */
+export function parseUn(html: string, id: number): Page | null {
+  const headline = text(html.match(/field--name-title[^>]*>([\s\S]*?)<\/span>/)?.[1] ?? "");
+  // (a story's text in one or more columns, each closed before the next field)
+  const body = [...html.matchAll(/field--name-field-text-column[^>]*>([\s\S]*?)<\/div>/g)].map((m) => m[1]).join("");
+  if (!headline || !body) return null;
+  return { id, headline, subhead: "", date: null, paras: paragraphs(body), photo: null };
+}
+
+/** Every item of `date` from these sources not stored yet, with its photo. */
 export async function ingestOfficial(store: Store, date: string, opts: { log?: (s: string) => void; progress?: (p: Progress) => void } = {}):
   Promise<{ listed: number; fetched: number }> {
   const log = opts.log ?? (() => {});
   pages = 0;
   const taken = store.releases(date).filter((r) => !r.lang || r.lang === "gu");
+  // (world news in English, from two sources: one story once)
+  const takenEn = store.releases(date).filter((r) => r.lang === "en" && (r.source === "air" || r.source === "un"));
   const mediaDir = path.join(MEDIA_DIR, date);
   await mkdir(mediaDir, { recursive: true });
   let listed = 0, fetched = 0, done = 0;
-  // one source's day: its list, then its items one by one (the two sources side by side)
+  // one source's day: its list, then its items one by one (the sources side by side)
   const one = async (name: string, list: (date: string) => Promise<Item[]>) => {
     const items = await list(date).catch((e: unknown) => { log(`${name}: couldn't read the list (${e instanceof Error ? e.message : e})`); return [] as Item[]; });
     log(`${name}: ${items.length} item(s) for ${date}`);
@@ -192,16 +224,16 @@ export async function ingestOfficial(store: Store, date: string, opts: { log?: (
       opts.progress?.({ done: done++, total: Math.max(listed, done), label: "reading", item: it.headline });
       if (it.id && store.hasRelease(it.id)) return;
       const html = await get(it.url).catch(() => null);
-      const p = html ? (it.source === "cmo" ? parseCmo(html) : parseAir(html, it.id)) : null;
+      const p = html ? (it.source === "cmo" ? parseCmo(html) : it.source === "un" ? parseUn(html, it.id) : parseAir(html, it.id)) : null;
       if (!p || !p.paras.length) { log(`  ${it.url}: no text on the page`); return; }
       if (p.date && p.date !== date) return;
       if (store.hasRelease(p.id)) return;
-      // (world news in English: translated by the top-up, not compared with the Gujarati)
-      const twin = it.lang ? null : sameNewsIn({ headline: p.headline, body: p.paras.join("\n\n") }, taken);
+      // (world news in English: translated by the top-up, compared with the other English, not the Gujarati)
+      const twin = sameNewsIn({ headline: p.headline, body: p.paras.join("\n\n") }, it.lang ? takenEn : taken);
       if (twin) { log(`  ${p.headline.slice(0, 50)}: the same news as ${twin.source === "pib" ? `PIB ${twin.id}` : `an earlier item (${twin.id})`}, left out`); return; }
       // (taken at once: three are read side by side, and a twin of this one may be next)
-      if (!it.lang) taken.push({ id: p.id, date, url: it.url, office: OFFICE[it.source], headline: p.headline, subhead: p.subhead,
-                                 body: p.paras.join("\n\n"), photos: [], fetchedAt: "", source: it.source });
+      (it.lang ? takenEn : taken).push({ id: p.id, date, url: it.url, office: OFFICE[it.source], headline: p.headline, subhead: p.subhead,
+                                         body: p.paras.join("\n\n"), photos: [], fetchedAt: "", source: it.source });
       const photos: string[] = [];
       if (p.photo && it.source === "cmo") {
         const img = await fetch(p.photo, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(30_000) }).catch(() => null);
@@ -223,7 +255,8 @@ export async function ingestOfficial(store: Store, date: string, opts: { log?: (
       log(`  ${it.source} ${p.headline.slice(0, 70)} (${photos.length} photo${photos.length === 1 ? "" : "s"})`);
     }
   };
-  await Promise.all([one("the CM's office", cmoList), one("All India Radio, Gujarati", airList), one("All India Radio, world news", airWorldList)]);
+  await Promise.all([one("the CM's office", cmoList), one("All India Radio, Gujarati", airList), one("All India Radio, world news", airWorldList),
+                     one("UN News", unList)]);
   opts.progress?.({ done: listed, total: listed, label: "reading" });
   return { listed, fetched };
 }
