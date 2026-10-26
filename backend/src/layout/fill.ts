@@ -1,6 +1,7 @@
 // A filler block (layout/guillotine.ts): a hole beside an ad that no story
 // of the page fits, filled with real copy where there is any --
-//   1. a story held back from the pages, set as a brief to the hole's size;
+//   1. a story held back from the pages, set as a brief to the hole's size,
+//      else cut to it (whole sentences off its end);
 //   2. a "જાણવા જેવું" item written by the AI to its size (editorial/features.ts);
 //   3. the paper's message panel or house ad (once each in a paper: profile fillers).
 import type { Element } from "@ck/shared/contract";
@@ -74,6 +75,31 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
     const mod = await stretchTo(fit.module, h, ctx.m);
     ctx.log(`  page ${page}: ${s.id} set as a brief by an ad`);
     return { placed: { module: mod, col, x: colX(col), y } };
+  }
+  // 1b. a held story cut to the hole, whole sentences off its end (real news
+  // before anything written: 25 Oct wrote a cooking tip with eight stories held)
+  {
+    let best: { s: Story; mod: Module } | null = null;
+    for (const s of ctx.held.slice(0, 12)) {
+      const sentences = s.bodies.long.split(/(?<=[.।!?])\s+/);
+      for (let k = sentences.length; k >= 2; k--) {
+        const body = sentences.slice(0, k).join(" ");
+        if (words(body) < 15) break;
+        const mod = await buildModule({ ...s, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0);
+        if (!Number.isFinite(mod.height) || mod.height > h + 0.5) continue;
+        const heads = mod.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length;
+        if ((mod.displayFill >= 0.97 || cols === 1) && heads <= 4 && mod.headlineHeight <= 0.45 * mod.height && close(mod)
+            && (!best || mod.height > best.mod.height)) best = { s, mod };
+        break; // (the longest cut that fits: shorter ones fill less)
+      }
+      if (best && h - best.mod.height < 1.5 * pitch) break;
+    }
+    if (best && ctx.held.includes(best.s)) {
+      ctx.held.splice(ctx.held.indexOf(best.s), 1);
+      const mod = await stretchTo(best.mod, h, ctx.m);
+      ctx.log(`  page ${page}: ${best.s.id} cut to ${words(best.mod.story.bodies.long)} words for a hole by an ad`);
+      return { placed: { module: mod, col, x: colX(col), y } };
+    }
   }
   // 2. an item written to its size, its length from what a first try measured
   if (h >= (cols >= 3 ? 4 : 6) * pitch) {

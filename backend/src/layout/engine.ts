@@ -42,7 +42,7 @@ export interface EngineResult {
   /** stories with no room on any page */
   leftOut: Story[];
   cost: number;
-  /** each page's stories (a page the engine couldn't lay out goes to the old one with these) */
+  /** each page's stories */
   assigned: Story[][];
   factChecks: { story: string; detail: string }[];
 }
@@ -132,6 +132,10 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
     pages[from] = pages[from].filter((x) => x !== s);
     pages[short].push(s);
   }
+  // each page's stories most important first again (its first is its lead): the
+  // moves above put a story at the end of its new page
+  const order = new Map(sized.map((s, i) => [s, i]));
+  for (const p of pages) p.sort((a, b) => order.get(a)! - order.get(b)!);
   return { pages, held };
 }
 
@@ -296,6 +300,9 @@ export async function layOut(args: {
       }
       // (neither: just other designs next round)
     }
+    // (a story moved in goes in its place by importance, not at the end: the first is the page's lead)
+    const order = new Map(sized.map((s, k) => [s.story.id, k]));
+    for (const i of failed) shares[i].sort((a, b) => (order.get(a.story.id) ?? 0) - (order.get(b.story.id) ?? 0));
   }
   for (const p of pages) {
     for (const x of p?.placed ?? []) if (x.module.story.factCheck) factChecks.push({ story: x.module.story.id, detail: x.module.story.factCheck });
@@ -477,6 +484,7 @@ export function adLayouts(ads: Ad[], band: Band): Ad[][] {
   const at = (a: Ad, c0: number, bottom: number): Ad => ({ ...a, x: GRID.left + c0 * GRID.pitch, y: bottom - a.height });
   for (const right of [true, false]) {
     // a well: each ad on top of the stack it fits in, else a new stack beside the last
+    // (each arrangement judged by itself: one that doesn't fit doesn't rule out the others)
     const stacks: { c0: number; c1: number; top: number }[] = [];
     const well: Ad[] = [];
     let ok = true;
@@ -498,6 +506,7 @@ export function adLayouts(ads: Ad[], band: Band): Ad[][] {
     }
     if (ok) keep(well);
     // side by side along the foot
+    ok = true;
     let used = 0;
     const row: Ad[] = [];
     for (const a of sorted) {

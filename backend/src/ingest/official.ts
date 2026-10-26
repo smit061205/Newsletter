@@ -85,8 +85,14 @@ export const AIR_SECTION: Record<string, string> = {
   entertainment: "મનોરંજન", elections: "ચૂંટણી", weather: "હવામાન",
 };
 
-/** The CM's office: the day's items, from its news pages (newest first) until they're older. */
+/** The day before `date` (an ISO day). */
+const dayBefore = (date: string) => new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+
+/** The CM's office: the day's items and the day before's (it posts late: on 25 and
+ * 26 Oct its newest were a day old, so none came), from its news pages (newest
+ * first) until they're older. One already stored (an earlier day's) isn't read again. */
 async function cmoList(date: string): Promise<Item[]> {
+  const from = dayBefore(date);
   const out: Item[] = [];
   for (let page = 0; page < 8; page++) {
     const html = await get(`https://cmogujarat.gov.in/gu/news${page ? `?page=${page}` : ""}`);
@@ -97,8 +103,8 @@ async function cmoList(date: string): Promise<Item[]> {
     for (const r of rows) {
       const d = cmoDate(r[3]);
       if (!d) continue;
-      if (d < date) { older = true; continue; }
-      if (d === date) out.push({ source: "cmo", id: 0, url: `https://cmogujarat.gov.in${r[1]}`, headline: text(r[2]), date: d });
+      if (d < from) { older = true; continue; }
+      if (d <= date) out.push({ source: "cmo", id: 0, url: `https://cmogujarat.gov.in${r[1]}`, headline: text(r[2]), date: d });
     }
     if (older) break;
   }
@@ -123,8 +129,10 @@ async function airWorldList(date: string): Promise<Item[]> {
   return out;
 }
 
-/** UN News: the day's stories from its English feed (dated in India's time), the first few. */
-async function unList(date: string): Promise<Item[]> {
+/** UN News: the newest stories from its English feed, of the day or the day before in
+ * India's time (it publishes on New York's: in India's evening the day often has none),
+ * the first few not stored yet. */
+async function unList(date: string, store: Store): Promise<Item[]> {
   const xml = await get("https://news.un.org/feed/subscribe/en/news/all/rss.xml");
   if (!xml) return [];
   const out: Item[] = [];
@@ -133,7 +141,9 @@ async function unList(date: string): Promise<Item[]> {
     const when = Date.parse(m[1].match(/<pubDate>([^<]+)<\/pubDate>/)?.[1] ?? "");
     const nid = Number(url?.match(/\/(\d+)$/)?.[1]);
     if (!url || !nid || !Number.isFinite(when)) continue;
-    if (new Date(when + 5.5 * 3_600_000).toISOString().slice(0, 10) !== date) continue;
+    const day = new Date(when + 5.5 * 3_600_000).toISOString().slice(0, 10);
+    if (day !== date && day !== dayBefore(date)) continue;
+    if (store.hasRelease(ID_BASE.un + nid)) continue;
     out.push({ source: "un", id: ID_BASE.un + nid, url, headline: text(m[1].match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? ""), date,
                section: AIR_SECTION.international, lang: "en" });
     if (out.length >= UN_MAX) break;
@@ -204,9 +214,11 @@ export async function ingestOfficial(store: Store, date: string, opts: { log?: (
   Promise<{ listed: number; fetched: number }> {
   const log = opts.log ?? (() => {});
   pages = 0;
-  const taken = store.releases(date).filter((r) => !r.lang || r.lang === "gu");
+  // (the day before's too: an item of the day before may be news it printed)
+  const recent = [...store.releases(dayBefore(date)), ...store.releases(date)];
+  const taken = recent.filter((r) => !r.lang || r.lang === "gu");
   // (world news in English, from two sources: one story once)
-  const takenEn = store.releases(date).filter((r) => r.lang === "en" && (r.source === "air" || r.source === "un"));
+  const takenEn = recent.filter((r) => r.lang === "en" && (r.source === "air" || r.source === "un"));
   const mediaDir = path.join(MEDIA_DIR, date);
   await mkdir(mediaDir, { recursive: true });
   let listed = 0, fetched = 0, done = 0;
@@ -226,7 +238,7 @@ export async function ingestOfficial(store: Store, date: string, opts: { log?: (
       const html = await get(it.url).catch(() => null);
       const p = html ? (it.source === "cmo" ? parseCmo(html) : it.source === "un" ? parseUn(html, it.id) : parseAir(html, it.id)) : null;
       if (!p || !p.paras.length) { log(`  ${it.url}: no text on the page`); return; }
-      if (p.date && p.date !== date) return;
+      if (p.date && p.date !== date && p.date !== dayBefore(date)) return;
       if (store.hasRelease(p.id)) return;
       // (world news in English: translated by the top-up, compared with the other English, not the Gujarati)
       const twin = sameNewsIn({ headline: p.headline, body: p.paras.join("\n\n") }, it.lang ? takenEn : taken);
@@ -256,7 +268,7 @@ export async function ingestOfficial(store: Store, date: string, opts: { log?: (
     }
   };
   await Promise.all([one("the CM's office", cmoList), one("All India Radio, Gujarati", airList), one("All India Radio, world news", airWorldList),
-                     one("UN News", unList)]);
+                     one("UN News", (d) => unList(d, store))]);
   opts.progress?.({ done: listed, total: listed, label: "reading" });
   return { listed, fetched };
 }

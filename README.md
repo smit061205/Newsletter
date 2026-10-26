@@ -248,7 +248,7 @@ backend/
     blocks.ts               every setting of a story: widths x lengths x photo layouts, with heights
     designs.ts              page designs: the story area cut into one block per story and ad
     guillotine.ts           a design's heights solved exactly (whole points), then set out
-    fill.ts                 a hole no story fits: a held story as a brief, a written item, a panel
+    fill.ts                 a hole no story fits: a held story as a brief (cut to it if need be), a written item, a panel
     pack.ts                 the old packer (skyline + beam search), tombstone/headline rules
     fit.ts                  the old gap closing (a page the engine can't solve); house ad, message panel
     stories.ts              dedupe, related stories, edits, stand-in ads
@@ -439,7 +439,7 @@ Every page is laid out by this engine (the old packer below no longer lays out a
 3. **Pages** (`assign()`): the stories shared over the pages by the room each has (its band less its ads), most important first, the front page's lead on it and the front page filled first, related stories apart. A story with no room is held (listed as left out).
 4. **Designs** (`designs.ts`): for each page, hundreds of ways of cutting its story area straight across or down (a guillotine) into one block per story, each block a width its story may take, the ads at the foot in their own blocks. The ads are tried in several tidy arrangements (`adLayouts()`). Where a strip by an ad suits no story, a **filler** block (at most two a page).
 5. **Exact heights** (`guillotine.ts`): each design solved over every story's settings, in whole points: blocks side by side end level, stacked blocks add up (with the 8pt gap and its rule), the whole fills the band to its foot. A design with no exact solution is dropped; the cheapest (copy kept, photos kept, natural spacing) is set out, and judged as a reader sees it (headline sizes follow importance; level neighbours get a column rule).
-6. **Fillers** (`fill.ts`): a held story as a brief; else a "જાણવા જેવું" item written to its size in the paper's language (two stacked where one leaves room); else the paper's message panel or house ad (once each a paper).
+6. **Fillers** (`fill.ts`): a held story as a brief; else a held story cut to the hole, whole sentences off its end (real news before anything written); else a "જાણવા જેવું" item written to its size in the paper's language (two stacked where one leaves room); else the paper's message panel or house ad (once each a paper).
 7. **No design fills a page:** more designs, then a story moved in (held, or from a page with copy to spare) or held back; a page no design can be made for at all gets a narrow story once, then stories held back. From the fourth round on, a filler slot and, failing an exact design, the nearest one (its gap reported). A story that can't be set at its rank (a short story topping a page, its headline over 30% of it) is set a rank lower (`Blocks.settable`). An ad booked off the columns is set on the nearest ones. No other engine lays out a page.
 
 A copy (`editorial/copies.ts`) runs the same engine with its own seed: other page spreads and designs, the lengths already made (the day's longer versions reused, nothing new written), so a copy takes about half a minute and almost no AI.
