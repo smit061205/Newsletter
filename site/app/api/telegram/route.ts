@@ -22,6 +22,6 @@ export async function POST(req: Request) {
   if (!sql) return Response.json({ error: "no database" }, { status: 500 });
   await prepared(sql);
   const result = await handleUpdate(sql, await req.json());
-  if (result === "approved") for (const path of ["/", "/en"]) revalidatePath(path, "layout");
+  if (result === "approved") for (const path of ["/", "/en", "/hi"]) revalidatePath(path, "layout");
   return Response.json({ ok: true, result });
 }

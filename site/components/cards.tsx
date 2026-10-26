@@ -6,9 +6,9 @@ import { sectionName } from "../lib/sections.ts";
 import { timeText } from "../lib/format.ts";
 import { Chev } from "./icons.tsx";
 
-/** A story's words in the reader's language: its English when it has one. */
+/** A story's words in the reader's language: its English or Hindi when it has one, else the Gujarati. */
 export function words(s: Story, lang: Lang) {
-  const e = lang === "en" ? s.en : null;
+  const e = lang === "en" ? s.en : lang === "hi" ? s.hi : null;
   return { kicker: e?.kicker || s.kicker, headline: e?.headline || s.headline, deck: e?.deck || s.deck,
            body: e?.body || s.body, caption: e?.caption || s.caption, translated: !!e };
 }

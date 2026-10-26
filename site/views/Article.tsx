@@ -16,7 +16,7 @@ export function articleJsonLd(s: Story, lang: Lang) {
   const w = words(s, lang);
   return {
     "@context": "https://schema.org", "@type": "NewsArticle",
-    headline: w.headline.slice(0, 110), description: w.deck || undefined, inLanguage: lang === "en" && w.translated ? "en" : "gu",
+    headline: w.headline.slice(0, 110), description: w.deck || undefined, inLanguage: lang !== "gu" && w.translated ? lang : "gu",
     datePublished: s.publishedAt, dateModified: s.updatedAt,
     image: s.photo ? [new URL(s.photo.url, SITE_URL).href] : undefined,
     mainEntityOfPage: `${SITE_URL}${href(lang, `/news/${s.id}`)}`,
@@ -44,7 +44,7 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
       <div className="artg">
         <article className="art" lang={w.translated || lang === "gu" ? lang : "gu"}>
           <Link className="crumbs" href={href(lang, `/section/${s.tier}`)}>{sectionName(s.tier, lang)} <Chev /></Link>
-          {lang === "en" && !w.translated && <p className="fix" lang="en">{t(lang, "noEnglish")}</p>}
+          {lang !== "gu" && !w.translated && <p className="fix" lang={lang}>{t(lang, "noEnglish")}</p>}
           {s.corrections.map((c, i) => (
             <p key={i} className="fix">{t(lang, "correction")}, {dateText(c.at, lang)}: {lang === "en" && c.en ? c.en : c.gu}</p>
           ))}

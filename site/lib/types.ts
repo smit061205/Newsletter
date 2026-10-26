@@ -3,7 +3,7 @@
 
 export type Tier = "gujarat" | "india" | "world";
 export type Genre = "farm" | "economy" | "tech" | "health" | "sport" | "education" | "entertainment";
-export type Lang = "gu" | "en";
+export type Lang = "gu" | "en" | "hi";
 
 export interface Photo { url: string; width: number; height: number }
 export interface Source { kind: "pib" | "cmo" | "air" | "gujinfo" | "other"; name: string; url: string; office?: string }
@@ -30,6 +30,8 @@ export interface Story {
   page: number | null;
   rank: number | null;
   en: English | null;
+  /** Hindi (the engine writes it for national and world stories, ROADMAP §3.2) */
+  hi: English | null;
   corrections: Correction[];
   /** 'paper': from the evening paper; 'live': written by the engine through the day */
   origin: "paper" | "live";

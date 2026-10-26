@@ -11,6 +11,8 @@
   --ui:var(--font-ui),'Gujarati MT','Shruti',system-ui,sans-serif;
   --gut:16px; --side:16px; --scale:1;
 }
+/* the Hindi pages: Devanagari first, Gujarati behind it (a story not yet in Hindi) */
+html[lang="hi"]{--serif:var(--font-serif-hi),var(--font-serif),'Kohinoor Devanagari',Georgia,serif;--ui:var(--font-ui-hi),var(--font-ui),'Kohinoor Devanagari',system-ui,sans-serif}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#121214; --surface:#1c1b20; --ink:#e7e7ea; --strong:#ffffff; --soft:#c9c9d1; --muted:#a3a3ab;
   --rule:#2c2b31; --rule-strong:#e7e7ea; --brand:#c99be0; --navy:#a4a7ff; --on-navy:#121214;

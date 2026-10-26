@@ -17,7 +17,7 @@ export default function Saved({ lang, empty }: { lang: Lang; empty: string }) {
   if (!items.length) return <p className="empty">{empty}</p>;
   return (
     <div className="stack">
-      {items.map((s) => <Link key={s.id} className="h cmp" href={`${lang === "en" ? "/en" : ""}/news/${s.id}`}><div><h3 className="h4">{s.headline}</h3></div></Link>)}
+      {items.map((s) => <Link key={s.id} className="h cmp" href={`${lang === "gu" ? "" : `/${lang}`}/news/${s.id}`}><div><h3 className="h4">{s.headline}</h3></div></Link>)}
     </div>
   );
 }

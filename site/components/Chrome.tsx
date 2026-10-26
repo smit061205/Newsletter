@@ -11,7 +11,7 @@ export interface ChromeProps {
   name: string;
   tagline: string;
   /** this page in each language, for the language switch */
-  paths: { gu: string; en: string };
+  paths: { gu: string; en: string; hi: string };
   sections: { key: string; name: string; href: string }[];
   links: { home: string; latest: string; epaper: string; archive: string; search: string; saved: string; about: string; how: string; policy: string; corrections: string; contact: string };
   words: Record<"menu" | "sections" | "search" | "close" | "epaper" | "home" | "latest" | "latestTitle" | "archive" | "searchPlaceholder" | "settings" | "theme" |
@@ -105,6 +105,7 @@ export default function Chrome(p: ChromeProps) {
         <div className="setl">{w.language}</div>
         <div className="seg" role="group" aria-label={w.language}>
           <Link className="seglink" href={p.paths.gu} aria-current={p.lang === "gu" ? "true" : undefined} hrefLang="gu">ગુજરાતી</Link>
+          <Link className="seglink" href={p.paths.hi} aria-current={p.lang === "hi" ? "true" : undefined} hrefLang="hi">हिंदी</Link>
           <Link className="seglink" href={p.paths.en} aria-current={p.lang === "en" ? "true" : undefined} hrefLang="en">English</Link>
         </div>
         <h3>{w.about}</h3>

@@ -15,6 +15,6 @@ export async function POST() {
   const at = Object.fromEntries(rows.map((r) => [r.key as string, Date.parse(r.value as string)]));
   if (!at.content_changed_at || (at.refreshed_at && at.refreshed_at >= at.content_changed_at)) return Response.json({ refreshed: false });
   await sql.query(`insert into state (key, value) values ('refreshed_at', now()::text) on conflict (key) do update set value = excluded.value`);
-  for (const path of ["/", "/en"]) revalidatePath(path, "layout");
+  for (const path of ["/", "/en", "/hi"]) revalidatePath(path, "layout");
   return Response.json({ refreshed: true });
 }

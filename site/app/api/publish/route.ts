@@ -27,6 +27,6 @@ export async function POST(req: Request) {
   const problem = valid(p);
   if (problem) return Response.json({ error: problem }, { status: 400 });
   await saveIssue(sql, p);
-  for (const path of ["/", "/en"]) revalidatePath(path, "layout");
+  for (const path of ["/", "/en", "/hi"]) revalidatePath(path, "layout");
   return Response.json({ ok: true, date: p.issue.date, stories: p.stories.length });
 }

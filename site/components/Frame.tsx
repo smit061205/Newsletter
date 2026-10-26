@@ -30,7 +30,7 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
       <a className="skip" href="#main">{t(lang, "skip")}</a>
       <Chrome
         lang={lang} name={PAPER.gu.name} tagline={PAPER[lang].tagline} words={words} bottomBar={bottomBar} active={active}
-        paths={{ gu: href("gu", path), en: href("en", path) }}
+        paths={{ gu: href("gu", path), en: href("en", path), hi: href("hi", path) }}
         sections={SECTIONS.map((k) => ({ key: k, name: sectionName(k, lang), href: L(`/section/${k}`) }))}
         links={{ home: L("/"), latest: L("/latest"), epaper: L("/epaper"), archive: L("/archive"), search: L("/search"), saved: L("/saved"),
                  about: L("/about"), how: L("/how-we-check"), policy: L("/editorial-policy"), corrections: L("/corrections"), contact: L("/contact") }}
@@ -47,9 +47,10 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
               <Link href={L("/how-we-check")}>{t(lang, "fHow")}</Link><Link href={L("/corrections")}>{t(lang, "fFix")}</Link><Link href={L("/contact")}>{t(lang, "fContact")}</Link></div>
             <div><b>{t(lang, "f2")}</b>{SECTIONS.slice(0, 6).map((k) => <Link key={k} href={L(`/section/${k}`)}>{sectionName(k, lang)}</Link>)}</div>
             <div><b>{t(lang, "f3")}</b><Link href={L("/epaper")}>{t(lang, "epaper")}</Link><Link href={L("/archive")}>{t(lang, "archive")}</Link>
-              <a href={lang === "en" ? "/en/rss.xml" : "/rss.xml"}>{t(lang, "fRss")}</a></div>
+              <a href={lang === "gu" ? "/rss.xml" : `/${lang}/rss.xml`}>{t(lang, "fRss")}</a></div>
             <div><b>{t(lang, "f4")}</b><Link href={L("/terms")}>{t(lang, "fTerms")}</Link><Link href={L("/privacy")}>{t(lang, "fPrivacy")}</Link>
-              <Link href={href(lang === "gu" ? "en" : "gu", path)} hrefLang={lang === "gu" ? "en" : "gu"}>{lang === "gu" ? "English" : "ગુજરાતી"}</Link></div>
+              {(["gu", "hi", "en"] as const).filter((l) => l !== lang).map((l) => (
+                <Link key={l} href={href(l, path)} hrefLang={l}>{{ gu: "ગુજરાતી", hi: "हिंदी", en: "English" }[l]}</Link>))}</div>
           </div>
           <p className="legal">© {num(PAPER.founded, lang)}–{num(new Date().getFullYear(), lang)} {PAPER[lang].name}, {PAPER[lang].place} · RNI {PAPER.rni}</p>
         </footer>

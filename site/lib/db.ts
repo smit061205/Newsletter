@@ -50,6 +50,7 @@ function storyOf(r: Row): Story {
     page: (r.page as number | null) ?? null,
     rank: (r.rank as number | null) ?? null,
     en: r.en_status === "done" ? ((r.en as English | null) ?? null) : null,
+    hi: r.hi_status === "done" ? ((r.hi as English | null) ?? null) : null,
     corrections: (r.corrections as Correction[]) ?? [],
     origin: r.origin === "live" ? "live" : "paper",
     sources: (r.sources as StorySource[] | null) ?? [],
@@ -64,7 +65,7 @@ function issueOf(r: Row): Issue {
 }
 
 const COLUMNS = `id, issue_date, published_at, updated_at, tier, genres, kicker, headline, deck, body, caption, photo, source,
-                 checked, page, rank, en, en_status, corrections, origin, sources, importance`;
+                 checked, page, rank, en, en_status, hi, hi_status, corrections, origin, sources, importance`;
 
 /** The newest stories, the latest day's paper first in its printed order. */
 export async function latestStories(limit = 60): Promise<Story[]> {

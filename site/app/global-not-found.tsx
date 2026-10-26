@@ -13,7 +13,7 @@ export default function GlobalNotFound() {
           <a className="wm" href="/" style={{ justifyContent: "center" }}><b>કેપિટલ ક્રાંતિ</b></a>
           <h1 className="h3" style={{ marginTop: 32 }}>આ પાનું મળ્યું નહીં</h1>
           <p className="note" lang="en">This page isn’t here.</p>
-          <p><a className="more" href="/">હોમ પર જાઓ</a> · <a className="more" href="/en" lang="en">Home in English</a></p>
+          <p><a className="more" href="/">હોમ પર જાઓ</a> · <a className="more" href="/hi" lang="hi">होम हिंदी में</a> · <a className="more" href="/en" lang="en">Home in English</a></p>
         </main>
       </body>
     </html>
