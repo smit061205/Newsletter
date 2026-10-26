@@ -37,10 +37,19 @@ function Photo({ s, lang, cls = "ph", eager = false, morph = false }: { s: Story
   return morph ? <ViewTransition name={`photo-${s.id}`} share="morph" default="none">{framed}</ViewTransition> : framed;
 }
 
+/** How big the lead is, from the engine's importance (the Guardian's "boost levels"):
+ *  a normal lead sits beside its photo; bigger news gets a bigger headline, and the
+ *  biggest takes the photo across the top. */
+export type Boost = "default" | "boost" | "mega" | "giga";
+export const boostOf = (s: Story): Boost => {
+  const i = s.origin === "live" ? s.importance ?? 0 : 0;
+  return i >= 11 ? "giga" : i >= 9.5 ? "mega" : i >= 7.5 ? "boost" : "default";
+};
+
 export function Lead({ s, lang }: { s: Story; lang: Lang }) {
   const w = words(s, lang);
   return (
-    <article className="lead">
+    <article className={`lead b-${boostOf(s)}`}>
       <Link className="h txt" href={storyHref(s, lang)}>
         {w.kicker && <span className="kick">{w.kicker}</span>}
         <h2 className="display">{w.headline}</h2>
