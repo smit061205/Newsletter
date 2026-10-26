@@ -28,3 +28,12 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Build (Next.js typechecks as it builds)
         run: npm run build
+      - name: Accessibility check (WCAG 2 AA on the main pages, phone and desktop, light and dark)
+        env:
+          CK_SAMPLE: "1"
+        run: |
+          npx playwright install --with-deps chromium
+          npm run build
+          (npx next start --port 3200 > /tmp/site.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://localhost:3200/ && break; sleep 2; done
+          node test/a11y.mjs http://localhost:3200
