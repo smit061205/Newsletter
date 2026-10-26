@@ -82,14 +82,18 @@ export interface Batch {
 /** An article printed in every copy, word for word (26 Oct: an order of 25
  * copies, each with one of the customer's titles and photos): its text, and
  * the titles and photos the copies go through -- every title with every photo,
- * in turn (copy 1: title 1 with photo 1, copy 2: title 1 with photo 2, ...). */
+ * spread so any few copies in a row show them all (3 x 3: 1-1, 2-2, 3-3, then
+ * 1-2, 2-3, 3-1, then 1-3, 2-1, 3-2). */
 export interface Extra { body: string; titles: string[]; photos: string[]; deck?: string }
 
 /** Copy n's title and photo (n from 1). */
 export function extraFor(e: Extra, n: number): { title: string; photo: string | null } {
-  const photos = e.photos.length || 1;
-  const k = (n - 1) % (e.titles.length * photos);
-  return { title: e.titles[Math.floor(k / photos)], photo: e.photos[k % photos] ?? null };
+  const t = e.titles.length, p = e.photos.length || 1;
+  const k = (n - 1) % (t * p);
+  // title and photo step together; after every pairing of the two counts, the photos move on one
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+  const round = Math.floor(k / ((t * p) / gcd(t, p)));
+  return { title: e.titles[k % t], photo: e.photos[(k + round) % p] ?? null };
 }
 
 /** The fixed article as copy n prints it: a story of its own, kept whole (store.ts wordForWord). */
