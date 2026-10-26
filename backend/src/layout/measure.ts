@@ -351,9 +351,13 @@ export class Measurer {
       size: r.size, hScale: r.hScale ?? 1, kern: r.paras.some((p) => unspaced.test(p)),
       base: family(r.font),
       space: this.shape(" ", r.font)[0].text,
-      // a long token may break after a "/" (a URL, "PLI/RPLI"): its parts glued, no space between
+      // a long token may break after a "/" (a URL, "PLI/RPLI"), and a long
+      // email or web address after its "@" and dots too (26 Oct: an address
+      // alone on a line ran 7 mm past its column): its parts glued, no space between
       paras: r.paras.map((p) => p.split(/\s+/).filter(Boolean).flatMap((tok) =>
-        (tok.length > 10 && tok.includes("/") ? tok.split(/(?<=\/)(?=[^/])/) : [tok]).map((w, k) => ({
+        (tok.length > 14 && /^[\w.@\-+:/%?=&#~]+$/.test(tok) && /[A-Za-z]{2}/.test(tok) && /[@./]/.test(tok)
+          ? tok.split(/(?<=[@/])(?=[^/])|(?<=\.)(?=\w)/)
+          : tok.length > 10 && tok.includes("/") ? tok.split(/(?<=\/)(?=[^/])/) : [tok]).map((w, k) => ({
           word: w, glue: k > 0, runs: this.shape(w, r.font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? r.font) })),
         })))),
     }));
