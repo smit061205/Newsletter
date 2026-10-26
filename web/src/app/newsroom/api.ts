@@ -49,7 +49,9 @@ export interface AdRow { id: string; date: string; page: number; width: number; 
   /** every day the booking runs */
   days: string[] }
 export interface Settings { runAt: string; autoRun: boolean; openrouterKey: boolean; lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number;
-  inrAuto: boolean; inrUpdated: string; notify: boolean; siteUrl: string; editions: Edition[]; editionsAuto: boolean }
+  inrAuto: boolean; inrUpdated: string; notify: boolean; siteUrl: string; editions: Edition[]; editionsAuto: boolean;
+  /** the paper's Telegram bot (news the editor sends it): none set up, or its name, the code a new person sends it, who's let in */
+  telegram?: { token: false } | { token: true; bot: string | null; code: string; chats: { id: number; name: string }[]; waiting: number } }
 /** A language the paper's copies and sister papers come in. */
 export type PaperLang = "gu" | "hi" | "ur";
 /** A sister paper: the day's paper under another name, maybe in another language. */

@@ -204,6 +204,14 @@ async function setEnv(name: string, value: string) {
   await writeFile(ENV_FILE, lines.join("\n") + "\n", { mode: 0o600 });
 }
 
+/** The paper's Telegram bot, for Settings: its name (if the token works), the code a new person sends it, who's let in. */
+async function telegramOf(store: Store) {
+  if (!envHas("TELEGRAM_BOT_TOKEN")) return { token: false };
+  const { botName, telegramState } = await import("./ingest/telegram.ts");
+  const { code, chats } = telegramState(store);
+  return { token: true, bot: await botName(), code, chats, waiting: store.inbox(true).length };
+}
+
 /** What became of each of the day's releases. */
 function releaseStatus(store: Store, date: string) {
   const stories = store.stories(date);
@@ -570,11 +578,12 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         });
       }
       if (parts[0] === "api" && parts[1] === "settings") {
-        if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
+        if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY"), telegram: await telegramOf(store) });
         if (req.method === "POST") {
           const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string; lang?: string;
                                                    onboarded?: boolean; inrPerUsd?: number; inrAuto?: boolean; notify?: boolean; siteUrl?: string;
-                                                   editions?: Edition[]; editionsAuto?: boolean };
+                                                   editions?: Edition[]; editionsAuto?: boolean;
+                                                   telegramToken?: string; telegramRemove?: number };
           if (body.editions !== undefined) {
             // only the names change: the papers themselves (their ids and languages) stay
             const now = settingsOf(store).editions;
@@ -611,8 +620,29 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             if (!/^sk-or-[A-Za-z0-9_-]{20,}$/.test(body.openrouterKey.trim())) return send(res, 400, { error: "that doesn't look like an OpenRouter key (sk-or-...)" });
             await setEnv("OPENROUTER_API_KEY", body.openrouterKey.trim());
           }
-          return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY") });
+          if (body.telegramToken) {
+            if (!/^\d{5,}:[A-Za-z0-9_-]{30,}$/.test(body.telegramToken.trim())) return send(res, 400, { error: "that doesn't look like a Telegram bot token (from @BotFather)" });
+            await setEnv("TELEGRAM_BOT_TOKEN", body.telegramToken.trim());
+            store.putSetting("telegramOffset", 0);
+          }
+          if (body.telegramRemove !== undefined) {
+            store.putSetting("telegramChats", store.setting<{ id: number }[]>("telegramChats", []).filter((c) => c.id !== body.telegramRemove));
+          }
+          return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY"), telegram: await telegramOf(store) });
         }
+      }
+      if (parts[0] === "api" && parts[1] === "telegram" && parts[2] === "photos") {
+        // photos sent to the paper's bot that no article has yet, and the articles not printed yet (the newsroom attaches one)
+        const { articles, attach } = await import("./ingest/telegram.ts");
+        if (req.method === "POST") {
+          const body = (await readJson(req)) as { photo: number; to: number };
+          if (!(await attach(store, Number(body.photo), Number(body.to)))) return send(res, 400, { error: "that photo or article is gone" });
+        }
+        const all = store.inbox(true);
+        return send(res, 200, {
+          photos: all.filter((x) => x.kind === "photo" && x.pairedTo === undefined && x.at > Date.now() / 1000 - 2 * 86400).map((x) => ({ id: x.id, url: x.photo, at: x.at, from: x.from })),
+          articles: articles(all).map((a) => ({ id: a.ids[0], at: a.at, title: a.text.split("\n").find((l) => l.trim())?.trim().slice(0, 80) ?? "" })),
+        });
       }
       if (parts[0] === "api" && parts[1] === "papers") return await papersApi(req, res, parts, url);
       return send(res, 404, { error: "not found" });
@@ -636,6 +666,8 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
   }, log);
   backupDaily(store, log);
   collectHourly(store, log);
+  // news the editor sends the paper's Telegram bot, taken in as it comes (ingest/telegram.ts)
+  (await import("./ingest/telegram.ts")).pollTelegram(store, log);
   // the rupee rate, kept up to date (when it's on): now, then every few hours
   rupeeRate(store, log).catch(() => {});
   setInterval(() => rupeeRate(store, log).catch(() => {}), 3 * 3600_000);

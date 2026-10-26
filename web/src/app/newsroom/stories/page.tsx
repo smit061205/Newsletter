@@ -2,7 +2,7 @@
 // સમાચાર / Stories: the day's stories (search, filter, open one to edit),
 // and the press releases they came from (translate a Hindi one).
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { call, type ReleaseRow, type StoryRow } from "../api";
+import { call, media, type ReleaseRow, type StoryRow } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { num } from "../ui/format";
@@ -88,7 +88,7 @@ export default function Stories() {
             )}
         </section>
       ) : (
-        <Sources releases={releases} open={openRel} setOpen={setOpenRel} busy={busy} translate={translate} />
+        <><TelegramPhotos /><Sources releases={releases} open={openRel} setOpen={setOpenRel} busy={busy} translate={translate} /></>
       )}
       {editing && <StoryPanel story={editing} onClose={() => setEditing(null)} onChanged={() => { load(); refresh(); }} />}
     </div>
@@ -125,7 +125,7 @@ function Sources({ releases, open, setOpen, busy, translate }: { releases: Relea
                     <div className={s.expand}>
                       <p className={s.original} lang={r.lang}>{r.body}</p>
                       <div className={s.row}>
-                        <a className={s.btn} href={r.url} target="_blank" rel="noreferrer">{Icon.external()}{t("sources.open")}</a>
+                        {/^https?:/.test(r.url) && <a className={s.btn} href={r.url} target="_blank" rel="noreferrer">{Icon.external()}{t("sources.open")}</a>}
                         {r.lang === "hi" && !r.translated && (
                           <Button kind="primary" onClick={() => translate(r.id)} disabled={busy === r.id}>{busy === r.id ? t("sources.translating") : t("sources.translate")}</Button>
                         )}
@@ -139,5 +139,35 @@ function Sources({ releases, open, setOpen, busy, translate }: { releases: Relea
         );
       })}
     </>
+  );
+}
+
+/** Photos sent to the paper's Telegram bot that no article has yet: each attached with one choice. */
+function TelegramPhotos() {
+  const { t, toast } = useApp();
+  type Waiting = { photos: { id: number; url: string; from: string }[]; articles: { id: number; title: string }[] };
+  const [w, setW] = useState<Waiting | null>(null);
+  useEffect(() => { call<Waiting>("/api/telegram/photos").then(setW).catch(() => setW(null)); }, []);
+  if (!w?.photos.length) return null;
+  const attach = async (photo: number, to: number) => {
+    try { setW(await call<Waiting>("/api/telegram/photos", { json: { photo, to } })); toast(t("settings.saved")); }
+    catch (e) { toast((e as Error).message); }
+  };
+  return (
+    <section className={s.card}>
+      <h2 className={s.cardTitle}>{t("tg.photos")}</h2>
+      <p className={s.muted}>{t("tg.photos.body")}</p>
+      {w.photos.map((p) => (
+        <div key={p.id} className={s.row} style={{ alignItems: "center" }}>
+          <img src={media(p.url)} alt="" style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 6 }} />
+          <select className={s.input} style={{ flex: 1, minWidth: 200 }} defaultValue="" aria-label={t("tg.photos.which")}
+                  onChange={(e) => e.target.value && attach(p.id, Number(e.target.value))}>
+            <option value="" disabled>{t("tg.photos.which")}</option>
+            {w.articles.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+            <option value="0">{t("tg.photos.none")}</option>
+          </select>
+        </div>
+      ))}
+    </section>
   );
 }
