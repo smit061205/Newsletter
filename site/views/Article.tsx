@@ -7,10 +7,11 @@ import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
 import { dateText, minutes, num, paragraphs, timeText } from "../lib/format.ts";
 import { PAPER, SITE_URL } from "../lib/site.ts";
-import { Cmp, Head, Join, LatestList, words } from "../components/cards.tsx";
+import { Cmp, Head, Join, LatestList, Std, words } from "../components/cards.tsx";
 import { Check, Chev, Flag } from "../components/icons.tsx";
 import ArticleTools from "../components/ArticleTools.tsx";
 import ReadProgress from "../components/ReadProgress.tsx";
+import PhotoZoom from "../components/PhotoZoom.tsx";
 import { ViewTransition } from "react";
 import Frame from "../components/Frame.tsx";
 
@@ -38,6 +39,11 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
   const changed = s.updatedAt && Date.parse(s.updatedAt) - Date.parse(s.publishedAt) > 5 * 60_000;
   const toolWords = Object.fromEntries((["share", "shareShort", "copy", "copied", "save", "saved", "savedToast", "unsavedToast", "size"] as const)
     .map((k) => [k, t(lang, k)])) as Parameters<typeof ArticleTools>[0]["words"];
+  const others = related.filter((x) => x.id !== s.id);
+  const paras = paragraphs(w.body);
+  // a long story carries one related story inside it, after its third paragraph (as news sites do)
+  const inline = paras.length >= 5 ? others.find((x) => x.photo) ?? others[0] : undefined;
+  const after = others.filter((x) => x !== inline).slice(0, 3);
   const mail = `mailto:${PAPER.email}?subject=${encodeURIComponent(`${t(lang, "reportBody")} ${s.id}`)}&body=${encodeURIComponent(`${w.headline}\n${url}\n\n`)}`;
 
   return (
@@ -54,23 +60,38 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
           {w.kicker && <span className="kick">{w.kicker}</span>}
           <h1>{w.headline}</h1>
           {w.deck && <p className="stand">{w.deck}</p>}
-          <div className="times">
-            {t(lang, "by")} <b>{t(lang, "desk")}</b>, {PAPER[lang].place}
-            <br />{t(lang, "published")}: {dateText(s.publishedAt, lang)}, {timeText(s.publishedAt, lang)}
-            {changed && <> · {t(lang, "updatedAt")}: {timeText(s.updatedAt, lang)}</>}
-            {" · "}{num(minutes(w.body), lang)} {t(lang, "min")}
+          <div className="byblock">
+            <span className="badge" aria-hidden="true">{PAPER[lang].name.slice(0, 1)}</span>
+            <div className="times">
+              <span>{t(lang, "by")} <b>{t(lang, "desk")}</b>, {PAPER[lang].place}</span>
+              <span>{dateText(s.publishedAt, lang)}, {timeText(s.publishedAt, lang)}
+                {changed && <> · {t(lang, "updatedAt")} {timeText(s.updatedAt, lang)}</>}
+                {" · "}{num(minutes(w.body), lang)} {t(lang, "min")}</span>
+            </div>
           </div>
           {s.checked && <div className="chk"><Check />{t(lang, "checked")}</div>}
           <ArticleTools id={s.id} url={url} headline={w.headline} words={toolWords} />
           {s.photo && (
             <figure>
-              <ViewTransition name={`photo-${s.id}`} share="morph" default="none">
-                <span className="phw"><img className="ph" src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline} /></span>
-              </ViewTransition>
+              <PhotoZoom src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline}
+                         caption={w.caption} label={t(lang, "zoom")} close={t(lang, "close2")}>
+                <ViewTransition name={`photo-${s.id}`} share="morph" default="none">
+                  <span className="phw"><img className="ph" src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline} /></span>
+                </ViewTransition>
+              </PhotoZoom>
               {w.caption && <figcaption>{w.caption} ({t(lang, "photo")}: {s.source?.name ?? "PIB"})</figcaption>}
             </figure>
           )}
-          <div className="body">{paragraphs(w.body).map((p, i) => <p key={i}>{p}</p>)}</div>
+          <div className="body">
+            {paras.map((p, i) => (
+              <div key={i} style={{ display: "contents" }}>
+                <p>{p}</p>
+                {inline && i === 2 && (
+                  <aside className="readalso"><b>{t(lang, "readAlso")}</b><Cmp s={inline} lang={lang} /></aside>
+                )}
+              </div>
+            ))}
+          </div>
           <div className="srcbox">
             <h2>{t(lang, "srcTitle")}</h2>
             {s.sources.length > 1 ? (
@@ -80,9 +101,9 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
             {s.checked && <p className="how">{t(lang, "how")}</p>}
             <a className="report" href={mail}><Flag />{t(lang, "report")}</a>
           </div>
-          {related.filter((x) => x.id !== s.id).length > 0 && (
+          {after.length > 0 && (
             <section className="ctr"><Head label={t(lang, "related")} to={href(lang, `/section/${s.tier}`)} />
-              <div className="stack">{related.filter((x) => x.id !== s.id).slice(0, 4).map((x) => <Cmp key={x.id} s={x} lang={lang} />)}</div></section>
+              <div className="g cards c3 relgrid">{after.map((x) => <Std key={x.id} s={x} lang={lang} />)}</div></section>
           )}
           <section className="ctr"><Join lang={lang} /></section>
         </article>
