@@ -50,3 +50,23 @@ SOURCE: The Gujarat government on 26 October 2026 declared four districts drough
     }
   }
 }
+
+// real-sized work, three tries each, to tell a busy Google from a request it can't take:
+// a 12-headline ranking, and a story written from a release's full text
+if (KEY) {
+  const { triageBatch } = await import("./triage.ts");
+  const heads = ["Gujarat declares four districts drought-hit", "Cyclone Arnab to cross Andhra coast", "RBI keeps repo rate unchanged",
+    "Celebrity attends a party", "Lok Sabha Speaker opens BRICS forum", "Silver prices fall", "Manipur violence kills 14",
+    "ISRO launches PSLV", "Statue of Unity rain forest project", "Lula wins Brazil election", "Local club elects president", "Delhi bans old vehicles"];
+  const release = Array.from({ length: 8 }, (_, i) => `Paragraph ${i + 1}: The Gujarat government on 26 October 2026 declared four districts drought-affected after rainfall was 40 per cent below normal. Relief of Rs 450 crore was announced for farmers; fodder depots will open in 120 villages; the Chief Minister chaired the meeting in Gandhinagar.`).join("\n\n");
+  const { writeChecked } = await import("./newsroom.ts");
+  const { sourceById } = await import("./sources.ts");
+  for (let k = 1; k <= 3; k++) {
+    let t = Date.now();
+    const tr = await triageBatch(null, heads.map((h, i) => ({ i: i + 1, source: "PIB", lang: "en", title: h, summary: "", factcheck: false })));
+    console.log(`ranking 12   try ${k}: ${((Date.now() - t) / 1000).toFixed(1)}s ${tr.ok ? `ok (${tr.model}, ${tr.value.size} items)` : `FAILED ${tr.why.slice(0, 160)}`}`);
+    t = Date.now();
+    const w = await writeChecked(null, [{ source: sourceById.get("pib-gu")!, url: "https://pib.gov.in/x", title: "Drought declared in four districts", text: release, image: null, official: true }], "normal", "2026-10-26", "Gujarat declares drought");
+    console.log(`story+check  try ${k}: ${((Date.now() - t) / 1000).toFixed(1)}s ${w.ok ? `ok: ${w.written.headline}` : `FAILED ${w.why.slice(0, 160)}`}`);
+  }
+}

@@ -164,7 +164,7 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
     last = Date.now();
     usedThisRun++;
     if (sql) await count(sql, counter(model));
-    const res = isGoogle(model)
+    let res = isGoogle(model)
       ? await callGoogle(model, { system: a.system, user: a.user, temperature: a.temperature ?? 0.2, maxTokens: a.maxTokens ?? 3000 }, 200)
       : await call(model, {
       temperature: a.temperature ?? 0.2, max_tokens: a.maxTokens ?? 3000, response_format: { type: "json_object" },
@@ -172,6 +172,13 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
       reasoning: { effort: "low", exclude: true },
       messages: [{ role: "system", content: a.system }, { role: "user", content: a.user }],
     }, 120);
+    // Google's "Internal error" (500) means try again: once, after a few seconds (26 Oct: most were passing)
+    if (isGoogle(model) && res.status === 500) {
+      await new Promise((r) => setTimeout(r, 4000));
+      if (sql) await count(sql, counter(model));
+      usedThisRun++;
+      res = await callGoogle(model, { system: a.system, user: a.user, temperature: a.temperature ?? 0.2, maxTokens: a.maxTokens ?? 3000 }, 200);
+    }
     if (!res.ok) {
       why = `${model}: ${res.status} ${(await res.text()).slice(0, 160)}`;
       whys.push(why);
@@ -179,7 +186,7 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
       if (res.status === 429 && /per-?day|free-models-per-day|PerDay/i.test(why)) { resting.set(model, Date.now() + 24 * 3600_000); continue; }
       // busy, gone, or too slow: set aside for a while, ask the next
       // ("rate-limited upstream" asks to retry shortly: a minute; anything else longer)
-      if ([404, 408, 429, 500, 502, 503, 504].includes(res.status)) resting.set(model, Date.now() + (res.status === 429 ? 60_000 : REST_MS));
+      if ([404, 408, 429, 500, 502, 503, 504].includes(res.status)) resting.set(model, Date.now() + (res.status === 429 || res.status === 500 ? 60_000 : REST_MS));
       continue;
     }
     const answer = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
