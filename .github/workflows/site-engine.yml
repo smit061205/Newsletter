@@ -1,0 +1,42 @@
+# The website's news engine (site/engine/run.ts; ROADMAP §3): every 15 minutes
+# it reads the sources, checks each event is genuine, writes the important ones
+# in Gujarati (English and Hindi for national and world news) with free models
+# only, and puts them on the website, or holds them for the editor on Telegram.
+name: site-engine
+on:
+  # paused until a dry run's stories have been read and approved (26 Oct); to start the engine,
+  # put back:  schedule: [{ cron: "4,19,34,49 * * * *" }]
+  workflow_dispatch:
+
+concurrency:
+  group: site-engine
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
+      - name: Install
+        run: |
+          npm ci --no-audit --no-fund --ignore-scripts
+          npm ci --prefix site --no-audit --no-fund
+      - name: Self-test
+        run: node --experimental-strip-types --no-warnings site/engine/selftest.ts
+      - name: Run
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GOOGLE_AI_KEY: ${{ secrets.GOOGLE_AI_KEY }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
+        run: node --experimental-strip-types --no-warnings site/engine/run.ts

@@ -1,0 +1,167 @@
+// The engine's run, every 15 minutes on GitHub (.github/workflows/site-engine.yml;
+// ROADMAP §3, decided 25 Oct). In order, each step stopping in time for the next run:
+//   0. the editor's Telegram presses since the last run (lib/telegram.ts);
+//   1. every source asked what's new (collect.ts);
+//   2. new items ranked and grouped into events (triage.ts);
+//   3. each event's checks: fresh, not debunked, official or 2+ independent outlets (newsroom.ts gate);
+//   4. the most important confirmed events written in Gujarati, checked claim by claim
+//      by a second free model, English and Hindi added for national and world news;
+//   5. live at once, or held for the editor (sensitive, or a check not passed);
+//   9. published stories watched for 24 hours: a source correcting or withdrawing holds them.
+// Free models only: the day's allowance is spent on the most important events first.
+// Run: node --experimental-strip-types site/engine/run.ts   (DATABASE_URL, OPENROUTER_API_KEY;
+//      BLOB_READ_WRITE_TOKEN for photos; TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_IDS for approvals)
+import { neon } from "@neondatabase/serverless";
+import { WEBSITE } from "../lib/config.ts";
+import { ensureSchema } from "../lib/schema.ts";
+import { askApproval, pollUpdates, tell } from "../lib/telegram.ts";
+import { touched } from "../lib/write.ts";
+import { aiLeft, aiUsed, freeModels } from "./ai.ts";
+import { collect } from "./collect.ts";
+import { gate, gather, importance, levelOf, needsTranslation, translate, writeChecked, type ClusterItem, type Debunk } from "./newsroom.ts";
+import { indiaDate, photoOf, saveLive } from "./publish.ts";
+import { cluster, triage, type Triage } from "./triage.ts";
+
+const url = process.env.DATABASE_URL;
+if (!url) { console.error("DATABASE_URL is not set (a repository secret)"); process.exit(1); }
+const sql = neon(url);
+const log = (s: string) => console.log(s);
+const started = Date.now();
+/** leave room before the next run starts */
+const deadline = started + 11 * 60_000;
+/** free requests kept back each day for the hourly run's English (site/pipeline/run.ts) */
+const RESERVE = 120;
+/** at most this many stories written in one run (each takes ~3-5 requests) */
+const PER_RUN = 8;
+
+const CORRECTION = /\b(corrigendum|correction|corrected|withdrawn|retracted|clarification|erratum)\b|સુધારો|સ્પષ્ટતા|शुद्धिपत्र|संशोधन|स्पष्टीकरण/i;
+
+async function itemsOf(clusterId: string): Promise<ClusterItem[]> {
+  const rows = await sql.query(
+    `select id, source, url, title, summary, lang, published_at, seen_at, image, triage from items where cluster_id = $1 order by seen_at`, [clusterId]);
+  return rows.map((r) => ({ id: r.id, source: r.source, url: r.url, title: r.title, summary: r.summary, lang: r.lang,
+    publishedAt: r.published_at ? new Date(r.published_at).toISOString() : null, seenAt: new Date(r.seen_at).toISOString(),
+    image: r.image, triage: r.triage as Triage }));
+}
+
+async function debunks(): Promise<Debunk[]> {
+  const rows = await sql.query(
+    `select source, url, triage from items where cluster_id = 'factcheck' and seen_at > now() - interval '30 days' and coalesce(triage->>'debunk', '') <> ''`);
+  return rows.map((r) => ({ claim: (r.triage as Triage).debunk!, keys: (r.triage as Triage).keys, url: r.url, source: r.source }));
+}
+
+/** Step 3: every open event through the checks before writing. */
+async function advance() {
+  const open = await sql.query(`select id, first_seen from clusters where state in ('new', 'waiting') and updated_at > now() - interval '48 hours'`);
+  const known = await debunks();
+  const tally: Record<string, number> = {};
+  for (const c of open) {
+    const g = gate(await itemsOf(c.id), new Date(c.first_seen).toISOString(), known);
+    tally[g.state] = (tally[g.state] ?? 0) + 1;
+    await sql.query(`update clusters set state = $2, reason = $3 where id = $1`, [c.id, g.state, g.why]);
+    if (g.state === "blocked") await tell(`🚫 <b>ફેક્ટ-ચેક:</b> ${g.why}`);
+  }
+  log(`  checks: ${Object.entries(tally).map(([k, v]) => `${v} ${k}`).join(", ") || "nothing open"}`);
+}
+
+/** Steps 4 and 5: the most important confirmed events, written, checked, translated, saved. */
+async function write() {
+  const left = await aiLeft(sql);
+  const can = Math.min(PER_RUN, Math.floor((left - RESERVE) / 5));
+  if (can <= 0) { log(`  writing: waits (${left} free requests left today)`); return; }
+  const ready = await sql.query(`select * from clusters where state = 'confirmed' order by score desc, first_seen asc limit 40`);
+  let written = 0;
+  for (const c of ready) {
+    if (written >= can || Date.now() > deadline) break;
+    const items = await itemsOf(c.id);
+    const g = gate(items, new Date(c.first_seen).toISOString(), []);
+    if (g.state !== "confirmed") continue;
+    const imp = importance(Math.max(...items.map((i) => i.triage.score)), c.tier, g.groups.length, g.official);
+    const level = levelOf(imp);
+    if (!level) { await sql.query(`update clusters set state = 'dropped', reason = 'too small for a story' where id = $1`, [c.id]); continue; }
+    const src = await gather(items);
+    if (!src.length) { await sql.query(`update clusters set state = 'dropped', reason = 'no source text to write from' where id = $1`, [c.id]); continue; }
+    log(`  writing ${c.id} (${level}, ${imp}): ${c.event}`);
+    const res = await writeChecked(sql, src, level, indiaDate(), c.event);
+    written++;
+    if (!res.ok && !("written" in res && res.written)) {
+      log(`    not written${"retry" in res && res.retry ? " (the free models are busy: next run)" : ""}: ${res.why}`);
+      if (res.stop || ("retry" in res && res.retry)) break;
+      continue;
+    }
+    const w = res.written;
+    const checked = res.checked;
+    const id = `live-${c.id.slice(1)}`;
+    // held for the editor: sensitive, or a check not passed (ROADMAP §0.1, decided 25 Oct)
+    const holdReason = c.sensitive ? "સંવેદનશીલ સમાચાર" : !checked.ok ? `ચકાસણી: ${checked.problems.slice(0, 3).join("; ")}` : null;
+    const translated = needsTranslation(c.tier);
+    const en = translated ? await translate(sql, w, "en", indiaDate()) : null;
+    const hi = translated ? await translate(sql, w, "hi", indiaDate()) : null;
+    const photo = await photoOf(sql, src, id);
+    await saveLive(sql, { id, tier: c.tier, genres: c.genres, written: w, checked, src, importance: imp, status: holdReason ? "held" : "published",
+                          holdReason, en, hi, translated, photo });
+    await sql.query(`update clusters set state = $2, story_id = $3, reason = $4 where id = $1`, [c.id, holdReason ? "held" : "published", id, holdReason]);
+    if (holdReason) {
+      await askApproval(sql, { id, headline: w.headline, deck: w.deck, body: w.body, reason: holdReason, sources: src.map((s) => ({ name: s.source.name, url: s.url })) });
+      log(`    held for the editor: ${holdReason}`);
+    } else {
+      await touched(sql);
+      log(`    published: ${w.headline}`);
+    }
+  }
+}
+
+/** Step 9: a published story's sources watched for 24 hours. */
+async function watch() {
+  const live = await sql.query(
+    `select c.id, c.story_id, s.sources, s.updated_at, s.status from clusters c join stories s on s.id = c.story_id
+      where c.state in ('published', 'held') and s.published_at > now() - interval '24 hours'`);
+  for (const c of live) {
+    const fresh = await sql.query(`select source, url, title, summary from items where cluster_id = $1 and seen_at > $2`, [c.id, c.updated_at]);
+    if (!fresh.length) continue;
+    const have = new Set((c.sources as { url: string }[]).map((s) => s.url));
+    const add = fresh.filter((f) => !have.has(f.url));
+    const corrected = fresh.find((f) => CORRECTION.test(`${f.title} ${f.summary}`));
+    if (corrected && c.status === "published") {
+      await sql.query(`update stories set status = 'held', hold_reason = $2, updated_at = now() where id = $1`,
+        [c.story_id, `a source corrected or withdrew it: ${corrected.title}`]);
+      await touched(sql);
+      await tell(`⚠️ <b>સમાચાર રોક્યા:</b> સ્રોતે સુધારો કર્યો કે પાછા ખેંચ્યા.\n${corrected.title}\n${corrected.url}`);
+      log(`    ${c.story_id}: taken down, a source corrected it`);
+    } else if (add.length) {
+      const { sourceById } = await import("./sources.ts");
+      const more = add.map((f) => ({ name: sourceById.get(f.source)?.name ?? f.source, url: f.url, trust: sourceById.get(f.source)?.trust, group: sourceById.get(f.source)?.group }));
+      await sql.query(`update stories set sources = sources || $2::jsonb, updated_at = now() where id = $1`, [c.story_id, JSON.stringify(more)]);
+    }
+  }
+}
+
+await ensureSchema(sql);
+const [run] = await sql.query(`insert into runs (kind, started_at) values ('engine', now()) returning id`);
+const details: Record<string, unknown> = { models: await freeModels() };
+let ok = true;
+try {
+  log(`engine run ${run.id}; free models: ${(details.models as string[]).join(", ")}`);
+  details.presses = await pollUpdates(sql);
+  log("sources:");
+  details.collect = await collect(sql, log, started + 4 * 60_000);
+  log("triage:");
+  const left = await aiLeft(sql);
+  details.triage = await triage(sql, log, Math.max(0, Math.min(6, Math.floor((left - RESERVE) / 10))), started + 7 * 60_000);
+  await cluster(sql, log);
+  log("checks:");
+  await advance();
+  log("writing:");
+  await write();
+  await watch();
+} catch (e) {
+  ok = false;
+  details.error = e instanceof Error ? `${e.message}\n${e.stack?.split("\n").slice(1, 4).join("\n")}` : String(e);
+  log(`failed: ${details.error}`);
+}
+details.aiRequests = aiUsed();
+details.seconds = Math.round((Date.now() - started) / 1000);
+await sql.query(`update runs set finished_at = now(), ok = $2, details = $3 where id = $1`, [run.id, ok, JSON.stringify(details)]);
+const refreshed = await fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) }).then((r) => r.json()).catch((e) => ({ error: String(e) }));
+log(`website refresh: ${JSON.stringify(refreshed)}; ${aiUsed()} free AI request(s), ${details.seconds}s`);
+if (!ok) process.exit(1);

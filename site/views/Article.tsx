@@ -10,13 +10,15 @@ import { PAPER, SITE_URL } from "../lib/site.ts";
 import { Cmp, Head, Join, LatestList, words } from "../components/cards.tsx";
 import { Check, Chev, Flag } from "../components/icons.tsx";
 import ArticleTools from "../components/ArticleTools.tsx";
+import ReadProgress from "../components/ReadProgress.tsx";
+import { ViewTransition } from "react";
 import Frame from "../components/Frame.tsx";
 
 export function articleJsonLd(s: Story, lang: Lang) {
   const w = words(s, lang);
   return {
     "@context": "https://schema.org", "@type": "NewsArticle",
-    headline: w.headline.slice(0, 110), description: w.deck || undefined, inLanguage: lang === "en" && w.translated ? "en" : "gu",
+    headline: w.headline.slice(0, 110), description: w.deck || undefined, inLanguage: lang !== "gu" && w.translated ? lang : "gu",
     datePublished: s.publishedAt, dateModified: s.updatedAt,
     image: s.photo ? [new URL(s.photo.url, SITE_URL).href] : undefined,
     mainEntityOfPage: `${SITE_URL}${href(lang, `/news/${s.id}`)}`,
@@ -41,10 +43,11 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
   return (
     <Frame lang={lang} path={`/news/${s.id}`} section={s.tier} bottomBar={false}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd(s, lang)).replace(/</g, "\\u003c") }} />
+      <ReadProgress target=".art" />
       <div className="artg">
         <article className="art" lang={w.translated || lang === "gu" ? lang : "gu"}>
           <Link className="crumbs" href={href(lang, `/section/${s.tier}`)}>{sectionName(s.tier, lang)} <Chev /></Link>
-          {lang === "en" && !w.translated && <p className="fix" lang="en">{t(lang, "noEnglish")}</p>}
+          {lang !== "gu" && !w.translated && <p className="fix" lang={lang}>{t(lang, "noEnglish")}</p>}
           {s.corrections.map((c, i) => (
             <p key={i} className="fix">{t(lang, "correction")}, {dateText(c.at, lang)}: {lang === "en" && c.en ? c.en : c.gu}</p>
           ))}
@@ -61,14 +64,18 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
           <ArticleTools id={s.id} url={url} headline={w.headline} words={toolWords} />
           {s.photo && (
             <figure>
-              <img className="ph" src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline} />
+              <ViewTransition name={`photo-${s.id}`} share="morph" default="none">
+                <span className="phw"><img className="ph" src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline} /></span>
+              </ViewTransition>
               {w.caption && <figcaption>{w.caption} ({t(lang, "photo")}: {s.source?.name ?? "PIB"})</figcaption>}
             </figure>
           )}
           <div className="body">{paragraphs(w.body).map((p, i) => <p key={i}>{p}</p>)}</div>
           <div className="srcbox">
             <h2>{t(lang, "srcTitle")}</h2>
-            {s.source ? <a href={s.source.url} target="_blank" rel="noopener">{s.source.name}{s.source.office ? `, ${s.source.office}` : ""}</a>
+            {s.sources.length > 1 ? (
+              <ul className="srcs">{s.sources.map((x) => <li key={x.url}><a href={x.url} target="_blank" rel="noopener">{x.name}</a></li>)}</ul>
+            ) : s.source ? <a href={s.source.url} target="_blank" rel="noopener">{s.source.name}{s.source.office ? `, ${s.source.office}` : ""}</a>
                       : <span>{t(lang, "desk")}</span>}
             {s.checked && <p className="how">{t(lang, "how")}</p>}
             <a className="report" href={mail}><Flag />{t(lang, "report")}</a>

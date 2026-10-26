@@ -1,14 +1,16 @@
 // The cards and container heads of DESIGN.md §3.2-3.3, as server components.
 import Link from "next/link";
+import { ViewTransition } from "react";
 import type { Lang, Story } from "../lib/types.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
 import { timeText } from "../lib/format.ts";
+import TimeAgo from "./TimeAgo.tsx";
 import { Chev } from "./icons.tsx";
 
-/** A story's words in the reader's language: its English when it has one. */
+/** A story's words in the reader's language: its English or Hindi when it has one, else the Gujarati. */
 export function words(s: Story, lang: Lang) {
-  const e = lang === "en" ? s.en : null;
+  const e = lang === "en" ? s.en : lang === "hi" ? s.hi : null;
   return { kicker: e?.kicker || s.kicker, headline: e?.headline || s.headline, deck: e?.deck || s.deck,
            body: e?.body || s.body, caption: e?.caption || s.caption, translated: !!e };
 }
@@ -18,16 +20,21 @@ function Meta({ s, lang, sec = true }: { s: Story; lang: Lang; sec?: boolean }) 
   return (
     <div className="meta">
       {sec && <><span className="sec">{sectionName(s.tier, lang)}</span><span aria-hidden="true">·</span></>}
-      <time dateTime={s.publishedAt}>{timeText(s.publishedAt, lang)}</time>
+      <TimeAgo iso={s.publishedAt} lang={lang} fallback={timeText(s.publishedAt, lang)} />
     </div>
   );
 }
 
-function Photo({ s, lang, cls = "ph", eager = false }: { s: Story; lang: Lang; cls?: string; eager?: boolean }) {
+function Photo({ s, lang, cls = "ph", eager = false, morph = false }: { s: Story; lang: Lang; cls?: string; eager?: boolean; morph?: boolean }) {
   if (!s.photo) return null;
   const w = words(s, lang);
-  return <img className={cls} src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline}
-              loading={eager ? "eager" : "lazy"} decoding="async" />;
+  const img = <img className={cls} src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline}
+                   loading={eager ? "eager" : "lazy"} decoding="async" />;
+  // the standard photo sits in a frame that shimmers while it loads and lets it zoom gently on hover
+  if (cls !== "ph") return img;
+  const framed = <span className="phw">{img}</span>;
+  // the photo grows into the story's own photo when the story opens (one name per story on a page)
+  return morph ? <ViewTransition name={`photo-${s.id}`} share="morph" default="none">{framed}</ViewTransition> : framed;
 }
 
 export function Lead({ s, lang }: { s: Story; lang: Lang }) {
@@ -42,7 +49,7 @@ export function Lead({ s, lang }: { s: Story; lang: Lang }) {
       </Link>
       {s.photo && (
         <div className="pic">
-          <Link href={storyHref(s, lang)} tabIndex={-1}><Photo s={s} lang={lang} eager /></Link>
+          <Link href={storyHref(s, lang)} tabIndex={-1}><Photo s={s} lang={lang} eager morph /></Link>
           {w.caption && <p className="cap">{w.caption} ({t(lang, "photo")}: {s.source?.name ?? "PIB"})</p>}
         </div>
       )}
@@ -50,11 +57,11 @@ export function Lead({ s, lang }: { s: Story; lang: Lang }) {
   );
 }
 
-export function Std({ s, lang, sec = true }: { s: Story; lang: Lang; sec?: boolean }) {
+export function Std({ s, lang, sec = true, morph = false }: { s: Story; lang: Lang; sec?: boolean; morph?: boolean }) {
   const w = words(s, lang);
   return (
     <Link className="h std" href={storyHref(s, lang)}>
-      <Photo s={s} lang={lang} />
+      <Photo s={s} lang={lang} morph={morph} />
       <div><h3 className="h3">{w.headline}</h3>{w.deck && <p className="dek">{w.deck}</p>}<Meta s={s} lang={lang} sec={sec} /></div>
       {s.photo && <Photo s={s} lang={lang} cls="thumb" />}
     </Link>
@@ -76,7 +83,7 @@ export function LatestList({ stories, lang, n }: { stories: Story[]; lang: Lang;
     <>
       <ul className="list">
         {stories.slice(0, n).map((s) => (
-          <li key={s.id}><Link className="h" href={storyHref(s, lang)}><time dateTime={s.publishedAt}>{timeText(s.publishedAt, lang)}</time>
+          <li key={s.id}><Link className="h" href={storyHref(s, lang)}><TimeAgo iso={s.publishedAt} lang={lang} fallback={timeText(s.publishedAt, lang)} />
             <h3 className="h4">{words(s, lang).headline}</h3></Link></li>
         ))}
       </ul>
@@ -102,7 +109,7 @@ export function River({ stories, lang, sec = false }: { stories: Story[]; lang: 
         const w = words(s, lang);
         return (
           <Link key={s.id} className="h" href={storyHref(s, lang)}>
-            <span className="when">{timeText(s.publishedAt, lang)}</span>
+            <span className="when"><TimeAgo iso={s.publishedAt} lang={lang} fallback={timeText(s.publishedAt, lang)} /></span>
             <div><h3 className="h3">{w.headline}</h3>{w.deck && <p className="dek">{w.deck}</p>}<Meta s={s} lang={lang} sec={sec} /></div>
             {s.photo ? <img src={s.photo.url} alt="" loading="lazy" decoding="async" /> : <span />}
           </Link>

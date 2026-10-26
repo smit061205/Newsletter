@@ -314,6 +314,16 @@ to PIB for now.
 - `/api/publish` and `/api/publish/file` exist (a day in with the publish key
   `CK_PUBLISH_KEY`), but nothing sends to them; they need no key until something does.
 
+- **The news engine (25 Oct, evening; a cloud session):** built in `site/engine/` (site/README.md,
+  "The news engine"; ROADMAP §0.1, §3, §3.1): 122 sources every 15 minutes, free OpenRouter
+  models only (₹0), the genuineness loop, Gujarati stories by importance, English and Hindi for
+  national and world news, publish or hold for the editor on Telegram. The user's decisions:
+  confirmed non-sensitive stories go live by themselves; approvals on Telegram now and a site page
+  later; world news in all three languages. Dry runs: `site-engine-try.yml` (stores nothing).
+  Free models are often "rate-limited upstream" (both Gemmas for half an hour on 25 Oct), so the
+  engine rotates through up to ten of them. Website sessions are fenced into `site/`
+  (`site/.claude/`, `site-guard.yml`); open Claude Code in `site/` for website work.
+
 **Next:**
 1. See the English versions arrive (above), then review phase A with the user: phone and
    desktop screenshots of home, a story, a section, the e-paper, English, dark mode.

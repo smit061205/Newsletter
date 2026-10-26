@@ -7,6 +7,7 @@ export const INDEXABLE = !/\.vercel\.app$/.test(new URL(SITE_URL).hostname);
 export const PAPER = {
   gu: { name: "કેપિટલ ક્રાંતિ", tagline: "સમાજનો વિવેકપૂર્ણ દ્રષ્ટિકોણ", place: "ગાંધીનગર" },
   en: { name: "Capital Kranti", tagline: "A thoughtful view of society", place: "Gandhinagar" },
+  hi: { name: "कैपिटल क्रांति", tagline: "समाज का विवेकपूर्ण दृष्टिकोण", place: "गांधीनगर" },
   rni: "54922/93",
   email: "capitalkranti@gmail.com",
   phone: "98256 08744",

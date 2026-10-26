@@ -11,7 +11,7 @@ export interface ChromeProps {
   name: string;
   tagline: string;
   /** this page in each language, for the language switch */
-  paths: { gu: string; en: string };
+  paths: { gu: string; en: string; hi: string };
   sections: { key: string; name: string; href: string }[];
   links: { home: string; latest: string; epaper: string; archive: string; search: string; saved: string; about: string; how: string; policy: string; corrections: string; contact: string };
   words: Record<"menu" | "sections" | "search" | "close" | "epaper" | "home" | "latest" | "latestTitle" | "archive" | "searchPlaceholder" | "settings" | "theme" |
@@ -38,6 +38,7 @@ export default function Chrome(p: ChromeProps) {
   const [theme, setTheme] = useState("auto");
   const [size, setSize] = useState("1");
   const [away, setAway] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const q = useRef<HTMLInputElement>(null);
   const w = p.words;
 
@@ -48,6 +49,13 @@ export default function Chrome(p: ChromeProps) {
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
   }, [open]);
+  // the header settles (smaller, with a shadow) once the page moves
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 8);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
   useEffect(() => {
     if (!p.bottomBar) return;
     let last = window.scrollY;
@@ -65,7 +73,7 @@ export default function Chrome(p: ChromeProps) {
 
   return (
     <>
-      <header className="top">
+      <header className={`top${scrolled ? " scrolled" : ""}`} style={{ viewTransitionName: "site-header" }}>
         <div className="wrap bar">
           <div className="l">
             <button type="button" className="ib menu-plain" aria-label={w.menu} onClick={() => openMenu(false)}><MenuIcon /></button>
@@ -105,6 +113,7 @@ export default function Chrome(p: ChromeProps) {
         <div className="setl">{w.language}</div>
         <div className="seg" role="group" aria-label={w.language}>
           <Link className="seglink" href={p.paths.gu} aria-current={p.lang === "gu" ? "true" : undefined} hrefLang="gu">ગુજરાતી</Link>
+          <Link className="seglink" href={p.paths.hi} aria-current={p.lang === "hi" ? "true" : undefined} hrefLang="hi">हिंदी</Link>
           <Link className="seglink" href={p.paths.en} aria-current={p.lang === "en" ? "true" : undefined} hrefLang="en">English</Link>
         </div>
         <h3>{w.about}</h3>

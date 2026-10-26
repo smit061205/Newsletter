@@ -1,5 +1,5 @@
 // The pages a news site needs and Google News looks for (ROADMAP §4): who we
-// are, how we work, how to reach us, and the rules. Plain words, both languages.
+// are, how we work, how to reach us, and the rules. Plain words, in Gujarati, English and Hindi.
 import { notFound } from "next/navigation";
 import type { Lang } from "../lib/types.ts";
 import { PAPER } from "../lib/site.ts";
@@ -7,49 +7,71 @@ import { num } from "../lib/format.ts";
 import Frame from "../components/Frame.tsx";
 
 type Page = { title: string; paras: string[] };
-const contact = (lang: Lang) => lang === "gu"
-  ? `ઈમેલ: ${PAPER.email} · ફોન: ${num(PAPER.phone, "gu")} · ${PAPER.gu.place}, ગુજરાત`
-  : `Email: ${PAPER.email} · Phone: ${PAPER.phone} · ${PAPER.en.place}, Gujarat`;
+const contact = (lang: Lang) => ({
+  gu: `ઈમેલ: ${PAPER.email} · ફોન: ${num(PAPER.phone, "gu")} · ${PAPER.gu.place}, ગુજરાત`,
+  en: `Email: ${PAPER.email} · Phone: ${PAPER.phone} · ${PAPER.en.place}, Gujarat`,
+  hi: `ईमेल: ${PAPER.email} · फ़ोन: ${PAPER.phone} · ${PAPER.hi.place}, गुजरात`,
+})[lang];
 
 export const POLICY: Record<string, Record<Lang, Page>> = {
   about: {
     gu: { title: "અમારા વિશે", paras: [
       `કેપિટલ ક્રાંતિ ગાંધીનગરથી પ્રકાશિત થતું ગુજરાતી દૈનિક છે (RNI ${PAPER.rni}). ગુજરાતના પાટનગરથી, ${num(PAPER.founded, "gu")}થી, અમે સરકાર, ખેતી, અર્થતંત્ર, શિક્ષણ અને સમાજના સમાચાર વાચકો સુધી પહોંચાડીએ છીએ.`,
-      "આ વેબસાઇટ પર દરરોજ સાંજે છપાયેલા પેપરના સમાચાર, આખું ઈ-પેપર અને જૂના અંકો મળે છે. સમાચાર ગુજરાતીમાં અને અંગ્રેજીમાં વાંચી શકાય છે.",
+      "આ વેબસાઇટ પર દિવસભર તાજા સમાચાર, દરરોજ સાંજે છપાયેલા પેપરના સમાચાર, આખું ઈ-પેપર અને જૂના અંકો મળે છે. સમાચાર ગુજરાતીમાં, અને દેશ-વિદેશના સમાચાર હિંદી અને અંગ્રેજીમાં પણ વાંચી શકાય છે.",
       "અમારું સૂત્ર છે: સમાજનો વિવેકપૂર્ણ દ્રષ્ટિકોણ. અમે હકીકતો આપીએ છીએ, સ્રોત જણાવીએ છીએ અને ભૂલ થાય તો ખુલ્લેઆમ સુધારીએ છીએ.",
     ] },
     en: { title: "About us", paras: [
       `Capital Kranti is a Gujarati daily newspaper published from Gandhinagar (RNI ${PAPER.rni}). From Gujarat’s capital, since ${PAPER.founded}, it has brought readers the news of government, farming, the economy, education and society.`,
-      "This website carries the stories of each evening’s printed paper, the full e-paper and past issues. Stories can be read in Gujarati and in English.",
+      "This website carries the latest news through the day, the stories of each evening’s printed paper, the full e-paper and past issues. Stories are in Gujarati; national and world stories are also in Hindi and English.",
       "Our motto is “a thoughtful view of society”. We give the facts, say where they come from, and correct mistakes openly.",
+    ] },
+    hi: { title: "हमारे बारे में", paras: [
+      `कैपिटल क्रांति गांधीनगर से प्रकाशित होने वाला गुजराती दैनिक है (RNI ${PAPER.rni})। गुजरात की राजधानी से, ${PAPER.founded} से, हम सरकार, खेती, अर्थव्यवस्था, शिक्षा और समाज के समाचार पाठकों तक पहुँचाते हैं।`,
+      "इस वेबसाइट पर दिन भर ताज़ा समाचार, हर शाम छपे अख़बार के समाचार, पूरा ई-पेपर और पुराने अंक मिलते हैं। समाचार गुजराती में हैं; देश और विदेश के समाचार हिंदी और अंग्रेज़ी में भी पढ़े जा सकते हैं।",
+      "हमारा सूत्र है: समाज का विवेकपूर्ण दृष्टिकोण। हम तथ्य देते हैं, स्रोत बताते हैं और ग़लती होने पर खुलकर सुधारते हैं।",
     ] },
   },
   "editorial-policy": {
     gu: { title: "સંપાદકીય નીતિ", paras: [
-      "સ્રોત: અમારા સમાચાર મુખ્યત્વે સત્તાવાર સ્રોતો પરથી છે: પત્ર સૂચના કાર્યાલય (PIB), ગુજરાતના મુખ્યમંત્રી કાર્યાલય અને આકાશવાણી. દરેક સમાચારના અંતે તેનો સ્રોત લિંક સાથે આપેલો છે.",
-      "અમારા શબ્દોમાં: સમાચાર અમે અમારા શબ્દોમાં લખીએ છીએ; બીજા માધ્યમોનું લખાણ કે ફોટા લેતા નથી. ફોટા સરકારી સ્રોતના છે અને તેનો સ્રોત લખેલો છે.",
+      "સ્રોત: અમારા સમાચાર સત્તાવાર સ્રોતો (પત્ર સૂચના કાર્યાલય – PIB, મંત્રાલયો, રિઝર્વ બેંક, ગુજરાત સરકાર, વિદેશની સરકારો અને આંતરરાષ્ટ્રીય સંસ્થાઓ) અને જાણીતાં, વિશ્વસનીય સમાચાર માધ્યમો પરથી છે. દરેક સમાચારના અંતે તેના બધા સ્રોત લિંક સાથે આપેલા છે.",
+      "અમારા શબ્દોમાં: સમાચાર અમે અમારા શબ્દોમાં લખીએ છીએ; બીજા માધ્યમોનું લખાણ કે ફોટા લેતા નથી. ફોટા ફક્ત સરકારી સ્રોતના છે અને તેનો સ્રોત લખેલો છે.",
       "સંવેદનશીલ સમાચાર: મૃત્યુ, અકસ્માત, ગુના કે કોઈ વ્યક્તિ સામેના આક્ષેપો જેવા સમાચાર સંપાદક જોયા પછી જ પ્રકાશિત થાય છે.",
       "જાહેરાત અને સમાચાર અલગ: પૈસા લઈને સમાચાર છાપવામાં આવતા નથી. જાહેરાત હંમેશાં જાહેરાત તરીકે ઓળખાશે.",
     ] },
     en: { title: "Editorial policy", paras: [
-      "Sources: our stories come mainly from official sources: the Press Information Bureau (PIB), the Gujarat Chief Minister’s office and All India Radio. Every story ends with its source and a link.",
-      "In our own words: we write stories in our own words and never take other outlets’ text or photos. Photos come from government sources and say so.",
+      "Sources: our stories come from official sources (the Press Information Bureau – PIB, ministries, the Reserve Bank, the Gujarat government, foreign governments and international bodies) and from established, trusted news outlets. Every story ends with all its sources and links.",
+      "In our own words: we write stories in our own words and never take other outlets’ text or photos. Photos come only from government sources and say so.",
       "Sensitive stories: deaths, accidents, crime and allegations against named people are published only after the editor has seen them.",
       "News is not for sale: we do not publish news for payment. Advertising is always marked as advertising.",
+    ] },
+    hi: { title: "संपादकीय नीति", paras: [
+      "स्रोत: हमारे समाचार आधिकारिक स्रोतों (पत्र सूचना कार्यालय – PIB, मंत्रालय, रिज़र्व बैंक, गुजरात सरकार, विदेशी सरकारें और अंतरराष्ट्रीय संस्थाएँ) और जाने-माने, भरोसेमंद समाचार माध्यमों से हैं। हर समाचार के अंत में उसके सभी स्रोत लिंक के साथ दिए गए हैं।",
+      "अपने शब्दों में: हम समाचार अपने शब्दों में लिखते हैं; दूसरे माध्यमों का लेख या फ़ोटो नहीं लेते। फ़ोटो केवल सरकारी स्रोतों के हैं और उनका स्रोत लिखा होता है।",
+      "संवेदनशील समाचार: मृत्यु, दुर्घटना, अपराध या किसी व्यक्ति पर आरोप जैसे समाचार संपादक के देखने के बाद ही प्रकाशित होते हैं।",
+      "समाचार बिकाऊ नहीं: पैसे लेकर समाचार नहीं छापे जाते। विज्ञापन हमेशा विज्ञापन के रूप में पहचाना जाएगा।",
     ] },
   },
   "how-we-check": {
     gu: { title: "અમે સમાચાર કેવી રીતે ચકાસીએ છીએ", paras: [
-      "દરેક આંકડો: સમાચારમાંનો દરેક આંકડો (રકમ, તારીખ, સંખ્યા) મૂળ સ્રોત સાથે મેળવવામાં આવે છે. મેળ ન ખાય તો સમાચાર સંપાદક પાસે જાય છે; બધા આંકડા મેળ ખાય ત્યારે જ સમાચાર પર “આંકડા મૂળ સ્રોત સાથે ચકાસેલા” લખાય છે.",
-      "અંગ્રેજી અનુવાદ: અંગ્રેજી અનુવાદના આંકડા પણ ગુજરાતી સમાચાર સાથે મેળવાય છે. મેળ ન ખાય તો અંગ્રેજીમાં પણ ગુજરાતી સમાચાર જ બતાવાય છે.",
-      "એક જ વાત બે વાર નહીં: એક જ સમાચારમાં એક વાક્ય બે વાર ન આવે અને એક જ ઘટના બે સમાચાર તરીકે ન છપાય તેની ચકાસણી થાય છે.",
-      "સ્રોત હંમેશાં: દરેક સમાચારના અંતે મૂળ સ્રોતની લિંક હોય છે, જેથી વાચક જાતે મેળવી શકે.",
+      "કોણે કહ્યું: સરકાર કે સત્તાવાર સંસ્થા પોતે જાહેર કરે તે સમાચાર જ એકલા સ્રોત પર પ્રકાશિત થાય છે. કોઈ માધ્યમના સમાચાર માટે ઓછામાં ઓછાં બે સ્વતંત્ર માધ્યમો (અલગ માલિકીનાં) એક જ વાત કહે ત્યારે જ તે પ્રકાશિત થાય છે.",
+      "તાજા અને સાચા: જૂના સમાચાર ફરી ફરતા હોય તો પકડાય છે. ફેક્ટ-ચેક સંસ્થાઓએ (જેમ કે PIB ફેક્ટ ચેક) ખોટા જાહેર કરેલા દાવા પ્રકાશિત થતા નથી.",
+      "દરેક દાવો અને આંકડો: સમાચારનો દરેક દાવો અને દરેક આંકડો (રકમ, તારીખ, સંખ્યા) મૂળ સ્રોત સાથે મેળવાય છે; લખનાર સિવાયની બીજી તપાસ પણ દરેક દાવો ફરી તપાસે છે. મેળ ન ખાય તો સમાચાર સંપાદક પાસે જાય છે.",
+      "અનુવાદ: અંગ્રેજી અને હિંદી અનુવાદના આંકડા પણ ગુજરાતી સમાચાર સાથે મેળવાય છે. મેળ ન ખાય તો ગુજરાતી સમાચાર જ બતાવાય છે.",
+      "પ્રકાશન પછી પણ: સ્રોત પોતાના સમાચાર સુધારે કે પાછા ખેંચે તો અમારા સમાચાર પણ તરત રોકાય છે અને સુધારાય છે. દરેક સમાચારના અંતે મૂળ સ્રોતની લિંક હોય છે, જેથી વાચક જાતે મેળવી શકે.",
     ] },
     en: { title: "How we check the news", paras: [
-      "Every number: each number in a story (amounts, dates, counts) is matched against the original source. If one doesn’t match, the story goes to the editor; only a story whose numbers all match carries “Numbers checked against the original source”.",
-      "English versions: the numbers in each English version are matched against the Gujarati story too. If they don’t match, the English page shows the Gujarati story instead.",
-      "Nothing said twice: we check that no sentence repeats within a story and that one event isn’t printed as two stories.",
-      "Always the source: every story ends with a link to its original source, so readers can check it themselves.",
+      "Who said it: only a government or official body speaking for itself is published on its own. A report from a news outlet is published only when at least two independent outlets (with different owners) say the same.",
+      "Fresh and true: old news going round again is caught. Claims that fact-checkers (such as PIB Fact Check) have found false are not published.",
+      "Every claim and number: each claim and each number in a story (amounts, dates, counts) is matched against the original sources, and a second check, separate from the writing, goes over every claim again. If anything doesn’t match, the story goes to the editor.",
+      "Translations: the numbers in each English and Hindi version are matched against the Gujarati story too. If they don’t match, the Gujarati story is shown instead.",
+      "After publishing too: if a source corrects or withdraws its report, our story is held and corrected at once. Every story ends with links to its original sources, so readers can check it themselves.",
+    ] },
+    hi: { title: "हम समाचार कैसे जाँचते हैं", paras: [
+      "किसने कहा: केवल सरकार या आधिकारिक संस्था के अपने बयान ही एक स्रोत पर प्रकाशित होते हैं। किसी समाचार माध्यम की ख़बर तभी प्रकाशित होती है जब कम से कम दो स्वतंत्र माध्यम (अलग मालिकों वाले) एक ही बात कहें।",
+      "ताज़ा और सच: पुराने समाचार फिर से फैलें तो पकड़े जाते हैं। फ़ैक्ट-चेक संस्थाओं (जैसे PIB फ़ैक्ट चेक) ने जिन दावों को ग़लत बताया है, वे प्रकाशित नहीं होते।",
+      "हर दावा और आँकड़ा: समाचार का हर दावा और हर आँकड़ा (रक़म, तारीख़, संख्या) मूल स्रोतों से मिलाया जाता है, और लिखने से अलग एक दूसरी जाँच हर दावे को फिर परखती है। मेल न खाए तो समाचार संपादक के पास जाता है।",
+      "अनुवाद: अंग्रेज़ी और हिंदी संस्करणों के आँकड़े भी गुजराती समाचार से मिलाए जाते हैं। मेल न खाए तो गुजराती समाचार ही दिखाया जाता है।",
+      "प्रकाशन के बाद भी: स्रोत अपनी ख़बर सुधारे या वापस ले, तो हमारा समाचार तुरंत रोका और सुधारा जाता है। हर समाचार के अंत में मूल स्रोतों की लिंक होती है, ताकि पाठक ख़ुद जाँच सकें।",
     ] },
   },
   corrections: {
@@ -61,10 +83,15 @@ export const POLICY: Record<string, Record<Lang, Page>> = {
       "When we make a mistake, we correct it openly. A corrected story carries a dated note at the top saying what changed. We never change a story silently.",
       "If you spot a mistake, press “Spotted a mistake? Tell us” at the end of the story, or write to us: " + PAPER.email + ".",
     ] },
+    hi: { title: "सुधार", paras: [
+      "ग़लती होने पर हम उसे खुलकर सुधारते हैं। सुधारे गए समाचार के ऊपर तारीख़ के साथ लिखा जाता है कि क्या बदला। चुपचाप बदलाव नहीं किया जाता।",
+      "कोई ग़लती दिखे तो समाचार के अंत में “कोई ग़लती दिखी? हमें बताएँ” दबाएँ, या हमें लिखें: " + PAPER.email + "।",
+    ] },
   },
   contact: {
     gu: { title: "સંપર્ક", paras: [contact("gu"), "સમાચાર, ભૂલ, જાહેરાત કે અન્ય કોઈ બાબત માટે ઈમેલ કરો. અમે જલદી જવાબ આપીશું."] },
     en: { title: "Contact", paras: [contact("en"), "Email us about news, a mistake, advertising or anything else. We’ll reply as soon as we can."] },
+    hi: { title: "संपर्क", paras: [contact("hi"), "समाचार, ग़लती, विज्ञापन या किसी और बात के लिए ईमेल करें। हम जल्द जवाब देंगे।"] },
   },
   terms: {
     gu: { title: "ઉપયોગના નિયમો", paras: [
@@ -76,6 +103,11 @@ export const POLICY: Record<string, Record<Lang, Page>> = {
       "The stories, photos and e-paper on this website belong to Capital Kranti (photos from government sources to their sources). Use them for personal reading; sharing links to stories is welcome.",
       "To republish whole stories or the e-paper elsewhere, ask us for written permission first.",
       "We do our best to keep every story accurate; if you spot a mistake, tell us and we will correct it.",
+    ] },
+    hi: { title: "उपयोग के नियम", paras: [
+      "इस वेबसाइट के समाचार, फ़ोटो और ई-पेपर कैपिटल क्रांति के हैं (सरकारी स्रोतों के फ़ोटो उनके स्रोतों के)। निजी पढ़ने के लिए उपयोग करें; समाचारों की लिंक भेजने का स्वागत है।",
+      "पूरे समाचार या ई-पेपर कहीं और फिर से प्रकाशित करने हों तो पहले हमारी लिखित अनुमति लें।",
+      "हम हर समाचार सही रखने की पूरी कोशिश करते हैं; ग़लती दिखे तो बताएँ, हम सुधारेंगे।",
     ] },
   },
   privacy: {
@@ -90,6 +122,12 @@ export const POLICY: Record<string, Record<Lang, Page>> = {
       "Your appearance (light or dark), text size and saved stories stay in your own browser only; they never reach us.",
       "The service that runs the website (Vercel) keeps ordinary technical logs for a short time, for security.",
       "Questions? Write to " + PAPER.email + ".",
+    ] },
+    hi: { title: "गोपनीयता", paras: [
+      "इस वेबसाइट को पढ़ने के लिए खाता या साइन-इन ज़रूरी नहीं है। हम आपकी जानकारी नहीं बेचते और विज्ञापन के लिए आपको ट्रैक नहीं करते।",
+      "आपका रूप (लाइट/डार्क), अक्षर का आकार और सहेजे गए समाचार केवल आपके अपने ब्राउज़र में रहते हैं; हम तक नहीं आते।",
+      "वेबसाइट चलाने वाली सेवा (Vercel) सुरक्षा के लिए थोड़े समय तक सामान्य तकनीकी लॉग रखती है।",
+      "कोई प्रश्न? लिखें: " + PAPER.email + "।",
     ] },
   },
 };

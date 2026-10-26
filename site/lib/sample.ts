@@ -27,7 +27,7 @@ export function sample() {
       tier, genres: genre ? [genre as never] : [], kicker: r.k, headline: r.h, deck: r.d, body: r.body.replace(/^[^\n]*::\s*\n?/, ""), caption: r.cap,
       photo: r.img ? { url: r.img, width: 1200, height: 800 } : null,
       source: { kind: "pib", name: "પત્ર સૂચના કાર્યાલય (PIB)", url: r.src }, checked: true,
-      page: Math.floor(i / 8) + 1, rank: i % 8, en: i % 3 === 0 ? null : null, corrections: [],
+      page: Math.floor(i / 8) + 1, rank: i % 8, en: i % 3 === 0 ? null : null, corrections: [], hi: null, origin: "paper", sources: [], importance: null,
     };
   });
   const issues: Issue[] = [{ date: "2026-10-22", number: 271, pdf: null, publishedAt: "2026-10-22T14:40:00.000Z", storyIds: stories.map((s) => s.id),
