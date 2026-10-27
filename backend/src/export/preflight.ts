@@ -3,7 +3,7 @@
 //
 //   trim     every page exactly the profile's page size
 //   fonts    every font in the PDF embedded (none left for the printer's RIP to substitute)
-//   photos   every photo at 200 ppi or more at the size it prints
+//   photos   every photo at the profile's ppi or more at the size it prints
 //   bounds   nothing outside the page
 //
 // Bleed, crop marks and CMYK/PDF-X wait for the printer's own specs.
@@ -15,7 +15,9 @@ import { imageSize } from "../ingest/pib.ts";
 import { profile } from "../profile.ts";
 
 export interface Check { name: string; pass: boolean; detail: string }
-const MIN_PPI = 200;
+// (the paper's own: 120 for Capital Kranti, whose printed pages run PIB's photos
+// two and three columns wide, 28 Oct)
+const MIN_PPI = profile.photo.minPpi;
 
 export async function preflight(pdf: Uint8Array, issue: IssueRender): Promise<Check[]> {
   const doc = await PDFDocument.load(pdf, { updateMetadata: false });

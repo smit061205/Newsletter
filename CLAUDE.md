@@ -10,7 +10,8 @@ before changing Next code (`web/AGENTS.md`).
 - The developer (the user here) works on a Mac and talks in plain English. Explain what changed and why, briefly.
 
 ## The paper's rules (decided; don't re-litigate)
-- **No page ever has a full-width story** (the paper, its copies and sister papers) unless the editor allows it for that story (`MAX_STORY_COLS` from the profile's `frontPageMaxCols`, gate W; widened from the front page on 23 Oct 2026). A kicker is always smaller than its headline.
+- **No page ever has a full-width story** (the paper, its copies and sister papers) unless the editor allows it for that story (`MAX_STORY_COLS` from the profile's `frontPageMaxCols`, gate W; widened from the front page on 23 Oct 2026). **The front page's lead may run the full width** (the editor, 28 Oct: profile `grid.leadFullWidth`). A kicker is always smaller than its headline.
+- **Like the editor's own pages (28 Oct):** every headline big and bold (28pt at the least, profile `headline.min`), a photo with every story that has one (PIB's small photos print down to 100 ppi), fewer and longer stories: none under 100 words (`editorial.minWords`), a front lead of 250 words or more.
 - **At most one slogan / message panel and one house ad per paper.** Fill space with stories.
 - **"વિશેષ લેખ" (special article) appears only once per paper.**
 - Every story is headline > sub-heading > body, in decreasing sizes; kickers are centred; columns end level; no empty space on a page (horizontal rules divide stories and fill odd gaps).

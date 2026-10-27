@@ -30,6 +30,7 @@ import { acquireBrowser, releaseBrowser } from "./browser.ts";
 import { spanWidth } from "./layout/module.ts";
 import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
+import { wordCount } from "./editorial/quality.ts";
 import { alwaysPrinted, storyIdOf, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
@@ -46,6 +47,14 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
 
 /** A copy of the day's paper: its stories in other places, reworded, its
  * masthead, page headers and footer left empty for the paper's own. */
+/** The fewest words a front-page lead has (a lead's headline over less is top-heavy). */
+const LEAD_WORDS = 250;
+/** Under this a story is a short item, ranked below the day's ordinary stories (set as a brief). */
+const SHORT_WORDS = 200;
+/** Most important first; of equal rank, one with a photo first (28 Oct: the
+ * editor's own pages put a photo with nearly every story), then the longest. */
+const byRank = (a: Story, b: Story) => a.priority - b.priority || Number(!a.photo) - Number(!b.photo) || b.bodies.long.length - a.bodies.long.length;
+
 export interface CopyOpts {
   /** a random number in [0, 1), the same every time for the same copy */
   rng: () => number;
@@ -171,7 +180,7 @@ export async function fillContext(store: Store, date: string): Promise<{
     const edits = store.edits(date);
     const dropped = droppedBy(edits);
     const pool = dedupe(applyTextEdits(store.stories(date), edits).filter((s) => !dropped.has(s.id) && inPaperLanguage(s)))
-      .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
+      .sort(byRank);
     const packer = new Packer(m);
     const ctx = {
       room,
@@ -263,7 +272,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     };
     let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && !speechDup(s) && (opts.copy?.translate || inPaperLanguage(s))))
       .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
-      .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
+      .sort(byRank);
     // the editorial plan ranks the day's stories (an editor's own rank wins)
     const rankedByEditor = new Set(edits.filter((e) => typeof e.change.priority === "number").map((e) => e.storyId));
     const planned = await planDay(store, date, pool, { log });
@@ -274,7 +283,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     if (planned) {
       const by = new Map(planned.plan.map((p) => [p.id, p]));
       pool = pool.map((s) => (!rankedByEditor.has(s.id) && by.has(s.id) ? { ...s, priority: by.get(s.id)!.rank } : s))
-        .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
+        .sort(byRank);
       log(`  editorial plan: leads ${planned.plan.filter((p) => p.rank === 1).map((p) => p.id).join(", ") || "none"}`);
     }
     planCost = planned?.cost ?? 0;
@@ -288,13 +297,32 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       const best = pool.filter((s) => kind(s) === section && !rankedByEditor.has(s.id)).sort((a, b) => a.priority - b.priority).slice(0, want);
       if (!best.length) continue;
       pool = pool.map((s) => (best.includes(s) && s.priority > 3 ? { ...s, priority: 3 } : s))
-        .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
+        .sort(byRank);
       log(`  ${section === "રાષ્ટ્રીય" ? "national" : "world"} news kept in: ${best.map((s) => s.id).join(", ")}`);
     }
     // what the editor sent the paper's Telegram bot: never ranked below 2 by the plan
     // (26 Oct: always in the paper; the layout never holds one back while another can be)
     pool = pool.map((s) => (alwaysPrinted(s) && !rankedByEditor.has(s.id) && s.priority > 2 ? { ...s, priority: 2 } : s))
-      .sort((a, b) => a.priority - b.priority || b.bodies.long.length - a.bodies.long.length);
+      .sort(byRank);
+    // no page led by a few lines (the editor's own rank stands): a story too short for a lead's headline isn't
+    // ranked a lead, nor a short item above the day's ordinary stories (its
+    // headline can't be bigger than theirs: 28 Oct)
+    const words = (s: Story) => wordCount(s.bodies.long);
+    pool = pool.map((s) => (rankedByEditor.has(s.id) ? s
+      : words(s) < SHORT_WORDS ? { ...s, priority: Math.max(s.priority, 4) }
+      : s.priority === 1 && words(s) < LEAD_WORDS ? { ...s, priority: 2 } : s))
+      .sort(byRank);
+    // the front page's lead: a story long enough to carry a lead's headline, an
+    // important one with a photo first (28 Oct: the plan made a 134-word radio
+    // item the lead; too short for a lead's headline, page 1 had none) -- the editor's own lead stands
+    if (pool[0] && !rankedByEditor.has(pool[0].id) && wordCount(pool[0].bodies.long) < LEAD_WORDS) {
+      const k = pool.findIndex((s) => s.priority <= Math.max(2, pool[0].priority) && wordCount(s.bodies.long) >= LEAD_WORDS);
+      if (k > 0) {
+        const [s] = pool.splice(k, 1);
+        log(`  the lead: ${s.id} (${pool[0].id} is too short for one)`);
+        pool.unshift({ ...s, priority: Math.min(s.priority, pool[0].priority) });
+      }
+    }
     // feature articles print like the news: no kicker, no special title (24 Oct, the editor's wish)
     pool = pool.map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s));
     let rewordCost = 0;
@@ -491,7 +519,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     { gate: "1 plotter: no overflow, overlap, off-page, failed fonts or images", pass: plotterProblems.length === 0, detail: `${plotterProblems.length} warning(s)` },
     { gate: "F every letter in the paper's own fonts", pass: missingGlyphs.size === 0,
       detail: missingGlyphs.size ? [...missingGlyphs].map(([ch, at]) => `"${ch}" (U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}) in ${[...at].slice(0, 3).join(", ")}`).join("; ") : "ok" },
-    { gate: "P print preflight: trim size, fonts embedded, photos 200 ppi+, nothing off the page", pass: print.every((c) => c.pass),
+    { gate: "P print preflight: trim size, fonts embedded, photos sharp enough, nothing off the page", pass: print.every((c) => c.pass),
       detail: print.map((c) => `${c.name} ${c.pass ? "ok" : c.detail}`).join("; ") },
     { gate: "2 no empty space on the page (every column filled to what's below)", pass: result.gaps.length === 0,
       detail: `${result.gaps.length} empty stretch(es)` },

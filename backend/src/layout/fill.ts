@@ -16,7 +16,7 @@ import type { Measurer } from "./measure.ts";
 import { buildModule, spanWidth, type Module } from "./module.ts";
 import { colX, type PlacedModule } from "./pack.ts";
 import { profile } from "../profile.ts";
-import { BODY, GAP, PT } from "./typography.ts";
+import { BODY, GAP, HEADLINE, PT } from "./typography.ts";
 
 export interface FillContext {
   store: Store; date: string; m: Measurer; blocks: Blocks;
@@ -90,7 +90,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
       for (let k = sentences.length; k >= 1; k--) {
         const body = sentences.slice(0, k).join(" ");
         if (words(body) < 10) break;
-        const mod = await buildModule({ ...s, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0);
+        const mod = await buildModule({ ...s, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0, BODY.pitch, HEADLINE.filler);
         if (!Number.isFinite(mod.height) || mod.height > h + 0.5) continue;
         const heads = mod.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length;
         if ((mod.displayFill >= 0.97 || cols === 1) && heads <= 4 && mod.headlineHeight <= 0.45 * mod.height && close(mod)
@@ -127,7 +127,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
         for (let k = sentences.length; k >= 1; k--) {
           const body = sentences.slice(0, k).join(" ");
           if (words(body) < 8) break;
-          tried = await buildModule({ ...got.story, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0);
+          tried = await buildModule({ ...got.story, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0, BODY.pitch, HEADLINE.filler);
           if (Number.isFinite(tried.height) && tried.height <= h + 0.5) break;
         }
         const heads = tried ? tried.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length : 0;
@@ -157,7 +157,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
       // set as a brief; a short headline that can't fill a wider brief's width a size up
       // (never a bigger headline than the page's own stories': it's the least of them)
       const set = async (story: Story) => {
-        let mod = await buildModule(story, 5, cols, "long", ctx.m, 0);
+        let mod = await buildModule(story, 5, cols, "long", ctx.m, 0, BODY.pitch, HEADLINE.filler);
         for (const rank of [4, 3]) {
           if (mod.displayFill >= 0.97 || cols === 1) break;
           const up = await buildModule(story, rank, cols, "long", ctx.m, 0);
@@ -184,7 +184,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
     for (let k = 0; best && !close(best) && k < 4; k++) {
       const cut = best.story.bodies.long.split(/(?<=[.।!?])\s+/).slice(0, -1).join(" ");
       if (!cut || words(cut) < 8) break;
-      const shorter = await buildModule({ ...best.story, bodies: { long: cut, medium: cut, short: cut } }, best.rank, cols, "long", ctx.m, 0);
+      const shorter = await buildModule({ ...best.story, bodies: { long: cut, medium: cut, short: cut } }, best.rank, cols, "long", ctx.m, 0, BODY.pitch, HEADLINE.filler);
       if (!(shorter.displayFill >= 0.97 || cols === 1)) break;
       best = shorter;
     }

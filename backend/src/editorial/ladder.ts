@@ -15,6 +15,7 @@
 import { fitLength, paragraphs } from "./rewrite.ts";
 import { repeats, settable, wordCount } from "./quality.ts";
 import { inPaperLanguage } from "../layout/stories.ts";
+import { profile } from "../profile.ts";
 import { wordForWord, type Release, type Store, type Story } from "../store.ts";
 
 export interface Rung {
@@ -26,8 +27,8 @@ export interface Rung {
   factCheck?: string;
 }
 
-/** Shortest a rung may be (a brief is about this). */
-const MIN_WORDS = 25;
+/** Shortest a rung may be (the profile's: a brief is about 25 words). */
+export const MIN_WORDS = profile.editorial.minWords;
 /** Two rungs closer than this (share of words) are one. */
 const STEP = 0.03;
 /** Most rungs a story keeps. */

@@ -31,7 +31,8 @@
     "left": 14.4,
     "columns": 8,
     "column": 124.2,
-    "gutter": 11.884
+    "gutter": 11.884,
+    "leadFullWidth": true
   },
   "ink": "#231f20",
   "fonts": {
@@ -99,21 +100,22 @@
       "capByColumns": [
         0,
         22,
-        30,
-        40,
+        32,
+        42,
         54,
         60,
         64,
         68,
         72
       ],
-      "min": 21,
+      "min": 28,
+      "fillerMax": 22,
       "rankScale": [
         1.0,
+        0.85,
         0.78,
-        0.62,
-        0.5,
-        0.42
+        0.72,
+        0.65
       ],
       "maxLines": [
         2,
@@ -156,7 +158,7 @@
     "maxCrop": 0.15,
     "minHeight": 80,
     "minCols": 2,
-    "minPpi": 200,
+    "minPpi": 100,
     "maxShare": 0.45
   },
   "chrome": "chrome.json",
@@ -165,7 +167,8 @@
     "leadModel": "google/gemini-3.8-flash",
     "leadStories": 3,
     "translateModel": "google/gemini-3.8-flash",
-    "fillTarget": 1.35
+    "fillTarget": 1.35,
+    "minWords": 100
   },
   "fontLicence": "Bharati Gopika fonts (Oasis Systems, 2002), commercial. Their embedding flag (fsType 1, a pre-OpenType value) does not forbid embedding, so the print PDF embeds them. They are still kept server-side ('restricted' here): never at a public URL, so the website shows page images, until the paper confirms its licence covers web-font use.",
   "fillers": {

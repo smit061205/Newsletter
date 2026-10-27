@@ -69,6 +69,9 @@ export const ProfileSchema = z.object({
     /** the widest a story may be on the front page, in columns (default: all but one) --
      * an editor may let one story run full width */
     frontPageMaxCols: z.number().int().positive().optional(),
+    /** the front page's lead may run the full width of the page, as the paper's
+     * own front pages do (the editor's say, 28 Oct) */
+    leadFullWidth: z.boolean().optional(),
   }),
   ink: z.string().min(1),
   fonts: z.record(z.string(), FontRoleSchema),
@@ -90,6 +93,9 @@ export const ProfileSchema = z.object({
       rankScale: z.array(z.number().positive()).min(1).default([1, 0.8, 0.66, 0.56, 0.48]),
       /** most lines a headline may take, by rank */
       maxLines: z.array(z.number().int().positive()).min(1).default([2, 2, 2, 3, 3]),
+      /** the largest headline (pt) of an item filling a narrow gap by an ad, when
+       * `min` is too big for one (none: the usual sizes) */
+      fillerMax: pt.positive().optional(),
     }),
     kicker: TextStyleSchema.extend({ ratio: z.number().positive(), min: pt.positive(), leading: z.number().positive() }),
     deck: TextStyleSchema.extend({ ratio: z.number().positive(), min: pt.positive(), leading: z.number().positive() }),
@@ -138,6 +144,9 @@ export const ProfileSchema = z.object({
     /** the copy wanted, as a share of the pages at natural size: over 1, so the
      * layout has choices and a reserve of stories for holes and short pages */
     fillTarget: z.number().positive().default(1.35),
+    /** the fewest words a story prints at: none cut shorter, none shorter printed
+     * (28 Oct: the editor's own pages have no items of a few lines) */
+    minWords: z.number().int().positive().default(25),
     /** a ceiling on a day's top-up AI spend (US$), if the paper wants one; none by default: the top-up stops when the pages are full */
     dailyBudgetUsd: z.number().positive().optional(),
     /** no longer read: every page is laid out by layout/engine.ts (the old "v1" packer was taken out, 26 Oct; kept so older profiles still load) */
