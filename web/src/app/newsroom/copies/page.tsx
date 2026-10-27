@@ -14,7 +14,7 @@ import { num, rupees } from "../ui/format";
 import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
 import { artOf, Articles, blankArt, type Art } from "./Articles";
-import { Designs } from "./Designs";
+import { designName, Designs } from "./Designs";
 
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
 // (Urdu waits for its own fonts and layout)
@@ -51,10 +51,6 @@ export default function Copies() {
   const [designs, setDesigns] = useState<PaperDesigns>({ designs: [], copies: {} });
   useEffect(() => { call<PaperDesigns>("/api/designs").then(setDesigns).catch(() => {}); }, []);
   const paperOf = (n: number) => designs.designs.find((d) => d.id === designs.copies[String(n)]);
-  const assign = async (n: number, id: string) => {
-    try { setDesigns(await call<PaperDesigns>("/api/designs/assign", { json: { copy: n, id: id || null } })); toast(t("design.saved")); }
-    catch (e) { setError((e as Error).message); }
-  };
 
   const load = useCallback(() => {
     call<CopiesRun | null>(`/api/issues/${date}/copies`).then(setRun).catch(() => {});
@@ -131,15 +127,20 @@ export default function Copies() {
     return w === "checking" ? t("progress.checking") : w === "translating" ? t("copies.doing.translating") : w === "rewording" ? t("copies.doing.rewording") : w;
   };
   // a copy's print PDF, or (`corel`) the one whose text stays text in CorelDRAW
+  // a copy's file name: on its paper's design, that paper's
+  const nameOf = (n: number, corel = true) => {
+    const paper = paperOf(n);
+    return `${paper ? designName(paper.name) : `${paperName} ${issueNo}`} - ${lang === "gu" ? "નકલ" : "copy"} ${n}${run && run.lang !== "gu" ? ` (${run.lang})` : ""} - ${date.split("-").reverse().join("-")}${corel ? " - CorelDRAW" : ""}.pdf`;
+  };
   const open = (n: number, corel = false) => {
     const paper = paperOf(n);
     // (a paper's designs changed: the copy fetched afresh)
-    const v = `${run?.endedAt ?? ""}${paper ? `|${paper.id}|${Object.values(paper.slots).join()}` : ""}`;
+    const v = `${run?.endedAt ?? ""}${paper ? `|${paper.id}` : ""}`;
     return pdf({
       url: media(`/api/issues/${date}/copies/${n}.${corel ? "editable." : ""}pdf?t=${encodeURIComponent(v)}`),
-      title: `${paper ? `${paper.name} · ` : ""}${corel ? t("corel.title", { what: t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }) })
+      title: `${paper ? `${designName(paper.name)} · ` : ""}${corel ? t("corel.title", { what: t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }) })
         : t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) })}`,
-      fileName: `${paper ? paper.name : `${paperName} ${issueNo}`} - ${lang === "gu" ? "નકલ" : "copy"} ${n}${run && run.lang !== "gu" ? ` (${run.lang})` : ""} - ${date.split("-").reverse().join("-")}${corel ? " - CorelDRAW" : ""}.pdf`,
+      fileName: nameOf(n, corel),
     });
   };
 
@@ -232,11 +233,7 @@ export default function Copies() {
                 </div>
                 <Button icon={Icon.print()} onClick={() => open(f.n)}>{t("copies.open")}</Button>
                 {(f.lang ?? "gu") === "gu" && <Button kind="quiet" icon={Icon.download()} onClick={() => open(f.n, true)}>{t("corel.pdf")}</Button>}
-                {designs.designs.length > 0 && <label className={s.field}><span className={s.label}>{t("design.for")}</span>
-                  <select className={s.select} value={designs.copies[String(f.n)] ?? ""} onChange={(e) => assign(f.n, e.target.value)}>
-                    <option value="">{t("design.forNone")}</option>
-                    {designs.designs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select></label>}
+                {paperOf(f.n) && <span className={s.faint} style={{ overflowWrap: "anywhere" }}>{designName(paperOf(f.n)!.name)}</span>}
               </div>
             ))}
           </div>
@@ -250,7 +247,7 @@ export default function Copies() {
           </details>
         </section>
       )}
-      <Designs designs={designs} pages={run?.files[0]?.pages ?? 4} onChange={setDesigns} />
+      <Designs designs={designs} onChange={setDesigns} run={run} date={date} nameOf={(n) => nameOf(n)} />
     </div>
   );
 }
