@@ -61,6 +61,9 @@ export interface PageLayout { widthCm: number; heightCm: number; columns: number
   pages: { page: number; topCm: number; bottomCm: number }[] }
 export type Reword = "headline" | "headlineDeck" | "all";
 export type Shuffle = "keepLead" | "anywhere" | "samePage";
+/** Another paper's title, page headers and footer, printed under the copies that go to it (backend/src/export/designs.ts). */
+export interface PaperDesign { id: string; name: string; /** "title" | "header-N" | "footer" -> when added */ slots: Record<string, string> }
+export interface PaperDesigns { designs: PaperDesign[]; /** copy number -> design id */ copies: Record<string, string> }
 export interface CopiesRun { kind: "copies" | "editions"; date: string; count: number; reword: Reword; shuffle: Shuffle; lang: PaperLang;
   status: "running" | "done" | "failed" | "stopped"; startedAt: string; endedAt?: string; done: number;
   files: { n: number; id?: string; name?: string; lang: PaperLang; ready: boolean; pages: number }[]; cost: number; log: string[]; error?: string;
