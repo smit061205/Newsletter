@@ -2,8 +2,9 @@
 // its own, 25 or more a day). A design is one PDF per paper, exported from
 // CorelDRAW at the page's size (390 x 525 mm): page 1 with its title, the
 // other pages with their headers (page numbers and all), the last with its
-// footer. Each design goes with one copy and each copy with one design: given
-// in turn as they're added (the first to copy 1, ...), changed by hand. A copy
+// footer. Each copy goes with one design: given in turn as they're added (the
+// first to copy 1, ...), changed by hand; a design may go with many copies
+// (27 Oct: a test, or a paper taking more than one). A copy
 // opened or downloaded is printed on its design's pages -- its print PDF and
 // its CorelDRAW PDF -- and copies made before (PDFs from elsewhere) can be put
 // on theirs too, saved in a folder in Downloads.
@@ -66,16 +67,14 @@ export async function dropDesign(id: string | null): Promise<Designs> {
   return d;
 }
 
-/** Copy `n` goes with design `id` (null: none). A design already with another
- * copy changes places: that copy takes `n`'s old one -- one design per copy. */
-export async function assign(n: number, id: string | null): Promise<Designs> {
+/** Copies `ns` go with design `id` (null: none). */
+export async function assign(ns: number[], id: string | null): Promise<Designs> {
   const d = await designsOf();
   if (id && !d.designs.some((x) => x.id === id)) throw new Error("no such design");
-  const had = d.copies[String(n)];
-  const other = id ? Object.keys(d.copies).find((k) => d.copies[k] === id && k !== String(n)) : undefined;
-  if (other) { if (had) d.copies[other] = had; else delete d.copies[other]; }
-  if (id) d.copies[String(n)] = id;
-  else delete d.copies[String(n)];
+  for (const n of ns) {
+    if (id) d.copies[String(n)] = id;
+    else delete d.copies[String(n)];
+  }
   await save(d);
   return d;
 }
