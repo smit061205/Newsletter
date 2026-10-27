@@ -23,7 +23,7 @@
 //   GET   /api/issues/:date/editions   the day's sister papers; POST {only?} makes them (all, or one); GET .../editions/<id>.pdf
 //   GET   /api/issues/:date/copies/N.pdf  one copy (on its paper's design, if it has one)
 //   GET   /api/designs  POST /api/designs {name, base64}  DELETE /api/designs/:id|all   other papers' designs, one per copy
-//   POST  /api/designs/assign {copy, id|null}   POST /api/designs/save {date, names}   POST /api/designs/stamp {date, copy, name, base64}
+//   POST  /api/designs/assign {copy | upTo, id|null}   POST /api/designs/save {date, names}   POST /api/designs/stamp {date, copy, name, base64}
 //   POST  /api/designs/reveal {date}   the copies on their designs, saved in a folder in Downloads (and that folder opened)
 //   GET   /api/layout                  the page, its columns and each page's room for stories (the Ads screen's preview)
 //   GET   /healthz                     "ok" (for the host's health check)
@@ -685,10 +685,11 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             return send(res, 200, await d.addDesign(body.name || "design.pdf", new Uint8Array(Buffer.from(body.base64, "base64"))));
           }
           if (req.method === "POST" && parts[2] === "assign") {
-            const body = (await readJson(req)) as { copy?: number; id?: string | null };
-            const n = Math.round(Number(body.copy));
-            if (!(n >= 1 && n <= 200)) return send(res, 400, { error: "which copy: 1 to 200" });
-            return send(res, 200, await d.assign(n, body.id || null));
+            // one copy, or (`upTo`) copies 1 to upTo
+            const body = (await readJson(req)) as { copy?: number; upTo?: number; id?: string | null };
+            const n = Math.round(Number(body.copy ?? 1)), last = Math.round(Number(body.upTo ?? n));
+            if (!(n >= 1 && last >= n && last <= 200)) return send(res, 400, { error: "which copy: 1 to 200" });
+            return send(res, 200, await d.assign(Array.from({ length: last - n + 1 }, (_, i) => n + i), body.id || null));
           }
           // every copy of the day the app has, on its design, into the Downloads folder
           if (req.method === "POST" && parts[2] === "save") {

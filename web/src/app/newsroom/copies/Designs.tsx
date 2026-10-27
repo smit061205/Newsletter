@@ -1,7 +1,7 @@
 "use client";
 // Other papers' designs: one PDF per paper (its title, headers and footer on
-// its pages), each going with one copy -- given in turn as they're added,
-// changed here. The copies on their designs are saved in a folder in
+// its pages), each copy going with one -- given in turn as they're added,
+// changed here; a design may go with any number of copies. The copies on their designs are saved in a folder in
 // Downloads; copies made before (PDFs from elsewhere) can be put on theirs too
 // (backend/src/export/designs.ts).
 import { useState } from "react";
@@ -36,7 +36,6 @@ export function Designs({ designs, onChange, run, date, nameOf }:
   const [saved, setSaved] = useState<{ folder: string; n: number; without: number[] } | null>(null);
   const [old, setOld] = useState<Old[]>([]);
   const byId = new Map(designs.designs.map((d) => [d.id, d]));
-  const copyOf = (id: string) => Object.keys(designs.copies).find((k) => designs.copies[k] === id);
   const pagesOf = (n: number) => run?.files.find((f) => f.n === n)?.pages ?? run?.files[0]?.pages ?? 4;
   // a row for every copy made, every design and every copy given one
   const rows = Math.max(run?.count ?? 0, designs.designs.length, ...Object.keys(designs.copies).map(Number));
@@ -102,13 +101,11 @@ export function Designs({ designs, onChange, run, date, nameOf }:
                 <select className={s.select} style={{ flex: 1, minWidth: 180 }} value={d?.id ?? ""} aria-label={t("design.copy", { n: num(lang, n) })}
                         onChange={(e) => act(() => call("/api/designs/assign", { json: { copy: n, id: e.target.value || null } }))}>
                   <option value="">{t("design.none")}</option>
-                  {designs.designs.map((x) => {
-                    const at = copyOf(x.id);
-                    return <option key={x.id} value={x.id}>{designName(x.name)}{at && at !== String(n) ? ` (${t("design.with", { n: num(lang, at) })})` : ""}</option>;
-                  })}
+                  {designs.designs.map((x) => <option key={x.id} value={x.id}>{designName(x.name)}</option>)}
                 </select>
+                {d && <Button kind="quiet" onClick={() => act(() => call("/api/designs/assign", { json: { copy: 1, upTo: rows, id: d.id } }))}>{t("design.every")}</Button>}
                 {d && <Button kind="quiet" icon={Icon.trash()} aria-label={`${designName(d.name)}: ${t("copies.extra.removeItem")}`}
-                              onClick={() => act(() => call(`/api/designs/${d.id}`, { method: "DELETE" }))}>{t("copies.extra.removeItem")}</Button>}
+                              onClick={() => { if (window.confirm(t("design.removeConfirm", { name: designName(d.name) }))) act(() => call(`/api/designs/${d.id}`, { method: "DELETE" })); }}>{t("copies.extra.removeItem")}</Button>}
               </div>
               {d && d.pages < need && <span className={s.hint}>{t("design.pages", { has: num(lang, d.pages), need: num(lang, need) })}</span>}
             </div>
