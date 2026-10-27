@@ -72,7 +72,11 @@ export interface CopiesRun { kind: "copies" | "editions"; date: string; count: n
   /** the time meter: the wording, and each one's layout (seconds) */
   times?: { name: string; seconds: number }[];
   /** an article in every copy, word for word: its titles and photos taken in turn */
+  /** articles in every copy, word for word (copies made before 27 Oct: `extra`, one article) */
+  articles?: CopyArticle[];
   extra?: { body: string; deck?: string; titles: string[]; photos: string[] } }
+/** An article in every copy: the copies go through its titles, sub-headings, texts and photos in turn. */
+export interface CopyArticle { titles: string[]; decks: string[]; bodies: string[]; photos: string[] }
 
 /** A batch's share done (0-1), and minutes left from how fast it has gone so far (or `guess` before it knows). */
 export function batchProgress(run: CopiesRun, guess: number): { share: number; minutes: number } {

@@ -64,8 +64,8 @@ export interface CopyOpts {
   store?: Store;
   /** the stories come in another language (`reword` translates them): not filtered by language until then */
   translate?: boolean;
-  /** an article in this copy only, printed word for word with its title and photo (editorial/copies.ts) */
-  extra?: Story;
+  /** articles in this copy, printed word for word with its titles, texts and photos (editorial/copies.ts) */
+  extras?: Story[];
 }
 
 /** The sample ads (the paper's own stand-ins for a day with nothing booked) as
@@ -308,8 +308,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       // with enough chance that every copy comes out its own
       const spread = c.shuffle === "anywhere" ? 4 : 2.5;
       const lead = c.lead && got.pool.some((s) => s.id === c.lead) ? c.lead : got.pool[0]?.id;
-      // (the copy's fixed article, as given: never reworded)
-      const list = c.extra ? [...got.pool, c.extra] : got.pool;
+      // (the copy's fixed articles, as given: never reworded)
+      const list = [...got.pool, ...(c.extras ?? [])];
       const keyed = list.map((s) => ({ s, k: c.shuffle === "keepLead" && s.id === lead ? -Infinity : s.priority + c.rng() * spread }));
       pool = keyed.sort((a, b) => a.k - b.k).map((x) => x.s) as typeof pool;
     }

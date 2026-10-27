@@ -75,32 +75,53 @@ export interface Batch {
   parts?: Record<string, { share: number; what: string }>;
   /** the time meter: how long the wording took, and each one's layout (seconds) */
   times?: { name: string; seconds: number }[];
-  /** copies: an article in every copy (a customer's), word for word */
-  extra?: Extra;
+  /** copies: articles in every copy (a customer's), word for word */
+  articles?: Article[];
+  /** (copies made before 27 Oct: one article) */
+  extra?: { body: string; titles: string[]; photos: string[]; deck?: string };
 }
 
 /** An article printed in every copy, word for word (26 Oct: an order of 25
- * copies, each with one of the customer's titles and photos): its text, and
- * the titles and photos the copies go through -- every title with every photo,
- * spread so any few copies in a row show them all (3 x 3: 1-1, 2-2, 3-3, then
- * 1-2, 2-3, 3-1, then 1-3, 2-1, 3-2). */
-export interface Extra { body: string; titles: string[]; photos: string[]; deck?: string }
+ * copies, each with one of the customer's titles and photos; 27 Oct: any
+ * number of articles, each with any number of titles, sub-headings, texts and
+ * photos). The copies go through them in turn (articleFor). */
+export interface Article { titles: string[]; decks: string[]; bodies: string[]; photos: string[] }
 
-/** Copy n's title and photo (n from 1). */
-export function extraFor(e: Extra, n: number): { title: string; photo: string | null } {
-  const t = e.titles.length, p = e.photos.length || 1;
-  const k = (n - 1) % (t * p);
-  // title and photo step together; after every pairing of the two counts, the photos move on one
-  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
-  const round = Math.floor(k / ((t * p) / gcd(t, p)));
-  return { title: e.titles[k % t], photo: e.photos[(k + round) % p] ?? null };
+/** The n-th (from 1) of every mix of one from each list, in turn: each list
+ * steps on with every copy; a mix already used gives way to the next unused
+ * one (the later lists moving first), so every mix comes before any repeats
+ * and any few copies in a row show every one of each list (3 titles x 3
+ * photos: 1-1, 2-2, 3-3, then 1-2, 2-3, 3-1, then 1-3, 2-1, 3-2). */
+export function mixFor(lengths: number[], n: number): number[] {
+  const L = lengths.map((x) => Math.max(1, x));
+  const all = L.reduce((a, b) => a * b, 1);
+  const k = (n - 1) % all;
+  const used = new Set<string>();
+  let got: number[] = [];
+  for (let i = 0; i <= k; i++) {
+    for (let t = 0; t < all; t++) {
+      // t's digits over the lists, the last list's the fastest
+      let r = t;
+      const d = L.map(() => 0);
+      for (let j = L.length - 1; j >= 0; j--) { d[j] = r % L[j]; r = Math.floor(r / L[j]); }
+      const mix = L.map((len, j) => (i + d[j]) % len);
+      if (!used.has(mix.join())) { used.add(mix.join()); got = mix; break; }
+    }
+  }
+  return got;
 }
 
-/** The fixed article as copy n prints it: a story of its own, kept whole (store.ts wordForWord). */
-function extraStory(e: Extra, n: number, date: string): Story {
-  const { title, photo } = extraFor(e, n);
-  const body = e.body.split(/\n+/).map((p) => p.trim()).filter(Boolean).join("\n\n");
-  return { id: "z-fixed", releaseId: null, date, kicker: "", headline: title.trim(), deck: (e.deck ?? "").trim(), bodies: { long: body, medium: body, short: body },
+/** Copy n's title, sub-heading, text and photo of article `a`. */
+export function articleFor(a: Article, n: number): { title: string; deck: string; body: string; photo: string | null } {
+  const [t, d, b, p] = mixFor([a.titles.length, a.decks.length, a.bodies.length, a.photos.length], n);
+  return { title: a.titles[t] ?? "", deck: a.decks[d] ?? "", body: a.bodies[b] ?? "", photo: a.photos[p] ?? null };
+}
+
+/** The fixed article `i` as copy n prints it: a story of its own, kept whole (store.ts wordForWord). */
+function articleStory(a: Article, i: number, n: number, date: string): Story {
+  const { title, deck, body: text, photo } = articleFor(a, n);
+  const body = text.split(/\n+/).map((p) => p.trim()).filter(Boolean).join("\n\n");
+  return { id: `z-fixed-${i + 1}`, releaseId: null, date, kicker: "", headline: title.trim(), deck: deck.trim(), bodies: { long: body, medium: body, short: body },
            priority: 2, page: null, photo, photos: photo ? [photo] : [], caption: "", source: "fixed:copy", model: "as-is", needsReview: false };
 }
 /** Kept for the newsroom (api.ts CopiesRun). */
@@ -260,8 +281,8 @@ interface SetSpec {
   date: string;
   items: { n: number; id?: string; name?: string; pdf: string; seed: number }[];
   reword: Reword; shuffle: Shuffle; translate: boolean;
-  /** the article in every copy, word for word */
-  extra?: Extra;
+  /** the articles in every copy, word for word */
+  articles?: Article[];
   /** each story's page and the lead in the day's paper */
   pageOf: [string, number][]; lead?: string;
   /** placements already used (the day's paper, earlier copies): none may repeat */
@@ -325,7 +346,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
         copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, reword, pdfPath: item.pdf,
                 translate: spec.translate, ...(spec.reword === "all" && !spec.translate ? { store: own } : {}),
-                ...(spec.extra ? { extra: extraStory(spec.extra, n, spec.date) } : {}) },
+                ...(spec.articles?.length ? { extras: spec.articles.map((a, i) => articleStory(a, i, n, spec.date)) } : {}) },
       });
       spent += built.report.cost;
       const sig = built.report.placed.map((p) => `${p.story}:${p.page}:${p.cols}`).sort().join(",");
@@ -644,18 +665,20 @@ async function layOutUnique(store: Store, tasks: Task[], seen: string[], say: Sa
 }
 
 /** Make `count` copies of the day's paper, in `lang` (in the background). */
-export async function makeCopies(store: Store, date: string, opts: { count: number; reword: Reword; shuffle: Shuffle; lang?: Lang; extra?: Extra; log: Say }): Promise<Batch> {
+export async function makeCopies(store: Store, date: string, opts: { count: number; reword: Reword; shuffle: Shuffle; lang?: Lang; articles?: Article[]; log: Say }): Promise<Batch> {
   const lang = opts.lang ?? (profile.language.lang as Lang);
   const day = dayOf(store, date);
   const batch: Batch = { kind: "copies", date, count: opts.count, reword: opts.reword, shuffle: opts.shuffle, lang, status: "running",
-                         startedAt: new Date().toISOString(), done: 0, files: [], cost: 0, log: [], ...(opts.extra ? { extra: opts.extra } : {}) };
+                         startedAt: new Date().toISOString(), done: 0, files: [], cost: 0, log: [], ...(opts.articles?.length ? { articles: opts.articles } : {}) };
   return runBatch(batch, copiesDir(date), async (say) => {
     await rm(copiesDir(date), { recursive: true, force: true });
     await mkdir(copiesDir(date), { recursive: true });
     const translate = lang !== profile.language.lang;
     say(`${opts.count} cop${opts.count === 1 ? "y" : "ies"} in ${LANG_NAME[lang]}`);
-    const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead, ...(opts.extra ? { extra: opts.extra } : {}) };
-    if (opts.extra) say(`the fixed article in every copy: ${opts.extra.titles.length} title(s) x ${Math.max(1, opts.extra.photos.length)} photo(s), in turn`);
+    const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead, ...(opts.articles?.length ? { articles: opts.articles } : {}) };
+    for (const [i, a] of (opts.articles ?? []).entries()) {
+      say(`fixed article ${i + 1} in every copy: ${a.titles.length} title(s), ${a.decks.length} sub-heading(s), ${a.bodies.length} text(s), ${a.photos.length} photo(s), in turn`);
+    }
     const tasks: Task[] = Array.from({ length: opts.count }, (_, i) => ({
       lang, label: `copy ${i + 1}`, spec: base, seen: day.seen,
       item: { n: i + 1, pdf: copyFile(date, i + 1), seed: i + 1 + (translate ? 1000 * LANGS.indexOf(lang) : 0) },

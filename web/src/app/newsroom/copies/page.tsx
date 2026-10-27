@@ -13,6 +13,7 @@ import { BatchTime } from "../ui/BatchTime";
 import { num, rupees } from "../ui/format";
 import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
+import { artOf, Articles, blankArt, type Art } from "./Articles";
 import { Designs } from "./Designs";
 
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
@@ -28,11 +29,6 @@ const toBase64 = (f: File) => new Promise<string>((ok, bad) => {
   r.onerror = () => bad(new Error("couldn't read that file"));
   r.readAsDataURL(f);
 });
-/** A photo of the fixed article: picked here, or one the last copies used. */
-type Pic = { file: File; preview: string; small?: boolean } | { url: string } | null;
-/** Narrower than this a photo prints soft across two columns (200 ppi). */
-const SHARP_WIDTH = 720;
-const widthOf = (src: string) => new Promise<number>((ok) => { const i = new Image(); i.onload = () => ok(i.naturalWidth); i.onerror = () => ok(0); i.src = src; });
 
 export default function Copies() {
   const { t, lang, date, toast, pdf } = useApp();
@@ -45,16 +41,10 @@ export default function Copies() {
   const [shuffle, setShuffle] = useState<Shuffle>("keepLead");
   const [paperLang, setPaperLang] = useState<PaperLang>("gu");
   const translated = paperLang !== "gu";
-  // an article in every copy (a customer's), word for word, its titles and photos in turn
+  // articles in every copy (a customer's), word for word, their titles, sub-headings, texts and photos in turn
   const [useExtra, setUseExtra] = useState(false);
-  const [xBody, setXBody] = useState("");
-  const [xDeck, setXDeck] = useState("");
-  const [xTitles, setXTitles] = useState(["", "", ""]);
-  const [xPics, setXPics] = useState<Pic[]>([null, null, null]);
+  const [arts, setArts] = useState<Art[]>([blankArt()]);
   const [xTouched, setXTouched] = useState(false);
-  const titles = xTitles.map((x) => x.trim()).filter(Boolean);
-  const pics = xPics.filter((x): x is NonNullable<Pic> => !!x);
-  const mixes = Math.max(1, titles.length) * Math.max(1, pics.length);
   const [error, setError] = useState("");
   const has = !!status?.issue;
   // other papers' titles, headers and footers, and which copy goes to which
@@ -69,16 +59,16 @@ export default function Copies() {
   const load = useCallback(() => {
     call<CopiesRun | null>(`/api/issues/${date}/copies`).then(setRun).catch(() => {});
   }, [date]);
-  // the last copies' article, ready to make them again
-  const lastExtra = run?.extra;
+  // the last copies' articles, ready to make them again
+  const lastArticles = run?.articles ?? (run?.extra ? [{ titles: run.extra.titles, decks: run.extra.deck ? [run.extra.deck] : [],
+                                                          bodies: [run.extra.body], photos: run.extra.photos }] : undefined);
+  const lastKey = JSON.stringify(lastArticles ?? null);
   useEffect(() => {
-    if (!lastExtra || xTouched) return;
+    if (!lastArticles?.length || xTouched) return;
     setUseExtra(true);
-    setXBody(lastExtra.body);
-    setXDeck(lastExtra.deck ?? "");
-    setXTitles([0, 1, 2].map((i) => lastExtra.titles[i] ?? ""));
-    setXPics([0, 1, 2].map((i) => (lastExtra.photos[i] ? { url: lastExtra.photos[i] } : null)));
-  }, [lastExtra, xTouched]);
+    setArts(lastArticles.map(artOf));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastKey, xTouched]);
   useEffect(() => {
     setInfo(null); setRun(null); setError("");
     if (!has) return;
@@ -107,14 +97,16 @@ export default function Copies() {
   const make = async () => {
     setError("");
     const withExtra = useExtra && !translated;
-    if (withExtra && (!xBody.trim() || !titles.length)) { setError(t("copies.extra.need")); return; }
+    const lines = (xs: string[]) => xs.map((x) => x.trim()).filter(Boolean);
+    const missing = withExtra ? arts.findIndex((a) => !lines(a.titles).length || !lines(a.bodies).length) : -1;
+    if (missing >= 0) { setError(t("copies.extra.need", { n: num(lang, missing + 1) })); return; }
     try {
-      const extra = withExtra ? {
-        body: xBody, deck: xDeck, titles,
-        photos: await Promise.all(pics.map(async (p) => ("url" in p ? { url: p.url } : { name: p.file.name, base64: await toBase64(p.file) }))),
-      } : undefined;
+      const articles = withExtra ? await Promise.all(arts.map(async (a) => ({
+        titles: lines(a.titles), decks: lines(a.decks), bodies: lines(a.bodies),
+        photos: await Promise.all(a.pics.map(async (p) => ("url" in p ? { url: p.url } : { name: p.file.name, base64: await toBase64(p.file) }))),
+      }))) : [];
       setXTouched(true);
-      setRun(await call<CopiesRun>(`/api/issues/${date}/copies`, { json: { count, reword, shuffle, lang: paperLang, extra } }));
+      setRun(await call<CopiesRun>(`/api/issues/${date}/copies`, { json: { count, reword, shuffle, lang: paperLang, articles } }));
       toast(t("copies.making", { done: num(lang, 1), total: num(lang, count) }));
     } catch (e) { setError((e as Error).message); }
   };
@@ -197,39 +189,7 @@ export default function Copies() {
         {!translated && <>
           <label className={s.choice}><input type="checkbox" checked={useExtra} disabled={running} onChange={(e) => { setXTouched(true); setUseExtra(e.target.checked); }} />
             <span><strong>{t("copies.extra")}</strong></span></label>
-          {useExtra && <div className={s.field}>
-            <span className={s.hint}>{t("copies.extra.body")}</span>
-            <div className={s.grid2} style={{ gap: 16, marginTop: 8 }}>
-              <div className={s.field}>
-                {xTitles.map((v, i) => <label key={i} className={s.field}><span className={s.label}>{t("copies.extra.title", { n: num(lang, i + 1) })}</span>
-                  <input className={s.input} value={v} disabled={running}
-                         onChange={(e) => { setXTouched(true); setXTitles(xTitles.map((x, k) => (k === i ? e.target.value : x))); }} /></label>)}
-              </div>
-              <div className={s.thumbsRow}>
-                {xPics.map((p, i) => (
-                  <label key={i} className={s.drop} style={{ padding: 8, width: 120 }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {p ? <img src={"url" in p ? media(p.url) : p.preview} alt="" style={{ width: "100%", border: "none" }} />
-                      : <>{Icon.image()}<div>{t("copies.extra.photo", { n: num(lang, i + 1) })}</div></>}
-                    <input type="file" accept="image/jpeg,image/png" disabled={running} aria-label={t("copies.extra.photo", { n: num(lang, i + 1) })}
-                           onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; setXTouched(true);
-                             const preview = URL.createObjectURL(f);
-                             const small = (await widthOf(preview)) < SHARP_WIDTH;
-                             setXPics((now) => now.map((x, k) => (k === i ? { file: f, preview, small } : x))); }} />
-                  </label>
-                ))}
-              </div>
-            </div>
-            <label className={s.field} style={{ marginTop: 8 }}><span className={s.label}>{t("copies.extra.deck")}</span>
-              <input className={s.input} value={xDeck} disabled={running} onChange={(e) => { setXTouched(true); setXDeck(e.target.value); }} /></label>
-            <span className={s.label} style={{ marginTop: 8 }}>{t("copies.extra.text")}</span>
-            <textarea className={s.textarea} rows={8} value={xBody} disabled={running} aria-label={t("copies.extra.text")}
-                      onChange={(e) => { setXTouched(true); setXBody(e.target.value); }} />
-            {xPics.some((p) => p && "small" in p && p.small) && <Note tone="warn">{t("copies.extra.small")}</Note>}
-            {titles.length > 0 && <span className={s.faint}>{count >= mixes
-              ? t("copies.extra.plan", { mixes: num(lang, mixes), count: num(lang, count), each: num(lang, Math.round(count / mixes)) })
-              : t("copies.extra.planFew", { mixes: num(lang, mixes), count: num(lang, count) })}</span>}
-          </div>}
+          {useExtra && <Articles arts={arts} onChange={(x) => { setXTouched(true); setArts(x); }} disabled={running} count={count} />}
         </>}
         {error && <Note tone="bad">{error}</Note>}
         {paperBusy && <Note tone="warn">{t("copies.busyPaper")}</Note>}
