@@ -5,6 +5,7 @@
 // plain browser these cards say where they work.
 import { useEffect, useRef, useState } from "react";
 import s from "../newsroom.module.css";
+import { num } from "./format";
 import { Button, Note, useApp } from "./kit";
 
 interface Ck {
@@ -20,7 +21,8 @@ interface Ck {
   onUpdate?(fn: (u: Update) => void): void;
 }
 /** Where updating the app stands (desktop/main.js). */
-export interface Update { state: "idle" | "checking" | "none" | "downloading" | "ready" | "error"; current: string; latest: string; error: string; building?: boolean }
+export interface Update { state: "idle" | "checking" | "none" | "downloading" | "ready" | "error"; current: string; latest: string; error: string; building?: boolean;
+  /** how much of the download is in (0-100) */ percent?: number }
 export const ck = (): Ck | undefined => (typeof window === "undefined" ? undefined : (window as unknown as { ck?: Ck }).ck);
 
 export function useDesktop() {
@@ -124,7 +126,7 @@ export function useUpdate() {
 /** Settings → Updates: the version, a button to look for a newer one, and
  * (once it's downloaded) one to restart into it. */
 export function UpdateCard({ busy }: { busy: boolean }) {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const u = useUpdate();
   const [error, setError] = useState("");
   if (!u) return null;
@@ -134,10 +136,14 @@ export function UpdateCard({ busy }: { busy: boolean }) {
       <h2 className={s.cardTitle}>{t("update.title")}</h2>
       <p className={s.muted}>{t("update.current", { v: u.current })}</p>
       {u.state === "checking" ? <p className={s.faint}>{t("update.checking")}</p>
-        : u.state === "downloading" ? <Note tone="good">{t("update.downloading", { v: u.latest })}</Note>
+        : u.state === "downloading" ? <>
+            <Note tone="good">{t("update.downloading", { v: u.latest })}{u.percent ? ` ${num(lang, u.percent)}%` : ""}</Note>
+            <progress max={100} value={u.percent ?? 0} style={{ width: "100%" }} aria-label={t("update.downloading", { v: u.latest })} />
+            <span className={s.faint}>{t("update.downloadingNote")}</span>
+          </>
         : u.state === "ready" ? <Note tone="good">{t("update.ready", { v: u.latest })}</Note>
         : u.state === "none" ? <p className={s.faint}>{u.building ? t("update.building", { v: u.latest }) : t("update.none")}</p>
-        : u.state === "error" ? <Note tone="bad">{t("update.error")}</Note> : null}
+        : u.state === "error" ? <Note tone="bad">{/stopped/.test(u.error) ? t("update.stopped") : t("update.error")}</Note> : null}
       {u.state === "ready"
         ? <div className={s.row}>
             <Button kind="primary" onClick={() => ck()!.applyUpdate!()} disabled={busy}>{t("update.restart")}</Button>

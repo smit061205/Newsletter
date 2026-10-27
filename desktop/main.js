@@ -87,6 +87,8 @@ async function startAll() {
     ...(lastStatus?.lang ? { CK_LANG: lastStatus.lang } : {}),
     // Chromium for laying out pages ships inside the app (node_modules/playwright-core/.local-browsers)
     PLAYWRIGHT_BROWSERS_PATH: "0",
+    // the app's version, for the newsroom's About line (the app has no .git to read it from)
+    CK_APP_VERSION: app.getVersion(),
   };
   fs.mkdirSync(engineEnv.DATA_DIR, { recursive: true });
   if (!(await answers(`http://127.0.0.1:${ENGINE}/healthz`))) {
@@ -354,7 +356,8 @@ async function migrateOldInstall() {
 // (not notarised): the release's zip, swapped in by a small script.
 const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 let pendingUpdate = null;
-/** Where updating stands, for the newsroom: idle | checking | none | downloading | ready | error. */
+/** Where updating stands, for the newsroom: idle | checking | none | downloading | ready | error
+ * (`percent`: how much of the download is in, while downloading). */
 let update = { state: "idle", current: app.getVersion(), latest: "", error: "" };
 const setUpdate = (patch) => {
   update = { ...update, ...patch };
@@ -366,7 +369,8 @@ function windowsUpdater() {
   const { autoUpdater } = require("electron-updater");
   autoUpdater.autoDownload = true;
   // registered once (each check used to add another listener: one dialog per day)
-  autoUpdater.on("update-available", (i) => setUpdate({ state: "downloading", latest: i.version }));
+  autoUpdater.on("update-available", (i) => setUpdate({ state: "downloading", latest: i.version, percent: 0 }));
+  autoUpdater.on("download-progress", (p) => setUpdate({ percent: Math.floor(p.percent || 0) }));
   autoUpdater.on("update-not-available", () => setUpdate({ state: "none" }));
   autoUpdater.on("error", (e) => setUpdate({ state: "error", error: e.message }));
   autoUpdater.on("update-downloaded", (i) => {
@@ -421,10 +425,10 @@ async function checkForUpdates(from = "start") {
     // a release whose installers are still being built: none to fetch yet
     if (!isMac || !asset || !app.isPackaged) { setUpdate({ state: "none", latest: v, building: true }); return update; }
     // macOS without notarisation: download the new app, check it, swap it in on restart
-    setUpdate({ state: "downloading", latest: v });
+    setUpdate({ state: "downloading", latest: v, percent: 0 });
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ck-update-"));
     const zip = path.join(tmp, asset.name);
-    fs.writeFileSync(zip, Buffer.from(await (await fetch(asset.browser_download_url)).arrayBuffer()));
+    await download(asset.browser_download_url, zip, (percent) => setUpdate({ percent }));
     execFileSync("ditto", ["-x", "-k", zip, tmp]);
     const fresh = path.join(tmp, "Capital Kranti.app");
     if (!fs.existsSync(path.join(fresh, "Contents", "MacOS"))) throw new Error("the downloaded update isn't an app");
@@ -442,6 +446,34 @@ async function checkForUpdates(from = "start") {
     setUpdate({ state: "error", error: e.message });
   }
   return update;
+}
+/** `url` to `file`, a piece at a time, `onPercent` told as it comes in (27 Oct: the
+ * 500 MB update fetched in one piece showed nothing for many minutes, and a dropped
+ * connection would have left it waiting for ever). Gives up when nothing has come
+ * for a minute. */
+async function download(url, file, onPercent) {
+  const stalled = new AbortController();
+  let timer = setTimeout(() => stalled.abort(), 60_000);
+  try {
+    const res = await fetch(url, { signal: stalled.signal });
+    if (!res.ok || !res.body) throw new Error(`the download answered ${res.status}`);
+    const total = Number(res.headers.get("content-length")) || 0;
+    const out = fs.createWriteStream(file);
+    let got = 0, said = -1;
+    try {
+      for await (const chunk of res.body) {
+        clearTimeout(timer);
+        timer = setTimeout(() => stalled.abort(), 60_000);
+        if (!out.write(chunk)) await new Promise((ok) => out.once("drain", ok));
+        got += chunk.length;
+        const pct = total ? Math.floor((got / total) * 100) : 0;
+        if (pct !== said) { said = pct; onPercent(pct); }
+      }
+    } finally { await new Promise((ok) => out.end(ok)); }
+    if (total && got < total) throw new Error("the download stopped part-way");
+  } catch (e) {
+    throw stalled.signal.aborted ? new Error("the download stopped: nothing came for a minute (check the internet)") : e;
+  } finally { clearTimeout(timer); }
 }
 function offerUpdate() {
   if (!pendingUpdate) return;
