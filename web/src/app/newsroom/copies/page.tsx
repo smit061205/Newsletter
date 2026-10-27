@@ -2,16 +2,18 @@
 // નકલો / Copies: copies of the day's paper -- how many, what the AI rewords,
 // how far the stories move -- made in the background, each copy a print PDF
 // with its masthead, page headers and footer left empty for the paper's own
-// (backend/src/editorial/copies.ts).
+// (backend/src/editorial/copies.ts), or printed on the designs of the paper it
+// goes to (./Designs.tsx).
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { batchProgress, call, media, type CopiesRun, type IssueInfo, type Job, type PaperLang, type Reword, type Shuffle } from "../api";
+import { batchProgress, call, media, type CopiesRun, type IssueInfo, type Job, type PaperDesigns, type PaperLang, type Reword, type Shuffle } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { BatchTime } from "../ui/BatchTime";
 import { num, rupees } from "../ui/format";
 import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
+import { Designs } from "./Designs";
 
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
 // (Urdu waits for its own fonts and layout)
@@ -55,6 +57,14 @@ export default function Copies() {
   const mixes = Math.max(1, titles.length) * Math.max(1, pics.length);
   const [error, setError] = useState("");
   const has = !!status?.issue;
+  // other papers' titles, headers and footers, and which copy goes to which
+  const [designs, setDesigns] = useState<PaperDesigns>({ designs: [], copies: {} });
+  useEffect(() => { call<PaperDesigns>("/api/designs").then(setDesigns).catch(() => {}); }, []);
+  const paperOf = (n: number) => designs.designs.find((d) => d.id === designs.copies[String(n)]);
+  const assign = async (n: number, id: string) => {
+    try { setDesigns(await call<PaperDesigns>("/api/designs/assign", { json: { copy: n, id: id || null } })); toast(t("design.saved")); }
+    catch (e) { setError((e as Error).message); }
+  };
 
   const load = useCallback(() => {
     call<CopiesRun | null>(`/api/issues/${date}/copies`).then(setRun).catch(() => {});
@@ -129,12 +139,17 @@ export default function Copies() {
     return w === "checking" ? t("progress.checking") : w === "translating" ? t("copies.doing.translating") : w === "rewording" ? t("copies.doing.rewording") : w;
   };
   // a copy's print PDF, or (`corel`) the one whose text stays text in CorelDRAW
-  const open = (n: number, corel = false) => pdf({
-    url: media(`/api/issues/${date}/copies/${n}.${corel ? "editable." : ""}pdf?t=${encodeURIComponent(run?.endedAt ?? "")}`),
-    title: corel ? t("corel.title", { what: t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }) })
-      : t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }),
-    fileName: `${paperName} ${issueNo} - ${lang === "gu" ? "નકલ" : "copy"} ${n}${run && run.lang !== "gu" ? ` (${run.lang})` : ""} - ${date.split("-").reverse().join("-")}${corel ? " - CorelDRAW" : ""}.pdf`,
-  });
+  const open = (n: number, corel = false) => {
+    const paper = paperOf(n);
+    // (a paper's designs changed: the copy fetched afresh)
+    const v = `${run?.endedAt ?? ""}${paper ? `|${paper.id}|${Object.values(paper.slots).join()}` : ""}`;
+    return pdf({
+      url: media(`/api/issues/${date}/copies/${n}.${corel ? "editable." : ""}pdf?t=${encodeURIComponent(v)}`),
+      title: `${paper ? `${paper.name} · ` : ""}${corel ? t("corel.title", { what: t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) }) })
+        : t("copies.pdfTitle", { issue: num(lang, issueNo), n: num(lang, n) })}`,
+      fileName: `${paper ? paper.name : `${paperName} ${issueNo}`} - ${lang === "gu" ? "નકલ" : "copy"} ${n}${run && run.lang !== "gu" ? ` (${run.lang})` : ""} - ${date.split("-").reverse().join("-")}${corel ? " - CorelDRAW" : ""}.pdf`,
+    });
+  };
 
   if (!has) {
     return (
@@ -257,6 +272,11 @@ export default function Copies() {
                 </div>
                 <Button icon={Icon.print()} onClick={() => open(f.n)}>{t("copies.open")}</Button>
                 {(f.lang ?? "gu") === "gu" && <Button kind="quiet" icon={Icon.download()} onClick={() => open(f.n, true)}>{t("corel.pdf")}</Button>}
+                {designs.designs.length > 0 && <label className={s.field}><span className={s.label}>{t("design.for")}</span>
+                  <select className={s.select} value={designs.copies[String(f.n)] ?? ""} onChange={(e) => assign(f.n, e.target.value)}>
+                    <option value="">{t("design.forNone")}</option>
+                    {designs.designs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select></label>}
               </div>
             ))}
           </div>
@@ -270,6 +290,7 @@ export default function Copies() {
           </details>
         </section>
       )}
+      <Designs designs={designs} pages={run?.files[0]?.pages ?? 4} onChange={setDesigns} />
     </div>
   );
 }

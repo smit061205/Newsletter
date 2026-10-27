@@ -21,7 +21,9 @@
 //   GET   /api/papers/:id  POST /api/papers/:id/test  GET /api/papers/:id/pdf   a paper's test issue
 //   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang} makes them
 //   GET   /api/issues/:date/editions   the day's sister papers; POST {only?} makes them (all, or one); GET .../editions/<id>.pdf
-//   GET   /api/issues/:date/copies/N.pdf  one copy
+//   GET   /api/issues/:date/copies/N.pdf  one copy (on the paper's designs it goes to, if any)
+//   GET   /api/designs  POST /api/designs {name, id?}  DELETE /api/designs/:id   other papers' designs for the copies
+//   POST  /api/designs/:id/:slot {base64|null}  a title / header-N / footer PDF;  POST /api/designs/assign {copy, id|null}
 //   GET   /api/layout                  the page, its columns and each page's room for stories (the Ads screen's preview)
 //   GET   /healthz                     "ok" (for the host's health check)
 //   GET   /reader                      the release reader: a bookmark that sends the release page you're reading here
@@ -335,13 +337,13 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           if (req.method === "GET" && parts[4]?.endsWith(".editable.pdf")) {
             const json = copyFile(date, Number(parts[4].replace(/\.editable\.pdf$/, ""))).replace(/\.pdf$/, ".json");
             if (!existsSync(json)) return send(res, 404, { error: "make the copies again for their CorelDRAW PDF" });
-            return sendEditable(res, JSON.parse(await readFile(json, "utf8")));
+            return sendEditable(res, JSON.parse(await readFile(json, "utf8")), Number(parts[4].replace(/\.editable\.pdf$/, "")));
           }
           if (req.method === "GET" && parts[4]) {
             const n = Number(parts[4].replace(/\.pdf$/, ""));
             const file = copyFile(date, n);
             if (!Number.isInteger(n) || n < 1 || !existsSync(file)) return send(res, 404, { error: `no copy ${parts[4]} for ${date}` });
-            return send(res, 200, new Uint8Array(await readFile(file)), "application/pdf");
+            return send(res, 200, await onDesign(new Uint8Array(await readFile(file)), n), "application/pdf");
           }
           if (req.method === "GET") return send(res, 200, copiesOf(date));
           if (req.method === "POST") {
@@ -665,6 +667,33 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         });
       }
       if (parts[0] === "api" && parts[1] === "papers") return await papersApi(req, res, parts, url);
+      if (parts[0] === "api" && parts[1] === "designs") {
+        const d = await import("./export/designs.ts");
+        try {
+          if (req.method === "GET" && !parts[2]) return send(res, 200, await d.designsOf());
+          if (req.method === "POST" && parts[2] === "assign") {
+            const body = (await readJson(req)) as { copy?: number; id?: string | null };
+            const n = Math.round(Number(body.copy));
+            if (!(n >= 1 && n <= 50)) return send(res, 400, { error: "which copy: 1 to 50" });
+            await d.assign(n, body.id || null);
+            return send(res, 200, await d.designsOf());
+          }
+          if (req.method === "POST" && !parts[2]) {
+            const body = (await readJson(req)) as { name?: string; id?: string };
+            await d.nameDesign(body.name ?? "", body.id);
+            return send(res, 200, await d.designsOf());
+          }
+          if (req.method === "DELETE" && parts[2] && !parts[3]) {
+            await d.dropDesign(parts[2]);
+            return send(res, 200, await d.designsOf());
+          }
+          if (req.method === "POST" && parts[2] && parts[3]) {
+            const body = (await readJson(req)) as { base64?: string | null };
+            await d.putSlot(parts[2], parts[3], body.base64 ? new Uint8Array(Buffer.from(body.base64, "base64")) : null);
+            return send(res, 200, await d.designsOf());
+          }
+        } catch (e) { return send(res, 400, { error: e instanceof Error ? e.message : String(e) }); }
+      }
       return send(res, 404, { error: "not found" });
     } catch (e) {
       log(`error: ${e instanceof Error ? e.stack : e}`);
@@ -696,11 +725,18 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
 let copiesNow: (() => { date: string } | null) | undefined;
 
 /** An issue as the CorelDRAW PDF, or why there's none (a Hindi or Urdu paper's text needs shaping). */
-async function sendEditable(res: ServerResponse, issue: import("@ck/shared/contract").IssueRender) {
+/** `copy`: a copy's number, printed onto the designs of the paper it goes to (export/designs.ts). */
+async function sendEditable(res: ServerResponse, issue: import("@ck/shared/contract").IssueRender, copy?: number) {
   const { editablePdf } = await import("./export/pdf-editable.ts");
   const pdf = await editablePdf(issue);
   if (!pdf) return send(res, 400, { error: "a Hindi or Urdu paper has no CorelDRAW PDF: use its print PDF" });
-  return send(res, 200, pdf, "application/pdf");
+  return send(res, 200, copy ? await onDesign(new Uint8Array(pdf), copy) : pdf, "application/pdf");
+}
+/** Copy `n`'s PDF on the title, headers and footer of the paper it goes to, if it has one. */
+async function onDesign(pdf: Uint8Array, n: number): Promise<Uint8Array> {
+  const { designFor, withDesign } = await import("./export/designs.ts");
+  const design = Number.isInteger(n) && n > 0 ? await designFor(n) : null;
+  return design ? withDesign(pdf, design) : pdf;
 }
 /** Days to lay out again once the run that's going ends (edits made meanwhile). */
 const afterRun = new Set<string>();
