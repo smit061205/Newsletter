@@ -11,7 +11,8 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { PDFDocument } from "pdf-lib";
+import { clip, endPath, PDFDocument, popGraphicsState, pushGraphicsState, rectangle } from "pdf-lib";
+import { bandOf } from "../chrome/chrome.ts";
 import { DATA_DIR, ROOT } from "../config.ts";
 
 export const DESIGNS_DIR = DATA_DIR ? path.join(DATA_DIR, "designs") : path.join(ROOT, "backend", "data", "designs");
@@ -87,7 +88,10 @@ export async function designFor(n: number): Promise<Design | null> {
 
 /** `pdf` (a copy, print or CorelDRAW) with `design`'s pages laid over its own,
  * page for page: one of the page's shape over the whole page, any other fitted
- * in from the top. */
+ * in from the top -- shown only above and below where the copy's stories go
+ * (27 Oct: a paper's PageMaker design carried a white box that, laid over the
+ * copy, blanked the foot of page 3's first columns; laid under, the print PDF's
+ * white page hid the design). */
 export async function withDesign(pdf: Uint8Array, design: Design): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdf, { ignoreEncryption: true });
   const src = await PDFDocument.load(await readFile(fileOf(design.id)), { ignoreEncryption: true });
@@ -97,9 +101,16 @@ export async function withDesign(pdf: Uint8Array, design: Design): Promise<Uint8
     const crop = from.getCropBox();
     const art = await doc.embedPage(from, { left: crop.x, bottom: crop.y, right: crop.x + crop.width, top: crop.y + crop.height });
     const { width: W, height: H } = page.getSize();
-    if (Math.abs(art.width / art.height - W / H) < 0.03) { page.drawPage(art, { x: 0, y: 0, width: W, height: H }); continue; }
-    const s = Math.min(W / art.width, H / art.height);
-    page.drawPage(art, { x: (W - art.width * s) / 2, y: H - art.height * s, width: art.width * s, height: art.height * s });
+    // the room outside the stories: the band above them and the band below
+    const band = bandOf(i + 1, doc.getPageCount());
+    const k = H / band.page.height;
+    page.pushOperators(pushGraphicsState(), rectangle(0, H - band.top * k, W, band.top * k), rectangle(0, 0, W, H - band.bottom * k), clip(), endPath());
+    if (Math.abs(art.width / art.height - W / H) < 0.03) page.drawPage(art, { x: 0, y: 0, width: W, height: H });
+    else {
+      const s = Math.min(W / art.width, H / art.height);
+      page.drawPage(art, { x: (W - art.width * s) / 2, y: H - art.height * s, width: art.width * s, height: art.height * s });
+    }
+    page.pushOperators(popGraphicsState());
   }
   return doc.save();
 }

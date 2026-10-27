@@ -93,6 +93,18 @@ export interface ChromeResult {
   bodyBottom: number;
 }
 
+/** Where page `n` of `total`'s stories go (template pixels): under its header,
+ * above its footer or foot margin -- outside it, a copy leaves the room for
+ * another paper's own (export/designs.ts). */
+export function bandOf(n: number, total: number): { top: number; bottom: number; page: Template["page"] } {
+  const role = template.roles[n === 1 ? "first" : n === total ? "last" : "inner"];
+  // a one-page paper has no "last page" header; give its last page the footer anyway
+  const footer = role.footer ?? (n === total ? template.roles.last.footer : undefined);
+  // the template's own foot margin, else the footer's top, else the page's;
+  // the stories start a little under the header (profile spacing.underHeader)
+  return { top: role.bodyTop + GAP.underHeader, bottom: Math.min(role.bodyBottom ?? template.page.height, footer ? footer.y : template.page.height), page: template.page };
+}
+
 /** Chrome for page `n` of `total`: page 1 carries the masthead, the last page
  * the last-page header and the footer, every other page the inner header.
  * `blank`: the same room kept, left empty -- a copy whose masthead, page
@@ -113,8 +125,6 @@ export async function chromeFor(n: number, total: number, issueDate: string, iss
     const r = role.rule;
     els.push({ id: `p${n}-foot-rule`, kind: "line", x1: r.x1, y1: r.y, x2: r.x2, y2: r.y, color: r.color, width: r.width });
   }
-  // the template's own foot margin, else the footer's top, else the page's
-  const bottom = Math.min(role.bodyBottom ?? template.page.height, footer ? footer.y : template.page.height);
-  // (the stories start a little under the header: profile spacing.underHeader)
-  return { elements: els, bodyTop: role.bodyTop + GAP.underHeader, bodyBottom: bottom };
+  const band = bandOf(n, total);
+  return { elements: els, bodyTop: band.top, bodyBottom: band.bottom };
 }
