@@ -245,6 +245,15 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
   // days edited while a run went: laid out again, one at a time, when it ends
   const next = () => {
     if (currentJob() || copiesNow?.()) return;
+    // a paper asked for while its copies or sister papers were being made: made now
+    const [waited, from] = [...afterBatch][0] ?? [];
+    if (waited) {
+      afterBatch.delete(waited);
+      afterRun.delete(waited);
+      log(`making ${waited} again, asked for while its other papers were being made`);
+      runPipeline(store, waited, { by: "newsroom", from, log }).catch((e) => log(`run for ${waited} stopped: ${e instanceof Error ? e.message : e}`));
+      return;
+    }
     const day = [...afterRun][0];
     if (!day) return;
     afterRun.delete(day);
@@ -252,11 +261,16 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
     runPipeline(store, day, { by: "newsroom", from: "build", log }).catch((e) => log(`run for ${day} stopped: ${e instanceof Error ? e.message : e}`));
   };
   onJob((job) => { if (job.status !== "running") setTimeout(next, 500); });
-  setInterval(next, 30_000);
+  setInterval(next, 10_000);
   /** Start a run in the background and answer at once with its job. */
   const startJob = (res: ServerResponse, date: string, from?: StepName) => {
     if (currentJob()) return send(res, 409, { error: `a run for ${currentJob()!.date} is still going`, job: currentJob() });
-    if (copiesNow?.()?.date === date) return send(res, 409, { error: "copies of this day are being made: make the paper again when they're done" });
+    // its copies or sister papers being made: the paper is made as soon as they're done
+    const batch = copiesNow?.();
+    if (batch?.date === date) {
+      if (!afterBatch.has(date) || !from) afterBatch.set(date, from);
+      return send(res, 202, { waitingFor: batch.kind });
+    }
     runPipeline(store, date, { by: "newsroom", from, log }).catch((e) => log(`run for ${date} stopped: ${e instanceof Error ? e.message : e}`));
     return send(res, 202, currentJob());
   };
@@ -758,7 +772,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
   setInterval(() => rupeeRate(store, log).catch(() => {}), 3 * 3600_000);
 }
 
-let copiesNow: (() => { date: string } | null) | undefined;
+let copiesNow: (() => { date: string; kind: "copies" | "editions" } | null) | undefined;
 
 /** An issue as the CorelDRAW PDF, or why there's none (a Hindi or Urdu paper's text needs shaping). */
 /** `copy`: a copy's number, printed onto the designs of the paper it goes to (export/designs.ts). */
@@ -776,6 +790,8 @@ async function onDesign(pdf: Uint8Array, n: number): Promise<Uint8Array> {
 }
 /** Days to lay out again once the run that's going ends (edits made meanwhile). */
 const afterRun = new Set<string>();
+/** Days to make again once their copies or sister papers are done, and the step to start from. */
+const afterBatch = new Map<string, StepName | undefined>();
 
 /** The day's US dollar in rupees, from the European Central Bank's reference
  * rates (Frankfurter), else open.er-api.com -- once a day, while "keep it up

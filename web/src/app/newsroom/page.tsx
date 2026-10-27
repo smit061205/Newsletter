@@ -57,6 +57,8 @@ export default function Today() {
   const [publishing, setPublishing] = useState<"ask" | "working" | "done" | null>(null);
   const [editing, setEditing] = useState<StoryRow | null>(null);
   const [error, setError] = useState("");
+  // the paper asked for while its copies or sister papers are made: it starts when they're done
+  const [waiting, setWaiting] = useState<"copies" | "editions" | null>(null);
 
   const hasIssue = !!status?.issue;
   const issueVersion = status?.issue?.version;
@@ -75,7 +77,7 @@ export default function Today() {
     return () => clearInterval(id);
   }, [reviewing, loadIssue]);
   useEffect(() => {
-    setJob(null); setTicker([]); setPublishing(null);
+    setJob(null); setTicker([]); setPublishing(null); setWaiting(null);
     call<Job[]>(`/api/jobs?date=${date}`).then((js) => setJob(js[0] ?? null)).catch(() => {});
     call<Job[]>("/api/jobs").then((js) => setLastDone(js.find((j) => j.status === "done"))).catch(() => {});
   }, [date]);
@@ -86,6 +88,7 @@ export default function Today() {
       const { job: j } = JSON.parse(e.data) as { job: Job | null };
       if (!j || j.date !== date) return;
       setJob(j);
+      setWaiting(null);
       const item = j.steps.find((x) => x.status === "running")?.progress?.item;
       if (item && !/^\d+$/.test(item)) setTicker((tk) => (tk[0] === item ? tk : [item, ...tk].slice(0, 4)));
       if (j.status !== "running") refresh();
@@ -103,8 +106,11 @@ export default function Today() {
 
   const run = async (from?: StepName) => {
     setError("");
-    try { setJob(await call<Job>("/api/jobs", { json: { date, ...(from ? { from } : {}) } })); setTicker([]); }
-    catch (e) { setError((e as Error).message); }
+    try {
+      const got = await call<Job | { waitingFor: "copies" | "editions" }>("/api/jobs", { json: { date, ...(from ? { from } : {}) } });
+      if ("waitingFor" in got) { setWaiting(got.waitingFor); return; }
+      setJob(got); setTicker([]);
+    } catch (e) { setError((e as Error).message); }
   };
   const [stopping, setStopping] = useState(false);
   // "start again from the beginning" while a run goes: stop it, then run from the first step
@@ -205,6 +211,7 @@ export default function Today() {
         {job && <TimeMeter job={job} />}
         {reviewing && !running && <p className={s.faint}>{t("today.reviewing")}</p>}
         {error && <Note tone="bad">{error}</Note>}
+        {waiting && <Note>{t(waiting === "copies" ? "today.waitCopies" : "today.waitPapers")}</Note>}
         {otherRunning && <p className={s.faint}>{t("today.otherRunning", { date: status!.running!.date })}</p>}
         <div className={s.row} style={{ justifyContent: "space-between" }}>
           <span className={s.faint}>{date === status?.today ? nextRun : ""}</span>
