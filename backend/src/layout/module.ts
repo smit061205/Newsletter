@@ -270,7 +270,8 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   const spans = !photo ? [0]
     : photoMode === 1 ? [cols]
     : cols === 1 ? [1, 0]
-    : [...new Set([Math.ceil(cols / 2), cols - 1, cols, Math.max(PHOTO.minCols, Math.floor(cols / 2))])]
+    // (a third of a wide story too: a small photo set in a full-width lead, 28 Oct)
+    : [...new Set([Math.ceil(cols / 2), cols - 1, cols, Math.max(PHOTO.minCols, Math.floor(cols / 2)), ...(cols >= 6 ? [Math.ceil(cols / 3)] : [])])]
         .filter((k) => k >= PHOTO.minCols && k <= cols).concat(0);
   // the wider layouts may give the picture more of the story -- only a
   // landscape picture: a tall one spread across the story would take it over

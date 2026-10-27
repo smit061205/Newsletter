@@ -13,7 +13,7 @@
 //      pages tried again; then with room for a filler, and the nearest design
 //      if none is exact (its gap reported). No other engine lays out a page.
 import type { Element } from "@ck/shared/contract";
-import { ladderOf, type Rung } from "../editorial/ladder.ts";
+import { ladderOf, MIN_WORDS, type Rung } from "../editorial/ladder.ts";
 import { alwaysPrinted, type Ad, type Release, type Store, type Story } from "../store.ts";
 import { Blocks, type Option } from "./blocks.ts";
 import { spanWidth } from "./module.ts";
@@ -24,7 +24,7 @@ import type { FillerCount } from "./fit.ts";
 import type { Measurer } from "./measure.ts";
 import { outranks, rankOf, renderPlaced, tombstoned, type Band, type PlacedModule } from "./pack.ts";
 import { related } from "./stories.ts";
-import { GAP, GRID, PT } from "./typography.ts";
+import { GAP, GRID, LEAD_FULL_WIDTH, PT } from "./typography.ts";
 
 export interface EnginePage {
   page: number;
@@ -79,10 +79,10 @@ interface Sized { story: Story; min: number; mid: number; max: number }
 /** News the editor sent the paper's Telegram bot, and a copy's fixed article:
  * always printed (26 Oct, the editor's wish): never the story held back while another can be. */
 const sent = (s: Sized) => alwaysPrinted(s.story);
-/** the story to hold back first: not one he sent, then the least important */
-const toHold = (a: Sized, b: Sized) => Number(sent(a)) - Number(sent(b)) || b.story.priority - a.story.priority;
-/** the held story to bring back first: one he sent, then the most important */
-const toBring = (a: Sized, b: Sized) => Number(sent(b)) - Number(sent(a)) || a.story.priority - b.story.priority;
+/** the story to hold back first: not one he sent, then the least important, then one with no photo */
+const toHold = (a: Sized, b: Sized) => Number(sent(a)) - Number(sent(b)) || b.story.priority - a.story.priority || Number(!!a.story.photo) - Number(!!b.story.photo);
+/** the held story to bring back first: one he sent, then the most important, then one with a photo */
+const toBring = (a: Sized, b: Sized) => Number(sent(b)) - Number(sent(a)) || a.story.priority - b.story.priority || Number(!!b.story.photo) - Number(!!a.story.photo);
 
 /** The stories shared out over the pages: each page's list, most important first. */
 export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<string, number>; rng?: () => number }): { pages: Sized[][]; held: Sized[] } {
@@ -179,6 +179,11 @@ export async function layOut(args: {
   };
   // (a copy: the day's paper's longer versions, already paid for)
   await lengths(args.pool, args.longer ? false : "cached");
+  // a story shorter than the paper's shortest (profile minWords) isn't printed,
+  // unless the editor sent it: no items of a few lines under a big headline
+  const tooShort = args.pool.filter((s) => !alwaysPrinted(s) && Math.max(...(ladders.get(s.id) ?? []).map((r) => r.words)) < MIN_WORDS);
+  if (tooShort.length) log(`  shorter than ${MIN_WORDS} words, left out: ${tooShort.map((s) => s.id).join(", ")}`);
+  args = { ...args, pool: args.pool.filter((s) => !tooShort.includes(s)) };
   const blocks = new Blocks(m, ladders);
   log(`  lengths: ${[...ladders.values()].reduce((a, r) => a + r.length, 0)} for ${ladders.size} stories (${secs(t0)}s)`);
   const t1 = Date.now();
@@ -228,7 +233,8 @@ export async function layOut(args: {
     const todo = shares.map((_, i) => i).filter((i) => !pages[i] && tried.get(i) !== shares[i].map((s) => s.story.id).join() + round);
     if (!todo.length) break;
     const diag = new Map<number, Diagnosis>();
-    fill.held = held.map((s) => s.story);
+    // (a story too short to print as one may still fill a strip by an ad)
+    fill.held = [...held.map((s) => s.story), ...tooShort];
     await inParallel(todo.map((i) => async () => {
       const n = i + 1;
       tried.set(i, shares[i].map((s) => s.story.id).join() + round);
@@ -245,6 +251,7 @@ export async function layOut(args: {
     }), total); // every page at once
     // held stories set as briefs by an ad are on their pages now
     for (const s of [...held]) if (!fill.held.includes(s.story)) held.splice(held.indexOf(s), 1);
+    for (const s of [...tooShort]) if (!fill.held.includes(s)) tooShort.splice(tooShort.indexOf(s), 1);
     const failed = todo.filter((i) => !pages[i]);
     if (!failed.length) break;
     for (const i of failed) {
@@ -317,7 +324,7 @@ export async function layOut(args: {
   }
   cost += fill.cost;
   log(`  layout: ${pages.filter(Boolean).length} of ${total} pages solved exactly (${secs(t0)}s in all)`);
-  return { pages, leftOut: held.map((s) => s.story), cost, assigned: shares.map((p) => p.map((s) => s.story)), factChecks };
+  return { pages, leftOut: [...held.map((s) => s.story), ...tooShort], cost, assigned: shares.map((p) => p.map((s) => s.story)), factChecks };
 }
 
 /** Rounds of tries for a page; from LAST on, a filler slot and the nearest design if none is exact. */
@@ -338,6 +345,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   const t0 = Date.now();
   const none = { page: null, diagnosis: { short: 0, long: 0 } };
   if (!stories.length) return none;
+  // the front page's lead may run the full width (the profile's leadFullWidth)
+  if (n === 1 && LEAD_FULL_WIDTH) stories = [{ ...stories[0], fullWidth: true }, ...stories.slice(1)];
   // an ad the editor put at a place of their own: laid round it. One booked off
   // the columns (from an old issue) is set on the nearest ones, its picture
   // drawn to their width
@@ -359,7 +368,9 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   }
   const options = (i: number, cols: number) => table.get(`${i}|${cols}`) ?? [];
   const ds: DesignStory[] = stories.map((s, i) => {
-    const widths = blocks.widths(s, ranks[i]).filter((c) => options(i, c).length);
+    let widths = blocks.widths(s, ranks[i]).filter((c) => options(i, c).length);
+    // the front page's lead across the whole page when it can be (its usual widths only if not)
+    if (s.fullWidth && n === 1 && i === 0 && LEAD_FULL_WIDTH && widths.includes(GRID.columns)) widths = [GRID.columns];
     return {
       widths,
       area: (cols: number) => {

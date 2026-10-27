@@ -17,6 +17,8 @@ export const PAGE = { width: profile.page.width * PT, height: profile.page.heigh
  * allows it the full width ("Allow full width"). (The profile's key keeps its
  * old name: it once held for the front page only.) */
 export const MAX_STORY_COLS = profile.grid.frontPageMaxCols ?? profile.grid.columns - 1;
+/** The front page's lead may run the full width without the editor's say-so. */
+export const LEAD_FULL_WIDTH = !!profile.grid.leadFullWidth;
 
 export const GRID = {
   left: profile.grid.left * PT,
@@ -61,6 +63,8 @@ export const HEADLINE = {
     return Math.max(t.headline.min, t.headline.capByColumns[Math.min(cols, t.headline.capByColumns.length - 1)] * scale) * PT;
   },
   maxLines: (rank: number) => t.headline.maxLines[Math.min(rank, t.headline.maxLines.length) - 1],
+  /** an item filling a narrow gap: its headline's band, if the profile sets one smaller than `min` */
+  filler: t.headline.fillerMax ? { max: t.headline.fillerMax * PT, min: t.headline.fillerMax * PT * 0.8 } : undefined,
 };
 
 export const KICKER = { font: t.kicker.font, ratio: t.kicker.ratio, min: t.kicker.min * PT, leading: t.kicker.leading };
