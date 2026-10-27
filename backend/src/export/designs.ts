@@ -1,32 +1,28 @@
-// Other papers' designs for the copies: each paper's title (page 1), its page
-// headers (one per page, numbers and all) and its footer (the last page), as
-// PDFs exported from CorelDRAW. A copy given a paper is printed onto them when
-// it's opened or downloaded -- its print PDF and its CorelDRAW PDF -- so nobody
-// pastes them in by hand. Which paper each copy goes to is kept by copy number
-// (copy 3 goes to the same paper every day until it's changed).
-//
-// A design is fitted into the room the copy left empty for it (chrome.json's
-// masthead, header and footer), top-aligned (the footer bottom-aligned) and
-// centred; a design the size of a whole page is laid over the whole page.
+// Other papers' designs for the copies (27 Oct: each copy goes to a paper of
+// its own, 25 or more a day). A design is one PDF per paper, exported from
+// CorelDRAW at the page's size (390 x 525 mm): page 1 with its title, the
+// other pages with their headers (page numbers and all), the last with its
+// footer. Each design goes with one copy and each copy with one design: given
+// in turn as they're added (the first to copy 1, ...), changed by hand. A copy
+// opened or downloaded is printed on its design's pages -- its print PDF and
+// its CorelDRAW PDF -- and copies made before (PDFs from elsewhere) can be put
+// on theirs too, saved in a folder in Downloads.
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { PDFDocument } from "pdf-lib";
-import { designRoom } from "../chrome/chrome.ts";
 import { DATA_DIR, ROOT } from "../config.ts";
 
 export const DESIGNS_DIR = DATA_DIR ? path.join(DATA_DIR, "designs") : path.join(ROOT, "backend", "data", "designs");
-const LIST = path.join(DESIGNS_DIR, "designs.json");
-
-/** "title" (page 1), "header-N" (page N's header), "footer" (the last page). */
-export type Slot = string;
-export const isSlot = (s: string) => s === "title" || s === "footer" || /^header-([2-9]|[1-9]\d)$/.test(s);
+const LIST = path.join(DESIGNS_DIR, "pool.json");
+const fileOf = (id: string) => path.join(DESIGNS_DIR, `${id}.pdf`);
 
 export interface Design {
   id: string;
+  /** the file it came from */
   name: string;
-  /** slot -> when its PDF was added */
-  slots: Record<Slot, string>;
+  pages: number;
 }
 export interface Designs {
   designs: Design[];
@@ -42,91 +38,87 @@ async function save(d: Designs) {
   await mkdir(DESIGNS_DIR, { recursive: true });
   await writeFile(LIST, JSON.stringify(d, null, 1));
 }
-const slotFile = (id: string, slot: Slot) => path.join(DESIGNS_DIR, id, `${slot}.pdf`);
 
-/** A new paper's designs (no PDFs yet), or `id`'s renamed. */
-export async function nameDesign(name: string, id?: string): Promise<Design> {
+/** A design added, given to the first copy that has none. Throws on a file that isn't a PDF. */
+export async function addDesign(name: string, pdf: Uint8Array): Promise<Designs> {
+  const doc = await PDFDocument.load(pdf, { ignoreEncryption: true }).catch(() => null);
+  if (!doc?.getPageCount()) throw new Error(`${name}: not a PDF -- export it from CorelDRAW as a PDF`);
   const d = await designsOf();
-  const clean = name.replace(/\s+/g, " ").trim().slice(0, 80);
-  if (!clean) throw new Error("the paper needs a name");
-  let got = id ? d.designs.find((x) => x.id === id) : undefined;
-  if (id && !got) throw new Error("no such paper");
-  if (got) got.name = clean;
-  else d.designs.push(got = { id: `d${Date.now().toString(36)}`, name: clean, slots: {} });
+  const id = `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  await mkdir(DESIGNS_DIR, { recursive: true });
+  await writeFile(fileOf(id), pdf);
+  d.designs.push({ id, name: name.slice(0, 160), pages: doc.getPageCount() });
+  let n = 1;
+  while (d.copies[String(n)]) n++;
+  d.copies[String(n)] = id;
   await save(d);
-  return got;
+  return d;
 }
 
-export async function dropDesign(id: string) {
+/** Design `id` taken out (null: all of them). */
+export async function dropDesign(id: string | null): Promise<Designs> {
   const d = await designsOf();
-  d.designs = d.designs.filter((x) => x.id !== id);
-  for (const [n, x] of Object.entries(d.copies)) if (x === id) delete d.copies[n];
+  for (const x of d.designs) if (!id || x.id === id) await rm(fileOf(x.id), { force: true });
+  d.designs = id ? d.designs.filter((x) => x.id !== id) : [];
+  for (const [n, x] of Object.entries(d.copies)) if (!id || x === id) delete d.copies[n];
   await save(d);
-  await rm(path.join(DESIGNS_DIR, id), { recursive: true, force: true });
+  return d;
 }
 
-/** `slot`'s PDF for paper `id` (null takes it away). Throws on a file that isn't a PDF. */
-export async function putSlot(id: string, slot: Slot, pdf: Uint8Array | null) {
+/** Copy `n` goes with design `id` (null: none). A design already with another
+ * copy changes places: that copy takes `n`'s old one -- one design per copy. */
+export async function assign(n: number, id: string | null): Promise<Designs> {
   const d = await designsOf();
-  const got = d.designs.find((x) => x.id === id);
-  if (!got) throw new Error("no such paper");
-  if (!isSlot(slot)) throw new Error("no such part of the page");
-  if (pdf) {
-    const doc = await PDFDocument.load(pdf, { ignoreEncryption: true }).catch(() => null);
-    if (!doc?.getPageCount()) throw new Error("that file isn't a PDF: export it from CorelDRAW as a PDF");
-    await mkdir(path.dirname(slotFile(id, slot)), { recursive: true });
-    await writeFile(slotFile(id, slot), pdf);
-    got.slots[slot] = new Date().toISOString();
-  } else {
-    await rm(slotFile(id, slot), { force: true });
-    delete got.slots[slot];
-  }
-  await save(d);
-}
-
-/** Copy `n` goes to paper `id` (null: to none, its room left empty). */
-export async function assign(n: number, id: string | null) {
-  const d = await designsOf();
-  if (id && !d.designs.some((x) => x.id === id)) throw new Error("no such paper");
+  if (id && !d.designs.some((x) => x.id === id)) throw new Error("no such design");
+  const had = d.copies[String(n)];
+  const other = id ? Object.keys(d.copies).find((k) => d.copies[k] === id && k !== String(n)) : undefined;
+  if (other) { if (had) d.copies[other] = had; else delete d.copies[other]; }
   if (id) d.copies[String(n)] = id;
   else delete d.copies[String(n)];
   await save(d);
+  return d;
 }
 
-/** The paper copy `n` goes to, if it has one with any design added. */
+/** Copy `n`'s design, if it has one. */
 export async function designFor(n: number): Promise<Design | null> {
   const d = await designsOf();
-  const got = d.designs.find((x) => x.id === d.copies[String(n)]);
-  return got && Object.keys(got.slots).length ? got : null;
+  return d.designs.find((x) => x.id === d.copies[String(n)] && existsSync(fileOf(x.id))) ?? null;
 }
 
-/** `pdf` (a copy, print or CorelDRAW) with `design`'s title, headers and footer on its pages. */
+/** `pdf` (a copy, print or CorelDRAW) with `design`'s pages laid over its own,
+ * page for page: one of the page's shape over the whole page, any other fitted
+ * in from the top. */
 export async function withDesign(pdf: Uint8Array, design: Design): Promise<Uint8Array> {
-  const doc = await PDFDocument.load(pdf);
-  const pages = doc.getPages();
-  for (const [i, page] of pages.entries()) {
-    const n = i + 1;
-    const room = designRoom(n, pages.length);
-    const parts: [Slot, typeof room.head, "top" | "bottom"][] = [[n === 1 ? "title" : `header-${n}`, room.head, "top"]];
-    if (room.foot) parts.push(["footer", room.foot, "bottom"]);
+  const doc = await PDFDocument.load(pdf, { ignoreEncryption: true });
+  const src = await PDFDocument.load(await readFile(fileOf(design.id)), { ignoreEncryption: true });
+  for (const [i, page] of doc.getPages().entries()) {
+    if (i >= src.getPageCount()) break;
+    const from = src.getPage(i);
+    const crop = from.getCropBox();
+    const art = await doc.embedPage(from, { left: crop.x, bottom: crop.y, right: crop.x + crop.width, top: crop.y + crop.height });
     const { width: W, height: H } = page.getSize();
-    const k = W / room.page.width;
-    for (const [slot, box, align] of parts) {
-      if (!design.slots[slot] || !existsSync(slotFile(design.id, slot))) continue;
-      const src = await PDFDocument.load(await readFile(slotFile(design.id, slot)), { ignoreEncryption: true });
-      const first = src.getPage(0);
-      const crop = first.getCropBox();
-      const art = await doc.embedPage(first, { left: crop.x, bottom: crop.y, right: crop.x + crop.width, top: crop.y + crop.height });
-      // a whole page (390 x 525 mm, its design where it belongs): over the whole page
-      if (Math.abs(art.width / art.height - W / H) < 0.02 && art.width > W * 0.5) {
-        page.drawPage(art, { x: 0, y: 0, width: W, height: H });
-        continue;
-      }
-      const [bx, by, bw, bh] = [box.x * k, box.y * k, box.width * k, box.height * k];
-      const s = Math.min(bw / art.width, bh / art.height);
-      const [w, h] = [art.width * s, art.height * s];
-      page.drawPage(art, { x: bx + (bw - w) / 2, y: align === "top" ? H - by - h : H - by - bh, width: w, height: h });
-    }
+    if (Math.abs(art.width / art.height - W / H) < 0.03) { page.drawPage(art, { x: 0, y: 0, width: W, height: H }); continue; }
+    const s = Math.min(W / art.width, H / art.height);
+    page.drawPage(art, { x: (W - art.width * s) / 2, y: H - art.height * s, width: art.width * s, height: art.height * s });
   }
   return doc.save();
+}
+
+/** The folder in Downloads copies put on their designs are saved in. */
+export function outFolder(date: string): string {
+  const [y, m, d] = date.split("-");
+  return path.join(os.homedir(), "Downloads", `Capital Kranti - copies with designs - ${d}-${m}-${y}`);
+}
+
+/** A copy made before (`pdf`, from file `name`) put on copy `n`'s design, saved in `date`'s folder. */
+export async function stampFile(date: string, n: number, name: string, pdf: Uint8Array): Promise<string> {
+  const design = await designFor(n);
+  if (!design) throw new Error(`copy ${n} has no design yet`);
+  const doc = await PDFDocument.load(pdf, { ignoreEncryption: true }).catch(() => null);
+  if (!doc?.getPageCount()) throw new Error(`${name}: not a PDF`);
+  const dir = outFolder(date);
+  await mkdir(dir, { recursive: true });
+  const out = path.join(dir, path.basename(name).replace(/\.pdf$/i, "") + ".pdf");
+  await writeFile(out, await withDesign(pdf, design));
+  return out;
 }

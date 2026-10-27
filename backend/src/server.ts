@@ -21,9 +21,10 @@
 //   GET   /api/papers/:id  POST /api/papers/:id/test  GET /api/papers/:id/pdf   a paper's test issue
 //   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang, articles?} makes them
 //   GET   /api/issues/:date/editions   the day's sister papers; POST {only?} makes them (all, or one); GET .../editions/<id>.pdf
-//   GET   /api/issues/:date/copies/N.pdf  one copy (on the paper's designs it goes to, if any)
-//   GET   /api/designs  POST /api/designs {name, id?}  DELETE /api/designs/:id   other papers' designs for the copies
-//   POST  /api/designs/:id/:slot {base64|null}  a title / header-N / footer PDF;  POST /api/designs/assign {copy, id|null}
+//   GET   /api/issues/:date/copies/N.pdf  one copy (on its paper's design, if it has one)
+//   GET   /api/designs  POST /api/designs {name, base64}  DELETE /api/designs/:id|all   other papers' designs, one per copy
+//   POST  /api/designs/assign {copy, id|null}   POST /api/designs/save {date, names}   POST /api/designs/stamp {date, copy, name, base64}
+//   POST  /api/designs/reveal {date}   the copies on their designs, saved in a folder in Downloads (and that folder opened)
 //   GET   /api/layout                  the page, its columns and each page's room for stories (the Ads screen's preview)
 //   GET   /healthz                     "ok" (for the host's health check)
 //   GET   /reader                      the release reader: a bookmark that sends the release page you're reading here
@@ -674,28 +675,57 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
       if (parts[0] === "api" && parts[1] === "papers") return await papersApi(req, res, parts, url);
       if (parts[0] === "api" && parts[1] === "designs") {
         const d = await import("./export/designs.ts");
+        const dayOk = (x: unknown): x is string => typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x);
         try {
           if (req.method === "GET" && !parts[2]) return send(res, 200, await d.designsOf());
+          if (req.method === "DELETE" && parts[2]) return send(res, 200, await d.dropDesign(parts[2] === "all" ? null : parts[2]));
+          if (req.method === "POST" && !parts[2]) {
+            const body = (await readJson(req)) as { name?: string; base64?: string };
+            if (!body.base64) return send(res, 400, { error: "no file" });
+            return send(res, 200, await d.addDesign(body.name || "design.pdf", new Uint8Array(Buffer.from(body.base64, "base64"))));
+          }
           if (req.method === "POST" && parts[2] === "assign") {
             const body = (await readJson(req)) as { copy?: number; id?: string | null };
             const n = Math.round(Number(body.copy));
-            if (!(n >= 1 && n <= 50)) return send(res, 400, { error: "which copy: 1 to 50" });
-            await d.assign(n, body.id || null);
-            return send(res, 200, await d.designsOf());
+            if (!(n >= 1 && n <= 200)) return send(res, 400, { error: "which copy: 1 to 200" });
+            return send(res, 200, await d.assign(n, body.id || null));
           }
-          if (req.method === "POST" && !parts[2]) {
-            const body = (await readJson(req)) as { name?: string; id?: string };
-            await d.nameDesign(body.name ?? "", body.id);
-            return send(res, 200, await d.designsOf());
+          // every copy of the day the app has, on its design, into the Downloads folder
+          if (req.method === "POST" && parts[2] === "save") {
+            const body = (await readJson(req)) as { date?: string; names?: Record<string, string> };
+            if (!dayOk(body.date)) return send(res, 400, { error: "which day" });
+            const { copiesOf, copyFile } = await import("./editorial/copies.ts");
+            const { editablePdf } = await import("./export/pdf-editable.ts");
+            const saved: number[] = [];
+            const without: number[] = [];
+            for (const f of copiesOf(body.date)?.files ?? []) {
+              const design = await d.designFor(f.n);
+              if (!design) { without.push(f.n); continue; }
+              const json = copyFile(body.date, f.n).replace(/\.pdf$/, ".json");
+              const corel = f.lang === "gu" && existsSync(json) ? await editablePdf(JSON.parse(await readFile(json, "utf8"))) : null;
+              const pdf = corel ? new Uint8Array(corel) : new Uint8Array(await readFile(copyFile(body.date, f.n)));
+              const name = (body.names?.[String(f.n)] ?? `copy ${f.n}.pdf`).replace(/[\\/:*?"<>|]/g, "-");
+              await d.stampFile(body.date, f.n, name, pdf);
+              saved.push(f.n);
+            }
+            return send(res, 200, { folder: d.outFolder(body.date), saved, without });
           }
-          if (req.method === "DELETE" && parts[2] && !parts[3]) {
-            await d.dropDesign(parts[2]);
-            return send(res, 200, await d.designsOf());
+          // a copy made before, from elsewhere, on copy n's design
+          if (req.method === "POST" && parts[2] === "stamp") {
+            const body = (await readJson(req)) as { date?: string; copy?: number; name?: string; base64?: string };
+            if (!dayOk(body.date) || !body.base64) return send(res, 400, { error: "which day, and the file" });
+            const n = Math.round(Number(body.copy));
+            const name = (body.name || `copy ${n}.pdf`).replace(/[\\/:*?"<>|]/g, "-");
+            await d.stampFile(body.date, n, name, new Uint8Array(Buffer.from(body.base64, "base64")));
+            return send(res, 200, { folder: d.outFolder(body.date) });
           }
-          if (req.method === "POST" && parts[2] && parts[3]) {
-            const body = (await readJson(req)) as { base64?: string | null };
-            await d.putSlot(parts[2], parts[3], body.base64 ? new Uint8Array(Buffer.from(body.base64, "base64")) : null);
-            return send(res, 200, await d.designsOf());
+          if (req.method === "POST" && parts[2] === "reveal") {
+            const body = (await readJson(req)) as { date?: string };
+            if (!dayOk(body.date) || !existsSync(d.outFolder(body.date))) return send(res, 404, { error: "nothing saved for that day yet" });
+            const { spawn } = await import("node:child_process");
+            const dir = d.outFolder(body.date);
+            spawn(process.platform === "win32" ? "explorer.exe" : process.platform === "darwin" ? "open" : "xdg-open", [dir], { detached: true, stdio: "ignore" }).unref();
+            return send(res, 200, { folder: dir });
           }
         } catch (e) { return send(res, 400, { error: e instanceof Error ? e.message : String(e) }); }
       }

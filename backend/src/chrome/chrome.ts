@@ -93,14 +93,6 @@ export interface ChromeResult {
   bodyBottom: number;
 }
 
-/** Where page `n` of `total` keeps its masthead or header (`head`) and its
- * footer (`foot`), in the template's pixels: the room a copy leaves empty, for
- * another paper's own (export/designs.ts). */
-export function designRoom(n: number, total: number): { page: Template["page"]; head: Role["art"]; foot?: Role["art"] } {
-  const role = template.roles[n === 1 ? "first" : n === total ? "last" : "inner"];
-  return { page: template.page, head: role.art, foot: role.footer ?? (n === total ? template.roles.last.footer : undefined) };
-}
-
 /** Chrome for page `n` of `total`: page 1 carries the masthead, the last page
  * the last-page header and the footer, every other page the inner header.
  * `blank`: the same room kept, left empty -- a copy whose masthead, page
