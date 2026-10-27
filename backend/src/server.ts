@@ -879,8 +879,9 @@ async function placeAd(ad: Ad, at: Ad["at"] | undefined): Promise<Ad> {
 }
 
 let version: string | null = null;
-/** The code's version (its git commit), for the newsroom's About line. */
+/** The code's version, for the newsroom's About line: the app's (desktop/main.js), else its git commit. */
 function gitVersion(): string {
+  if (version === null && process.env.CK_APP_VERSION) version = process.env.CK_APP_VERSION;
   if (version === null) {
     try {
       version = readFileSync(path.join(ROOT, ".git", "HEAD"), "utf8").trim();
