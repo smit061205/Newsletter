@@ -19,7 +19,7 @@
 //   POST  /api/papers/draft            {pdfs: [base64]} -- a new paper's profile, drafted from its PDFs
 //   GET   /api/papers  POST /api/papers   the papers; save a new one from its reviewed draft
 //   GET   /api/papers/:id  POST /api/papers/:id/test  GET /api/papers/:id/pdf   a paper's test issue
-//   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang} makes them
+//   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang, articles?} makes them
 //   GET   /api/issues/:date/editions   the day's sister papers; POST {only?} makes them (all, or one); GET .../editions/<id>.pdf
 //   GET   /api/issues/:date/copies/N.pdf  one copy (on the paper's designs it goes to, if any)
 //   GET   /api/designs  POST /api/designs {name, id?}  DELETE /api/designs/:id   other papers' designs for the copies
@@ -347,8 +347,10 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           }
           if (req.method === "GET") return send(res, 200, copiesOf(date));
           if (req.method === "POST") {
-            const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string; lang?: string;
-                                                    extra?: { body?: string; deck?: string; titles?: string[]; photos?: ({ name: string; base64: string } | { url: string })[] } };
+            type Pic = { name: string; base64: string } | { url: string };
+            type Given = { titles?: string[]; decks?: string[]; bodies?: string[]; photos?: Pic[] };
+            const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string; lang?: string; articles?: Given[];
+                                                    extra?: { body?: string; deck?: string; titles?: string[]; photos?: Pic[] } };
             if (body.lang !== undefined && !["gu", "hi", "ur"].includes(body.lang)) return send(res, 400, { error: "the language is gu, hi or ur" });
             const count = Math.round(Number(body.count));
             if (!(count >= 1 && count <= 50)) return send(res, 400, { error: "make between 1 and 50 copies" });
@@ -357,25 +359,28 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             if (currentCopies()) return send(res, 409, { error: "copies or the other papers are being made: wait for them to finish" });
             if (currentJob()?.date === date) return send(res, 409, { error: "the day's paper is being made: make copies when it's done" });
             if (!store.latestIssue(date)) return send(res, 404, { error: `no paper made for ${date} yet` });
-            // an article in every copy, word for word: its titles, and its photos saved with the day's
-            let extra: { body: string; deck: string; titles: string[]; photos: string[] } | undefined;
-            if (body.extra) {
-              const titles = (body.extra.titles ?? []).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
-              const text = (body.extra.body ?? "").trim();
-              if (!text || !titles.length) return send(res, 400, { error: "the article needs its text and at least one title" });
-              if ((body.lang ?? "gu") !== "gu") return send(res, 400, { error: "the article goes in Gujarati copies only" });
+            // articles in every copy, word for word: their titles, sub-headings, texts and photos, the photos saved with the day's
+            const given: Given[] = body.articles ?? (body.extra ? [{ titles: body.extra.titles, decks: body.extra.deck ? [body.extra.deck] : [],
+                                                                      bodies: [body.extra.body ?? ""], photos: body.extra.photos }] : []);
+            const articles: import("./editorial/copies.ts").Article[] = [];
+            const line = (x: string) => x.replace(/\s+/g, " ").trim();
+            for (const [k, a] of given.slice(0, 10).entries()) {
+              const titles = (a.titles ?? []).map(line).filter(Boolean).slice(0, 12);
+              const bodies = (a.bodies ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 12);
+              if (!titles.length || !bodies.length) return send(res, 400, { error: `article ${k + 1} needs its text and at least one title` });
+              if ((body.lang ?? "gu") !== "gu") return send(res, 400, { error: "the articles go in Gujarati copies only" });
               const dir = path.join(MEDIA_DIR, date);
               await mkdir(dir, { recursive: true });
               const photos: string[] = [];
-              for (const [i, p] of (body.extra.photos ?? []).slice(0, 6).entries()) {
+              for (const [i, p] of (a.photos ?? []).slice(0, 12).entries()) {
                 if ("url" in p) { if (/^\/media\/[\w./-]+$/.test(p.url) && !p.url.includes("..")) photos.push(p.url); continue; }
-                const name = `fixed-${i + 1}-${p.name.replace(/[^A-Za-z0-9._-]/g, "_")}`;
+                const name = `fixed-${k + 1}-${i + 1}-${p.name.replace(/[^A-Za-z0-9._-]/g, "_")}`;
                 await writeFile(path.join(dir, name), Buffer.from(p.base64, "base64"));
                 photos.push(`/media/${date}/${name}`);
               }
-              extra = { body: text, deck: (body.extra.deck ?? "").replace(/\s+/g, " ").trim(), titles: titles.slice(0, 6), photos };
+              articles.push({ titles, decks: (a.decks ?? []).map(line).filter(Boolean).slice(0, 12), bodies, photos });
             }
-            makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", lang: body.lang as "gu" | undefined, extra, log })
+            makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", lang: body.lang as "gu" | undefined, articles, log })
               .catch((e) => log(`copies stopped: ${e instanceof Error ? e.message : e}`));
             return send(res, 202, copiesOf(date));
           }
