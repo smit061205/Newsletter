@@ -337,6 +337,21 @@ verification loop), `docs/website/UIUX.md` (the UI choices and where each lives)
   http://localhost:3200 with 22 Oct's sample stories and needs no keys. Check layout at
   390, 800, 1440 and 2000 px wide; the user's screen is about 2000 px.
 
+**Aavtikal (આવતીકાલ), the flagship section (28-29 Oct):** long articles on AI, tech, science
+and politics at `/aavtikal` (and `/en/aavtikal`, `/hi/aavtikal`), linked from the daily site's
+sections row, menu and footer. Look modelled on Pirate Wires, measured in
+`docs/website/FLAGSHIP.md`; the beat's name sits on the plain page, never on a colour block
+(the user, 28 Oct). Its own table `features`, so the daily queries never meet it. Code:
+`site/lib/flagship.ts`, `site/components/flagship/`, `site/views/Flagship.tsx`. Articles are
+published from `site/pipeline/features/<date>.json` by `site-features.yml` (photos copied
+into the site's store, credited in captions); 11 explainers went live on 28 Oct, all by the
+AI desk. Next for it: the editor page (shared with the daily site's), then an engine that
+drafts features and always holds them for the editor; Hindi translations; the WhatsApp channel.
+
+**The engine's schedule (checked 29 Oct):** GitHub starts `site-engine.yml` only every 4 to 6
+hours, not every 15 minutes (11 runs from 26 to 28 Oct), so few stories reach the site. It
+needs an outside timer calling the workflow's dispatch API (the user's to set up: a token).
+
 **Next (the user's list, in order):**
 1. Check the engine's first scheduled hours and show the user the first stories that went
    live. Fix what the logs show (only in `site/`).
