@@ -13,4 +13,11 @@ export const WEBSITE = {
   dailyGoogleRequests: 1400,
   dailyFreeRequests: 900,
   dailyUploads: 50,
+  // Aavtikal's desk (engine/desk.ts; the user, 29 Oct): deep explainers for AI, Tech and Science (never Politics),
+  // written by Gemini Flash on its free tier (about 20 requests a day), 10 a day; more on the days named
+  deskBeats: ["ai", "tech", "science"] as const,
+  deskDaily: 10,
+  deskDays: { "2026-10-29": 20 } as Record<string, number>,
+  flashModels: ["gemini-3.8-flash", "gemini-3.8-flash-latest"],
+  dailyFlashRequests: 20,
 };
