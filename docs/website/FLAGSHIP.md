@@ -276,6 +276,31 @@ and "Share" on the right.
 - Footnote markers: superscript 15, underlined. The notes go at the end
   (16/23.8, number hung at 25).
 
+**More detail, from a second, free article** ("The New American-Greenlandic
+Forever Pact", 28 Oct; the page is 14,137 tall, the body 11,434):
+- **Spacing:** paragraphs are 20 apart. The paragraph after a subheading, and
+  the first note, are 24 below. Subheadings are 40 compressed with 40 above and
+  none below (that article marks them as `h1`).
+- **Links:** underlined, 1.1 px, in ink at 50 % (`rgba(0,0,0,.5)`), so the line
+  is quieter than the text.
+- **Footnotes:** the reference is a superscript (18.3 on 22 text). After the
+  body, a 1 px rule `rgba(43,43,43,.45)` with 20 above and below. Then the notes
+  as ordinary paragraphs, each starting with its number in superscript (22/32.8
+  here; 16/23.8 in the first article, so the size varies by article).
+- **Calls to action in the body:** a centred outline button (1 px ink border,
+  padding 12 24, system font 16/500). Theirs say "Get 14 day free trial" and
+  "Subscribe now". **Ours:** the same button for the WhatsApp channel, at most
+  one per article.
+- **The end-of-article pop-up** (theirs, shown as you reach the notes):
+  - a white box 640 wide, padding 32, an **8 px ink border**, square corners,
+    shadow `0 8 24 rgba(0,0,0,.15)`;
+  - the title "Enjoying this story?" 54/54, centred;
+  - an email field and a black button;
+  - an × to close.
+
+  **Ours:** no pop-up. The same box sits *in the page* at the end of the
+  article, as the WhatsApp channel invitation, so nothing covers the text.
+
 **"Continue Reading"** (band `#D9D9D9`, padding 40 20): the title 120/94, then
 three cards.
 
