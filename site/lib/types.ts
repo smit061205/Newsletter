@@ -5,7 +5,8 @@ export type Tier = "gujarat" | "india" | "world";
 export type Genre = "farm" | "economy" | "tech" | "health" | "sport" | "education" | "entertainment";
 export type Lang = "gu" | "en" | "hi";
 
-export interface Photo { url: string; width: number; height: number }
+/** credit: the photo's author and licence when it isn't the story's source's (a Wikimedia Commons file photo) */
+export interface Photo { url: string; width: number; height: number; credit?: string }
 export interface Source { kind: "pib" | "cmo" | "air" | "gujinfo" | "other"; name: string; url: string; office?: string }
 export interface English { kicker: string; headline: string; deck: string; body: string; caption: string }
 export interface Correction { at: string; gu: string; en?: string }

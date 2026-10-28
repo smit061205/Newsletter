@@ -62,7 +62,7 @@ export function Lead({ s, lang, more = [] }: { s: Story; lang: Lang; more?: Stor
       {s.photo && (
         <div className="pic">
           <Link href={storyHref(s, lang)} tabIndex={-1}><Photo s={s} lang={lang} eager morph /></Link>
-          {w.caption && <p className="cap">{w.caption} ({t(lang, "photo")}: {s.source?.name ?? "PIB"})</p>}
+          {w.caption && <p className="cap">{w.caption} ({t(lang, "photo")}: {s.photo?.credit ?? s.source?.name ?? "PIB"})</p>}
         </div>
       )}
     </article>
