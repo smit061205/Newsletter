@@ -74,27 +74,49 @@ export async function leadPhoto(title: string): Promise<{ url: string; credit: s
 /** Free-licence photos from a Wikipedia article (Aavtikal's explainers, the user, 29 Oct: several pictures in each),
  * shown from Wikimedia's own servers (they allow it), so they take none of the site's daily uploads: a photo or a
  * diagram, not a logo, icon, flag or map symbol, with its description for the writer and its credit. */
+type CommonsPage = { title: string; index?: number; imageinfo?: { thumburl?: string; thumbwidth?: number; thumbheight?: number; width?: number; extmetadata?: Record<string, { value?: string }> }[] };
+
+/** The free-licence photos among Commons files: a photo or a diagram, not a logo, icon, flag or map symbol. */
+function freeOnes(pages: CommonsPage[], max: number): { url: string; width: number; height: number; alt: string; credit: string }[] {
+  const out: { url: string; width: number; height: number; alt: string; credit: string }[] = [];
+  for (const pg of pages.sort((a, b) => (a.index ?? 0) - (b.index ?? 0))) {
+    const ii = pg.imageinfo?.[0];
+    const meta = ii?.extmetadata ?? {};
+    const licence = plain(meta.LicenseShortName?.value ?? "");
+    if (!ii?.thumburl || !ii.thumbwidth || !ii.thumbheight || (ii.width ?? 0) < 500 || !FREE.test(licence)) continue;
+    if (!/\.(jpe?g|png)$/i.test(pg.title) || /logo|icon|flag|symbol|seal|emblem|signature|coat of arms|wordmark|map of|locator/i.test(pg.title)) continue;
+    if (ii.thumbheight > ii.thumbwidth * 1.6 || ii.thumbwidth > ii.thumbheight * 3.5) continue;
+    const alt = plain(meta.ImageDescription?.value ?? "").slice(0, 160) || pg.title.replace(/^File:|\.\w+$/g, "");
+    const artist = plain(meta.Artist?.value ?? "").slice(0, 80) || "Wikimedia Commons";
+    out.push({ url: ii.thumburl, width: ii.thumbwidth, height: ii.thumbheight, alt, credit: `${artist}, ${licence}, Wikimedia Commons` });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** Free-licence photos from a Wikipedia article (Aavtikal's explainers, the user, 29 Oct: several pictures in each),
+ * shown from Wikimedia's own servers (they allow it), so they take none of the site's daily uploads, with their
+ * descriptions for the writer and their credits. */
 export async function commonsPictures(title: string, max = 6): Promise<{ url: string; width: number; height: number; alt: string; credit: string }[]> {
   const q = new URLSearchParams({ action: "query", generator: "images", titles: title, gimlimit: "40", redirects: "1",
     prop: "imageinfo", iiprop: "url|size|extmetadata", iiurlwidth: "1200", format: "json", origin: "*" });
   try {
     const r = await fetch(`https://en.wikipedia.org/w/api.php?${q}`, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(20_000) });
     if (!r.ok) return [];
-    const pages = Object.values(((await r.json()) as { query?: { pages?: Record<string, { title: string; imageinfo?: { thumburl?: string; thumbwidth?: number; thumbheight?: number; width?: number; extmetadata?: Record<string, { value?: string }> }[] }> } }).query?.pages ?? {});
-    const out: { url: string; width: number; height: number; alt: string; credit: string }[] = [];
-    for (const pg of pages) {
-      const ii = pg.imageinfo?.[0];
-      const meta = ii?.extmetadata ?? {};
-      const licence = plain(meta.LicenseShortName?.value ?? "");
-      if (!ii?.thumburl || !ii.thumbwidth || !ii.thumbheight || (ii.width ?? 0) < 500 || !FREE.test(licence)) continue;
-      if (!/\.(jpe?g|png)$/i.test(pg.title) || /logo|icon|flag|symbol|seal|emblem|signature|coat of arms|wordmark|map of|locator/i.test(pg.title)) continue;
-      if (ii.thumbheight > ii.thumbwidth * 1.6 || ii.thumbwidth > ii.thumbheight * 3.5) continue;
-      const alt = plain(meta.ImageDescription?.value ?? "").slice(0, 160) || pg.title.replace(/^File:|\.\w+$/g, "");
-      const artist = plain(meta.Artist?.value ?? "").slice(0, 80) || "Wikimedia Commons";
-      out.push({ url: ii.thumburl, width: ii.thumbwidth, height: ii.thumbheight, alt, credit: `${artist}, ${licence}, Wikimedia Commons` });
-      if (out.length >= max) break;
-    }
-    return out;
+    return freeOnes(Object.values(((await r.json()) as { query?: { pages?: Record<string, CommonsPage> } }).query?.pages ?? {}), max);
+  } catch {
+    return [];
+  }
+}
+
+/** Free-licence photos found by searching Wikimedia Commons itself, for a subject whose Wikipedia articles have none. */
+export async function commonsSearch(query: string, max = 4): Promise<{ url: string; width: number; height: number; alt: string; credit: string }[]> {
+  const q = new URLSearchParams({ action: "query", generator: "search", gsrsearch: `${query} filetype:bitmap`, gsrnamespace: "6", gsrlimit: "20",
+    prop: "imageinfo", iiprop: "url|size|extmetadata", iiurlwidth: "1200", format: "json", origin: "*" });
+  try {
+    const r = await fetch(`https://commons.wikimedia.org/w/api.php?${q}`, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(20_000) });
+    if (!r.ok) return [];
+    return freeOnes(Object.values(((await r.json()) as { query?: { pages?: Record<string, CommonsPage> } }).query?.pages ?? {}), max);
   } catch {
     return [];
   }
