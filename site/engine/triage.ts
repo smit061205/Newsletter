@@ -116,6 +116,31 @@ export function similarity(a: Set<string>, b: Set<string>): number {
 /** Two items are one event when most of the shorter keyword set is shared (and at least 3 words). */
 export const SAME_EVENT = 0.6;
 
+// Two clusters can grow for one event when its reports share too few keywords (29 Oct: Spain's train
+// crash went up twice, minutes apart). Before a cluster is written, the stories of the last two days that
+// share words with it are put to a free model; when one is the same incident, the cluster joins it.
+const SAME = `You compare news events. You get one NEW event and a numbered list of EARLIER events.
+Answer with the number of the earlier event that is the SAME real-world incident or decision (the same crash,
+the same verdict, the same announcement), even when the wording, numbers or angle differ. A different incident
+on the same topic (another crash, another verdict) is NOT the same. Reply with JSON only: {"same": 0} when none is.`;
+
+/** The published or held cluster (last 48 hours) that is the same event as this one, or null. */
+export async function sameEvent(sql: Sql, c: { id: string; event: string; keys: string[]; before?: string }): Promise<{ id: string; story: string } | null> {
+  const mine = keySet(c.keys);
+  const rows = await sql.query(
+    `select id, event, keys, story_id from clusters where id <> $1 and story_id is not null and state in ('published', 'held')
+       and first_seen > now() - interval '48 hours' and ($2::timestamptz is null or first_seen < $2)`, [c.id, c.before ?? null]);
+  const near = rows.map((r) => {
+    let both = 0;
+    for (const k of keySet(r.keys as string[])) if (mine.has(k)) both++;
+    return { id: r.id as string, story: r.story_id as string, event: r.event as string, both };
+  }).filter((r) => r.both >= 2).sort((a, b) => b.both - a.both).slice(0, 6);
+  if (!near.length) return null;
+  const res = await askJson(sql, { system: SAME, user: `NEW: ${c.event}\n\nEARLIER:\n${near.map((r, i) => `${i + 1}. ${r.event}`).join("\n")}`, maxTokens: 60 },
+    (v) => { const n = Number((v as { same?: unknown })?.same); return Number.isInteger(n) && n >= 0 && n <= near.length ? n : null; });
+  return res.ok && res.value > 0 ? near[res.value - 1] : null;
+}
+
 /** Triaged, unclustered news items into clusters (new ones, or joining one from the last 2 days). */
 export async function cluster(sql: Sql, log: (s: string) => void) {
   const items = await sql.query(
