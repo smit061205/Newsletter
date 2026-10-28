@@ -110,7 +110,7 @@
  {
   "id": "deepfakes-and-elections",
   "beat": "politics",
-  "author": "editor",
+  "author": "desk",
   "photo": {
    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/Contr_Unit_of_Electronic_Voting_Machine_2.jpg/1920px-Contr_Unit_of_Electronic_Voting_Machine_2.jpg",
    "width": 1920,
@@ -218,7 +218,7 @@
  {
   "id": "ai-agents-explained",
   "beat": "ai",
-  "author": "editor",
+  "author": "desk",
   "photo": {
    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0b/Humanoid_robot_at_Science_Square_Tsukuba.jpg/1920px-Humanoid_robot_at_Science_Square_Tsukuba.jpg",
    "width": 1920,

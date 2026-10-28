@@ -151,13 +151,13 @@ export async function searchFeatures(q: string, limit = 30): Promise<Feature[]> 
 }
 
 // ---- local checking (CK_SAMPLE=1): sample articles with freely licensed photos
-// (docs/website/sample/aavtikal.json; each caption credits its photographer) ----
+// (site/pipeline/features: the articles first published, pipeline/features.ts; each caption credits its photographer) ----
 
 let sampleCache: Feature[] | null = null;
 function sampleFeatures(): Feature[] {
   if (sampleCache) return sampleCache;
   type Raw = Omit<Feature, "publishedAt" | "updatedAt" | "hi" | "en"> & { en: FeatureText };
-  const raw = JSON.parse(readFileSync(path.join(process.cwd(), "..", "docs/website/sample/aavtikal.json"), "utf8")) as Raw[];
+  const raw = JSON.parse(readFileSync(path.join(process.cwd(), "pipeline/features/2026-10-28.json"), "utf8")) as Raw[];
   // newest first, about a day apart
   sampleCache = raw.map((r, i): Feature => {
     const at = new Date(Date.parse("2026-10-28T06:00:00Z") - i * 26 * 3600_000).toISOString();
