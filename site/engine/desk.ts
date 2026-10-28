@@ -26,7 +26,7 @@ import { parseFeed, pageText } from "./feed.ts";
 import { ask } from "./fetch.ts";
 import { indiaDate, storePhoto } from "./publish.ts";
 import { SOURCES } from "./sources.ts";
-import { leadPhoto } from "./wikiphoto.ts";
+import { commonsPictures, UA as WIKI_UA } from "./wikiphoto.ts";
 
 type Sql = NeonQueryFunction<false, false>;
 type Beat = (typeof WEBSITE.deskBeats)[number];
@@ -103,14 +103,17 @@ a real, significant development with substance to explain (a new AI model and it
 a discovery), with facts, numbers and specifications in the sources. Prefer what is new today and what the labs or agencies
 themselves announced. Never: company deals, funding rounds, earnings and revenue results, share prices, lawsuits, opinion, product rumours, politics, celebrity news,
 or a subject already covered (listed under COVERED).
-Give the numbers of every item about that same subject (1 to 4 of them), the subject in one English line, and the exact title of
-its English Wikipedia article if it has one (for a file photo), else "".
-Reply with JSON only: {"pick":[1],"topic":"","wiki":""} or {"pick":[]} if nothing deserves it.`;
+Give the numbers of every item about that same subject (1 to 4 of them), the subject in one English line, and the exact titles
+of the English Wikipedia articles on it (for background and free photos): the subject's own if it has one, and the company, lab,
+agency or mission behind it.
+Reply with JSON only: {"pick":[1],"topic":"","wiki":["",""]} or {"pick":[]} if nothing deserves it.`;
 
 // ---- reading a subject ----
 
 interface Source { name: string; url: string; text: string; official: boolean }
-interface Picture { n: number; url: string; alt: string; from: string }
+/** A picture on offer: an official page's (stored in the site's own store, credited to its site) or a free-licence
+ *  one from Wikimedia Commons (shown from Wikimedia's servers: it has its size and its credit already). */
+interface Picture { n: number; url: string; alt: string; from: string; credit?: string; width?: number; height?: number }
 
 /** The pictures in a page's main part (not logos, icons or avatars), its own og:image first. */
 function pictures(html: string, base: string): { url: string; alt: string }[] {
@@ -147,9 +150,24 @@ function primaryLinks(html: string, base: string): string[] {
   return hits.sort((a, b) => b.score - a.score).map((h) => h.url).filter((u) => !seen.has(u) && !!seen.add(u)).slice(0, 3);
 }
 
-export async function research(picked: Lead[]): Promise<{ sources: Source[]; pics: Picture[] }> {
+/** A Wikipedia article's text, for background facts (its own photos come from commonsPictures). */
+async function wikiText(title: string): Promise<{ url: string; text: string } | null> {
+  const q = new URLSearchParams({ action: "query", prop: "extracts", explaintext: "1", redirects: "1", titles: title, format: "json", origin: "*" });
+  try {
+    const r = await fetch(`https://en.wikipedia.org/w/api.php?${q}`, { headers: { "user-agent": WIKI_UA }, signal: AbortSignal.timeout(20_000) });
+    if (!r.ok) return null;
+    const pg = Object.values(((await r.json()) as { query?: { pages?: Record<string, { title?: string; extract?: string }> } }).query?.pages ?? {})[0];
+    if (!pg?.title || !pg.extract || pg.extract.length < 800) return null;
+    const text = pg.extract.replace(/\n={2,}\s*(See also|References|External links|Notes|Further reading)\s*={2,}[\s\S]*$/, "");
+    return { url: `https://en.wikipedia.org/wiki/${encodeURIComponent(pg.title.replace(/ /g, "_"))}`, text };
+  } catch {
+    return null;
+  }
+}
+
+export async function research(picked: Lead[], wiki: string[] = []): Promise<{ sources: Source[]; pics: Picture[] }> {
   const sources: Source[] = [];
-  const raw: { url: string; alt: string; from: string }[] = [];
+  const raw: Omit<Picture, "n">[] = [];
   const primary: string[] = [];
   for (const l of picked) {
     const a = await ask(l.url);
@@ -168,12 +186,18 @@ export async function research(picked: Lead[]): Promise<{ sources: Source[]; pic
     sources.push({ name: hostOf(a.url), url: a.url, text: p.text, official: true });
     raw.push(...pictures(a.text, a.url).map((x) => ({ ...x, from: hostOf(a.url) })));
   }
-  // the primary pages first; all of them together near 26,000 letters, what the writer and the checker both read
+  // Wikipedia for the background, and its free-licence photos (the user, 29 Oct: several pictures in every article)
+  for (const title of wiki.slice(0, 2)) {
+    const w = await wikiText(title);
+    if (w) sources.push({ name: "Wikipedia", url: w.url, text: w.text, official: false });
+    raw.push(...(await commonsPictures(title, 5)).map((x) => ({ ...x, from: "Wikimedia Commons" })));
+  }
+  // the primary pages first; all of them together near 30,000 letters, what the writer and the checker both read
   sources.sort((a, b) => Number(b.official) - Number(a.official));
-  let room = 26_000;
+  let room = 30_000;
   const kept = sources.map((s) => { const text = s.text.slice(0, Math.max(0, Math.min(12_000, room))); room -= text.length; return { ...s, text }; }).filter((s) => s.text.length > 200);
   const seen = new Set<string>();
-  const pics = raw.filter((p) => !seen.has(p.url) && !!seen.add(p.url)).slice(0, 10).map((p, i) => ({ ...p, n: i + 1 }));
+  const pics = raw.filter((p) => !seen.has(p.url) && !!seen.add(p.url)).slice(0, 12).map((p, i) => ({ ...p, n: i + 1 }));
   return { sources: kept, pics };
 }
 
@@ -205,7 +229,9 @@ Accuracy (most important):
 - Name your sources in the text where it matters ("કંપનીની જાહેરાત મુજબ", "Nature સામયિકના અહેવાલ મુજબ").
 - Never copy a sentence from a source; never mention AI writing.
 
-Graphs, tables, diagrams and pictures (they make it easier to understand; use 2 to 5):
+Graphs, tables, diagrams and pictures (readers understand far better with them; use 4 to 8): at least two graphs or tables
+whenever the sources have numbers, a "steps" diagram of how it works, and the offered PICTURES that truly show the subject
+(up to 4) as "image" figures, spread through the article:
 - "bar": a comparison of one measure across items, ONLY with numbers stated in the sources (benchmark scores of this model and
   others, prices per million tokens, sizes). rows: [{"label": "...", "value": 91.2, "mark": true for the subject itself}], "unit".
 - "table": specifications side by side: "head": [column names], "cells": [[...row...]] (text, numbers as in the sources).
@@ -213,7 +239,8 @@ Graphs, tables, diagrams and pictures (they make it easier to understand; use 2 
 - "image": one of the numbered PICTURES offered (only if it truly shows the subject): "pick": its number, "title": a Gujarati caption.
 - Every figure has a Gujarati "title" and may have a "note" (e.g. "ઊંચું એટલે વધુ સારું", or what the numbers measure) and "source" (the SOURCE number).
 - Place each figure in the body as its own paragraph "[[fig N]]" (N counts the figures from 1), right after the paragraph it explains.
-- "cover": the number of the best PICTURE for the top of the article, or 0; "caption": its Gujarati caption.
+- "cover": the number of the PICTURE for the top of the article (every article has one: the one that best shows the subject),
+  not one of the "image" figures; "caption": its Gujarati caption.
 
 Reply with JSON only:
 {"headline":"(Gujarati, up to 14 words, specific and inviting)","dek":"(Gujarati, one or two sentences)","body":"...",
@@ -235,8 +262,8 @@ function readDraft(v: unknown): Draft | null {
 }
 
 /** The draft's figures made into the site's, in Gujarati (the translation adds English and Hindi); a broken one is left out. */
-function figuresOf(d: Draft): (Figure | null)[] {
-  return d.figures.map((g): Figure | null => {
+function figuresOf(list: DraftFigure[]): (Figure | null)[] {
+  return list.map((g): Figure | null => {
     const title = one(String(g.title ?? "").trim()), note = g.note ? one(String(g.note).trim()) : undefined;
     if (g.kind === "bar") {
       const rows = (g.rows ?? []).map((r) => ({ label: one(String(r.label ?? "").trim()), value: Number(r.value), mark: r.mark === true }))
@@ -261,6 +288,71 @@ function figuresOf(d: Draft): (Figure | null)[] {
 const figureText = (figs: Figure[]) => figs.map((g) => [
   ...(g.rows ?? []).map((r) => `${r.label.gu} ${r.value}`), ...(g.cells ?? []).flat().map((c) => c.gu), ...(g.steps ?? []).map((s) => `${s.title.gu} ${s.text.gu}`),
 ].join("\n")).join("\n");
+
+/** A picture made the site's: an official one stored in the site's own store, a Commons one shown from Wikimedia's. */
+async function keep(sql: Sql, p: Picture, name: string): Promise<(Photo & { credit?: string }) | null> {
+  if (p.width && p.height) return { url: p.url, width: p.width, height: p.height, credit: p.credit ?? p.from };
+  const s = await storePhoto(sql, p.url, name);
+  return s ? { ...s, credit: p.from } : null;
+}
+
+/** The draft's figures checked: graphs and tables number by number against the sources, pictures kept. */
+async function checkedFigures(sql: Sql, made: (Figure | null)[], pics: Picture[], used: Set<number>, all: string, id: string, date: string, log: (s: string) => void): Promise<(Figure | null)[]> {
+  const out: (Figure | null)[] = [];
+  for (const g of made) {
+    if (g?.kind === "image") {
+      const p = pics.find((x) => x.n === g.pick);
+      const kept = p && !used.has(p.n) ? await keep(sql, p, `${id}-${p.n}`) : null;
+      if (kept && p) { used.add(p.n); g.photo = kept; delete g.pick; out.push(g); } else out.push(null);
+    } else if (g && numbersNotIn(figureText([g]), all, date).length) {
+      log(`  a ${g.kind} left out: its numbers aren't all in the sources`);
+      out.push(null);
+    } else out.push(g);
+  }
+  return out;
+}
+
+// ---- more figures (Gemini Flash Lite), when the writer gave too few ----
+
+const ADD = (n: number) => `You add graphs, tables, diagrams and pictures to a long Gujarati explainer from Aavtikal, so that an ordinary reader
+understands it more easily. You get its paragraphs, numbered; the figures it already has; its sources; and the PICTURES on offer.
+Add up to ${n} new figures, each showing something the existing ones don't:
+- "bar": one measure compared across items, ONLY with numbers stated exactly in the sources: "rows": [{"label":"","value":0,"mark":false}], "unit".
+- "table": facts side by side, as in the sources: "head": ["",""], "cells": [["",""]].
+- "steps": how something in the article works, 3 to 6 steps: "steps": [{"title":"","text":"one or two sentences"}].
+- "image": a numbered PICTURE that truly shows something the article explains: "pick": its number.
+All words in Gujarati (names of models, companies and products in English letters). Every figure has a Gujarati "title" (for a
+picture, its caption) and may have a "note". "after": the number of the paragraph it belongs after (never a "## " heading).
+Spread them through the article. Reply with JSON only: {"figures":[{"kind":"bar","after":3,"title":"","note":"","unit":"","rows":[]}]}`;
+
+/** Figures added until the article has enough (at least 3 graphs, tables or diagrams, and 2 pictures when there are
+ *  pictures to show): their "[[fig N]]" paragraphs put in the body where they belong. Returns the new body. */
+async function moreFigures(sql: Sql, body: string, figs: Figure[], src: Source[], pics: Picture[], used: Set<number>, id: string, date: string, log: (s: string) => void): Promise<string> {
+  const data = figs.filter((g) => g.kind !== "image").length, images = figs.length - data;
+  const free = pics.filter((p) => !used.has(p.n));
+  const want = Math.max(0, 3 - data) + Math.max(0, Math.min(2, free.length) - images);
+  if (!want) return body;
+  const paras = body.split("\n\n");
+  const res = await askGemini(sql, "lite", {
+    system: ADD(want + 1),
+    user: `PARAGRAPHS:\n${paras.map((p, i) => `${i + 1}. ${p.slice(0, 700)}`).join("\n")}\n\nFIGURES IT HAS:\n${figs.map((g) => `${g.kind}: ${g.title.gu}`).join("\n") || "(none)"}\n\nPICTURES:\n${free.map((p) => `${p.n}. from ${p.from}: ${p.alt || "(no description)"}`).join("\n") || "(none)"}\n\n${block(src)}`,
+    maxTokens: 8000,
+  }, (v) => { const x = (v as { figures?: (DraftFigure & { after?: unknown })[] })?.figures; return Array.isArray(x) ? x : null; });
+  if (!res.ok) { log(`  no more figures (${res.why.slice(0, 100)})`); return body; }
+  const all = src.map((s) => s.text).join("\n\n");
+  const checked = await checkedFigures(sql, figuresOf(res.value), pics, used, all, id, date, log);
+  const inserts: { after: number; n: number }[] = [];
+  checked.forEach((g, i) => {
+    if (!g) return;
+    let after = Math.min(paras.length, Math.max(1, Math.round(Number(res.value[i].after) || paras.length)));
+    if (paras[after - 1]?.startsWith("## ") && after < paras.length) after++;
+    figs.push(g);
+    inserts.push({ after, n: figs.length });
+  });
+  for (const x of inserts.sort((a, b) => b.after - a.after)) paras.splice(x.after, 0, `[[fig ${x.n}]]`);
+  if (inserts.length) log(`  ${inserts.length} figure(s) added`);
+  return paras.join("\n\n");
+}
 
 // ---- checking (a Gemma) ----
 
@@ -339,7 +431,8 @@ const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+
 /** Which beat needs an article most: the day's target shared about 4 : 3 : 3 between AI, Tech and Science. */
 async function beatToday(sql: Sql, date: string, target: number): Promise<Beat | null> {
   const rows = await sql.query(
-    `select beat, count(*)::int as n from features where author = 'desk' and (created_at at time zone 'Asia/Kolkata')::date = $1::date group by beat`, [date]);
+    `select beat, count(*)::int as n from features where author = 'desk' and status <> 'withdrawn'
+       and (created_at at time zone 'Asia/Kolkata')::date = $1::date group by beat`, [date]);
   const have = Object.fromEntries(rows.map((r) => [r.beat, r.n as number])) as Record<string, number>;
   const done = Object.values(have).reduce((a, b) => a + b, 0);
   if (done >= target) return null;
@@ -349,6 +442,87 @@ async function beatToday(sql: Sql, date: string, target: number): Promise<Beat |
 
 type Outcome = "published" | "held" | "skipped" | "done" | "stop";
 
+const stateList = async (sql: Sql, key: string) =>
+  String((await sql.query(`select value from state where key = $1`, [key]))[0]?.value ?? "").split("\n").filter(Boolean);
+const addToList = (sql: Sql, key: string, item: string) => sql.query(
+  `insert into state (key, value) values ($1, $2) on conflict (key) do update set value = (
+     select string_agg(t, E'\n') from (select unnest(string_to_array($2 || E'\n' || state.value, E'\n')) as t limit 60) x)`, [key, item]);
+
+/** The proper names and numbers in a subject's line ("Gemini", "4", "Carbon"): two subjects sharing two are compared. */
+const nameWords = (t: string) => new Set((t.match(/[A-Za-z0-9][\w.+-]*/g) ?? [])
+  .filter((w) => /[A-Z0-9]/.test(w) && !/^(The|A|An|In|On|Of|And|For|With|New|How|Why|What|Its|Is|To|AI)$/.test(w)));
+const SAME = `Is the NEW subject the same as one of the EARLIER ones: the same product, model, mission, study or discovery, even if worded
+differently? A different version, a different product or a different event is NOT the same.
+Reply with JSON only: {"same": N} with the EARLIER number, or {"same": 0}.`;
+
+/** The earlier subject this one repeats, if any (29 Oct: "Gemini 4 Carbon" was written twice, worded differently). */
+async function alreadyCovered(sql: Sql, topic: string, covered: string[]): Promise<string | null> {
+  const mine = nameWords(topic);
+  const near = covered.filter((c) => { const o = nameWords(c); return [...mine].filter((w) => o.has(w)).length >= 2; }).slice(0, 8);
+  if (!near.length) return null;
+  const res = await askJson(sql, { system: SAME, user: `NEW: ${topic}\n\nEARLIER:\n${near.map((c, i) => `${i + 1}. ${c}`).join("\n")}`, maxTokens: 60 },
+    (v) => { const x = v as { same?: unknown }; return typeof x?.same === "number" ? x.same : null; });
+  return res.ok && res.value >= 1 && res.value <= near.length ? near[res.value - 1] : null;
+}
+
+interface Subject { beat: Beat; topic: string; wiki: string[]; leads: Lead[] }
+interface Made { gu: Words3; photo: Photo & { credit?: string }; figs: Figure[]; en: Words3 | null; hi: Words3 | null; problems: string[]; sources: Source[]; model: string; words: number }
+
+/** One article on a subject: read, written, given its pictures and figures, checked, translated. A string when it
+ *  couldn't be: "thin" (too little to read), "nophoto" (no picture to show: every article has one, the user, 29 Oct),
+ *  "skipped" (not written), "stop" (no writing requests left today). */
+async function make(sql: Sql, subj: Subject, id: string, date: string, log: (s: string) => void, note = ""): Promise<Made | "thin" | "nophoto" | "skipped" | "stop"> {
+  // the sources and their pictures
+  const { sources, pics } = await research(subj.leads, subj.wiki);
+  if (sources.reduce((n, s) => n + words(s.text), 0) < 500) { log("  too little to read about it"); return "thin"; }
+  if (!pics.length) { log("  no picture to show with it"); return "nophoto"; }
+
+  // the Gujarati article (Gemini Flash)
+  const draft = await askGemini(sql, "writer", {
+    system: WRITE,
+    user: `SUBJECT (${subj.beat}): ${subj.topic}${note}\n\nPICTURES:\n${pics.map((p) => `${p.n}. from ${p.from}: ${p.alt || "(no description)"}`).join("\n")}\n\n${block(sources)}`,
+  }, readDraft);
+  if (!draft.ok) { log(`  not written: ${draft.why}`); return draft.stop ? "stop" : "skipped"; }
+  const d = draft.value;
+
+  // the picture at the top: the writer's choice, else the first that can be shown
+  let photo: (Photo & { credit?: string }) | null = null;
+  const used = new Set<number>();
+  for (const p of [...pics.filter((x) => x.n === d.cover), ...pics.filter((x) => x.n !== d.cover)]) {
+    if (d.figures.some((g) => g.kind === "image" && Number(g.pick) === p.n) && p.n !== d.cover && pics.length > 1) continue;
+    photo = await keep(sql, p, `${id}-cover`);
+    if (photo) { used.add(p.n); break; }
+  }
+  if (!photo) { log("  no picture could be kept"); return "nophoto"; }
+  const caption = d.caption || d.headline;
+
+  // the figures: graphs and tables checked number by number, pictures kept; the body's markers numbered again
+  const all = sources.map((s) => s.text).join("\n\n");
+  const checked = await checkedFigures(sql, figuresOf(d.figures), pics, used, all, id, date, log);
+  const figs: Figure[] = [];
+  const renumber = new Map<number, number>();
+  checked.forEach((g, i) => { if (g) { figs.push(g); renumber.set(i + 1, figs.length); } });
+  let body = d.body.split("\n\n").map((p) => {
+    const m = p.trim().match(/^\[\[fig (\d+)\]\]$/);
+    if (!m) return p;
+    const n = renumber.get(Number(m[1]));
+    return n ? `[[fig ${n}]]` : null;
+  }).filter((p): p is string => p !== null).join("\n\n");
+  // a figure the writer made but didn't place goes at the end of its section
+  figs.forEach((_, i) => { if (!body.includes(`[[fig ${i + 1}]]`)) body += `\n\n[[fig ${i + 1}]]`; });
+  body = await moreFigures(sql, body, figs, sources, pics, used, id, date, log);
+
+  // the check, then English and Hindi
+  const gu = { headline: d.headline, dek: d.dek, caption, body };
+  const problems = await checkArticle(sql, [d.headline, d.dek, body, figureText(figs)].join("\n\n"), sources, date);
+  const en = await translate(sql, gu, figs, "en", date);
+  const hi = await translate(sql, gu, figs, "hi", date);
+  return { gu, photo, figs, en, hi, problems, sources, model: draft.model, words: words(body) };
+}
+
+const sourcesJson = (src: Source[]) => JSON.stringify(src.map((s) => ({ name: s.name, url: s.url, trust: s.official ? "official" : "outlet" })));
+const madeLine = (m: Made) => `${m.words} words, ${m.figs.length} figure(s) (${m.figs.filter((g) => g.kind === "image").length} pictures), a photo${m.en ? ", English" : ""}${m.hi ? ", Hindi" : ""}`;
+
 async function oneArticle(sql: Sql, log: (s: string) => void): Promise<Outcome> {
   const date = indiaDate();
   const target = WEBSITE.deskDays[date] ?? WEBSITE.deskDaily;
@@ -356,98 +530,87 @@ async function oneArticle(sql: Sql, log: (s: string) => void): Promise<Outcome> 
   if (!beat) { log(`today's ${target} articles are done`); return "done"; }
   if (!(await geminiLeft(sql, "writer"))) { log("Gemini Flash's free requests for today are used up"); return "stop"; }
 
-  // 1. the subject
-  const list = await leads(sql, beat);
+  // 1. the subject: nothing already written about (its pages not read again, its subject not repeated)
+  const usedUrls = new Set((await sql.query(
+    `select jsonb_array_elements(sources)->>'url' as u from features where created_at > now() - interval '30 days' and status <> 'withdrawn'`)).map((r) => r.u as string));
+  const list = (await leads(sql, beat)).filter((l) => !usedUrls.has(l.url)).map((l, i) => ({ ...l, n: i + 1 }));
   const covered = [
-    ...(await sql.query(`select coalesce(topic, headline) as t from features where created_at > now() - interval '30 days' order by created_at desc limit 80`)).map((r) => r.t as string),
-    ...String((await sql.query(`select value from state where key = 'desk_skipped'`))[0]?.value ?? "").split("\n").filter(Boolean),
+    ...(await sql.query(`select coalesce(topic, headline) as t from features where created_at > now() - interval '30 days' and status <> 'withdrawn' order by created_at desc limit 80`)).map((r) => r.t as string),
+    ...(await stateList(sql, "desk_skipped")),
   ];
   const pick = await askJson(sql, {
     system: PICK(beat),
     user: `ITEMS:\n${list.map((l) => `${l.n}. [${l.from}${l.official ? ", official" : ""}, ${l.at.slice(0, 10)}] ${l.title} -- ${l.summary}`).join("\n")}\n\nCOVERED:\n${covered.join("\n") || "(nothing yet)"}`,
     maxTokens: 600,
-  }, (v) => { const x = v as { pick?: unknown[]; topic?: string; wiki?: string }; return Array.isArray(x?.pick) ? { pick: x.pick.map(Number).filter((n) => n >= 1 && n <= list.length), topic: String(x.topic ?? ""), wiki: String(x.wiki ?? "") } : null; });
+  }, (v) => {
+    const x = v as { pick?: unknown[]; topic?: string; wiki?: unknown };
+    const wiki = (Array.isArray(x?.wiki) ? x.wiki : [x?.wiki]).map((w) => String(w ?? "").trim()).filter(Boolean).slice(0, 2);
+    return Array.isArray(x?.pick) ? { pick: x.pick.map(Number).filter((n) => n >= 1 && n <= list.length), topic: String(x.topic ?? ""), wiki } : null;
+  });
   if (!pick.ok) { log(`${beat}: no subject picked (${pick.why.slice(0, 120)})`); return pick.stop ? "stop" : "skipped"; }
   if (!pick.value.pick.length || !pick.value.topic) { log(`${beat}: nothing today deserves an explainer`); return "skipped"; }
   const topic = pick.value.topic.slice(0, 200);
   log(`${beat}: ${topic}`);
+  const twin = await alreadyCovered(sql, topic, covered);
+  if (twin) { log(`  already written: ${twin}`); await addToList(sql, "desk_skipped", topic); return "skipped"; }
 
-  // 2. the sources and their pictures
-  const { sources, pics } = await research(pick.value.pick.map((n) => list[n - 1]));
-  if (sources.reduce((n, s) => n + words(s.text), 0) < 500) {
-    log("  too little to read about it: left for another day");
-    await sql.query(`insert into state (key, value) values ('desk_skipped', $1) on conflict (key) do update set value = (
-      select string_agg(t, E'\n') from (select unnest(string_to_array($1 || E'\n' || state.value, E'\n')) as t limit 40) x)`, [topic]);
-    return "skipped";
-  }
-
-  // 3. the Gujarati article (Gemini Flash)
-  const draft = await askGemini(sql, "writer", {
-    system: WRITE,
-    user: `SUBJECT (${beat}): ${topic}\n\nPICTURES:\n${pics.map((p) => `${p.n}. from ${p.from}: ${p.alt || "(no description)"}`).join("\n") || "(none)"}\n\n${block(sources)}`,
-  }, readDraft);
-  if (!draft.ok) { log(`  not written: ${draft.why}`); return draft.stop ? "stop" : "skipped"; }
-  const d = draft.value;
-
-  // the figures: graphs and tables checked number by number; a picture taken into the site's store, credited
   let id = slug(topic);
   if ((await sql.query(`select 1 from features where id = $1`, [id])).length) id = `${id}-${date.slice(5).replace("-", "")}`;
-  const all = sources.map((s) => s.text).join("\n\n");
-  const made = figuresOf(d);
-  const figs: Figure[] = [];
-  const renumber = new Map<number, number>();
-  for (const [i, g] of made.entries()) {
-    if (!g) continue;
-    if (g.kind === "image") {
-      const p = pics.find((x) => x.n === g.pick);
-      const stored = p ? await storePhoto(sql, p.url, `${id}-${figs.length + 1}`) : null;
-      if (!stored || !p) continue;
-      g.photo = { ...stored, credit: p.from };
-      delete g.pick;
-    } else if (numbersNotIn(figureText([g]), all, date).length) {
-      log(`  a ${g.kind} left out: its numbers aren't all in the sources`);
-      continue;
-    }
-    figs.push(g);
-    renumber.set(i + 1, figs.length);
-  }
-  const body = d.body.split("\n\n").map((p) => {
-    const m = p.trim().match(/^\[\[fig (\d+)\]\]$/);
-    if (!m) return p;
-    const n = renumber.get(Number(m[1]));
-    return n ? `[[fig ${n}]]` : null;
-  }).filter((p): p is string => p !== null).join("\n\n");
+  const m = await make(sql, { beat, topic, wiki: pick.value.wiki, leads: pick.value.pick.map((n) => list[n - 1]) }, id, date, log);
+  if (m === "stop") return "stop";
+  if (typeof m === "string") { if (m !== "skipped") await addToList(sql, "desk_skipped", topic); return "skipped"; }
 
-  // the picture at the top: the writer's pick, else a free-licence file photo of the subject
-  let photo: (Photo & { credit?: string }) | null = null;
-  let caption = d.caption;
-  const coverPic = pics.find((p) => p.n === d.cover);
-  if (coverPic) { const s = await storePhoto(sql, coverPic.url, `${id}-cover`); if (s) photo = { ...s, credit: coverPic.from }; }
-  if (!photo && pick.value.wiki) {
-    const lead = await leadPhoto(pick.value.wiki).catch(() => null);
-    const s = lead ? await storePhoto(sql, lead.url, `${id}-cover`) : null;
-    if (s && lead) { photo = { ...s, credit: lead.credit }; caption = caption || `ફાઇલ ફોટો: ${pick.value.wiki}`; }
-  }
-
-  // 4. the check
-  const gu = { headline: d.headline, dek: d.dek, caption, body };
-  const problems = await checkArticle(sql, [d.headline, d.dek, body, figureText(figs)].join("\n\n"), sources, date);
-
-  // 5. English and Hindi
-  const en = await translate(sql, gu, figs, "en", date);
-  const hi = await translate(sql, gu, figs, "hi", date);
-
-  const status = problems.length ? "held" : "published";
+  const status = m.problems.length ? "held" : "published";
   await sql.query(
     `insert into features (id, beat, status, headline, dek, body, caption, photo, author, en, hi, sources, checks, figures, topic, published_at, updated_at)
      values ($1, $2, $3, $4, $5, $6, $7, $8, 'desk', $9, $10, $11, $12, $13, $14, case when $3 = 'published' then now() end, now())`,
-    [id, beat, status, gu.headline, gu.dek, gu.body, gu.caption, photo ? JSON.stringify(photo) : null,
-     en ? JSON.stringify(en) : null, hi ? JSON.stringify(hi) : null,
-     JSON.stringify(sources.map((s) => ({ name: s.name, url: s.url, trust: s.official ? "official" : "outlet" }))),
-     JSON.stringify({ problems, writer: draft.model, words: words(body) }), JSON.stringify(figs), topic]);
+    [id, beat, status, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo),
+     m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null, sourcesJson(m.sources),
+     JSON.stringify({ problems: m.problems, writer: m.model, words: m.words }), JSON.stringify(m.figs), topic]);
   await touched(sql);
-  log(`  ${status}: ${id} (${words(body)} words, ${figs.length} figure(s)${photo ? ", a photo" : ""}${en ? ", English" : ""}${hi ? ", Hindi" : ""})${problems.length ? `: ${problems.slice(0, 2).join("; ")}` : ""}`);
+  log(`  ${status}: ${id} (${madeLine(m)})${m.problems.length ? `: ${m.problems.slice(0, 2).join("; ")}` : ""}`);
   return status;
+}
+
+// ---- the older articles written again to today's standard (the user, 29 Oct) ----
+
+const WIKI = `Give the exact titles of the 1 or 2 English Wikipedia articles that best cover this subject (for background facts and free photos).
+Reply with JSON only: {"titles":[""]}`;
+const REDO = `
+
+(This replaces an older, shorter article on the same subject. If the subject is not a fresh development, write it as a lasting
+explainer: what it is, how it works, its history and numbers, where it stands now, as the sources have them.)`;
+
+/** One published article from before the desk's standard (no photo, few figures, or written before the desk) written
+ *  again. Politics is never touched. It replaces the old one only when every number and claim checks out; each is
+ *  tried once. */
+async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "rewritten" | "kept" | "stop"> {
+  const tried = await stateList(sql, "desk_redone");
+  const [r] = await sql.query(
+    `select id, beat, headline, topic, en, sources from features where status = 'published' and beat <> 'politics'
+       and (author <> 'desk' or photo is null or jsonb_array_length(figures) < 4) and not (id = any($1::text[]))
+     order by published_at desc nulls last limit 1`, [tried]);
+  if (!r) return "none";
+  if (!(await geminiLeft(sql, "writer"))) return "stop";
+  const topic = String(r.topic ?? (r.en as { headline?: string } | null)?.headline ?? r.headline).slice(0, 200);
+  log(`again: ${r.id} (${topic})`);
+  const wiki = await askJson(sql, { system: WIKI, user: `${topic}\n${r.headline}`, maxTokens: 200 },
+    (v) => { const t = (v as { titles?: unknown[] })?.titles; return Array.isArray(t) ? t.map(String).filter(Boolean).slice(0, 2) : null; });
+  const leads: Lead[] = ((r.sources ?? []) as { name?: string; url?: string; trust?: string }[]).filter((s) => s.url && !/wikipedia\.org/.test(s.url))
+    .slice(0, 4).map((s, i) => ({ n: i + 1, title: topic, url: s.url!, summary: "", from: s.name ?? hostOf(s.url!), official: s.trust === "official", at: "" }));
+  const m = await make(sql, { beat: r.beat as Beat, topic, wiki: wiki.ok ? wiki.value : [], leads }, r.id, indiaDate(), log, REDO);
+  if (m === "stop") return "stop";
+  await addToList(sql, "desk_redone", r.id);
+  if (typeof m === "string") { log(`  kept as it was (${m})`); return "kept"; }
+  if (m.problems.length) { log(`  kept as it was: ${m.problems.slice(0, 2).join("; ")}`); return "kept"; }
+  await sql.query(
+    `update features set headline = $2, dek = $3, body = $4, caption = $5, photo = $6, en = $7, hi = $8, sources = $9, checks = $10,
+       figures = $11, topic = $12, updated_at = now() where id = $1`,
+    [r.id, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo), m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null,
+     sourcesJson(m.sources), JSON.stringify({ problems: [], writer: m.model, words: m.words, rewritten: true }), JSON.stringify(m.figs), topic]);
+  await touched(sql);
+  log(`  rewritten: ${r.id} (${madeLine(m)})`);
+  return "rewritten";
 }
 
 /** The desk's articles of the last week without their English or Hindi (a translation that failed) get them. */
@@ -468,7 +631,7 @@ async function retranslate(sql: Sql, log: (s: string) => void, deadline: number)
   }
 }
 
-// ---- run: as many articles as the time allows (about 8 minutes each) ----
+// ---- run: new articles and older ones written again, in turn, as long as the time allows ----
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const started = Date.now();
@@ -479,21 +642,37 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   await ensureSchema(sql);
   const [paused] = await sql.query(`select value from state where key = 'engine_paused'`);
   if (paused?.value === "yes") { log("the engine is stopped by the editor"); process.exit(0); }
+  // once: the second "Gemini 4 Carbon" of 29 Oct taken off (the subject written twice, worded differently)
+  if (!(await sql.query(`select 1 from state where key = 'desk_dup_1'`)).length) {
+    await sql.query(`update features set status = 'withdrawn', updated_at = now() where id = 'google-launches-gemini-4-carbon-with-significant-advancement' and author = 'desk'`);
+    await sql.query(`insert into state (key, value) values ('desk_dup_1', 'done') on conflict (key) do nothing`);
+    await touched(sql);
+  }
   const [run] = await sql.query(`insert into runs (kind) values ('desk') returning id`);
-  const details: Record<string, number> = { published: 0, held: 0, skipped: 0 };
+  const details: Record<string, number> = { published: 0, held: 0, skipped: 0, rewritten: 0, kept: 0 };
   try {
-    while (deadline - Date.now() > 8 * 60_000) {
-      const r = await oneArticle(sql, log);
-      // nothing more to do today (the day's articles made, or Flash's requests used up): the job rests a while
-      if (r === "done" || r === "stop") { process.exitCode = 3; break; }
-      details[r] = (details[r] ?? 0) + 1;
-      if (r === "skipped" && details.skipped >= 3) break;
+    let newDone = false, oldDone = false;
+    while (deadline - Date.now() > 8 * 60_000 && !(newDone && oldDone)) {
+      if (!newDone) {
+        const r = await oneArticle(sql, log);
+        if (r === "stop") break;
+        if (r === "done") newDone = true;
+        else if (++details[r] >= 4 && r === "skipped") newDone = true;
+      }
+      if (!oldDone && deadline - Date.now() > 8 * 60_000) {
+        const r = await redoOne(sql, log);
+        if (r === "stop") break;
+        if (r === "none") oldDone = true;
+        else details[r]++;
+      }
     }
+    // nothing more to do for now (the day's articles made, or Flash's requests used up): the job rests a while
+    if (newDone && oldDone || !(await geminiLeft(sql, "writer"))) process.exitCode = 3;
     await retranslate(sql, log, deadline);
     await sql.query(`update runs set finished_at = now(), ok = true, details = $2 where id = $1`, [run.id, JSON.stringify(details)]);
   } catch (e) {
     log(`failed: ${e instanceof Error ? e.stack : e}`);
     await sql.query(`update runs set finished_at = now(), ok = false, details = $2 where id = $1`, [run.id, JSON.stringify({ ...details, error: String(e).slice(0, 400) })]);
   }
-  if (details.published || details.held) await fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) }).catch(() => null);
+  if (details.published || details.held || details.rewritten) await fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) }).catch(() => null);
 }
