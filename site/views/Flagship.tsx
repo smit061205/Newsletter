@@ -8,7 +8,7 @@ import Share from "@/components/flagship/Share.tsx";
 import { Grid, JoinBox, Lead, featureHref, gl } from "@/components/flagship/cards.tsx";
 import { SearchIcon, Chev } from "@/components/icons.tsx";
 import type { Lang } from "@/lib/types.ts";
-import { AUTHORS, BEATS, beatName, featureById, featureWords, features, flw, isAuthor, isBeat, readMinutes, searchFeatures, type Beat } from "@/lib/flagship.ts";
+import { AUTHORS, BEATS, beatName, featureById, featureWords, features, flw, isAuthor, isBeat, readMinutes, searchFeatures, type Beat, type Figure, type L3 } from "@/lib/flagship.ts";
 import { dateText, num, paragraphs } from "@/lib/format.ts";
 import { SITE_URL } from "@/lib/site.ts";
 import { pageMeta } from "@/lib/meta.ts";
@@ -122,9 +122,64 @@ export async function FlSearch({ lang, q }: { lang: Lang; q: string }) {
   );
 }
 
-/** "## " starts a subheading, "### " a smaller one; the rest are paragraphs. */
-function Body({ text }: { text: string }) {
-  return <>{paragraphs(text).map((p, i) => p.startsWith("### ") ? <h3 key={i}>{p.slice(4)}</h3> : p.startsWith("## ") ? <h2 key={i}>{p.slice(3)}</h2> : <p key={i}>{p}</p>)}</>;
+/** "## " starts a subheading, "### " a smaller one, "[[fig N]]" places the article's Nth figure; the rest are paragraphs. */
+function Body({ text, figures, lang }: { text: string; figures: Figure[]; lang: Lang }) {
+  return <>{paragraphs(text).map((p, i) => {
+    const fig = p.match(/^\[\[fig (\d+)\]\]$/);
+    if (fig) { const g = figures[Number(fig[1]) - 1]; return g ? <Fig key={i} g={g} lang={lang} /> : null; }
+    return p.startsWith("### ") ? <h3 key={i}>{p.slice(4)}</h3> : p.startsWith("## ") ? <h2 key={i}>{p.slice(3)}</h2> : <p key={i}>{p}</p>;
+  })}</>;
+}
+
+/** A graph, table, diagram or picture, drawn by the site in the reader's language (engine/desk.ts makes them). */
+function Fig({ g, lang }: { g: Figure; lang: Lang }) {
+  const T = (l?: L3) => (l ? l[lang] || l.gu : "");
+  const n = (x: number) => x.toLocaleString(lang === "gu" ? "gu-IN-u-nu-gujr" : "en-IN", { maximumFractionDigits: 2 });
+  const head = <figcaption className={s.figHead}><b>{T(g.title)}</b>{g.note && <span>{T(g.note)}</span>}</figcaption>;
+  if (g.kind === "image" && g.photo) return (
+    <figure className={s.fig}>
+      <img src={g.photo.url} width={g.photo.width} height={g.photo.height} alt={T(g.title)} loading="lazy" />
+      <figcaption className={s.figCap}>{T(g.title)}{g.photo.credit && <span> ({g.photo.credit})</span>}</figcaption>
+    </figure>
+  );
+  if (g.kind === "bar" && g.rows?.length) {
+    const max = Math.max(...g.rows.map((r) => Math.max(0, r.value)), 1e-9);
+    return (
+      <figure className={s.fig}>
+        {head}
+        <div className={s.bars} role="list">
+          {g.rows.map((r, i) => (
+            <div key={i} className={`${s.barRow} ${r.mark ? s.barMark : ""}`} role="listitem">
+              <span className={s.barLabel}>{T(r.label)}</span>
+              <span className={s.barTrack}><span style={{ width: `${Math.max(1.5, (Math.max(0, r.value) / max) * 100)}%` }} /></span>
+              <span className={s.barVal}>{n(r.value)}{g.unit && g.unit.length <= 3 ? g.unit : ""}</span>
+            </div>
+          ))}
+        </div>
+        {g.unit && g.unit.length > 3 && <p className={s.figUnit}>{g.unit}</p>}
+      </figure>
+    );
+  }
+  if (g.kind === "table" && g.head?.length) return (
+    <figure className={s.fig}>
+      {head}
+      <div className={s.tblWrap}>
+        <table className={s.tbl}>
+          <thead><tr>{g.head.map((h, i) => <th key={i} scope="col">{T(h)}</th>)}</tr></thead>
+          <tbody>{(g.cells ?? []).map((r, i) => <tr key={i}>{r.map((c, j) => j === 0 ? <th key={j} scope="row">{T(c)}</th> : <td key={j}>{T(c)}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+    </figure>
+  );
+  if (g.kind === "steps" && g.steps?.length) return (
+    <figure className={s.fig}>
+      {head}
+      <ol className={s.steps}>
+        {g.steps.map((x, i) => <li key={i}><b>{T(x.title)}</b>{T(x.text) && <span>{T(x.text)}</span>}</li>)}
+      </ol>
+    </figure>
+  );
+  return null;
 }
 
 export async function FlArticle({ lang, id }: { lang: Lang; id: string }) {
@@ -154,7 +209,7 @@ export async function FlArticle({ lang, id }: { lang: Lang; id: string }) {
           <Share url={`${SITE_URL}${featureHref(f, lang)}`} headline={t.headline} words={{ share: w.share, copy: w.copy, copied: w.copied }} />
           <div className={s.body}>
             {lang !== "gu" && !t.translated && <p className={s.translated}>{w.notTranslated}</p>}
-            <Body text={t.body} />
+            <Body text={t.body} figures={f.figures ?? []} lang={lang} />
             {(f.author === "desk" || f.sources.length > 0) && (
               <aside className={s.note}>
                 {f.author === "desk" && <p style={{ margin: 0 }}>{w.aiNote}</p>}

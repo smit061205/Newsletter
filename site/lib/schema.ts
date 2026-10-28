@@ -139,6 +139,10 @@ export const SCHEMA = [
      updated_at timestamptz not null default now()
    )`,
   `create index if not exists features_published on features (status, published_at desc)`,
+  // the desk's graphs, tables, diagrams and pictures, each placed in the body by a "[[fig N]]" paragraph (engine/desk.ts)
+  `alter table features add column if not exists figures jsonb not null default '[]'`,
+  // what the desk wrote about, in English, so a subject isn't explained twice
+  `alter table features add column if not exists topic text`,
   // what was sent to the editor's phone, and what came back
   `create table if not exists approvals (
      story_id text primary key,

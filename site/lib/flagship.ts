@@ -34,6 +34,23 @@ export const AUTHORS: Record<AuthorKey, { name: Record<Lang, string>; role: Reco
 export const isAuthor = (k: string): k is AuthorKey => k in AUTHORS;
 
 export interface FeatureText { headline: string; dek: string; body: string; caption: string }
+/** A text in the three languages (the desk writes Gujarati; its translation adds the others). */
+export interface L3 { gu: string; en: string; hi: string }
+/** A graph, table, diagram or picture in an article, placed by a "[[fig N]]" paragraph (engine/desk.ts). */
+export interface Figure {
+  kind: "bar" | "table" | "steps" | "image";
+  title: L3;
+  note?: L3;
+  /** bar: the measure's unit ("%", "$ per million tokens") */
+  unit?: string;
+  rows?: { label: L3; value: number; mark?: boolean }[];
+  head?: L3[];
+  cells?: L3[][];
+  steps?: { title: L3; text: L3 }[];
+  photo?: Photo & { credit?: string };
+  /** while the desk works: the picture's number among those offered */
+  pick?: number;
+}
 export interface Feature {
   id: string;
   beat: Beat;
@@ -49,6 +66,7 @@ export interface Feature {
   en: FeatureText | null;
   hi: FeatureText | null;
   sources: StorySource[];
+  figures: Figure[];
 }
 
 /** A feature's words in the reader's language, else the Gujarati. */
@@ -69,9 +87,9 @@ export const FL_WORDS = {
     searchPlaceholder: "આવતીકાલમાં શોધો…", showing: (n: number) => `છેલ્લા ${n} લેખ`, found: (n: number) => `${n} લેખ મળ્યા`, notFound: "કોઈ લેખ ન મળ્યો. બીજો શબ્દ અજમાવો.",
     empty: "આવતીકાલના પહેલા લેખો તૈયાર થઈ રહ્યા છે. ટૂંક સમયમાં અહીં આવશે.",
     share: "WhatsApp પર મોકલો", copy: "લિંક કૉપી કરો", copied: "લિંક કૉપી થઈ",
-    aiNote: "આ લેખ આવતીકાલના AI ડેસ્કે લખ્યો છે અને પ્રકાશિત થતાં પહેલાં સંપાદકે વાંચીને તપાસ્યો છે. દરેક આંકડો નીચેના સ્રોતો સાથે મેળવ્યો છે.",
+    aiNote: "આ લેખ આવતીકાલના AI ડેસ્કે નીચેના સ્રોતો પરથી લખ્યો છે. તેનો દરેક આંકડો અને દરેક દાવો સ્રોતો સાથે મેળવ્યા પછી જ તે પ્રકાશિત થયો છે; જે લેખ એ તપાસમાં પાસ ન થાય તે સંપાદક પાસે જાય છે.",
     sources: "સ્રોત", notTranslated: "", about: "અમારા વિશે", policy: "સંપાદકીય નીતિ", how: "અમે કેવી રીતે ચકાસીએ છીએ", contact: "સંપર્ક",
-    writersText: "AI ડેસ્ક દુનિયાભરના વિશ્વસનીય સ્રોતો વાંચી લાંબા, સમજાવતા લેખ લખે છે; કોઈ પણ લેખ સંપાદકની મંજૂરી વિના પ્રકાશિત થતો નથી.",
+    writersText: "AI ડેસ્ક દુનિયાભરના વિશ્વસનીય સ્રોતો, કંપનીઓ અને સંસ્થાઓની પોતાની જાહેરાતો વાંચી લાંબા, સમજાવતા લેખ લખે છે. દરેક આંકડો અને દાવો સ્રોતો સાથે મેળવાય છે; જે લેખ એ તપાસમાં પાસ ન થાય તે સંપાદક વાંચે ત્યાં સુધી પ્રકાશિત થતો નથી.",
   },
   en: {
     name: "Aavtikal", tagline: "AI, tech, science and politics: what shapes tomorrow",
@@ -82,9 +100,9 @@ export const FL_WORDS = {
     searchPlaceholder: "Search Aavtikal…", showing: (n: number) => `The latest ${n} articles`, found: (n: number) => `${n} articles found`, notFound: "No articles found. Try another word.",
     empty: "Aavtikal's first articles are being written. They'll be here soon.",
     share: "Send on WhatsApp", copy: "Copy link", copied: "Link copied",
-    aiNote: "This article was written by Aavtikal's AI desk and read and checked by the editor before it was published. Every number was matched against the sources below.",
+    aiNote: "This article was written by Aavtikal's AI desk from the sources below. It was published only after every number and every claim in it was matched against them; an article that fails that check goes to the editor.",
     sources: "Sources", notTranslated: "This article isn't in English yet, so it's shown in Gujarati.", about: "About us", policy: "Editorial policy", how: "How we check", contact: "Contact",
-    writersText: "The AI desk reads trusted sources from around the world and writes long explainers; nothing is published without the editor's approval.",
+    writersText: "The AI desk reads trusted sources from around the world, and the companies' and agencies' own announcements, and writes long explainers. Every number and claim is matched against the sources; an article that fails that check isn't published until the editor has read it.",
   },
   hi: {
     name: "आवतीकाल", tagline: "AI, टेक, विज्ञान और राजनीति: जो कल को गढ़ते हैं",
@@ -95,9 +113,9 @@ export const FL_WORDS = {
     searchPlaceholder: "आवतीकाल में खोजें…", showing: (n: number) => `पिछले ${n} लेख`, found: (n: number) => `${n} लेख मिले`, notFound: "कोई लेख नहीं मिला। कोई और शब्द आज़माएँ।",
     empty: "आवतीकाल के पहले लेख लिखे जा रहे हैं। जल्द ही यहाँ होंगे।",
     share: "WhatsApp पर भेजें", copy: "लिंक कॉपी करें", copied: "लिंक कॉपी हुआ",
-    aiNote: "यह लेख आवतीकाल के AI डेस्क ने लिखा है और प्रकाशन से पहले संपादक ने पढ़कर जाँचा है। हर आँकड़ा नीचे दिए स्रोतों से मिलाया गया है।",
+    aiNote: "यह लेख आवतीकाल के AI डेस्क ने नीचे दिए स्रोतों से लिखा है। इसका हर आँकड़ा और हर दावा स्रोतों से मिलाने के बाद ही यह प्रकाशित हुआ है; जो लेख इस जाँच में पास नहीं होता, वह संपादक के पास जाता है।",
     sources: "स्रोत", notTranslated: "यह लेख अभी हिंदी में नहीं है, इसलिए गुजराती में दिखाया गया है।", about: "हमारे बारे में", policy: "संपादकीय नीति", how: "हम कैसे जाँचते हैं", contact: "संपर्क",
-    writersText: "AI डेस्क दुनिया भर के भरोसेमंद स्रोत पढ़कर लंबे, समझाने वाले लेख लिखता है; संपादक की मंज़ूरी के बिना कुछ भी प्रकाशित नहीं होता।",
+    writersText: "AI डेस्क दुनिया भर के भरोसेमंद स्रोत और कंपनियों व संस्थाओं की अपनी घोषणाएँ पढ़कर लंबे, समझाने वाले लेख लिखता है। हर आँकड़ा और दावा स्रोतों से मिलाया जाता है; जो लेख इस जाँच में पास नहीं होता, वह संपादक के पढ़ने तक प्रकाशित नहीं होता।",
   },
 } as const;
 export const flw = (lang: Lang) => FL_WORDS[lang];
@@ -113,9 +131,10 @@ function featureOf(r: Row): Feature {
     photo: (r.photo as Photo | null) ?? null, author: isAuthor(r.author as string) ? (r.author as AuthorKey) : "desk",
     publishedAt: iso(r.published_at), updatedAt: iso(r.updated_at),
     en: (r.en as FeatureText | null) ?? null, hi: (r.hi as FeatureText | null) ?? null, sources: (r.sources as StorySource[] | null) ?? [],
+    figures: (r.figures as Figure[] | null) ?? [],
   };
 }
-const COLS = `id, beat, headline, dek, body, caption, photo, author, published_at, updated_at, en, hi, sources`;
+const COLS = `id, beat, headline, dek, body, caption, photo, author, published_at, updated_at, en, hi, sources, figures`;
 
 /** The newest published articles, of one beat or author, or all. */
 export async function features(o: { beat?: Beat; author?: AuthorKey; limit?: number } = {}): Promise<Feature[]> {

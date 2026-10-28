@@ -225,6 +225,35 @@
 .body h2 { font-family: var(--ui); font-weight: 800; font-stretch: 75%; font-size: 40px; line-height: var(--hlLh); letter-spacing: var(--trk); margin: 40px 0 0; text-wrap: balance }
 .body h3 { font-family: var(--ui); font-weight: 800; font-stretch: 75%; font-size: 26px; line-height: 1.3; margin: 32px 0 0 }
 .body h2 + p, .body h3 + p { margin-top: 24px }
+/* the desk's figures: graphs, tables and step diagrams drawn from the sources' numbers, and pictures */
+.fig { margin: 36px 0 0; padding: 20px 0 0; border-top: 2px solid var(--ink); font-family: var(--ui); font-weight: 400 }
+.figHead { display: flex; flex-direction: column; gap: 4px; margin: 0 0 16px }
+.figHead b { font-weight: 800; font-stretch: 75%; font-size: 22px; line-height: 1.25 }
+.figHead span { font-size: 15px; color: var(--ink2) }
+.figCap { margin-top: 8px; font-size: 14px; color: var(--ink2) }
+.fig img { display: block; width: 100%; height: auto }
+.bars { display: flex; flex-direction: column; gap: 10px }
+.barRow { display: grid; grid-template-columns: minmax(90px, 32%) 1fr auto; align-items: center; gap: 12px; font-size: 15px }
+.barLabel { line-height: 1.3 }
+.barTrack { height: 22px; background: var(--pg2) }
+.barTrack span { display: block; height: 100%; background: var(--ink2) }
+.barMark .barTrack span { background: var(--beat, var(--ink)) }
+.barMark .barLabel, .barMark .barVal { font-weight: 800 }
+.barVal { font-variant-numeric: tabular-nums; min-width: 3.5ch; text-align: right }
+.figUnit { margin: 10px 0 0 !important; font-size: 14px; color: var(--ink2) }
+.tblWrap { overflow-x: auto }
+.tbl { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.4 }
+.tbl th, .tbl td { padding: 9px 12px 9px 0; text-align: left; vertical-align: top; border-bottom: .5px solid var(--line) }
+.tbl thead th { font-weight: 800; border-bottom: 1.5px solid var(--ink) }
+.tbl tbody th { font-weight: 700 }
+.tbl td { font-variant-numeric: tabular-nums }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: st; display: flex; flex-direction: column }
+.steps li { counter-increment: st; position: relative; padding: 0 0 18px 48px; display: flex; flex-direction: column; gap: 3px; font-size: 16px; line-height: 1.45 }
+.steps li::before { content: counter(st); position: absolute; left: 0; top: 0; width: 32px; height: 32px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--beat, var(--ink)); color: var(--onbeat, var(--pg)); font-weight: 800; font-size: 15px }
+.steps li:not(:last-child)::after { content: ""; position: absolute; left: 15.5px; top: 36px; bottom: 4px; width: 1.5px; background: var(--line) }
+.steps b { font-weight: 800 }
+.steps span { color: var(--ink2) }
 .body a { text-decoration: underline; text-decoration-thickness: 1.1px; text-decoration-color: color-mix(in srgb, var(--ink) 50%, transparent); text-underline-offset: .15em }
 .note { margin-top: 40px; padding-top: 20px; border-top: 1px solid color-mix(in srgb, var(--ink) 45%, transparent); font-family: var(--serif); font-weight: 300; font-size: 16px; line-height: 1.6 }
 .note h4 { font-family: var(--ui); font-size: 14px; font-weight: 700; margin: 16px 0 6px }
