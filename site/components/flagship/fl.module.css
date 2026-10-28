@@ -167,7 +167,7 @@
 
 /* ---------- a beat's page / an author's page ---------- */
 .pageHead { padding: 20px 0 0 }
-@media (min-width: 768px) { .pageHead { padding: 40px 0 40px } }
+@media (min-width: 768px) { .pageHead { padding: 40px 0 0 } }
 .authorHead { text-align: center; padding: 50px var(--m) 30px }
 .authorName { font-size: calc(max(48px, min(5.56vw, 96px)) * var(--gs)) }
 .authorRole { margin-top: 12px; font-family: var(--serif); font-size: 18px }
