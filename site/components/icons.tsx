@@ -16,3 +16,4 @@ export const HomeIcon = () => <svg {...P}><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"
 export const Clock = () => <svg {...P}><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></svg>;
 export const Paper = () => <svg {...P}><path d="M5 4h11l3 3v13H5z" /><path d="M8 9h8M8 12.5h8M8 16h5" /></svg>;
 export const Archive = () => <svg {...P}><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v12h14V8M10 12h4" /></svg>;
+export const LockIcon = () => <svg {...P}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>;

@@ -59,6 +59,7 @@ export default function Frame({ lang, beat, path, children }: { lang: Lang; beat
                 <Link className={s.dSmall} href={fl(lang, "/search")}>{w.search}</Link>
                 <Link className={s.dSmall} href={fl(lang, "/author/desk")}>{w.writers}</Link>
                 <Link className={s.dSmall} href={href(lang, "/")}>{w.daily}</Link>
+                <a className={s.dSmall} href={lang === "en" ? "/editor?lang=en" : "/editor"}>{w.editor}</a>
               </div>
               <div className={s.dGroup}>
                 <Look label={w.look} names={[w.lookAuto, w.lookLight, w.lookDark]} />

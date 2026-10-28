@@ -1,13 +1,15 @@
 // The editor page (ROADMAP §6 phase B, item 4): what waits for the editor's yes or no,
-// what's live now, Aavtikal's articles, the engine's stop switch and the day's use.
+// Capital Kranti's news and Aavtikal's articles (each searched, shown 25 at a time, changed
+// or taken down and put back), the engine's stop switch and the day's use.
 // Gujarati first, English as a switch (?lang=en); plain words, big buttons.
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import s from "./editor.module.css";
-import { approveStory, pauseEngine, publishFeature, rejectStory, removeFeature, removeStory } from "./actions.ts";
+import { W } from "./words.ts";
+import { approveStory, pauseEngine, publishFeature, putBackStory, rejectStory, removeFeature, removeStory } from "./actions.ts";
 import { db } from "@/lib/db.ts";
-import { COOKIE, desk, editorOf, signInReady, type DeskStory } from "@/lib/editor.ts";
+import { COOKIE, desk, editorOf, findFeatures, findStories, PAGE, signInReady, type DeskStory, type Found, type Show } from "@/lib/editor.ts";
 import { beatName, isBeat } from "@/lib/flagship.ts";
 import { num, timeText, shortDate } from "@/lib/format.ts";
 import { paragraphs } from "@/lib/format.ts";
@@ -15,38 +17,9 @@ import { paragraphs } from "@/lib/format.ts";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "સંપાદક | કેપિટલ ક્રાંતિ", robots: { index: false, follow: false } };
 
-const W = {
-  gu: {
-    title: "સંપાદકનું પાનું", signIn: "Google વડે પ્રવેશ કરો", signOut: "બહાર નીકળો", lang: "English",
-    intro: "અહીં તમે નક્કી કરો છો કે કયા સમાચાર સાઇટ પર જાય.",
-    off: "પ્રવેશ હજી ચાલુ નથી: Google પ્રવેશની ગોઠવણ બાકી છે.", again: "પ્રવેશ પૂરો ન થયો. ફરી પ્રયત્ન કરો.",
-    refused: "આ Google ખાતાને સંપાદકના પાના પર પ્રવેશ નથી.",
-    waiting: "તમારી રાહ જુએ છે", waitingNone: "હમણાં કંઈ બાકી નથી.", why: "કેમ રોક્યું",
-    publish: "પ્રકાશિત કરો", reject: "નહીં", read: "આખો સમાચાર વાંચો", sources: "સ્રોત",
-    live: "હમણાં સાઇટ પર", liveNone: "એન્જિને હજી કોઈ સમાચાર મૂક્યા નથી.", remove: "સાઇટ પરથી હટાવો", sure: "હા, હટાવો",
-    aavtikal: "આવતીકાલના લેખો", drafts: "મંજૂરીની રાહમાં", published: "પ્રકાશિત", none: "કંઈ નથી.",
-    engine: "સમાચાર એન્જિન", running: "ચાલુ છે: દર ૧૫ મિનિટે નવા સમાચાર શોધે છે.", stopped: "બંધ છે: કંઈ નવું મુકાતું નથી.",
-    stop: "એન્જિન બંધ કરો", start: "એન્જિન ફરી ચાલુ કરો", lastRuns: "છેલ્લી વખત ચાલ્યું", ok: "બરાબર", failed: "ભૂલ",
-    use: "આજનો વપરાશ", stories: "છેલ્લા ૨૪ કલાકમાં મુકાયેલા સમાચાર", ai: "AI વિનંતીઓ (મફત)", uploads: "આ મહિને ફોટા ચડાવ્યા", cost: "ખર્ચ",
-    free: "મફત મૉડલ જ વપરાય છે.", seconds: "સેકન્ડ", requests: "AI વિનંતી",
-  },
-  en: {
-    title: "Editor's page", signIn: "Sign in with Google", signOut: "Sign out", lang: "ગુજરાતી",
-    intro: "Here you decide which news goes on the site.",
-    off: "Sign-in isn't on yet: Google sign-in still needs setting up.", again: "Sign-in didn't finish. Try again.",
-    refused: "This Google account can't open the editor's page.",
-    waiting: "Waiting for you", waitingNone: "Nothing is waiting.", why: "Why it was held",
-    publish: "Publish", reject: "Don't publish", read: "Read the whole story", sources: "Sources",
-    live: "On the site now", liveNone: "The engine hasn't put any news up yet.", remove: "Take off the site", sure: "Yes, take it off",
-    aavtikal: "Aavtikal articles", drafts: "Waiting for approval", published: "Published", none: "Nothing.",
-    engine: "News engine", running: "Running: it looks for new news every 15 minutes.", stopped: "Stopped: nothing new goes up.",
-    stop: "Stop the engine", start: "Start the engine again", lastRuns: "Last runs", ok: "OK", failed: "Error",
-    use: "Today's use", stories: "News put up in the last 24 hours", ai: "AI requests (free)", uploads: "Photos uploaded this month", cost: "Cost",
-    free: "Only free models are used.", seconds: "s", requests: "AI requests",
-  },
-} as const;
+type Q = { lang?: string; signin?: string; q?: string; show?: string; n?: string; fq?: string; fshow?: string; fn?: string; saved?: string };
 
-export default async function Editor({ searchParams }: { searchParams: Promise<{ lang?: string; signin?: string }> }) {
+export default async function Editor({ searchParams }: { searchParams: Promise<Q> }) {
   const q = await searchParams;
   const lang = q.lang === "en" ? "en" : "gu";
   const w = W[lang];
@@ -67,9 +40,27 @@ export default async function Editor({ searchParams }: { searchParams: Promise<{
     );
   }
 
-  const d = await desk(db());
+  // what's asked for: words, which list, how many (25 more each time)
+  const words = (q.q ?? "").trim().slice(0, 80), fwords = (q.fq ?? "").trim().slice(0, 80);
+  const show: Show = q.show === "removed" ? "removed" : "site", fshow: Show = q.fshow === "removed" ? "removed" : "site";
+  const count = (v?: string) => Math.min(500, Math.max(PAGE, Math.round(Number(v) / PAGE) * PAGE || PAGE));
+  const n = count(q.n), fn = count(q.fn);
+  const sql = db();
+  const [d, news, arts] = await Promise.all([desk(sql), findStories(sql, words, show, n), findFeatures(sql, fwords, fshow, fn)]);
+
+  // a link to this page with some of its asks changed (the rest kept)
+  const keep: Record<string, string | undefined> = { lang: lang === "en" ? "en" : undefined, q: words || undefined, show: show === "removed" ? show : undefined,
+    n: n > PAGE ? String(n) : undefined, fq: fwords || undefined, fshow: fshow === "removed" ? fshow : undefined, fn: fn > PAGE ? String(fn) : undefined };
+  const link = (change: Record<string, string | undefined>, at: string) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries({ ...keep, ...change })) if (v) p.set(k, v);
+    const qs = p.toString();
+    return `/editor${qs ? `?${qs}` : ""}#${at}`;
+  };
+  const back = lang === "en" ? "lang=en" : "";
+
   const time = (iso: string) => (iso ? `${shortDate(iso, "gu")}, ${timeText(iso, "gu")}` : "");
-  const n = (x: number) => (lang === "gu" ? num(x, "gu") : String(x));
+  const nn = (x: number) => (lang === "gu" ? num(x, "gu") : String(x));
 
   const Held = ({ x }: { x: DeskStory }) => (
     <article className={s.card}>
@@ -83,10 +74,57 @@ export default async function Editor({ searchParams }: { searchParams: Promise<{
       </details>
       <div className={s.buttons}>
         <form action={approveStory.bind(null, x.id)}><button className={s.yes}>{w.publish}</button></form>
+        <Link className={s.ghost} href={`/editor/story/${x.id}${back ? `?${back}` : ""}`}>{w.edit}</Link>
         <form action={rejectStory.bind(null, x.id)}><button className={s.no}>{w.reject}</button></form>
       </div>
     </article>
   );
+
+  // one searchable list (Capital Kranti's news or Aavtikal's articles)
+  const Finder = ({ at, kind, found, value, which, more }: { at: string; kind: "story" | "feature"; found: { rows: Found[]; more: boolean }; value: string; which: Show; more: string }) => {
+    const qk = kind === "story" ? "q" : "fq", sk = kind === "story" ? "show" : "fshow", nk = kind === "story" ? "n" : "fn";
+    const hidden = Object.entries(keep).filter(([k, v]) => v && k !== qk && k !== nk);
+    return (
+      <>
+        <form className={s.search} action={`/editor#${at}`} role="search">
+          {hidden.map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+          <input type="search" name={qk} defaultValue={value} placeholder={w.searchFor} aria-label={w.search} />
+          <button className={s.find}>{w.search}</button>
+        </form>
+        <div className={s.tabs} role="group">
+          <Link href={link({ [sk]: undefined, [nk]: undefined }, at)} aria-current={which === "site" ? "true" : undefined}>{w.onSite}</Link>
+          <Link href={link({ [sk]: "removed", [nk]: undefined }, at)} aria-current={which === "removed" ? "true" : undefined}>{w.removedTab}</Link>
+          {value && <Link className={s.clear} href={link({ [qk]: undefined, [nk]: undefined }, at)}>{w.clear}</Link>}
+        </div>
+        {found.rows.length ? (
+          <ul className={s.list}>
+            {found.rows.map((x) => (
+              <li key={x.id}>
+                <div className={s.what}>
+                  {x.status === "withdrawn"
+                    ? <span className={s.title}>{x.headline}</span>
+                    : <a className={s.title} href={kind === "story" ? `/news/${x.id}` : `/aavtikal/p/${x.id}`} target="_blank" rel="noopener">{x.headline}</a>}
+                  <span className={s.when}>
+                    {time(x.at)} · {kind === "story" ? (x.kind === "live" ? w.fromEngine : w.fromPaper) : isBeat(x.kind) ? beatName(x.kind, lang) : x.kind}
+                  </span>
+                </div>
+                <div className={s.acts}>
+                  {x.status === "withdrawn" ? (
+                    <form action={(kind === "story" ? putBackStory : publishFeature).bind(null, x.id)}><button className={s.small}>{w.putBack}</button></form>
+                  ) : <>
+                    <Link className={s.small} href={`/editor/${kind}/${x.id}${back ? `?${back}` : ""}`}>{w.edit}</Link>
+                    <details className={s.confirm}><summary>{w.remove}</summary>
+                      <form action={(kind === "story" ? removeStory : removeFeature).bind(null, x.id)}><button className={s.no}>{w.sure}</button></form></details>
+                  </>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : <p className={s.empty}>{value ? w.noneFound : w.none}</p>}
+        {found.more && <Link className={s.moreBtn} href={more}>{w.more}</Link>}
+      </>
+    );
+  };
 
   return (
     <main className={s.page} lang={lang === "en" ? "en" : undefined}>
@@ -98,14 +136,26 @@ export default async function Editor({ searchParams }: { searchParams: Promise<{
           <form action="/api/editor/logout" method="post"><button className={s.link}>{w.signOut}</button></form>
         </div>
       </header>
+      <nav className={s.jump} aria-label={w.jump}>
+        <a href="#waiting">{w.waiting}{d.held.length > 0 && ` (${nn(d.held.length)})`}</a>
+        <a href="#news" className={s.jCK}>{w.ck}</a>
+        <a href="#aavtikal" className={s.jAV}>{w.av}</a>
+        <a href="#engine">{w.engine}</a>
+      </nav>
+      {q.saved && <p className={q.saved === "1" ? s.done : s.stopped} role="status">{q.saved === "1" ? w.saved : w.notSaved}</p>}
 
       <section className={s.block} aria-labelledby="waiting">
-        <h2 id="waiting">{w.waiting} {d.held.length > 0 && <span className={s.count}>{n(d.held.length)}</span>}</h2>
+        <h2 id="waiting">{w.waiting} {d.held.length > 0 && <span className={s.count}>{nn(d.held.length)}</span>}</h2>
         {d.held.length ? d.held.map((x) => <Held key={x.id} x={x} />) : <p className={s.empty}>{w.waitingNone}</p>}
       </section>
 
-      <section className={s.block} aria-labelledby="aavtikal">
-        <h2 id="aavtikal">{w.aavtikal}</h2>
+      <section className={`${s.block} ${s.ck}`} aria-labelledby="news">
+        <div className={s.brandHead}><h2 id="news">{w.ck}</h2><p>{w.ckNote}</p></div>
+        <Finder at="news" kind="story" found={news} value={words} which={show} more={link({ n: String(n + PAGE) }, "news")} />
+      </section>
+
+      <section className={`${s.block} ${s.av}`} aria-labelledby="aavtikal">
+        <div className={s.brandHead}><h2 id="aavtikal">{w.av}</h2><p>{w.avNote}</p></div>
         <h3 className={s.sub}>{w.drafts}</h3>
         {d.drafts.length ? d.drafts.map((f) => (
           <article key={f.id} className={s.card}>
@@ -115,37 +165,13 @@ export default async function Editor({ searchParams }: { searchParams: Promise<{
             <details className={s.more}><summary>{w.read}</summary>{paragraphs(f.body).map((p, i) => <p key={i}>{p.replace(/^#+\s*/, "")}</p>)}</details>
             <div className={s.buttons}>
               <form action={publishFeature.bind(null, f.id)}><button className={s.yes}>{w.publish}</button></form>
+              <Link className={s.ghost} href={`/editor/feature/${f.id}${back ? `?${back}` : ""}`}>{w.edit}</Link>
               <form action={removeFeature.bind(null, f.id)}><button className={s.no}>{w.reject}</button></form>
             </div>
           </article>
         )) : <p className={s.empty}>{w.none}</p>}
         <h3 className={s.sub}>{w.published}</h3>
-        <ul className={s.list}>
-          {d.features.map((f) => (
-            <li key={f.id}>
-              <a href={`/aavtikal/p/${f.id}`} target="_blank" rel="noopener">{f.headline}</a>
-              <span className={s.when}>{time(f.at)}</span>
-              <details className={s.confirm}><summary>{w.remove}</summary>
-                <form action={removeFeature.bind(null, f.id)}><button className={s.no}>{w.sure}</button></form></details>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className={s.block} aria-labelledby="live">
-        <h2 id="live">{w.live}</h2>
-        {d.live.length ? (
-          <ul className={s.list}>
-            {d.live.map((x) => (
-              <li key={x.id}>
-                <a href={`/news/${x.id}`} target="_blank" rel="noopener">{x.headline}</a>
-                <span className={s.when}>{time(x.at)}</span>
-                <details className={s.confirm}><summary>{w.remove}</summary>
-                  <form action={removeStory.bind(null, x.id)}><button className={s.no}>{w.sure}</button></form></details>
-              </li>
-            ))}
-          </ul>
-        ) : <p className={s.empty}>{w.liveNone}</p>}
+        <Finder at="aavtikal" kind="feature" found={arts} value={fwords} which={fshow} more={link({ fn: String(fn + PAGE) }, "aavtikal")} />
       </section>
 
       <section className={s.block} aria-labelledby="engine">
@@ -157,7 +183,7 @@ export default async function Editor({ searchParams }: { searchParams: Promise<{
           <ul className={s.runs}>
             {d.runs.map((r) => (
               <li key={r.at}><span>{time(r.at)}</span><span className={r.ok ? s.ok : s.bad}>{r.ok ? w.ok : w.failed}</span>
-                <span className={s.when}>{r.seconds != null && `${n(r.seconds)} ${w.seconds}`}{r.ai != null && ` · ${n(r.ai)} ${w.requests}`}</span></li>
+                <span className={s.when}>{r.seconds != null && `${nn(r.seconds)} ${w.seconds}`}{r.ai != null && ` · ${nn(r.ai)} ${w.requests}`}</span></li>
             ))}
           </ul>
         </>}
@@ -166,10 +192,10 @@ export default async function Editor({ searchParams }: { searchParams: Promise<{
       <section className={s.block} aria-labelledby="use">
         <h2 id="use">{w.use}</h2>
         <dl className={s.use}>
-          <div><dt>{w.stories}</dt><dd>{n(d.today.stories)}</dd></div>
-          <div><dt>{w.ai}</dt><dd>{n(d.today.ai)} / {n(d.today.aiLimit)}</dd></div>
-          <div><dt>{w.uploads}</dt><dd>{n(d.today.uploads)} / {n(d.today.uploadLimit)}</dd></div>
-          <div><dt>{w.cost}</dt><dd>₹{n(0)}</dd></div>
+          <div><dt>{w.stories}</dt><dd>{nn(d.today.stories)}</dd></div>
+          <div><dt>{w.ai}</dt><dd>{nn(d.today.ai)} / {nn(d.today.aiLimit)}</dd></div>
+          <div><dt>{w.uploads}</dt><dd>{nn(d.today.uploads)} / {nn(d.today.uploadLimit)}</dd></div>
+          <div><dt>{w.cost}</dt><dd>₹{nn(0)}</dd></div>
         </dl>
         <p className={s.empty}>{w.free}</p>
       </section>

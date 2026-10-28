@@ -333,6 +333,8 @@ a.h:active{opacity:.85}
 .srow .chev{transition:transform .2s;color:var(--muted)}.grp.open .chev{transform:rotate(90deg)}
 .subs{padding:0 0 8px 12px}.subs a{display:flex;align-items:center;min-height:40px;font-size:15px;color:var(--soft)}.subs a:hover{color:var(--brand)}
 .links a{display:flex;align-items:center;min-height:44px;font-size:15px;color:var(--ink)}.links a:hover{color:var(--brand)}
+.sheet .edlink{display:flex;align-items:center;gap:10px;min-height:48px;margin-top:16px;padding:0 14px;border:1px solid var(--rule);border-radius:8px;font-size:15px;font-weight:600;color:var(--soft)}
+.sheet .edlink:hover{border-color:var(--brand);color:var(--brand)}.sheet .edlink svg{width:18px;height:18px}
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--rule);border-radius:8px;overflow:hidden;margin-top:6px}
 .seg button{min-height:44px;font-size:15px;font-weight:600;color:var(--soft);text-align:center}
 .seg button + button{border-left:1px solid var(--rule)}

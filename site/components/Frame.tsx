@@ -28,7 +28,7 @@ export interface FrameProps {
 export default function Frame({ lang, path, section, active, bottomBar = true, children }: FrameProps) {
   const L = (p: string) => href(lang, p);
   const words = Object.fromEntries((["menu", "sections", "search", "close", "epaper", "home", "latest", "latestTitle", "archive", "searchPlaceholder",
-    "settings", "size", "language", "services", "about", "savedTitle", "fHow", "fPolicy", "fFix", "fContact"] as const)
+    "settings", "size", "language", "services", "about", "savedTitle", "fHow", "fPolicy", "fFix", "fContact", "editorPage"] as const)
     .map((k) => [k, t(lang, k)])) as Parameters<typeof Chrome>[0]["words"];
   return (
     <>
