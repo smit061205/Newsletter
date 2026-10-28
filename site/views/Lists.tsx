@@ -14,7 +14,11 @@ import Saved from "../components/Saved.tsx";
 export async function Section({ k, lang }: { k: string; lang: Lang }) {
   if (!isSection(k)) notFound();
   const list = await storiesIn(k, 60);
-  const top = list.find((s) => s.photo) ?? list[0];
+  // the lead is the day's news (the user, 29 Oct: an old story never heads a section): the most important of
+  // the last 24 hours, one with a photo first; only a section with nothing new leads with its newest
+  const fresh = list.filter((s) => Date.now() - Date.parse(s.publishedAt) < 24 * 3600_000)
+    .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
+  const top = fresh.find((s) => s.photo) ?? fresh[0] ?? list[0];
   return (
     <Frame lang={lang} path={`/section/${k}`} section={k}>
       <div className="sechead"><h1>{sectionName(k, lang)}</h1></div>
