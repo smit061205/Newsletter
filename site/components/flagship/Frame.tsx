@@ -2,6 +2,7 @@
 // menu, and the footer with the name across the page (FLAGSHIP.md §2.1-2.3, §2.11).
 import Link from "next/link";
 import s from "./fl.module.css";
+import Look from "./Look.tsx";
 import Menu from "./Menu.tsx";
 import { SearchIcon } from "../icons.tsx";
 import type { Lang } from "../../lib/types.ts";
@@ -58,6 +59,9 @@ export default function Frame({ lang, beat, path, children }: { lang: Lang; beat
                 <Link className={s.dSmall} href={fl(lang, "/search")}>{w.search}</Link>
                 <Link className={s.dSmall} href={fl(lang, "/author/desk")}>{w.writers}</Link>
                 <Link className={s.dSmall} href={href(lang, "/")}>{w.daily}</Link>
+              </div>
+              <div className={s.dGroup}>
+                <Look label={w.look} names={[w.lookAuto, w.lookLight, w.lookDark]} />
               </div>
               <div className={s.dGroup}>
                 {LANGS.map((l) => <Link key={l.lang} className={s.dSmall} href={fl(l.lang, path)} lang={l.lang} aria-current={l.lang === lang ? "true" : undefined}>{l.name}</Link>)}

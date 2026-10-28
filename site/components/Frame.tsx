@@ -75,5 +75,5 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
 /** Runs before the first paint: the reader's text size, so nothing jumps. The site is light only
  *  (the user, 29 Oct); a theme saved by its old switch is forgotten, so Aavtikal, the one part
  *  with a dark look, simply follows the phone. */
-export const PREPAINT = `try{var s=localStorage.getItem("ck-size"),r=document.documentElement;localStorage.removeItem("ck-theme");` +
+export const PREPAINT = `try{var s=localStorage.getItem("ck-size"),r=document.documentElement;localStorage.removeItem("ck-theme");var t=localStorage.getItem("fl-theme");if(t==="light"||t==="dark")r.setAttribute("data-theme",t);` +
   `if(s==="2"||s==="3")r.setAttribute("data-size",s)}catch(e){}`;

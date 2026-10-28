@@ -4,7 +4,7 @@
    containers of cards; the printed paper's purple, navy and cyan; light only (the user,
    29 Oct: dark is Aavtikal's alone, in components/flagship/fl.module.css). */
 :root{
-  --bg:#ffffff; --surface:#f6f5f8; --ink:#1d1d21; --strong:#111114; --soft:#3f3f46; --muted:#5f5f66;
+  --bg:#FDFDFC; --surface:#f6f5f8; --ink:#1d1d21; --strong:#111114; --soft:#3f3f46; --muted:#5f5f66;
   --rule:#e4e2e8; --rule-strong:#111114; --brand:#7f3894; --navy:#2e3192; --on-navy:#ffffff; --cyan:#0aaae4;
   --live:#0b6f99; --breaking:#b3261e; --checked:#1d7a46; --whatsapp:#1a7f45; --shade:rgba(17,17,20,.45); --photo:none;
   --serif:var(--font-serif),'Gujarati Sangam MN','Shruti',Georgia,serif;

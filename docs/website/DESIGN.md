@@ -79,7 +79,7 @@ The printed paper's colours, measured from the 22 Oct front page: wordmark purpl
 
 All text pairs pass WCAG AA (checked 24 Oct: muted 6.3:1 light / 7.5:1 dark; brand 7.3 / 8.2; live 5.6 / 9.8; white on breaking 6.5, on WhatsApp 5.0).
 
-**Theme:** light only (the user, 29 Oct 2026). The Dark column above is kept for reference; only Aavtikal has a dark look, following the phone (`components/flagship/fl.module.css`).
+**Theme:** light only (the user, 29 Oct 2026). The Dark column above is kept for reference; only Aavtikal has a dark look: it follows the phone, or the reader picks Light or Dark in its menu (`components/flagship/Look.tsx`, kept on the device as `fl-theme`). The page background is #FDFDFC (the user, 29 Oct).
 
 ### 2.2 Type
 
