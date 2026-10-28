@@ -13,10 +13,10 @@ import { storePhoto } from "./publish.ts";
 
 type Sql = NeonQueryFunction<false, false>;
 // Wikimedia asks programs to name themselves and a way to reach them
-const UA = "CapitalKranti-news/1.0 (https://capital-kranti.vercel.app; news photos from Wikimedia Commons)";
+export const UA = "CapitalKranti-news/1.0 (https://capital-kranti.vercel.app; news photos from Wikimedia Commons)";
 // free licences: Creative Commons (BY, BY-SA, 0), public domain, and the Government Open
 // Data Licence – India (most PIB and ministry photos on Commons)
-const FREE = /^(cc0|cc[ -]by(-sa)?\b|public domain|pd\b|pd-|godl)/i;
+export const FREE = /^(cc0|cc[ -]by(-sa)?\b|public domain|pd\b|pd-|godl)/i;
 
 export interface FreePhoto { photo: Photo; caption: { gu: string; en: string; hi: string } }
 interface Subject { title: string; gu: string; en: string; hi: string }
@@ -39,7 +39,7 @@ async function subjectOf(sql: Sql, w: Written): Promise<Subject | null> {
   return res.ok && res.value.title && res.value.gu ? res.value : null;
 }
 
-const plain = (html: string) => html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+export const plain = (html: string) => html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
 
 /** The article's main photo, when it's a free one on Commons: its address (1600 px wide) and its credit. */
 export async function leadPhoto(title: string): Promise<{ url: string; credit: string } | null> {
@@ -69,6 +69,35 @@ export async function leadPhoto(title: string): Promise<{ url: string; credit: s
   if (!bare(title).split(/[\s_(),-]+/).some((word) => word.length >= 4 && about.includes(word))) return null;
   const artist = plain(meta.Artist?.value ?? "").slice(0, 80) || "Wikimedia Commons";
   return { url: ii.thumburl ?? ii.url!, credit: `${artist}, ${licence}, Wikimedia Commons` };
+}
+
+/** Free-licence photos from a Wikipedia article (Aavtikal's explainers, the user, 29 Oct: several pictures in each),
+ * shown from Wikimedia's own servers (they allow it), so they take none of the site's daily uploads: a photo or a
+ * diagram, not a logo, icon, flag or map symbol, with its description for the writer and its credit. */
+export async function commonsPictures(title: string, max = 6): Promise<{ url: string; width: number; height: number; alt: string; credit: string }[]> {
+  const q = new URLSearchParams({ action: "query", generator: "images", titles: title, gimlimit: "40", redirects: "1",
+    prop: "imageinfo", iiprop: "url|size|extmetadata", iiurlwidth: "1200", format: "json", origin: "*" });
+  try {
+    const r = await fetch(`https://en.wikipedia.org/w/api.php?${q}`, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(20_000) });
+    if (!r.ok) return [];
+    const pages = Object.values(((await r.json()) as { query?: { pages?: Record<string, { title: string; imageinfo?: { thumburl?: string; thumbwidth?: number; thumbheight?: number; width?: number; extmetadata?: Record<string, { value?: string }> }[] }> } }).query?.pages ?? {});
+    const out: { url: string; width: number; height: number; alt: string; credit: string }[] = [];
+    for (const pg of pages) {
+      const ii = pg.imageinfo?.[0];
+      const meta = ii?.extmetadata ?? {};
+      const licence = plain(meta.LicenseShortName?.value ?? "");
+      if (!ii?.thumburl || !ii.thumbwidth || !ii.thumbheight || (ii.width ?? 0) < 500 || !FREE.test(licence)) continue;
+      if (!/\.(jpe?g|png)$/i.test(pg.title) || /logo|icon|flag|symbol|seal|emblem|signature|coat of arms|wordmark|map of|locator/i.test(pg.title)) continue;
+      if (ii.thumbheight > ii.thumbwidth * 1.6 || ii.thumbwidth > ii.thumbheight * 3.5) continue;
+      const alt = plain(meta.ImageDescription?.value ?? "").slice(0, 160) || pg.title.replace(/^File:|\.\w+$/g, "");
+      const artist = plain(meta.Artist?.value ?? "").slice(0, 80) || "Wikimedia Commons";
+      out.push({ url: ii.thumburl, width: ii.thumbwidth, height: ii.thumbheight, alt, credit: `${artist}, ${licence}, Wikimedia Commons` });
+      if (out.length >= max) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 /** A file photo of the story's subject, stored like the official ones; null when there's no fit. */
