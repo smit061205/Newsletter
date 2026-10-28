@@ -9,7 +9,7 @@
 //   2. the subject's pages are read, and the primary pages they link to (the company's announcement, its
 //      paper, its pricing), with their pictures;
 //   3. Gemini Flash writes the article (one request: 20 free a day for each Flash; 3.6 when 3.8's are used);
-//   4. every number is checked against the sources by code, every claim by a Gemma; an article that passes
+//   4. every number is checked against the sources by code, every claim by Gemini Flash Lite; an article that passes
 //      goes up by itself (decided 29 Oct), one that doesn't waits for the editor;
 //   5. Gemini Flash Lite (500 a day) translates it into English and Hindi, graphs included; a Gemma if it can't.
 //
@@ -366,7 +366,7 @@ async function moreFigures(sql: Sql, body: string, figs: Figure[], src: Source[]
   return paras.join("\n\n");
 }
 
-// ---- checking (a Gemma) ----
+// ---- checking (Gemini Flash Lite) ----
 
 const CHECK = `You are the fact-checking desk of Aavtikal, a Gujarati magazine. You get a long Gujarati explainer and its sources.
 List the article's specific, checkable claims about its subject (names, numbers, dates, prices, specifications, benchmark results,
@@ -382,8 +382,10 @@ async function checkArticle(sql: Sql, text: string, src: Source[], date: string)
   if (wrong.length) problems.push(`numbers not in any source: ${wrong.slice(0, 8).join(", ")}`);
   const stray = text.match(/[ऀ-ॿঀ-੿଀-෿]+/g);
   if (stray) problems.push(`letters from another script: ${[...new Set(stray)].slice(0, 3).join(", ")}`);
-  const res = await askJson(sql, { system: CHECK, user: `ARTICLE:\n${text}\n\n===\n\n${block(src)}`, role: "checker", maxTokens: 8000 },
-    (v) => { const c = (v as { claims?: { claim?: string; supported?: boolean }[] })?.claims; return Array.isArray(c) && c.length ? c : null; });
+  // Gemini Flash Lite: an article and its sources are more than a Gemma's 16,000 tokens a minute; a Gemma if it can't
+  const ask = { system: CHECK, user: `ARTICLE:\n${text}\n\n===\n\n${block(src)}`, role: "checker" as const, maxTokens: 8000 };
+  const claims = (v: unknown) => { const c = (v as { claims?: { claim?: string; supported?: boolean }[] })?.claims; return Array.isArray(c) && c.length ? c : null; };
+  const res = await askGemini(sql, "lite", ask, claims).then((r) => (r.ok ? r : askJson(sql, ask, claims)));
   if (!res.ok) problems.push(`the claim check didn't answer (${res.why.slice(0, 120)})`);
   else for (const c of res.value.filter((c) => c.supported !== true)) problems.push(`not in the sources: ${String(c.claim ?? "").slice(0, 160)}`);
   return problems;
