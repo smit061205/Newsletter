@@ -49,7 +49,7 @@ export const boostOf = (s: Story): Boost => {
 export function Lead({ s, lang, more = [] }: { s: Story; lang: Lang; more?: Story[] }) {
   const w = words(s, lang);
   return (
-    <article className={`lead b-${boostOf(s)}`}>
+    <article className={`lead b-${boostOf(s)}${s.photo ? "" : " nopic"}`}>
       <div className="txt">
         <Link className="h" href={storyHref(s, lang)}>
           {w.kicker && <span className="kick">{w.kicker}</span>}
