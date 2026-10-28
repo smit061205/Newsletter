@@ -137,6 +137,9 @@ async function watch() {
 }
 
 await ensureSchema(sql);
+// the editor's stop switch (the editor page, lib/editor.ts): nothing collected, written or published
+const [paused] = await sql.query(`select value from state where key = 'engine_paused'`);
+if (paused?.value === "yes") { log("the editor has paused the engine: nothing to do"); process.exit(0); }
 const [run] = await sql.query(`insert into runs (kind, started_at) values ('engine', now()) returning id`);
 const details: Record<string, unknown> = { models: await freeModels() };
 let ok = true;
