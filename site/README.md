@@ -17,6 +17,7 @@ app never carries it.
 | Loading 20-22 Oct | GitHub Actions `site-seed.yml` (once) | `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN` |
 | **The news engine** (every 15 min) | GitHub Actions `site-engine.yml` (`engine/run.ts`) | `DATABASE_URL`, `OPENROUTER_API_KEY`, `BLOB_READ_WRITE_TOKEN`; for approvals `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` |
 | The engine's checks and dry run | GitHub Actions `site-engine-try.yml` (on every engine change, any branch) | `OPENROUTER_API_KEY` (stores nothing) |
+| **The editor's page** (`/editor`: approve or reject held stories and Aavtikal drafts, take a story off, the engine's stop switch, the day's use) | the site (`lib/editor.ts`, `app/(gu)/editor`), Google sign-in | Vercel: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (a Google Cloud OAuth client, redirect `https://capital-kranti.vercel.app/api/editor/callback`), `CK_EDITORS` (the allowed Google addresses, comma-separated), `CK_SESSION_SECRET` (32+ random characters) |
 | The editor's Telegram buttons, instantly (optional) | `/api/telegram` on the site | Vercel: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS`, `TELEGRAM_WEBHOOK_SECRET` (else each engine run collects the presses) |
 
 ## How a day gets onto the site

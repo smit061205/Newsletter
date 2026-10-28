@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 const require = createRequire(import.meta.url);
 const AXE = require.resolve("axe-core/axe.min.js");
 const base = process.argv[2] ?? "http://localhost:3200";
-const PAGES = ["/", "/en", "/hi", "/latest", "/section/gujarat", "/epaper", "/about", "/aavtikal", "/en/aavtikal", "/aavtikal/science", "/aavtikal/author/desk", "/aavtikal/search"];
+const PAGES = ["/", "/en", "/hi", "/latest", "/section/gujarat", "/epaper", "/about", "/aavtikal", "/en/aavtikal", "/aavtikal/science", "/aavtikal/author/desk", "/aavtikal/search", "/editor"];
 const VIEWS = [{ name: "phone", width: 390, height: 844 }, { name: "desktop", width: 1440, height: 900 }];
 
 const b = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
