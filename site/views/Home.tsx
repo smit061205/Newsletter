@@ -60,10 +60,15 @@ export default async function Home({ lang }: { lang: Lang }) {
   const day = stories[0]?.issueDate;
   const today = stories.filter((s) => s.issueDate === day);
   // the lead: the engine's most important story of the last 12 hours when it's
-  // headline-sized (ROADMAP §0.1), else the printed paper's front page
-  const recentLive = stories.filter((s) => s.origin === "live" && Date.now() - Date.parse(s.publishedAt) < 12 * 3600_000 && (s.importance ?? 0) >= 7.5)
+  // headline-sized (ROADMAP §0.1) and has a photo, else the printed paper's front page.
+  // The lead always has a photo (the user, 29 Oct): the engine only takes official photos, so
+  // a big story from the outlets may have none; then the newest photo story leads, first
+  // from the last two days, else from the printed paper.
+  const recentLive = stories.filter((s) => s.photo && s.origin === "live" && Date.now() - Date.parse(s.publishedAt) < 12 * 3600_000 && (s.importance ?? 0) >= 7.5)
     .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
-  const lead = recentLive[0] ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
+  const newest = [...stories].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  const lead = recentLive[0] ?? newest.find((s) => s.photo && Date.now() - Date.parse(s.publishedAt) < 48 * 3600_000)
+    ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? newest.find((s) => s.photo) ?? today[0];
   // under the lead, its subject's other stories; below the top, what readers open most
   const [more, most] = await Promise.all([lead ? moreOnSubject(lead.id) : [], mostRead(5)]);
   // the stories under the lead: today's paper first, then the newest; whole rows of three
