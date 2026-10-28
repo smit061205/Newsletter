@@ -673,11 +673,11 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
   return "rewritten";
 }
 
-/** The desk's articles of the last week without their English or Hindi (a translation that failed) get them. */
+/** The desk's articles of the last week, new or written again, without their English or Hindi (a translation that failed) get them. */
 async function retranslate(sql: Sql, log: (s: string) => void, deadline: number) {
   const rows = await sql.query(
-    `select id, headline, dek, caption, body, figures, en, hi from features where author = 'desk' and status in ('published', 'held')
-       and (en is null or hi is null) and created_at > now() - interval '7 days' order by created_at desc limit 3`);
+    `select id, headline, dek, caption, body, figures, en, hi from features where (author = 'desk' or checks->>'rewritten' = 'true')
+       and status in ('published', 'held') and (en is null or hi is null) and updated_at > now() - interval '7 days' order by updated_at desc limit 3`);
   for (const r of rows) {
     if (Date.now() > deadline - 3 * 60_000) return;
     const figs = (r.figures ?? []) as Figure[];
