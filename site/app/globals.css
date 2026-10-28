@@ -67,6 +67,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* the section row's rule runs exactly as wide as the page's content, like every rule below it */
 .secs{display:flex;gap:4px 22px;overflow-x:auto;scrollbar-width:none;white-space:nowrap;background:linear-gradient(var(--rule),var(--rule)) content-box bottom/100% 1px no-repeat;font-weight:600;font-size:15px;color:var(--strong)}
 .secs::-webkit-scrollbar{display:none}
+.secs a.fl{margin-left:auto;padding-left:22px;border-left:1px solid var(--rule);font-weight:800;font-stretch:80%}
 .secs a{position:relative;padding-block:13px 11px;transition:color .15s ease}
 .secs a::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:3px 3px 0 0;background:var(--brand);transform:scaleX(0);transition:transform .25s cubic-bezier(.2,.7,.2,1)}
 .secs a:hover{color:var(--brand)}.secs a:hover::after{transform:scaleX(.5)}.secs a.on{color:var(--brand)}.secs a.on::after{transform:scaleX(1)}
