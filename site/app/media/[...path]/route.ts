@@ -8,8 +8,8 @@ const TYPES: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", p
 
 export async function GET(_: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const name = (await params).path.join("/");
-  // the daily paper's photos and e-paper by day; Aavtikal's photos (pipeline/features.ts) in their own folder
-  const m = name.match(/^(?:(?:photos|epaper)\/\d{4}-\d{2}-\d{2}|aavtikal)\/[a-z0-9-]+\.(jpg|jpeg|png|pdf)$/);
+  // the daily paper's photos, the e-paper and the live news photos (engine/publish.ts) by day; Aavtikal's photos (pipeline/features.ts) in their own folder
+  const m = name.match(/^(?:(?:photos|epaper|live)\/\d{4}-\d{2}-\d{2}|aavtikal)\/[a-z0-9-]+\.(jpg|jpeg|png|pdf)$/);
   if (!m) return new Response("not found", { status: 404 });
   const got = await get(name, { access: "private" }).catch(() => null);
   if (!got) return new Response("not found", { status: 404 });
