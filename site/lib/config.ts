@@ -14,10 +14,15 @@ export const WEBSITE = {
   dailyFreeRequests: 900,
   dailyUploads: 50,
   // Aavtikal's desk (engine/desk.ts; the user, 29 Oct): deep explainers for AI, Tech and Science (never Politics),
-  // written by Gemini Flash on its free tier (about 20 requests a day), 10 a day; more on the days named
+  // written by Gemini Flash on Google's free tier, 10 a day; more on the days named
   deskBeats: ["ai", "tech", "science"] as const,
   deskDaily: 10,
   deskDays: { "2026-10-29": 20 } as Record<string, number>,
-  flashModels: ["gemini-3.8-flash", "gemini-3.8-flash-latest"],
-  dailyFlashRequests: 20,
+  // each model's own free requests a day (AI Studio, 29 Oct), used in order: the writers (3.6 when 3.8's
+  // are used; the older Flashes write less well) and the translators (Gemma's 16,000 tokens a minute is too
+  // little for a long article)
+  gemini: {
+    writer: [{ id: "gemini-3.8-flash", daily: 20 }, { id: "gemini-3.6-flash", daily: 20 }],
+    lite: [{ id: "gemini-3.5-flash-lite", daily: 500 }, { id: "gemini-3.1-flash-lite", daily: 500 }],
+  },
 };

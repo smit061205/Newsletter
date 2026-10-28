@@ -8,10 +8,10 @@
 //      (the labs' and agencies' own, and good outlets) and the news engine's tech and science items;
 //   2. the subject's pages are read, and the primary pages they link to (the company's announcement, its
 //      paper, its pricing), with their pictures;
-//   3. Gemini Flash writes the article (one request: it has about 20 free a day);
+//   3. Gemini Flash writes the article (one request: 20 free a day for each Flash; 3.6 when 3.8's are used);
 //   4. every number is checked against the sources by code, every claim by a Gemma; an article that passes
 //      goes up by itself (decided 29 Oct), one that doesn't waits for the editor;
-//   5. a Gemma translates it into English and Hindi, graphs included.
+//   5. Gemini Flash Lite (500 a day) translates it into English and Hindi, graphs included; a Gemma if it can't.
 //
 // Run: node --experimental-strip-types site/engine/desk.ts [seconds]   (the engine's job runs it after each round)
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
@@ -21,7 +21,7 @@ import type { Figure, L3 } from "../lib/flagship.ts";
 import { ensureSchema } from "../lib/schema.ts";
 import type { Photo } from "../lib/types.ts";
 import { touched } from "../lib/write.ts";
-import { askFlash, askJson, flashLeft } from "./ai.ts";
+import { askGemini, askJson, geminiLeft } from "./ai.ts";
 import { parseFeed, pageText } from "./feed.ts";
 import { ask } from "./fetch.ts";
 import { indiaDate, storePhoto } from "./publish.ts";
@@ -282,7 +282,7 @@ async function checkArticle(sql: Sql, text: string, src: Source[], date: string)
   return problems;
 }
 
-// ---- translating (a Gemma), graphs included ----
+// ---- translating (Gemini Flash Lite), graphs included ----
 
 const TRANSLATE = (lang: "en" | "hi") => `You translate a long Gujarati explainer from Aavtikal into ${lang === "en"
   ? "English, in the clear, precise style of a serious science and technology magazine"
@@ -306,15 +306,17 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
   const source = [gu.headline, gu.dek, gu.caption, gu.body, ...labels.map((l) => l.gu)].join("\n\n");
   const marks = (s: string) => (s.match(/\[\[fig \d+\]\]/g) ?? []).join();
   let note = "";
+  const take = (v: unknown) => {
+    const x = v as Partial<Words3> & { strings?: unknown[] };
+    if (!x?.headline || typeof x.body !== "string" || words(x.body) < words(gu.body) * 0.6) return null;
+    if (marks(x.body) !== marks(gu.body) || !Array.isArray(x.strings) || x.strings.length !== labels.length) return null;
+    if (lang === "hi" && !/[ऀ-ॿ]/.test(x.headline + x.body)) return null;
+    return { headline: String(x.headline), dek: String(x.dek ?? ""), caption: String(x.caption ?? ""), body: x.body, strings: x.strings.map(String) };
+  };
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await askJson(sql, { system: TRANSLATE(lang), user: JSON.stringify({ ...gu, strings: labels.map((l) => l.gu) }) + note, maxTokens: 20_000 },
-      (v) => {
-        const x = v as Partial<Words3> & { strings?: unknown[] };
-        if (!x?.headline || typeof x.body !== "string" || words(x.body) < words(gu.body) * 0.6) return null;
-        if (marks(x.body) !== marks(gu.body) || !Array.isArray(x.strings) || x.strings.length !== labels.length) return null;
-        if (lang === "hi" && !/[ऀ-ॿ]/.test(x.headline + x.body)) return null;
-        return { headline: String(x.headline), dek: String(x.dek ?? ""), caption: String(x.caption ?? ""), body: x.body, strings: x.strings.map(String) };
-      });
+    // Gemini Flash Lite; a Gemma when its requests are used up
+    const ask = { system: TRANSLATE(lang), user: JSON.stringify({ ...gu, strings: labels.map((l) => l.gu) }) + note, maxTokens: 20_000 };
+    const res = await askGemini(sql, "lite", ask, take).then((r) => (r.ok || !r.stop ? r : askJson(sql, ask, take)));
     if (!res.ok) return null;
     const out = res.value;
     const wrong = numbersNotIn([out.headline, out.dek, out.caption, out.body, ...out.strings].join("\n"), source, date);
@@ -349,7 +351,7 @@ async function oneArticle(sql: Sql, log: (s: string) => void): Promise<Outcome> 
   const target = WEBSITE.deskDays[date] ?? WEBSITE.deskDaily;
   const beat = await beatToday(sql, date, target);
   if (!beat) { log(`today's ${target} articles are done`); return "done"; }
-  if ((await flashLeft(sql)) <= 0) { log("Gemini Flash's free requests for today are used up"); return "stop"; }
+  if (!(await geminiLeft(sql, "writer"))) { log("Gemini Flash's free requests for today are used up"); return "stop"; }
 
   // 1. the subject
   const list = await leads(sql, beat);
@@ -377,7 +379,7 @@ async function oneArticle(sql: Sql, log: (s: string) => void): Promise<Outcome> 
   }
 
   // 3. the Gujarati article (Gemini Flash)
-  const draft = await askFlash(sql, {
+  const draft = await askGemini(sql, "writer", {
     system: WRITE,
     user: `SUBJECT (${beat}): ${topic}\n\nPICTURES:\n${pics.map((p) => `${p.n}. from ${p.from}: ${p.alt || "(no description)"}`).join("\n") || "(none)"}\n\n${block(sources)}`,
   }, readDraft);

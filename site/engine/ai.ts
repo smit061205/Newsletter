@@ -207,51 +207,67 @@ export async function askJson<T>(sql: Sql | null, a: Ask, check: (v: unknown) =>
   return { ok: false, why: whys.join(" | ") || why, busy };
 }
 
-/** Gemini Flash, for Aavtikal's long explainers only (the user's choice, 29 Oct): Google's free tier,
- * about 20 requests a day, counted apart from Gemma's. Unlike Gemma it takes a system instruction and
- * answers in JSON mode. The model is the first of the site's named ones this key has. */
-let flash: string | null | undefined;
-async function flashModel(): Promise<string | null> {
-  if (flash !== undefined) return flash;
-  flash = null;
-  if (!GOOGLE_KEY) return flash;
-  try {
-    const res = await fetch(`${GOOGLE}/models?pageSize=200`, { headers: { "x-goog-api-key": GOOGLE_KEY }, signal: AbortSignal.timeout(20_000) });
-    const ids = (((await res.json()) as { models?: { name: string }[] }).models ?? []).map((m) => m.name.replace(/^models\//, ""));
-    flash = WEBSITE.flashModels.find((m) => ids.includes(m))
-      ?? ids.find((m) => /^gemini-[\d.]+-flash(-latest)?$/.test(m) && !/lite|image|tts|live|audio/.test(m)) ?? null;
-  } catch { /* none this run */ }
-  return flash;
+/** Gemini on Google's free tier, for Aavtikal's long explainers only (the user's choice, 29 Oct), counted
+ * apart from Gemma's. Each model has its own daily allowance (AI Studio, 29 Oct: 20 for each Flash, 500
+ * for each Flash Lite), so a pool's models are used in order: the first until its allowance is used, then
+ * the next. "writer" writes the articles; "lite" translates them (Gemma's 16,000 tokens a minute is too
+ * little for a 2,500-word article). Unlike Gemma, Gemini takes a system instruction and a JSON mode. */
+export type GeminiPool = "writer" | "lite";
+let geminiIds: string[] | null = null;
+async function geminiModels(pool: GeminiPool): Promise<{ id: string; daily: number }[]> {
+  if (!GOOGLE_KEY) return [];
+  if (!geminiIds) {
+    try {
+      const res = await fetch(`${GOOGLE}/models?pageSize=200`, { headers: { "x-goog-api-key": GOOGLE_KEY }, signal: AbortSignal.timeout(20_000) });
+      geminiIds = (((await res.json()) as { models?: { name: string }[] }).models ?? []).map((m) => m.name.replace(/^models\//, ""));
+    } catch { return []; }
+  }
+  const has = geminiIds;
+  return WEBSITE.gemini[pool].filter((m) => has.includes(m.id));
 }
-export const flashLeft = async (sql: Sql) => Math.max(0, WEBSITE.dailyFlashRequests - (await count(sql, "ai_flash", 0)));
+/** a model this run found used up (Google said 429 before our count did: its day ends at midnight in California) */
+const spent = new Set<string>();
+const geminiCounter = (id: string) => `ai_gemini:${id}`;
+async function geminiNext(sql: Sql, pool: GeminiPool): Promise<string | null> {
+  for (const m of await geminiModels(pool)) {
+    if (!spent.has(m.id) && (await count(sql, geminiCounter(m.id), 0)) < m.daily) return m.id;
+  }
+  return null;
+}
+/** whether a pool has a request left today */
+export const geminiLeft = async (sql: Sql, pool: GeminiPool) => (await geminiNext(sql, pool)) !== null;
 
-export async function askFlash<T>(sql: Sql, a: { system: string; user: string; maxTokens?: number; temperature?: number }, check: (v: unknown) => T | null): Promise<AiResult<T>> {
-  const model = await flashModel();
-  if (!model) return { ok: false, why: "no Gemini Flash for this key", stop: true };
-  if ((await flashLeft(sql)) <= 0) return { ok: false, why: "Gemini Flash's free requests for today are used up", stop: true };
-  await count(sql, "ai_flash");
-  usedThisRun++;
-  try {
-    const res = await fetch(`${GOOGLE}/models/${model}:generateContent`, {
-      method: "POST", signal: AbortSignal.timeout(300_000),
-      headers: { "x-goog-api-key": GOOGLE_KEY, "content-type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: a.system }] },
-        contents: [{ role: "user", parts: [{ text: a.user }] }],
-        generationConfig: { temperature: a.temperature ?? 0.4, maxOutputTokens: a.maxTokens ?? 48_000, responseMimeType: "application/json" },
-      }),
-    });
-    const text = await res.text();
-    if (!res.ok) return { ok: false, why: `${model}: ${res.status} ${text.slice(0, 200)}`, busy: [429, 500, 503].includes(res.status) };
-    const g = JSON.parse(text) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[] };
-    const c = g.candidates?.[0];
-    const out = (c?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("");
-    const parsed = readJson(out);
-    if (parsed === undefined) return { ok: false, why: `${model}: not JSON (${out.length} chars, ${c?.finishReason ?? "?"})` };
-    const value = check(parsed);
-    return value === null ? { ok: false, why: `${model}: JSON without what was asked for` } : { ok: true, value, model: `google:${model}` };
-  } catch (e) {
-    return { ok: false, why: `${model}: ${e instanceof Error ? e.message : e}`, busy: true };
+export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: string; user: string; maxTokens?: number; temperature?: number }, check: (v: unknown) => T | null): Promise<AiResult<T>> {
+  if (!(await geminiModels(pool)).length) return { ok: false, why: `no Gemini ${pool} model for this key`, stop: true };
+  for (;;) {
+    const model = await geminiNext(sql, pool);
+    if (!model) return { ok: false, why: `Gemini's free ${pool} requests for today are used up`, stop: true };
+    await count(sql, geminiCounter(model));
+    usedThisRun++;
+    try {
+      const res = await fetch(`${GOOGLE}/models/${model}:generateContent`, {
+        method: "POST", signal: AbortSignal.timeout(300_000),
+        headers: { "x-goog-api-key": GOOGLE_KEY, "content-type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: a.system }] },
+          contents: [{ role: "user", parts: [{ text: a.user }] }],
+          generationConfig: { temperature: a.temperature ?? 0.4, maxOutputTokens: a.maxTokens ?? 48_000, responseMimeType: "application/json" },
+        }),
+      });
+      const text = await res.text();
+      // this model's day is used up: the next one in the pool
+      if (res.status === 429 && /per ?day|PerDay|daily/i.test(text)) { spent.add(model); continue; }
+      if (!res.ok) return { ok: false, why: `${model}: ${res.status} ${text.slice(0, 200)}`, busy: [429, 500, 503].includes(res.status) };
+      const g = JSON.parse(text) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[] };
+      const c = g.candidates?.[0];
+      const out = (c?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("");
+      const parsed = readJson(out);
+      if (parsed === undefined) return { ok: false, why: `${model}: not JSON (${out.length} chars, ${c?.finishReason ?? "?"})` };
+      const value = check(parsed);
+      return value === null ? { ok: false, why: `${model}: JSON without what was asked for` } : { ok: true, value, model: `google:${model}` };
+    } catch (e) {
+      return { ok: false, why: `${model}: ${e instanceof Error ? e.message : e}`, busy: true };
+    }
   }
 }
 
