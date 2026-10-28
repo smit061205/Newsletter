@@ -331,6 +331,9 @@ export async function layOut(args: {
 const ROUNDS = 8;
 const LAST = 3;
 
+/** The tallest the front page's lead across the page may be, a share of the page. */
+const LEAD_MAX_SHARE = 0.4;
+
 /** Why a page found no design: how many designs came out too short for it, and too tall. */
 interface Diagnosis { short: number; long: number }
 
@@ -365,6 +368,15 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   const table = new Map<string, Option[]>();
   for (const [i, s] of stories.entries()) {
     for (const cols of blocks.widths(s, ranks[i])) table.set(`${i}|${cols}`, await blocks.options(s, ranks[i], cols));
+  }
+  // the front page's lead across the page leaves room for the rest: its photo
+  // across all the columns made it two thirds of the page, no design had room
+  // under it for the page's other stories, and the page was left a third empty
+  // (28 Oct). Its settings no taller than LEAD_MAX_SHARE of the page, when it has any
+  if (n === 1 && LEAD_FULL_WIDTH && stories[0].fullWidth) {
+    const all = table.get(`0|${GRID.columns}`) ?? [];
+    const low = all.filter((o) => o.height <= (band.bottom - band.top) * LEAD_MAX_SHARE);
+    if (low.length && low.length < all.length) table.set(`0|${GRID.columns}`, low);
   }
   const options = (i: number, cols: number) => table.get(`${i}|${cols}`) ?? [];
   const ds: DesignStory[] = stories.map((s, i) => {
