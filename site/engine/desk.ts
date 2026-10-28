@@ -631,7 +631,7 @@ async function retranslate(sql: Sql, log: (s: string) => void, deadline: number)
   }
 }
 
-// ---- run: new articles and older ones written again, in turn, as long as the time allows ----
+// ---- run: the older articles written again, then new ones, as long as the time allows ----
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const started = Date.now();
@@ -653,17 +653,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     let newDone = false, oldDone = false;
     while (deadline - Date.now() > 8 * 60_000 && !(newDone && oldDone)) {
-      if (!newDone) {
+      // the older articles first (the user, 29 Oct: "trigger rewriting now"), then the day's new ones
+      if (!oldDone) {
+        const r = await redoOne(sql, log);
+        if (r === "stop") break;
+        if (r === "none") oldDone = true;
+        else { details[r]++; continue; }
+      }
+      if (!newDone && deadline - Date.now() > 8 * 60_000) {
         const r = await oneArticle(sql, log);
         if (r === "stop") break;
         if (r === "done") newDone = true;
         else if (++details[r] >= 4 && r === "skipped") newDone = true;
-      }
-      if (!oldDone && deadline - Date.now() > 8 * 60_000) {
-        const r = await redoOne(sql, log);
-        if (r === "stop") break;
-        if (r === "none") oldDone = true;
-        else details[r]++;
       }
     }
     // nothing more to do for now (the day's articles made, or Flash's requests used up): the job rests a while
