@@ -9,10 +9,21 @@
 # schedule only queues the next keeper, which starts the moment this one ends
 # (one at a time: the concurrency group), or revives the engine if a run died.
 # Each round takes main's latest engine code, so a fix is live within 15 minutes.
+# 28 Oct: the hourly schedule didn't fire for six hours either, so each keeper also
+# queues the next one itself before it ends (a run may start another through the
+# API), and a change to this file starts one. Between rounds it listens to the
+# Telegram bot (engine/listen.ts), so the editors get answers within seconds.
 name: site-engine
 on:
   schedule: [{ cron: "4 * * * *" }]
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/site-engine.yml]
+
+permissions:
+  contents: read
+  actions: write
 
 concurrency:
   group: site-engine
@@ -41,6 +52,7 @@ jobs:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           end=$(( $(date +%s) + 340 * 60 ))
           installed=""
@@ -62,7 +74,12 @@ jobs:
             # the next :04, :19, :34 or :49
             now=$(date +%s); next=$(( (now - 240) / 900 * 900 + 900 + 240 ))
             [ "$next" -ge "$end" ] && break
-            sleep $(( next - now ))
+            timeout $(( next - now + 30 )) node --experimental-strip-types --no-warnings site/engine/listen.ts $(( next - now )) || true
+            now=$(date +%s); if [ "$next" -gt "$now" ]; then sleep $(( next - now )); fi
           done
+          # the next keeper, queued to start as this one ends
+          curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/site-engine.yml/dispatches" -d '{"ref":"main"}' \
+            || echo "::warning::couldn't queue the next run; the hourly schedule will"
           echo "$rounds rounds, $failed failed"
           [ "$failed" -eq 0 ]

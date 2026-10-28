@@ -1,13 +1,11 @@
 // The front page (DESIGN.md §3.3): a stack of containers. Containers with no
 // stories yet simply don't show (phase A has only the evening paper's).
-import Link from "next/link";
 import type { Lang, Story } from "../lib/types.ts";
-import { latestIssue, latestStories, moreOnSubject, mostRead } from "../lib/db.ts";
+import { latestStories, moreOnSubject, mostRead } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
-import { dateText, num, todayInIndia } from "../lib/format.ts";
-import { Cmp, Head, Join, LatestList, Lead, MostRead, Std, words } from "../components/cards.tsx";
-import { Chev } from "../components/icons.tsx";
+import { dateText } from "../lib/format.ts";
+import { Cmp, Head, Join, LatestList, Lead, MostRead, Std } from "../components/cards.tsx";
 import Frame from "../components/Frame.tsx";
 
 const inSection = (s: Story, key: string) => s.tier === key || s.genres.includes(key as never);
@@ -57,7 +55,7 @@ function WideBox({ k, list, lang }: { k: string; list: Story[]; lang: Lang }) {
 }
 
 export default async function Home({ lang }: { lang: Lang }) {
-  const [stories, issue] = await Promise.all([latestStories(200), latestIssue()]);
+  const stories = await latestStories(200);
   const day = stories[0]?.issueDate;
   const today = stories.filter((s) => s.issueDate === day);
   // the lead: the engine's most important story of the last 12 hours when it's
@@ -108,14 +106,6 @@ export default async function Home({ lang }: { lang: Lang }) {
               <div className={`g cards ${few.length >= 4 ? "c4" : `c${few.length}`} few`}>
                 {few.map(({ k, s }, i) => <Std key={s.id} s={s} lang={lang} sec={false} label={sectionName(k, lang)} photo={i < fewPhotos} />)}
               </div>
-            </section>
-          )}
-          {issue && issue.pages.length > 0 && (
-            <section className="ctr"><Head label={t(lang, issue.date === todayInIndia() ? "epTitle" : "epLast")} to={href(lang, "/epaper")} />
-              <div className="strip">{issue.pages.map((p) => (
-                <Link key={p.number} href={href(lang, "/epaper")}><span className="epg"><img src={p.url} alt={`${t(lang, "page")} ${num(p.number, lang)}`} loading="lazy" decoding="async" /></span>
-                  <div className="epcap">{t(lang, "page")} {num(p.number, lang)}</div></Link>))}</div>
-              <Link className="more" href={href(lang, "/epaper")}>{t(lang, issue.date === todayInIndia() ? "epRead" : "epReadLast")} <Chev /></Link>
             </section>
           )}
         </>

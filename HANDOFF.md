@@ -311,6 +311,9 @@ verification loop), `docs/website/UIUX.md` (the UI choices and where each lives)
   runs' logs (GitHub, Actions): items collected, triaged, written, published or held.
 - **Telegram approvals are off** until the user adds the secrets `TELEGRAM_BOT_TOKEN` and
   `TELEGRAM_CHAT_IDS`. Until then, held stories wait in the database (`status = 'held'`).
+  With only the token set, the bot answers `/start` with that chat's number (29 Oct; it
+  answered nothing before), the number `TELEGRAM_CHAT_IDS` needs. It answers within
+  seconds while the engine runs (`engine/listen.ts`), so the engine must be running.
 - **Dry runs** (store nothing): `site-engine-try.yml`, with input `stories` and an optional
   `probe`.
 - **The site:**

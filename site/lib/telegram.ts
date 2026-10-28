@@ -5,7 +5,8 @@
 //
 // The buttons' answers arrive either at the site (/api/telegram, instantly,
 // when the bot's webhook points there) or are fetched by each engine run
-// (getUpdates, when it doesn't). Both go through handleUpdate().
+// (getUpdates, when it doesn't). Both go through handleUpdate(), which also answers
+// a message (/start) with the chat's number, the one TELEGRAM_CHAT_IDS needs.
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import { touched } from "./write.ts";
 
@@ -13,10 +14,12 @@ type Sql = NeonQueryFunction<false, false>;
 const TOKEN = () => process.env.TELEGRAM_BOT_TOKEN ?? "";
 const CHATS = () => (process.env.TELEGRAM_CHAT_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 export const telegramOn = () => !!TOKEN() && CHATS().length > 0;
+/** The bot answers /start as soon as it has its token, so a new editor can learn their chat number. */
+const botOn = () => !!TOKEN();
 
-async function api(method: string, body: Record<string, unknown>) {
+async function api(method: string, body: Record<string, unknown>, ms = 20_000) {
   const res = await fetch(`https://api.telegram.org/bot${TOKEN()}/${method}`, {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(20_000),
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(ms),
   });
   return (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; result?: unknown; description?: string };
 }
@@ -46,10 +49,19 @@ export async function askApproval(sql: Sql, s: HeldStory) {
   await sql.query(`insert into approvals (story_id, message_id) values ($1, $2) on conflict (story_id) do nothing`, [s.id, first]);
 }
 
-interface Update { update_id: number; callback_query?: { id: string; data?: string; from: { id: number; first_name?: string }; message?: { chat: { id: number }; message_id: number; text?: string } } }
+interface Update { update_id: number; message?: { chat: { id: number }; text?: string; from?: { first_name?: string } }; callback_query?: { id: string; data?: string; from: { id: number; first_name?: string }; message?: { chat: { id: number }; message_id: number; text?: string } } }
 
 /** One button press: only from an editor's chat; a story is decided once. */
 export async function handleUpdate(sql: Sql, u: Update): Promise<string> {
+  // /start (or any message): the bot says the chat's number and whether it's an editor's
+  if (u.message) {
+    const chat = String(u.message.chat.id);
+    const editor = CHATS().includes(chat);
+    await api("sendMessage", { chat_id: chat, parse_mode: "HTML", text: editor
+      ? `નમસ્તે${u.message.from?.first_name ? ` ${esc(u.message.from.first_name)}` : ""}! આ ચેટ જોડાયેલી છે: મંજૂરી માગતા સમાચાર અહીં આવશે.\n\nThis chat is connected: stories that need your approval will arrive here.`
+      : `નમસ્તે! આ ચેટનો નંબર <code>${chat}</code> છે. સમાચાર અહીં મેળવવા, આ નંબર GitHub ના TELEGRAM_CHAT_IDS માં ઉમેરો.\n\nThis chat's number is <code>${chat}</code>. To get the stories here, add it to the TELEGRAM_CHAT_IDS secret on GitHub.` });
+    return editor ? "hello editor" : "told the chat number";
+  }
   const q = u.callback_query;
   if (!q?.data || !q.message) return "not a button";
   const chat = String(q.message.chat.id);
@@ -77,13 +89,15 @@ export async function handleUpdate(sql: Sql, u: Update): Promise<string> {
   return what === "a" ? "approved" : "rejected";
 }
 
-/** The presses since the last run, when the bot has no webhook (the engine run calls this). */
-export async function pollUpdates(sql: Sql): Promise<number> {
-  if (!telegramOn()) return 0;
+/** The messages and presses since last time, when the bot has no webhook (each engine run,
+ *  and engine/listen.ts between runs, which waits up to `wait` seconds for the next one).
+ *  null when the site takes them as they come (a webhook). */
+export async function pollUpdates(sql: Sql, wait = 0): Promise<number | null> {
+  if (!botOn()) return 0;
   const info = await api("getWebhookInfo", {});
-  if ((info.result as { url?: string })?.url) return 0; // the site takes them as they come
+  if ((info.result as { url?: string })?.url) return null;
   const [st] = await sql.query(`select value from state where key = 'telegram_offset'`);
-  const r = await api("getUpdates", { offset: st ? Number(st.value) : 0, timeout: 0, allowed_updates: ["callback_query"] });
+  const r = await api("getUpdates", { offset: st ? Number(st.value) : 0, timeout: wait, allowed_updates: ["callback_query", "message"] }, (wait + 20) * 1000);
   const updates = (r.result as Update[]) ?? [];
   for (const u of updates) await handleUpdate(sql, u);
   if (updates.length) {

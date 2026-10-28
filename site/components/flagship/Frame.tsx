@@ -19,7 +19,9 @@ const LANGS: { lang: Lang; name: string }[] = [{ lang: "gu", name: "ગુજર
 export function Wordmark({ lang, cls }: { lang: Lang; cls: string }) {
   return (
     <div className={cls}>
-      <svg viewBox="0 0 1000 235" role="img" aria-label={flw(lang).name}>
+      {/* 30 units above the line's top: the Gujarati and Hindi vowel signs over the letters
+          (ી, ि) rise to 18 above it, where the fixed header used to cut them off */}
+      <svg viewBox="0 -30 1000 265" role="img" aria-label={flw(lang).name}>
         <text x="0" y="198" fontSize="232" textLength="1000" lengthAdjust="spacingAndGlyphs">{flw(lang).name}</text>
       </svg>
     </div>
