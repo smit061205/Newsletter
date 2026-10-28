@@ -23,7 +23,7 @@ import { collect } from "./collect.ts";
 import { gate, gather, importance, levelOf, needsTranslation, translate, writeChecked, type ClusterItem, type Debunk } from "./newsroom.ts";
 import { indiaDate, photoOf, saveLive } from "./publish.ts";
 import { freePhoto } from "./wikiphoto.ts";
-import { cluster, placeTier, triage, type Triage } from "./triage.ts";
+import { cluster, placeTier, sameEvent, triage, type Triage } from "./triage.ts";
 
 const url = process.env.DATABASE_URL;
 if (!url) { console.error("DATABASE_URL is not set (a repository secret)"); process.exit(1); }
@@ -82,6 +82,14 @@ async function write() {
     const imp = importance(Math.max(...items.map((i) => i.triage.score)), c.tier, g.groups.length, g.official);
     const level = levelOf(imp);
     if (!level) { await sql.query(`update clusters set state = 'dropped', reason = 'too small for a story' where id = $1`, [c.id]); continue; }
+    const twin = await sameEvent(sql, { id: c.id, event: c.event, keys: c.keys ?? [] });
+    if (twin) {
+      // its reports join the story already up (the watch step reads them for changes) instead of a second story
+      await sql.query(`update items set cluster_id = $2 where cluster_id = $1`, [c.id, twin.id]);
+      await sql.query(`update clusters set state = 'dropped', reason = $2 where id = $1`, [c.id, `same event as ${twin.story}`]);
+      log(`    same event as ${twin.story}: ${c.event}`);
+      continue;
+    }
     const src = await gather(items);
     if (!src.length) { await sql.query(`update clusters set state = 'dropped', reason = 'no source text to write from' where id = $1`, [c.id]); continue; }
     log(`  writing ${c.id} (${level}, ${imp}): ${c.event}`);
@@ -156,6 +164,30 @@ async function photos() {
   return added;
 }
 
+/** Once (29 Oct): a story that went up twice (Spain's train crash) keeps its first copy; the later one comes down. */
+async function dedupe() {
+  const [done] = await sql.query(`select value from state where key = 'dedupe_once'`);
+  if (done) return 0;
+  const rows = await sql.query(
+    `select c.id, c.event, c.keys, c.first_seen, c.story_id from clusters c join stories s on s.id = c.story_id
+      where s.status = 'published' and s.origin = 'live' and c.first_seen > now() - interval '48 hours' order by c.first_seen desc limit 40`);
+  let removed = 0;
+  for (const r of rows) {
+    if (Date.now() > deadline) return removed;
+    const twin = await sameEvent(sql, { id: r.id, event: r.event, keys: r.keys ?? [], before: new Date(r.first_seen).toISOString() });
+    if (!twin) continue;
+    await sql.query(`update stories set status = 'withdrawn', hold_reason = $2, updated_at = now() where id = $1 and status = 'published'`,
+      [r.story_id, `the same event as ${twin.story}`]);
+    await sql.query(`update items set cluster_id = $2 where cluster_id = $1`, [r.id, twin.id]);
+    await sql.query(`update clusters set state = 'dropped', reason = $2 where id = $1`, [r.id, `same event as ${twin.story}`]);
+    removed++;
+    log(`    a second copy taken down: ${r.story_id} (the same event as ${twin.story})`);
+  }
+  await sql.query(`insert into state (key, value) values ('dedupe_once', '1') on conflict (key) do nothing`);
+  if (removed) await touched(sql);
+  return removed;
+}
+
 /** Once (29 Oct): events filed under Gujarat that happened elsewhere (Mumbai's airport) move to India, with their stories. */
 async function refile() {
   const [done] = await sql.query(`select value from state where key = 'tier_refile'`);
@@ -221,6 +253,7 @@ try {
   await write();
   log("photos:");
   details.refiled = await refile();
+  details.deduped = await dedupe();
   details.photos = await photos();
   await watch();
 } catch (e) {
