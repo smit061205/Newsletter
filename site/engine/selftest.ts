@@ -102,9 +102,11 @@ test("a model's JSON is read from a fence, and a cut-off list keeps its finished
   assert.equal(readJson("no json at all"), undefined);
 });
 test("news from outside Gujarat isn't filed under Gujarat", () => {
-  assert.equal(placeTier("gujarat", "Airlines asked to plan shifting flights to Navi Mumbai airport", ["mumbai", "airport", "airlines"]), "india");
-  assert.equal(placeTier("gujarat", "Mumbai-Ahmedabad bullet train reaches Surat", ["bullet train", "mumbai", "surat"]), "gujarat");
-  assert.equal(placeTier("gujarat", "Vadodara family dies", ["vadodara"]), "gujarat");
-  assert.equal(placeTier("india", "Delhi air quality", ["delhi"]), "india");
+  assert.equal(placeTier("gujarat", "MIAL asks airlines to submit Navi Mumbai flight shift plans by November 3"), "india");
+  assert.equal(placeTier("gujarat", "એરલાઇન્સ નવી મુંબઈ એરપોર્ટ પર ફ્લાઇટ્સ શિફ્ટ કરે"), "india");
+  assert.equal(placeTier("gujarat", "Mumbai-Ahmedabad bullet train reaches Surat"), "gujarat");
+  assert.equal(placeTier("gujarat", "ભૂપેન્દ્ર પટેલ દિલ્હીમાં વડાપ્રધાનને મળ્યા"), "gujarat");
+  assert.equal(placeTier("gujarat", "વડોદરામાં સોની પરિવારના ત્રણ સભ્યોએ આત્મહત્યા કરી"), "gujarat");
+  assert.equal(placeTier("india", "Delhi air quality"), "india");
 });
 console.log(`\n${n} checks passed (${SOURCES.length} sources listed)`);
