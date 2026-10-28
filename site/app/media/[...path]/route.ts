@@ -8,15 +8,16 @@ const TYPES: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", p
 
 export async function GET(_: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const name = (await params).path.join("/");
-  const m = name.match(/^(photos|epaper)\/\d{4}-\d{2}-\d{2}\/[a-z0-9-]+\.(jpg|jpeg|png|pdf)$/);
+  // the daily paper's photos and e-paper by day; Aavtikal's photos (pipeline/features.ts) in their own folder
+  const m = name.match(/^(?:(?:photos|epaper)\/\d{4}-\d{2}-\d{2}|aavtikal)\/[a-z0-9-]+\.(jpg|jpeg|png|pdf)$/);
   if (!m) return new Response("not found", { status: 404 });
   const got = await get(name, { access: "private" }).catch(() => null);
   if (!got) return new Response("not found", { status: 404 });
   return new Response(got.stream, {
     headers: {
-      "content-type": TYPES[m[2]],
+      "content-type": TYPES[m[1]],
       "cache-control": "public, max-age=31536000, s-maxage=31536000, immutable",
-      ...(m[2] === "pdf" ? { "content-disposition": `inline; filename="${name.split("/").pop()}"` } : {}),
+      ...(m[1] === "pdf" ? { "content-disposition": `inline; filename="${name.split("/").pop()}"` } : {}),
     },
   });
 }
