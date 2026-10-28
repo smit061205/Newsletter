@@ -3,7 +3,9 @@
 // daily site's queries never see these articles and the two never tangle.
 import type { Lang, Photo, StorySource } from "./types.ts";
 import { db } from "./db.ts";
-import { sample, sampleOn } from "./sample.ts";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { sampleOn } from "./sample.ts";
 
 export type Beat = "ai" | "tech" | "science" | "politics";
 export const BEATS: Beat[] = ["ai", "tech", "science", "politics"];
@@ -148,26 +150,18 @@ export async function searchFeatures(q: string, limit = 30): Promise<Feature[]> 
   return rows.map(featureOf);
 }
 
-// ---- local checking (CK_SAMPLE=1): real PIB stories of 22 Oct stand in for articles ----
+// ---- local checking (CK_SAMPLE=1): sample articles with freely licensed photos
+// (docs/website/sample/aavtikal.json; each caption credits its photographer) ----
 
-const SAMPLE_BEATS: Record<string, Beat> = {
-  p2326691: "ai", p2326879: "science", p2326762: "science", p2326728: "science", p2326873: "tech", p2326850: "tech", p2326779: "tech",
-  p2326600: "politics", p2326576: "politics", p2326774: "politics", p2326646: "politics", p2326534: "politics", p2326734: "politics",
-};
 let sampleCache: Feature[] | null = null;
 function sampleFeatures(): Feature[] {
   if (sampleCache) return sampleCache;
-  const order = Object.keys(SAMPLE_BEATS);
-  sampleCache = sample().stories.filter((s) => s.id in SAMPLE_BEATS)
-    .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
-    .map((s, i): Feature => {
-      const paras = s.body.split(/\n\s*\n/).filter(Boolean);
-      // a subheading after the second paragraph, as long articles have
-      const body = paras.length > 3 ? [...paras.slice(0, 2), `## ${s.kicker || s.deck.split(/[.,:]/)[0]}`, ...paras.slice(2)].join("\n\n") : paras.join("\n\n");
-      const at = new Date(Date.parse("2026-10-27T12:00:00Z") - i * 7 * 3600_000).toISOString();
-      return { id: s.id, beat: SAMPLE_BEATS[s.id], headline: s.headline, dek: s.deck, body, caption: s.caption, photo: s.photo,
-               author: i % 4 === 3 ? "editor" : "desk", publishedAt: at, updatedAt: at, en: null, hi: null,
-               sources: s.source ? [{ name: s.source.name, url: s.source.url, trust: "official" }] : [] };
-    });
+  type Raw = Omit<Feature, "publishedAt" | "updatedAt" | "hi" | "en"> & { en: FeatureText };
+  const raw = JSON.parse(readFileSync(path.join(process.cwd(), "..", "docs/website/sample/aavtikal.json"), "utf8")) as Raw[];
+  // newest first, about a day apart
+  sampleCache = raw.map((r, i): Feature => {
+    const at = new Date(Date.parse("2026-10-28T06:00:00Z") - i * 26 * 3600_000).toISOString();
+    return { ...r, publishedAt: at, updatedAt: at, hi: null };
+  });
   return sampleCache;
 }
