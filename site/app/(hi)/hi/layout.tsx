@@ -13,7 +13,7 @@ export default function Layout({ children }: Readonly<{ children: React.ReactNod
   return (
     <html lang="hi" className={`${uiHi.variable} ${serifHi.variable} ${ui.variable} ${serif.variable}`} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: PREPAINT }} /></head>
-      <body>{children}</body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
