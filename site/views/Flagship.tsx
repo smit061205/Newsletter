@@ -76,7 +76,7 @@ export async function FlBeat({ lang, beat }: { lang: Lang; beat: string }) {
   const [lead, ...rest] = await features({ beat, limit: 40 });
   return (
     <Frame lang={lang} beat={beat} path={`/${beat}`}>
-      <div className={`${s.beatBand} ${s.pageHead}`}><h1 className={s.huge}>{beatName(beat, lang)}</h1></div>
+      <div className={s.pageHead}><h1 className={s.huge}>{beatName(beat, lang)}</h1></div>
       {!lead ? <p className={s.empty}>{w.empty}</p> : (
         <section className={`${s.band} ${s.bandTop}`}>
           <Lead f={lead} lang={lang} />
