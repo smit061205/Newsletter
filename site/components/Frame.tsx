@@ -28,7 +28,7 @@ export interface FrameProps {
 export default function Frame({ lang, path, section, active, bottomBar = true, children }: FrameProps) {
   const L = (p: string) => href(lang, p);
   const words = Object.fromEntries((["menu", "sections", "search", "close", "epaper", "home", "latest", "latestTitle", "archive", "searchPlaceholder",
-    "settings", "theme", "themeAuto", "light", "dark", "size", "language", "services", "about", "savedTitle", "fHow", "fPolicy", "fFix", "fContact"] as const)
+    "settings", "size", "language", "services", "about", "savedTitle", "fHow", "fPolicy", "fFix", "fContact"] as const)
     .map((k) => [k, t(lang, k)])) as Parameters<typeof Chrome>[0]["words"];
   return (
     <>
@@ -52,7 +52,7 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
       </ViewTransition>
       <ToTop label={t(lang, "toTop")} />
       <ServiceWorker />
-      <div className="wrap">
+      <div className="foot"><div className="wrap">
         <footer>
           <Link className="wm" href={L("/")}><b>{PAPER.gu.name}</b></Link>
           <div className="fcols">
@@ -67,11 +67,13 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
           </div>
           <p className="legal">© {num(PAPER.founded, lang)}–{num(new Date().getFullYear(), lang)} {PAPER[lang].name}, {PAPER[lang].place} · RNI {PAPER.rni}</p>
         </footer>
-      </div>
+      </div></div>
     </>
   );
 }
 
-/** Runs before the first paint: the reader's theme and text size, so nothing flashes. */
-export const PREPAINT = `try{var t=localStorage.getItem("ck-theme"),s=localStorage.getItem("ck-size"),r=document.documentElement;` +
-  `if(t==="light"||t==="dark")r.setAttribute("data-theme",t);if(s==="2"||s==="3")r.setAttribute("data-size",s)}catch(e){}`;
+/** Runs before the first paint: the reader's text size, so nothing jumps. The site is light only
+ *  (the user, 29 Oct); a theme saved by its old switch is forgotten, so Aavtikal, the one part
+ *  with a dark look, simply follows the phone. */
+export const PREPAINT = `try{var s=localStorage.getItem("ck-size"),r=document.documentElement;localStorage.removeItem("ck-theme");` +
+  `if(s==="2"||s==="3")r.setAttribute("data-size",s)}catch(e){}`;

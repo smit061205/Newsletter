@@ -14,43 +14,44 @@ const inSection = (s: Story, key: string) => s.tier === key || s.genres.includes
 const BELOW = ["gujarat", "india", "farm", "economy", "tech", "health", "sport", "education", "entertainment"];
 
 // The sections below the top, after the Post's front page: a section with
-// plenty of news gets a full-width row (its best photo story, then two columns
-// of headlines); sections with a few stories share a row, three to a row on a
-// desktop. A story shows once on the page, in the first section it belongs to.
+// plenty of news gets a full-width row (its best photo story, then columns of
+// headlines); the stories of the sections with only a few go together into one
+// grid of cards, each with its section's name, cut to whole rows of four so no
+// row is left half empty. A story shows once on the page, in the first section it belongs to.
 function sectionBoxes(stories: Story[], shown: Set<string>) {
   const used = new Set(shown);
-  const boxes: { k: string; list: Story[] }[] = [];
-  for (const k of BELOW) {
+  const wide: { k: string; list: Story[] }[] = [];
+  const few: { k: string; s: Story }[] = [];
+  for (const k of [...BELOW, "world"]) {
     const list = stories.filter((s) => inSection(s, k) && !used.has(s.id)).slice(0, 7)
       .sort((a, b) => Number(!!b.photo) - Number(!!a.photo));
     if (!list.length) continue;
     list.forEach((s) => used.add(s.id));
-    boxes.push({ k, list });
+    if (list.length >= 4) wide.push({ k, list });
+    else few.push(...list.map((s) => ({ k, s })));
   }
-  return { wide: boxes.filter((b) => b.list.length >= 4), small: boxes.filter((b) => b.list.length < 4) };
+  few.sort((a, b) => Number(!!b.s.photo) - Number(!!a.s.photo));
+  return { wide, few: few.length >= 4 ? few.slice(0, Math.min(12, few.length - few.length % 4)) : few };
 }
 
 function WideBox({ k, list, lang }: { k: string; list: Story[]; lang: Lang }) {
   const [first, ...rest] = list;
+  // no photo to lead with: the section's stories as cards in whole rows of three
+  if (!first.photo) return (
+    <section className="ctr wide">
+      <Head label={sectionName(k, lang)} to={href(lang, `/section/${k}`)} />
+      <div className="g cards c3">{list.slice(0, list.length >= 6 ? 6 : 3).map((s) => <Std key={s.id} s={s} lang={lang} sec={false} photo={false} />)}</div>
+    </section>
+  );
+  // two columns of three headlines when there are six, else one column of them all
+  const cols = rest.length >= 6 ? [rest.slice(0, 3), rest.slice(3, 6)] : [rest];
   return (
     <section className="ctr wide">
       <Head label={sectionName(k, lang)} to={href(lang, `/section/${k}`)} />
-      <div className="wbody">
+      <div className={`wbody${cols.length === 1 ? " two" : ""}`}>
         <div><Std s={first} lang={lang} sec={false} /></div>
-        <div className="stack">{rest.slice(0, 3).map((s) => <Cmp key={s.id} s={s} lang={lang} />)}</div>
-        {rest.length > 3 && <div className="stack">{rest.slice(3, 6).map((s) => <Cmp key={s.id} s={s} lang={lang} />)}</div>}
+        {cols.map((c, i) => <div key={i} className="stack">{c.map((s) => <Cmp key={s.id} s={s} lang={lang} />)}</div>)}
       </div>
-    </section>
-  );
-}
-
-function SmallBox({ k, list, lang }: { k: string; list: Story[]; lang: Lang }) {
-  const [first, ...rest] = list;
-  return (
-    <section className="secbox">
-      <Head label={sectionName(k, lang)} to={href(lang, `/section/${k}`)} />
-      <Std s={first} lang={lang} sec={false} />
-      {rest.length > 0 && <div className="stack">{rest.map((s) => <Cmp key={s.id} s={s} lang={lang} />)}</div>}
     </section>
   );
 }
@@ -64,16 +65,19 @@ export default async function Home({ lang }: { lang: Lang }) {
   const recentLive = stories.filter((s) => s.origin === "live" && Date.now() - Date.parse(s.publishedAt) < 12 * 3600_000 && (s.importance ?? 0) >= 7.5)
     .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
   const lead = recentLive[0] ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
-  // the six under the lead: photo stories in the first row, so the row lines up
-  // under the lead, its subject's other stories; in the rail, what readers open most
+  // under the lead, its subject's other stories; below the top, what readers open most
   const [more, most] = await Promise.all([lead ? moreOnSubject(lead.id) : [], mostRead(5)]);
-  const six = today.filter((s) => s !== lead).slice(0, 6).sort((a, b) => Number(!!b.photo) - Number(!!a.photo));
+  // the stories under the lead: today's paper first, then the newest; whole rows of three
+  // only (28 Oct: four left one card alone in its row and a hole beside the rail)
+  const pool = [...today, ...stories.filter((s) => s.issueDate !== day)].filter((s) => s !== lead).slice(0, 6);
+  const six = pool.slice(0, pool.length < 3 ? pool.length : pool.length - pool.length % 3).sort((a, b) => Number(!!b.photo) - Number(!!a.photo));
   const shown = new Set([lead, ...six].filter(Boolean).map((s) => s!.id));
   // the latest list beside them: newest first, without the stories already at the top
   const byTime = stories.filter((s) => !shown.has(s.id))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || (a.page ?? 9) - (b.page ?? 9) || (a.rank ?? 99) - (b.rank ?? 99));
-  const world = stories.filter((s) => s.tier === "world" && !shown.has(s.id)).slice(0, 4);
-  const { wide, small } = sectionBoxes(stories, shown);
+  const { wide, few } = sectionBoxes(stories, shown);
+  // photos only in whole rows, so every row's headlines line up
+  const fewPhotos = Math.floor(few.filter((x) => x.s.photo).length / 4) * 4;
 
   return (
     <Frame lang={lang} path="/" active="home">
@@ -90,20 +94,20 @@ export default async function Home({ lang }: { lang: Lang }) {
                 </div>
               )}
             </div>
-            <aside className="rail vr"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={8} />
-              {most.length >= 3 && <div className="ctr"><Head label={t(lang, "mostRead")} /><MostRead stories={most} lang={lang} /></div>}
-              <div style={{ marginTop: 20 }}><Join lang={lang} /></div></aside>
+            {/* the rail is never taller than the stories beside it: the list shows only the headlines that fit */}
+            <aside className="rail vr"><div className="fit"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={16} /></div></aside>
           </div>
           <section className="ctr phone-latest"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={6} /></section>
-          {most.length >= 3 && <section className="ctr phone-latest"><Head label={t(lang, "mostRead")} /><MostRead stories={most} lang={lang} /></section>}
-          <section className="ctr phone-latest"><Join lang={lang} /></section>
+          <section className="ctr band">
+            {most.length >= 3 && <div><Head label={t(lang, "mostRead")} /><MostRead stories={most} lang={lang} /></div>}
+            <Join lang={lang} />
+          </section>
           {wide.map((b) => <WideBox key={b.k} k={b.k} list={b.list} lang={lang} />)}
-          {small.length > 0 && <div className="ctr g cards c3 smalls">{small.map((b) => <SmallBox key={b.k} k={b.k} list={b.list} lang={lang} />)}</div>}
-          {world.length > 0 && (
-            <section className="ctr"><Head label={sectionName("world", lang)} to={href(lang, "/section/world")} />
-              <div className="g cards c4">{world.map((s) => (
-                <Link key={s.id} className="h" href={href(lang, `/news/${s.id}`)}><h3 className="h4">{words(s, lang).headline}</h3>
-                  {words(s, lang).deck && <p className="dek">{words(s, lang).deck}</p>}</Link>))}</div>
+          {few.length > 0 && (
+            <section className="ctr"><Head label={t(lang, "moreNews")} />
+              <div className={`g cards ${few.length >= 4 ? "c4" : `c${few.length}`} few`}>
+                {few.map(({ k, s }, i) => <Std key={s.id} s={s} lang={lang} sec={false} label={sectionName(k, lang)} photo={i < fewPhotos} />)}
+              </div>
             </section>
           )}
           {issue && issue.pages.length > 0 && (

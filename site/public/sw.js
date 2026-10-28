@@ -47,7 +47,6 @@ async function offlinePage() {
   const body = `<!doctype html><html lang="gu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ઇન્ટરનેટ નથી · કેપિટલ ક્રાંતિ</title><style>
 body{margin:0;font-family:system-ui,sans-serif;background:#fff;color:#111114;line-height:1.6}
-@media (prefers-color-scheme:dark){body{background:#121214;color:#e7e7ea}a{color:#c99be0}}
 main{max-width:640px;margin:0 auto;padding:40px 16px}h1{font-size:26px;margin:0 0 8px;color:#7f3894}
 p{margin:0 0 16px}button{font:inherit;font-weight:700;padding:12px 20px;border-radius:999px;border:0;background:#2e3192;color:#fff;min-height:44px}
 ul{padding-left:20px}li{margin-bottom:10px}a{color:#7f3894;font-weight:600}small{color:#77757d}

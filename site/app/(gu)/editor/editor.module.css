@@ -1,6 +1,6 @@
 /* The editor page: one column, big type and big buttons (the editor is not
-   technical and uses it every evening); the site's own colour tokens, so it
-   follows light and dark like the rest of the site. */
+   technical and uses it every evening); the site's own colour tokens (light, like
+   the rest of the site). */
 .page { --yes: #1d7a46; --onyes: #fff; --no: #b3261e; max-width: 860px; margin: 0 auto; padding: 0 16px 80px; font-family: var(--ui); color: var(--ink); font-size: 18px; line-height: 1.5 }
 .page a { color: var(--navy) }
 .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 24px 0 16px; border-bottom: 2px solid var(--rule-strong) }
@@ -14,8 +14,6 @@
 .block { padding: 28px 0 8px; border-bottom: 1px solid var(--rule) }
 .block h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; font-size: 24px; font-weight: 800; color: var(--strong) }
 .sub { margin: 20px 0 10px; font-size: 18px; font-weight: 700; color: var(--soft) }
-@media (prefers-color-scheme: dark) { :global(html:not([data-theme="light"])) .page { --yes: #62cf8f; --onyes: #121214; --no: #ff8a80 } }
-:global(html[data-theme="dark"]) .page { --yes: #62cf8f; --onyes: #121214; --no: #ff8a80 }
 .count { display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 15px; background: var(--breaking); color: #fff; font-size: 16px }
 .empty { color: var(--muted); margin: 0 0 16px }
 

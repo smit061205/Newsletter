@@ -1,8 +1,8 @@
 /* Capital Kranti's own design system (docs/website/DESIGN.md), as in the approved
    sample (docs/website/sample/page_template.html): phone first; a 4/8/12-column grid
    whose 1px rules sit in the middle of the gutters; the front page as a stack of
-   containers of cards; the printed paper's purple, navy and cyan; light or dark
-   following the phone, or the reader's choice (data-theme on <html>). */
+   containers of cards; the printed paper's purple, navy and cyan; light only (the user,
+   29 Oct: dark is Aavtikal's alone, in components/flagship/fl.module.css). */
 :root{
   --bg:#ffffff; --surface:#f6f5f8; --ink:#1d1d21; --strong:#111114; --soft:#3f3f46; --muted:#5f5f66;
   --rule:#e4e2e8; --rule-strong:#111114; --brand:#7f3894; --navy:#2e3192; --on-navy:#ffffff; --cyan:#0aaae4;
@@ -20,14 +20,6 @@
 }
 /* the Hindi pages: Devanagari first, Gujarati behind it (a story not yet in Hindi) */
 html[lang="hi"]{--serif:var(--font-serif-hi),var(--font-serif),'Kohinoor Devanagari',Georgia,serif;--ui:var(--font-ui-hi),var(--font-ui),'Kohinoor Devanagari',system-ui,sans-serif}
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#121214; --surface:#1c1b20; --ink:#e7e7ea; --strong:#ffffff; --soft:#c9c9d1; --muted:#a3a3ab;
-  --rule:#2c2b31; --rule-strong:#e7e7ea; --brand:#c99be0; --navy:#a4a7ff; --on-navy:#121214;
-  --live:#5cc8f0; --checked:#62cf8f; --shade:rgba(0,0,0,.6); --photo:brightness(.9); color-scheme:dark } }
-:root[data-theme="dark"]{
-  --bg:#121214; --surface:#1c1b20; --ink:#e7e7ea; --strong:#ffffff; --soft:#c9c9d1; --muted:#a3a3ab;
-  --rule:#2c2b31; --rule-strong:#e7e7ea; --brand:#c99be0; --navy:#a4a7ff; --on-navy:#121214;
-  --live:#5cc8f0; --checked:#62cf8f; --shade:rgba(0,0,0,.6); --photo:brightness(.9); color-scheme:dark }
 :root[data-size="2"]{--scale:1.15} :root[data-size="3"]{--scale:1.3}
 @media (min-width:740px){ :root{--gut:24px; --side:24px} }
 @media (min-width:1024px){ :root{--gut:32px; --side:32px} }
@@ -119,6 +111,12 @@ main{padding-block:8px 48px}
 /* the top: lead + six on the left, latest in the rail */
 .topg > .rail{display:none}
 @media (min-width:1024px){ .topg{grid-template-columns:minmax(0,9fr) minmax(0,3fr)} .topg > .rail{display:block} .phone-latest{display:none} }
+/* the rail takes the stories' height, not its own: its list is laid out in a column that
+   wraps, so a headline that doesn't fit whole moves to a second column out of sight */
+.rail .fit{position:absolute;inset:0;display:flex;flex-direction:column}
+.rail .fit > .list{flex:1 1 0;min-height:0;display:flex;flex-flow:column wrap;overflow:hidden;column-gap:var(--gut)}
+.rail .fit > .list > li{width:100%}
+.rail .fit > .more{padding-bottom:0;border-top:1px solid var(--rule)}
 
 /* ---------- cards ---------- */
 .kick{font-weight:700;font-size:14px;color:var(--brand);margin-bottom:6px;display:block}
@@ -206,9 +204,27 @@ a.h:active{opacity:.85}
 @media (max-width:1023px){ .wbody > .stack + .stack{display:none} }
 @media (min-width:740px){ .wbody{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .wbody > .stack::before{content:"";position:absolute;top:0;bottom:0;left:calc(var(--gut) / -2);border-left:1px solid var(--rule)} }
 @media (min-width:1024px){ .wbody{grid-template-columns:minmax(0,6fr) minmax(0,3fr) minmax(0,3fr)} .wbody .std .h3{font-size:24px;line-height:1.35} }
-.smalls{row-gap:48px}
-.smalls > *::after{display:none!important}
-.smalls > .secbox .std .dek{display:none}
+@media (min-width:1024px){ .wbody.two{grid-template-columns:minmax(0,7fr) minmax(0,5fr)} }
+.wbody .stack{align-content:space-between}
+@media (min-width:740px){ .wbody > div:first-child .ph{aspect-ratio:16/9} }
+/* more news: the few-story sections' cards, each with its section's name */
+.lbl{display:block;font-size:13px;font-weight:700;color:var(--brand);margin-bottom:6px}
+.few .std .dek{display:none}
+@media (min-width:1024px){ .cards.c2{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.cards.c1{grid-template-columns:minmax(0,1fr)}
+
+/* most read across the page, the WhatsApp channel beside it */
+.band{display:grid;gap:var(--s8) var(--gut)}
+.band > *{position:relative;min-width:0}
+@media (min-width:740px){
+  .band .mostread{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));column-gap:var(--gut)}
+  .band .mostread li{position:relative}
+  .band .mostread li + li{border-top:0}
+  .band .mostread li + li::before{content:"";position:absolute;top:12px;bottom:12px;left:calc(var(--gut) / -2);border-left:1px solid var(--rule)}
+  .band .mostread a{grid-template-columns:minmax(0,1fr);gap:6px}
+  .band .mostread .n{font-size:40px}
+}
+@media (min-width:1024px){ .band{grid-template-columns:minmax(0,9fr) minmax(0,3fr)} .band > .join{align-self:start;margin-top:12px} }
 
 /* strips: shorts and e-paper pages */
 .strip{display:grid;grid-auto-flow:column;grid-auto-columns:44%;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding-bottom:4px}
@@ -315,7 +331,8 @@ a.h:active{opacity:.85}
 .setl{font-size:14px;color:var(--ink);margin-top:14px;font-weight:600}
 
 /* ---------- footer ---------- */
-footer{border-top:2px solid var(--rule-strong);margin-top:56px;padding-block:28px 36px}
+.foot{background:var(--surface);border-top:3px solid var(--brand);margin-top:72px}
+footer{padding-block:32px 36px}
 footer .wm b{font-size:28px}
 .fcols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px var(--gut);margin-top:20px}
 @media (min-width:740px){ .fcols{grid-template-columns:repeat(4,minmax(0,1fr))} }
