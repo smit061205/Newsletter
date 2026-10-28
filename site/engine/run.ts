@@ -23,7 +23,7 @@ import { collect } from "./collect.ts";
 import { gate, gather, importance, levelOf, needsTranslation, translate, writeChecked, type ClusterItem, type Debunk } from "./newsroom.ts";
 import { indiaDate, photoOf, saveLive } from "./publish.ts";
 import { freePhoto } from "./wikiphoto.ts";
-import { cluster, triage, type Triage } from "./triage.ts";
+import { cluster, placeTier, triage, type Triage } from "./triage.ts";
 
 const url = process.env.DATABASE_URL;
 if (!url) { console.error("DATABASE_URL is not set (a repository secret)"); process.exit(1); }
@@ -156,6 +156,24 @@ async function photos() {
   return added;
 }
 
+/** Once (29 Oct): events filed under Gujarat that happened elsewhere (Mumbai's airport) move to India, with their stories. */
+async function refile() {
+  const [done] = await sql.query(`select value from state where key = 'tier_refile'`);
+  if (done) return 0;
+  const rows = await sql.query(`select id, event, keys, story_id from clusters where tier = 'gujarat'`);
+  let moved = 0;
+  for (const r of rows) {
+    if (placeTier("gujarat", r.event, r.keys ?? []) === "gujarat") continue;
+    await sql.query(`update clusters set tier = 'india' where id = $1`, [r.id]);
+    if (r.story_id) await sql.query(`update stories set tier = 'india', updated_at = now() where id = $1 and tier = 'gujarat'`, [r.story_id]);
+    moved++;
+    log(`    to India: ${r.event}`);
+  }
+  await sql.query(`insert into state (key, value) values ('tier_refile', '1') on conflict (key) do nothing`);
+  if (moved) await touched(sql);
+  return moved;
+}
+
 /** Step 9: a published story's sources watched for 24 hours. */
 async function watch() {
   const live = await sql.query(
@@ -202,6 +220,7 @@ try {
   log("writing:");
   await write();
   log("photos:");
+  details.refiled = await refile();
   details.photos = await photos();
   await watch();
 } catch (e) {

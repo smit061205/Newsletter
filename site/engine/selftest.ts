@@ -9,7 +9,7 @@ import { ownItem } from "./collect.ts";
 import { parseFeed, pageText } from "./feed.ts";
 import { copiedShare, gate, importance, levelOf, type ClusterItem } from "./newsroom.ts";
 import { SOURCES, sourceById } from "./sources.ts";
-import { keySet, similarity, SAME_EVENT } from "./triage.ts";
+import { keySet, placeTier, similarity, SAME_EVENT } from "./triage.ts";
 
 let n = 0;
 const test = (name: string, fn: () => void) => { fn(); n++; console.log(`ok  ${name}`); };
@@ -100,5 +100,11 @@ test("a model's JSON is read from a fence, and a cut-off list keeps its finished
   assert.deepEqual(readJson("```json\n{\"a\":1}\n```"), { a: 1 });
   assert.deepEqual(readJson('Here: {"items":[{"i":1},{"i":2},{"i":3,"x"'), { items: [{ i: 1 }, { i: 2 }] });
   assert.equal(readJson("no json at all"), undefined);
+});
+test("news from outside Gujarat isn't filed under Gujarat", () => {
+  assert.equal(placeTier("gujarat", "Airlines asked to plan shifting flights to Navi Mumbai airport", ["mumbai", "airport", "airlines"]), "india");
+  assert.equal(placeTier("gujarat", "Mumbai-Ahmedabad bullet train reaches Surat", ["bullet train", "mumbai", "surat"]), "gujarat");
+  assert.equal(placeTier("gujarat", "Vadodara family dies", ["vadodara"]), "gujarat");
+  assert.equal(placeTier("india", "Delhi air quality", ["delhi"]), "india");
 });
 console.log(`\n${n} checks passed (${SOURCES.length} sources listed)`);
