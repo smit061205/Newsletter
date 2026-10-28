@@ -180,7 +180,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   // headline -- sized from the headline as planned, and set again from the
   // headline as set when that came out smaller (a long one fitted to its lines:
   // 23 Oct's copy printed a 43pt kicker over a 40pt headline)
-  const kicker = text.kicker.trim();
+  const kicker = KICKER.none ? "" : text.kicker.trim();
   const title = text.headline.trim();
   let kickerMax = Math.max(KICKER.min, hd * KICKER.ratio);
   for (let pass = 0; pass < 2; pass++) {
@@ -197,8 +197,10 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
       cursor = got.bottom + GAP.afterKicker;
     }
     if (title) {
-      // the rank's band, or the one set from outside (never below what the sub-heading needs)
-      const floor = DECK.min * 1.3;
+      // the rank's band, or the one set from outside (never below what the sub-heading needs,
+      // nor the paper's smallest headline unless the band set from outside is smaller:
+      // 28 Oct, a long headline given a line more shrank to 22pt under the editor's 28)
+      const floor = Math.max(DECK.min * 1.3, Math.min(HEADLINE.min, head?.min ?? HEADLINE.min));
       const hMax = Math.max(floor, head?.max ?? Math.max(hd, head?.min ?? 0));
       const hMin = Math.min(hMax, Math.max(floor, head?.min ?? Math.max(HEADLINE.min, hMax * 0.72)));
       const got = await display(title, "h", { font: HEADLINE.font, max: hMax, min: hMin,
@@ -218,8 +220,15 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   if (deck) {
     // the sub-heading: clearly smaller than the headline, clearly larger than the body
     const ds = Math.min(Math.max(DECK.min, (headSize || hd) * DECK.ratio), (headSize || hd) / 1.3);
-    const got = await display(deck, "d", { font: DECK.font, max: Math.max(ds, DECK.min), min: DECK.min, maxLines: 2, leading: DECK.leading,
-                                           align: "fit", lastFree: true }, 3, undefined, DECK.min);
+    // every line across the full width, a little larger or smaller to do it
+    // (28 Oct: a one-line sub-heading ending short left a gap the editor
+    // asked to fill), still clearly under the headline; else as a short
+    // paragraph, its last line free
+    const full = await setDisplay(m, deck, { font: DECK.font, max: Math.max(DECK.min, Math.min((headSize || hd) / 1.25, ds * 1.3)), min: DECK.min,
+                                             maxLines: cols <= 2 ? 3 : 2, leading: DECK.leading, align: "fit" }, `${aid}-d`, aid, 0, cursor, w);
+    if (full) displayFill = Math.min(displayFill, full.fill);
+    const got = full ?? await display(deck, "d", { font: DECK.font, max: Math.max(ds, DECK.min), min: DECK.min, maxLines: 2, leading: DECK.leading,
+                                                   align: "fit", lastFree: true }, 3, undefined, DECK.min);
     els.push(...got.elements);
     deckSize = got.size;
     cursor = got.bottom + GAP.afterDeck;

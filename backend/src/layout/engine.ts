@@ -157,6 +157,9 @@ export async function layOut(args: {
   longer: boolean;
   /** the day (a written brief's cache key) and the fillers the paper has used (one message, one house ad) */
   date: string; fillers: FillerCount;
+  /** a paper that failed its checks laid out again another way (pipeline.ts): the
+   * front page's lead in its usual width, the short items let in to fill gaps */
+  mend?: { narrowLead?: boolean; shortItems?: boolean };
   log: (s: string) => void; progress?: (done: number, total: number, what: string) => void;
 }): Promise<EngineResult> {
   const { m, log } = args;
@@ -181,7 +184,7 @@ export async function layOut(args: {
   await lengths(args.pool, args.longer ? false : "cached");
   // a story shorter than the paper's shortest (profile minWords) isn't printed,
   // unless the editor sent it: no items of a few lines under a big headline
-  const tooShort = args.pool.filter((s) => !alwaysPrinted(s) && Math.max(...(ladders.get(s.id) ?? []).map((r) => r.words)) < MIN_WORDS);
+  const tooShort = args.mend?.shortItems ? [] : args.pool.filter((s) => !alwaysPrinted(s) && Math.max(...(ladders.get(s.id) ?? []).map((r) => r.words)) < MIN_WORDS);
   if (tooShort.length) log(`  shorter than ${MIN_WORDS} words, left out: ${tooShort.map((s) => s.id).join(", ")}`);
   args = { ...args, pool: args.pool.filter((s) => !tooShort.includes(s)) };
   const blocks = new Blocks(m, ladders);
@@ -244,7 +247,7 @@ export async function layOut(args: {
       // to the old engine, which left the copies' white space (24 Oct)
       const slot = shortBy.get(i) ?? (round >= LAST ? (FILL_MAX / 2) * spanOf(1) : 0);
       const got = await solvePage(n, shares[i].map((s) => s.story), args.bands[i], pageAds(n), blocks, m,
-                                  seeded(args.seed * 31 + n + round * 7919), args.avoid, log, Math.min(round, LAST), fill, slot, round >= LAST);
+                                  seeded(args.seed * 31 + n + round * 7919), args.avoid, log, Math.min(round, LAST), fill, slot, round >= LAST, !args.mend?.narrowLead);
       pages[i] = got.page;
       diag.set(i, got.diagnosis);
       if (got.page) args.progress?.(++pagesDone, total, "pages");
@@ -343,13 +346,15 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
                          /** room (px²) no story is left for: a filler block may take it */
                          shortBy = 0,
                          /** the last try: no exact design, the nearest one */
-                         last = false):
+                         last = false,
+                         /** the front page's lead across the page (the profile's leadFullWidth) */
+                         leadWide = true):
   Promise<{ page: EnginePage | null; diagnosis: Diagnosis }> {
   const t0 = Date.now();
   const none = { page: null, diagnosis: { short: 0, long: 0 } };
   if (!stories.length) return none;
   // the front page's lead may run the full width (the profile's leadFullWidth)
-  if (n === 1 && LEAD_FULL_WIDTH) stories = [{ ...stories[0], fullWidth: true }, ...stories.slice(1)];
+  if (n === 1 && LEAD_FULL_WIDTH && leadWide) stories = [{ ...stories[0], fullWidth: true }, ...stories.slice(1)];
   // an ad the editor put at a place of their own: laid round it. One booked off
   // the columns (from an old issue) is set on the nearest ones, its picture
   // drawn to their width

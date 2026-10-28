@@ -82,7 +82,28 @@ const RETRY_EVERY_MS = 10 * 60_000;
 const RETRIES = 12;
 
 // layout checks a new arrangement of the paper can mend (gate names, report.gates)
-const REPAIR_BY_LAYOUT = /^(2 no empty space|3 no tombstoned|3 headline sizes|3 no headline over|S2 |S4 |S9 |W )/;
+const REPAIR_BY_LAYOUT = /^(1 plotter|2 no empty space|3 no tombstoned|3 headline sizes|3 no headline over|S2 |S4 |S9 |W )/;
+
+/** The other ways the paper is laid out when its checks fail, in turn: other
+ * arrangements; then, against empty space, the front page's lead in its usual
+ * width, the short items let in to fill gaps, and both (28 Oct: two more
+ * arrangements left page 1 a fifth empty, and the last, the worst, was kept). */
+const MENDS: { seedShift: number; mend?: { narrowLead?: boolean; shortItems?: boolean }; why: string }[] = [
+  { seedShift: 1, why: "another arrangement" },
+  { seedShift: 2, why: "another arrangement" },
+  { seedShift: 0, mend: { narrowLead: true }, why: "the front page's lead in its usual width" },
+  { seedShift: 0, mend: { shortItems: true }, why: "short items let in to fill the gaps" },
+  { seedShift: 3, mend: { narrowLead: true, shortItems: true }, why: "the lead in its usual width and the short items let in" },
+];
+/** Mending stops after this long (minutes): the paper is wanted the same evening. */
+const MEND_MINUTES = 10;
+
+/** How far a build is from clean: each check failing (not the page review,
+ * which comes after, nor gate 7, which only compares builds), and every point
+ * of a column left empty. 0 is clean. */
+function badness(r: { gates: { gate: string; pass: boolean }[]; whiteSpace: { height: number }[] }): number {
+  return r.gates.filter((g) => !g.pass && !/^[57] /.test(g.gate)).length * 1000 + r.whiteSpace.reduce((a, w) => a + w.height, 0);
+}
 
 /** Runs `job`, noting how long it took as one of the step's parts (the time meter). */
 type Timed = <T>(name: string, job: () => Promise<T>) => Promise<T>;
@@ -230,11 +251,16 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           if (ms > 500) part(label, ms / 1000);
         }
       }
-      // what the checks found, mended here and checked again (twice at most):
-      // a number its source doesn't have, written again without it; a page's
-      // layout failing a check, the paper laid out another way. What can't be
-      // mended is left for the editor, in the report.
-      for (let round = 1; round <= 2; round++) {
+      // what the checks found, mended here and checked again: a number its
+      // source doesn't have, written again without it; a page's layout failing
+      // a check, the paper laid out each of the other ways in turn (MENDS) until
+      // one is clean. The best of them all is the paper; what can't be mended is
+      // left for the editor, in the report.
+      const began = Date.now();
+      type Way = (typeof MENDS)[number] | null;
+      let way: Way = null;
+      let best: { way: Way; bad: number } = { way, bad: badness(r.report) };
+      for (let round = 1; best.bad > 0 && Date.now() - began < MEND_MINUTES * 60_000; round++) {
         const failing = r.report.gates.filter((g) => !g.pass);
         const layout = failing.filter((g) => REPAIR_BY_LAYOUT.test(g.gate));
         let mended = 0;
@@ -242,9 +268,24 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           const { repairFacts } = await import("./editorial/repair.ts");
           mended = await timed(`mending numbers ${round}`, () => repairFacts(store, date, say));
         }
-        if (!layout.length && !mended) break;
-        say(`mending ${round}: ${[...layout.map((g) => g.gate.replace(/^\S+ /, "")), ...(mended ? [`${mended} story(ies) written again`] : [])].join("; ")} -- laying out again`);
-        r = await timed(`laying out again ${round}`, () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: layout.length ? round : 0 }));
+        // (a story written again is laid out the best way so far; a layout failing, the next way)
+        const next: Way | undefined = layout.length ? MENDS[MENDS.indexOf(way!) + 1] : mended ? best.way : undefined;
+        if (next === undefined) break;
+        way = next;
+        const w = way;
+        say(`mending ${round}: ${[...layout.map((g) => g.gate.replace(/^\S+ /, "")), ...(mended ? [`${mended} story(ies) written again`] : [])].join("; ")}` +
+            ` -- laying out again${w ? `: ${w.why}` : ""}`);
+        r = await timed(`laying out again ${round}`, () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: w?.seedShift ?? 0, ...(w?.mend ? { mend: w.mend } : {}) }));
+        const bad = badness(r.report);
+        // (a story written again: every way before it was laid out from the old words)
+        if (bad < best.bad || mended) best = { way, bad };
+      }
+      // the best way the paper came out, made again if a later one was worse
+      // (the same inputs, the same paper: gate 7)
+      if (badness(r.report) > best.bad) {
+        say(`the best of the tries was ${best.way ? best.way.why : "the first"}: laid out that way again`);
+        const b = best.way;
+        r = await timed("the best try again", () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: b?.seedShift ?? 0, ...(b?.mend ? { mend: b.mend } : {}) }));
       }
       const version = (r.report as { version?: number }).version;
       say(`issue ${r.report.issueNumber} v${version ?? "?"}: ${r.report.ready ? "READY" : "NOT READY"} (the page review follows)`);

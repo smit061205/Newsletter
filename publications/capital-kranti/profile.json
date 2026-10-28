@@ -109,13 +109,12 @@
         72
       ],
       "min": 28,
-      "fillerMax": 22,
       "rankScale": [
         1.0,
-        0.85,
-        0.78,
-        0.72,
-        0.65
+        0.92,
+        0.86,
+        0.8,
+        0.75
       ],
       "maxLines": [
         2,
@@ -126,6 +125,7 @@
       ]
     },
     "kicker": {
+      "none": true,
       "font": "gopika-bold",
       "ratio": 0.6,
       "min": 14,

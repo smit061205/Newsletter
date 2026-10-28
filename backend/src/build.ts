@@ -31,6 +31,7 @@ import { spanWidth } from "./layout/module.ts";
 import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
 import { wordCount } from "./editorial/quality.ts";
+import { paperArticleStories } from "./editorial/articles.ts";
 import { alwaysPrinted, storyIdOf, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
@@ -38,6 +39,8 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
   reviewLater?: boolean;
   /** another arrangement of the same day (a repair after a layout check failed): 0 the day's own */
   seedShift?: number;
+  /** a paper that failed its checks laid out again another way (pipeline.ts; layout/engine.ts mend) */
+  mend?: { narrowLead?: boolean; shortItems?: boolean };
               /** how far the build has got: planning the pages, finishing each, checking (pipeline.ts) */
               progress?: (p: Progress) => void;
               /** page images even when the fonts may be served (tests read them) */
@@ -325,6 +328,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     }
     // feature articles print like the news: no kicker, no special title (24 Oct, the editor's wish)
     pool = pool.map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s));
+    // the editor's own articles, word for word (editorial/articles.ts): always printed
+    if (!opts.copy) {
+      const own = paperArticleStories(date);
+      if (own.length) log(`  the editor's own article(s), word for word: ${own.map((s) => s.id).join(", ")}`);
+      pool = [...pool, ...own.map((s) => ({ ...s, photos: s.photos ?? [] }))];
+    }
     let rewordCost = 0;
     if (opts.copy) {
       const c = opts.copy;
@@ -373,7 +382,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy,
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
       ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
-      date, fillers, log,
+      date, fillers, log, ...(opts.mend && !opts.copy ? { mend: opts.mend } : {}),
       // (the stories' lengths, then each page as it's laid out -- in the newsroom's words)
       progress: (done, of, what) => opts.progress?.(what === "pages"
         ? { done: total + done, total: total * 2 + 1, label: "planning", item: String(Math.min(total, done + 1)) }
@@ -488,7 +497,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // gate 7 compares only builds made from the same inputs by the same engine:
   // after a change to either, the paper is meant to differ
   // (another arrangement on purpose, a repair: compared only with its like)
-  const fingerprint = buildFingerprint(store, date) + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "");
+  const fingerprint = buildFingerprint(store, date) + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
+    + (opts.mend?.narrowLead ? "|narrow lead" : "") + (opts.mend?.shortItems ? "|short items" : "");
   // (a copy is meant to differ from the day's paper)
   const previous = opts.copy ? null : store.latestIssue(date);
   const comparable = previous && (previous.report as { fingerprint?: string }).fingerprint === fingerprint;

@@ -36,10 +36,19 @@ export function checkName(lang: Lang, gate: string): string {
   return tr(lang, key);
 }
 
-export interface Problem { kind: "numbers" | "space" | "review" | "layout" | "other"; text: string; story?: string; page?: number }
+export interface Problem { kind: "numbers" | "space" | "review" | "layout" | "other"; text: string; story?: string; page?: number;
+  /** not to be printed as it is: a page badly empty */
+  bad?: boolean }
+
+/** An empty stretch this tall (pt, about 2.5 cm) is a page badly empty, not a little space
+ * (28 Oct: a fifth of page 1 left blank was called "a little empty space"). */
+const BADLY_EMPTY = 72;
+/** Points to centimetres (the PDF's points: 1/72 inch). */
+const CM = 2.54 / 72;
 
 /** The checks that failed, as things the editor can look at, in plain words. */
-export function problems(lang: Lang, gates: Gate[], headlineOf: (id: string) => string | undefined): Problem[] {
+export function problems(lang: Lang, gates: Gate[], headlineOf: (id: string) => string | undefined,
+                         whiteSpace: { page: number; height: number }[] = []): Problem[] {
   const out: Problem[] = [];
   for (const g of gates.filter((x) => !x.pass)) {
     const k = g.gate.split(" ")[0];
@@ -49,7 +58,15 @@ export function problems(lang: Lang, gates: Gate[], headlineOf: (id: string) => 
         if (m) out.push({ kind: "numbers", story: m[1], text: tr(lang, "issue.numbers", { headline: headlineOf(m[1]) ?? m[1], nums: num(lang, m[2]) }) });
       }
     } else if (k === "2") {
-      out.push({ kind: "space", text: tr(lang, "issue.space") });
+      // each page badly empty said plainly, with how much of it is blank; else a little space
+      const pages = [...new Set(whiteSpace.filter((w) => w.height >= BADLY_EMPTY).map((w) => w.page))].sort((a, b) => a - b);
+      for (const page of pages) {
+        const tallest = Math.max(...whiteSpace.filter((w) => w.page === page).map((w) => w.height));
+        const cols = whiteSpace.filter((w) => w.page === page && w.height >= BADLY_EMPTY).length;
+        out.push({ kind: "space", page, bad: true,
+                   text: tr(lang, "issue.spaceBad", { page: num(lang, page), cm: num(lang, Math.round(tallest * CM)), cols: num(lang, cols) }) });
+      }
+      if (!pages.length) out.push({ kind: "space", text: tr(lang, "issue.space") });
     } else if (k === "5") {
       for (const part of g.detail.split("; ")) {
         const m = part.match(/^p(\d+) \S+ "[^"]*": (.+)$/);

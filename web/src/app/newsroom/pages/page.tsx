@@ -53,7 +53,7 @@ export default function Paper() {
   const placed = useMemo(() => new Map((info?.report.placed ?? []).map((p) => [p.story, p])), [info]);
   const page = issue?.pages.find((p) => p.number === n);
   const boxes = page ? storyBoxes(page, new Set(placed.keys())) : new Map();
-  const todo = info ? problems(lang, info.report.gates, (id) => stories.find((x) => x.id === id)?.headline) : [];
+  const todo = info ? problems(lang, info.report.gates, (id) => stories.find((x) => x.id === id)?.headline, info.report.whiteSpace) : [];
   const running = !!status?.running && status.running.date === date;
 
   const rebuild = async () => {

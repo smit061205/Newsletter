@@ -67,7 +67,7 @@ export const HEADLINE = {
   filler: t.headline.fillerMax ? { max: t.headline.fillerMax * PT, min: t.headline.fillerMax * PT * 0.8 } : undefined,
 };
 
-export const KICKER = { font: t.kicker.font, ratio: t.kicker.ratio, min: t.kicker.min * PT, leading: t.kicker.leading };
+export const KICKER = { font: t.kicker.font, ratio: t.kicker.ratio, min: t.kicker.min * PT, leading: t.kicker.leading, none: !!t.kicker.none };
 export const DECK = { font: t.deck.font, ratio: t.deck.ratio, min: t.deck.min * PT, leading: t.deck.leading };
 export const CAPTION = { font: t.caption.font, size: t.caption.size * PT, pitch: t.caption.pitch * PT };
 

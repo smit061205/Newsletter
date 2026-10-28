@@ -1,6 +1,7 @@
 "use client";
 // સમાચાર / Stories: the day's stories (search, filter, open one to edit),
-// and the press releases they came from (translate a Hindi one).
+// the press releases they came from (translate a Hindi one), and the
+// editor's own articles in the paper, word for word (OwnArticles).
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { call, media, type ReleaseRow, type StoryRow } from "../api";
 import { TopBar, useStatus } from "../Shell";
@@ -8,13 +9,14 @@ import s from "../newsroom.module.css";
 import { num } from "../ui/format";
 import { Badge, Button, Empty, Icon, Note, Skeleton, useApp } from "../ui/kit";
 import { StoryPanel } from "../ui/StoryPanel";
+import { OwnArticles } from "./OwnArticles";
 
 type Filter = "all" | "placed" | "out";
 
 export default function Stories() {
   const { t, lang, date, toast } = useApp();
   const { refresh } = useStatus();
-  const [tab, setTab] = useState<"stories" | "sources">("stories");
+  const [tab, setTab] = useState<"stories" | "sources" | "articles">("stories");
   const [stories, setStories] = useState<StoryRow[] | null>(null);
   const [releases, setReleases] = useState<ReleaseRow[] | null>(null);
   const [q, setQ] = useState("");
@@ -25,7 +27,7 @@ export default function Stories() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    try { if (new URLSearchParams(location.search).get("tab") === "sources") setTab("sources"); } catch {}
+    try { const k = new URLSearchParams(location.search).get("tab"); if (k === "sources" || k === "articles") setTab(k); } catch {}
   }, []);
   const load = useCallback(() => {
     call<StoryRow[]>(`/api/stories?date=${date}`).then(setStories).catch((e) => setError(e.message));
@@ -52,6 +54,7 @@ export default function Stories() {
         <div className={s.segmented} role="tablist">
           <button role="tab" aria-pressed={tab === "stories"} onClick={() => setTab("stories")}>{t("stories.tab.stories")}</button>
           <button role="tab" aria-pressed={tab === "sources"} onClick={() => setTab("sources")}>{t("stories.tab.sources")}</button>
+          <button role="tab" aria-pressed={tab === "articles"} onClick={() => setTab("articles")}>{t("stories.tab.articles")}</button>
         </div>
         {tab === "stories" && (
           <div className={s.row}>
@@ -87,7 +90,7 @@ export default function Stories() {
               </div>
             )}
         </section>
-      ) : (
+      ) : tab === "articles" ? <OwnArticles /> : (
         <><TelegramPhotos /><Sources releases={releases} open={openRel} setOpen={setOpenRel} busy={busy} translate={translate} /></>
       )}
       {editing && <StoryPanel story={editing} onClose={() => setEditing(null)} onChanged={() => { load(); refresh(); }} />}

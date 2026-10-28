@@ -103,7 +103,9 @@ export class Blocks {
     for (const [i, r] of rungs.entries()) {
       for (const mode of modes) {
         for (const [k, f] of sizes.entries()) {
-          const head = f === 1 ? undefined : { max: full * f, min: Math.max(HEADLINE.min, full * f * 0.72) };
+          // (never a step below the paper's smallest headline: 28 Oct)
+          if (k > 0 && full * sizes[k - 1] <= HEADLINE.min) break;
+          const head = f === 1 ? undefined : { max: Math.max(HEADLINE.min, full * f), min: Math.max(HEADLINE.min, full * f * 0.72) };
           const mod = await buildModule(atRung(story, r), rank, cols, "long", this.m, mode, BODY.pitch, head);
           if (!Number.isFinite(mod.height)) break; // a photo layout the rules don't allow
           if (mod.displayFill < 0.97 && !(rank === 5 && cols === 1)) continue;
