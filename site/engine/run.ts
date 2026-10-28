@@ -129,9 +129,16 @@ async function write() {
 /** Step 8: the last day and a half's stories that went up without a photo get a file photo,
  *  the most important first, each looked for once (engine/wikiphoto.ts). */
 async function photos() {
+  // once: the stories looked for before the lookup read Wikipedia's resized-copy addresses
+  // and India's open licence (29 Oct) are looked for again
+  const [again] = await sql.query(`select value from state where key = 'photo_retry'`);
+  if (!again) {
+    await sql.query(`update stories set photo_tried = false where origin = 'live' and photo is null and published_at > now() - interval '36 hours'`);
+    await sql.query(`insert into state (key, value) values ('photo_retry', '1') on conflict (key) do nothing`);
+  }
   const rows = await sql.query(
     `select id, kicker, headline, deck, body from stories where origin = 'live' and status = 'published' and photo is null and not photo_tried
-       and published_at > now() - interval '36 hours' order by importance desc nulls last, published_at desc limit 4`);
+       and published_at > now() - interval '36 hours' order by importance desc nulls last, published_at desc limit 6`);
   let added = 0;
   for (const r of rows) {
     if (Date.now() > deadline) break;
