@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { ROOT } from "./config.ts";
+import { paperArticles } from "./editorial/articles.ts";
 import { PROFILE_DIR } from "./profile.ts";
 import type { Store } from "./store.ts";
 
@@ -29,6 +30,7 @@ export function buildFingerprint(store: Store, date: string): string {
   const h = createHash("sha256");
   h.update(JSON.stringify({
     stories: store.stories(date), edits: store.edits(date), ads: store.ads(date), releases: store.releases(date),
+    articles: paperArticles(date),
   }));
   hashTree(h, path.join(ROOT, "backend", "src"));
   hashTree(h, path.join(ROOT, "shared", "src"));

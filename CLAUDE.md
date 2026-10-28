@@ -11,10 +11,10 @@ before changing Next code (`web/AGENTS.md`).
 
 ## The paper's rules (decided; don't re-litigate)
 - **No page ever has a full-width story** (the paper, its copies and sister papers) unless the editor allows it for that story (`MAX_STORY_COLS` from the profile's `frontPageMaxCols`, gate W; widened from the front page on 23 Oct 2026). **The front page's lead may run the full width** (the editor, 28 Oct: profile `grid.leadFullWidth`). A kicker is always smaller than its headline.
-- **Like the editor's own pages (28 Oct):** every headline big and bold (28pt at the least, profile `headline.min`), a photo with every story that has one (PIB's small photos print down to 100 ppi), fewer and longer stories: none under 100 words (`editorial.minWords`), a front lead of 250 words or more.
+- **Like the editor's own pages (28 Oct):** every headline big and bold (28pt at the least, profile `headline.min`), a photo with every story that has one (PIB's small photos print down to 100 ppi), fewer and longer stories: none under 100 words (`editorial.minWords`), a front lead of 250 words or more, never over 40% of the page. No headline under 28pt anywhere (gap fillers too); no kicker line over headlines (`kicker.none`); sub-headings set to fill their full width.
 - **At most one slogan / message panel and one house ad per paper.** Fill space with stories.
 - **"વિશેષ લેખ" (special article) appears only once per paper.**
-- Every story is headline > sub-heading > body, in decreasing sizes; kickers are centred; columns end level; no empty space on a page (horizontal rules divide stories and fill odd gaps).
+- Every story is headline > sub-heading > body, in decreasing sizes; kickers (where a paper has them) are centred; columns end level; no empty space on a page (horizontal rules divide stories and fill odd gaps).
 - The printed size and geometry follow the original paper exactly: 390 × 525 mm, with a foot rule on every page but the last. It goes to a printer, so check positions in the PDF itself.
 - News comes from **PIB**: Gujarati first, then Hindi translated when short. **Don't get around any website's bot blocking.**
 

@@ -97,7 +97,9 @@ export const ProfileSchema = z.object({
        * `min` is too big for one (none: the usual sizes) */
       fillerMax: pt.positive().optional(),
     }),
-    kicker: TextStyleSchema.extend({ ratio: z.number().positive(), min: pt.positive(), leading: z.number().positive() }),
+    kicker: TextStyleSchema.extend({ ratio: z.number().positive(), min: pt.positive(), leading: z.number().positive(),
+      /** no kicker printed over any headline (28 Oct: the editor's paper has none) */
+      none: z.boolean().optional() }),
     deck: TextStyleSchema.extend({ ratio: z.number().positive(), min: pt.positive(), leading: z.number().positive() }),
     caption: TextStyleSchema.extend({ size: pt.positive(), pitch: pt.positive() }),
   }),

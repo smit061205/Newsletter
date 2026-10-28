@@ -100,7 +100,9 @@ export default function Today() {
   const otherRunning = status?.running && status.running.date !== date;
   const report = issue?.report;
   const headlineOf = useCallback((id: string) => stories.find((x) => x.id === id)?.headline, [stories]);
-  const todo = useMemo(() => (report ? problems(lang, report.gates, headlineOf) : []), [report, lang, headlineOf]);
+  const todo = useMemo(() => (report ? problems(lang, report.gates, headlineOf, report.whiteSpace) : []), [report, lang, headlineOf]);
+  // a page badly empty: not ready, whatever else (28 Oct: called "ready" with a fifth of page 1 blank)
+  const badlyEmpty = todo.some((p) => p.bad);
   // the latest run stopped: say where, and offer to carry on from there
   const failed = !running && job?.status === "failed" ? job.steps.find((x) => x.status === "failed") : undefined;
 
@@ -181,6 +183,11 @@ export default function Today() {
             <Hero tone="good" icon={Icon.checkCircle()} title={t("today.published.title")} body={t("today.published.body", { issue: num(lang, report.issueNumber) })}>
               <Button kind="primary" big icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>
               {status?.siteUrl && <a className={`${s.btn} ${s.big}`} href={status.siteUrl} target="_blank" rel="noreferrer">{Icon.globe()}{t("today.website")}</a>}
+            </Hero>
+          ) : badlyEmpty ? (
+            <Hero tone="bad" icon={Icon.alert()} title={t("today.bad.title")} body={t("today.bad.body", { issue: num(lang, report.issueNumber) })}>
+              <Button kind="primary" big icon={Icon.refresh()} onClick={() => run()} disabled={!!otherRunning}>{t("today.again")}</Button>
+              <Link className={`${s.btn} ${s.big}`} href="/newsroom/pages">{Icon.paper()}{t("today.pages")}</Link>
             </Hero>
           ) : (
             <Hero tone={todo.length ? "warn" : "good"} icon={todo.length ? Icon.alert() : Icon.checkCircle()}

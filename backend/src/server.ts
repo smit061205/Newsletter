@@ -19,6 +19,7 @@
 //   POST  /api/papers/draft            {pdfs: [base64]} -- a new paper's profile, drafted from its PDFs
 //   GET   /api/papers  POST /api/papers   the papers; save a new one from its reviewed draft
 //   GET   /api/papers/:id  POST /api/papers/:id/test  GET /api/papers/:id/pdf   a paper's test issue
+//   GET   /api/issues/:date/articles   the editor's own articles in the paper (editorial/articles.ts); POST {articles} saves them and lays it out again
 //   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang, articles?} makes them
 //   GET   /api/issues/:date/editions   the day's sister papers; POST {only?} makes them (all, or one); GET .../editions/<id>.pdf
 //   GET   /api/issues/:date/copies/N.pdf  one copy (on its paper's design, if it has one)
@@ -331,6 +332,24 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           store.approve(date, got.version);
           return send(res, 200, { date, version: got.version, status: "approved" });
         }
+        if (parts[3] === "articles") {
+          // the editor's own articles in the day's paper, word for word (editorial/articles.ts)
+          const { paperArticles, savePaperArticles, takeArticles } = await import("./editorial/articles.ts");
+          if (req.method === "GET") return send(res, 200, paperArticles(date));
+          if (req.method === "POST") {
+            const body = (await readJson(req)) as { articles?: import("./editorial/articles.ts").GivenArticle[] };
+            const articles = await takeArticles(date, body.articles ?? [], "paper");
+            if (typeof articles === "string") return send(res, 400, { error: articles });
+            await savePaperArticles(date, articles);
+            // the paper laid out again with them, as after an edit
+            if (!store.latestIssue(date)) return send(res, 200, { saved: true });
+            if (currentJob() || copiesNow?.()?.date === date) {
+              afterRun.add(date);
+              return send(res, 202, { saved: true, rebuilding: "after the run that's going" });
+            }
+            return startJob(res, date, "build");
+          }
+        }
         if (req.method === "POST" && parts[3] === "edits") {
           const body = (await readJson(req)) as { storyId: string; change: Record<string, unknown> };
           if (!body.storyId || !body.change) return send(res, 400, { error: "an edit needs storyId and change" });
@@ -362,8 +381,8 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           }
           if (req.method === "GET") return send(res, 200, copiesOf(date));
           if (req.method === "POST") {
-            type Pic = { name: string; base64: string } | { url: string };
-            type Given = { titles?: string[]; decks?: string[]; bodies?: string[]; photos?: Pic[] };
+            type Pic = import("./editorial/articles.ts").GivenPhoto;
+            type Given = import("./editorial/articles.ts").GivenArticle;
             const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string; lang?: string; articles?: Given[];
                                                     extra?: { body?: string; deck?: string; titles?: string[]; photos?: Pic[] } };
             if (body.lang !== undefined && !["gu", "hi", "ur"].includes(body.lang)) return send(res, 400, { error: "the language is gu, hi or ur" });
@@ -377,24 +396,10 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             // articles in every copy, word for word: their titles, sub-headings, texts and photos, the photos saved with the day's
             const given: Given[] = body.articles ?? (body.extra ? [{ titles: body.extra.titles, decks: body.extra.deck ? [body.extra.deck] : [],
                                                                       bodies: [body.extra.body ?? ""], photos: body.extra.photos }] : []);
-            const articles: import("./editorial/copies.ts").Article[] = [];
-            const line = (x: string) => x.replace(/\s+/g, " ").trim();
-            for (const [k, a] of given.slice(0, 10).entries()) {
-              const titles = (a.titles ?? []).map(line).filter(Boolean).slice(0, 12);
-              const bodies = (a.bodies ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 12);
-              if (!titles.length || !bodies.length) return send(res, 400, { error: `article ${k + 1} needs its text and at least one title` });
-              if ((body.lang ?? "gu") !== "gu") return send(res, 400, { error: "the articles go in Gujarati copies only" });
-              const dir = path.join(MEDIA_DIR, date);
-              await mkdir(dir, { recursive: true });
-              const photos: string[] = [];
-              for (const [i, p] of (a.photos ?? []).slice(0, 12).entries()) {
-                if ("url" in p) { if (/^\/media\/[\w./-]+$/.test(p.url) && !p.url.includes("..")) photos.push(p.url); continue; }
-                const name = `fixed-${k + 1}-${i + 1}-${p.name.replace(/[^A-Za-z0-9._-]/g, "_")}`;
-                await writeFile(path.join(dir, name), Buffer.from(p.base64, "base64"));
-                photos.push(`/media/${date}/${name}`);
-              }
-              articles.push({ titles, decks: (a.decks ?? []).map(line).filter(Boolean).slice(0, 12), bodies, photos });
-            }
+            if (given.length && (body.lang ?? "gu") !== "gu") return send(res, 400, { error: "the articles go in Gujarati copies only" });
+            const { takeArticles } = await import("./editorial/articles.ts");
+            const articles = await takeArticles(date, given, "fixed");
+            if (typeof articles === "string") return send(res, 400, { error: articles });
             makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", lang: body.lang as "gu" | undefined, articles, log })
               .catch((e) => log(`copies stopped: ${e instanceof Error ? e.message : e}`));
             return send(res, 202, copiesOf(date));

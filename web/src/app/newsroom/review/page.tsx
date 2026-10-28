@@ -25,7 +25,7 @@ export default function Review() {
     call<IssueInfo>(`/api/issues/${date}`).then(setInfo).catch(() => {});
     call<StoryRow[]>(`/api/stories?date=${date}`).then(setStories).catch(() => {});
   }, [date, has]);
-  const items = useMemo(() => (info ? problems(lang, info.report.gates, (id) => stories.find((x) => x.id === id)?.headline) : []), [info, stories, lang]);
+  const items = useMemo(() => (info ? problems(lang, info.report.gates, (id) => stories.find((x) => x.id === id)?.headline, info.report.whiteSpace) : []), [info, stories, lang]);
   const item = items[i];
   const fix = () => {
     if (!item) return;
