@@ -188,20 +188,24 @@ async function dedupe() {
   return removed;
 }
 
-/** Once (29 Oct): events filed under Gujarat that happened elsewhere (Mumbai's airport) move to India, with their stories. */
+/** Once (29 Oct): events filed under Gujarat whose sources are about somewhere else (Mumbai's airport)
+ *  move to India, with their stories. (The first pass, 'tier_refile', read the model's own keywords.) */
 async function refile() {
-  const [done] = await sql.query(`select value from state where key = 'tier_refile'`);
+  const [done] = await sql.query(`select value from state where key = 'tier_refile_2'`);
   if (done) return 0;
-  const rows = await sql.query(`select id, event, keys, story_id from clusters where tier = 'gujarat'`);
+  const rows = await sql.query(
+    `select c.id, c.event, c.story_id, string_agg(i.title || ' ' || i.summary, ' ') as words
+       from clusters c join items i on i.cluster_id = c.id
+      where c.tier = 'gujarat' and c.first_seen > now() - interval '7 days' group by c.id, c.event, c.story_id`);
   let moved = 0;
   for (const r of rows) {
-    if (placeTier("gujarat", r.event, r.keys ?? []) === "gujarat") continue;
+    if (placeTier("gujarat", r.words ?? "") === "gujarat") continue;
     await sql.query(`update clusters set tier = 'india' where id = $1`, [r.id]);
     if (r.story_id) await sql.query(`update stories set tier = 'india', updated_at = now() where id = $1 and tier = 'gujarat'`, [r.story_id]);
     moved++;
     log(`    to India: ${r.event}`);
   }
-  await sql.query(`insert into state (key, value) values ('tier_refile', '1') on conflict (key) do nothing`);
+  await sql.query(`insert into state (key, value) values ('tier_refile_2', '1') on conflict (key) do nothing`);
   if (moved) await touched(sql);
   return moved;
 }

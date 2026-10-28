@@ -43,13 +43,14 @@ You get a numbered list of new items from news sources (Gujarati, Hindi or Engli
 Reply with JSON only: {"items":[{"i":1,"score":0,"tier":"india","genres":[],"sensitive":false,"event":"","keys":[],"debunk":""}, ...]} with one entry for every item.`;
 
 // The model sometimes files a Gujarati outlet's news from elsewhere under Gujarat (29 Oct: Mumbai's
-// airport). A "gujarat" event that names a place outside Gujarat and no place in it is national news.
-const GUJARAT = /\b(gujarat|ahmedabad|gandhinagar|surat|vadodara|baroda|rajkot|bhavnagar|jamnagar|junagadh|kutch|kachchh|bhuj|anand|nadiad|kheda|mehsana|patan|palanpur|banaskantha|sabarkantha|himmatnagar|panchmahal|godhra|dahod|bharuch|ankleshwar|valsad|vapi|navsari|tapi|dang|narmada|kevadia|ekta nagar|statue of unity|porbandar|dwarka|somnath|gir|amreli|botad|morbi|surendranagar|dholera|mundra|kandla|saurashtra|sabarmati|aravalli|modasa|mahisagar|chhota udepur|gift city|sanand|halol|diu|daman)\b/i;
-const ELSEWHERE = /\b(maharashtra|mumbai|pune|nagpur|thane|delhi|rajasthan|jaipur|udaipur|madhya pradesh|bhopal|indore|uttar pradesh|lucknow|noida|ayodhya|varanasi|bihar|patna|karnataka|bengaluru|bangalore|tamil nadu|chennai|kerala|kochi|west bengal|kolkata|telangana|hyderabad|andhra|punjab|chandigarh|haryana|gurugram|goa|odisha|assam|jharkhand|chhattisgarh|uttarakhand|himachal|kashmir|srinagar|ladakh|manipur|mizoram|nagaland|meghalaya|tripura|sikkim|arunachal)\b/i;
-export function placeTier(tier: Tier, event: string, keys: string[]): Tier {
+// airport), and then names Gujarat in its own keywords too; so the check reads the sources' own words
+// (headline and summary, in any script). A "gujarat" event whose sources name a place outside Gujarat
+// and none in it is national news.
+const GUJARAT = /\b(gujarat|ahmedabad|gandhinagar|surat|vadodara|baroda|rajkot|bhavnagar|jamnagar|junagadh|kutch|kachchh|bhuj|anand|nadiad|kheda|mehsana|patan|palanpur|banaskantha|sabarkantha|himmatnagar|panchmahal|godhra|dahod|bharuch|ankleshwar|valsad|vapi|navsari|tapi|dang|narmada|kevadia|ekta nagar|statue of unity|porbandar|dwarka|somnath|gir|amreli|botad|morbi|surendranagar|dholera|mundra|kandla|saurashtra|sabarmati|aravalli|modasa|mahisagar|chhota udepur|gift city|sanand|halol|diu|daman|bhupendra patel)\b|ગુજરાત|અમદાવાદ|ગાંધીનગર|સુરત|વડોદરા|રાજકોટ|ભાવનગર|જામનગર|જૂનાગઢ|કચ્છ|ભુજ|આણંદ|નડિયાદ|મહેસાણા|પાટણ|પાલનપુર|ગોધરા|દાહોદ|ભરૂચ|વલસાડ|વાપી|નવસારી|નર્મદા|કેવડિયા|એકતાનગર|પોરબંદર|દ્વારકા|સોમનાથ|અમરેલી|બોટાદ|મોરબી|સુરેન્દ્રનગર|સૌરાષ્ટ્ર|સાબરમતી|ભૂપેન્દ્ર પટેલ|गुजरात|अहमदाबाद|गांधीनगर|सूरत|वडोदरा|राजकोट/i;
+const ELSEWHERE = /\b(maharashtra|mumbai|pune|nagpur|thane|delhi|rajasthan|jaipur|udaipur|madhya pradesh|bhopal|indore|uttar pradesh|lucknow|noida|ayodhya|varanasi|bihar|patna|karnataka|bengaluru|bangalore|tamil nadu|chennai|kerala|kochi|west bengal|kolkata|telangana|hyderabad|andhra|punjab|chandigarh|haryana|gurugram|goa|odisha|assam|jharkhand|chhattisgarh|uttarakhand|himachal|kashmir|srinagar|ladakh|manipur|mizoram|nagaland|meghalaya|tripura|sikkim|arunachal|mial)\b|મુંબઈ|મુંબઇ|મહારાષ્ટ્ર|પુણે|દિલ્હી|રાજસ્થાન|જયપુર|મધ્યપ્રદેશ|ઉત્તરપ્રદેશ|બિહાર|કર્ણાટક|બેંગલુરુ|તમિલનાડુ|ચેન્નાઈ|કેરળ|બંગાળ|કોલકાતા|તેલંગાણા|હૈદરાબાદ|પંજાબ|હરિયાણા|ગોવા|ઓડિશા|આસામ|કાશ્મીર|मुंबई|महाराष्ट्र|दिल्ली|राजस्थान|जयपुर|मध्य प्रदेश|उत्तर प्रदेश|बिहार|कर्नाटक|बेंगलुरु|तमिलनाडु|केरल|बंगाल|कोलकाता|तेलंगाना|हैदराबाद|पंजाब|हरियाणा|गोवा|ओडिशा|असम|कश्मीर/i;
+export function placeTier(tier: Tier, sourceWords: string): Tier {
   if (tier !== "gujarat") return tier;
-  const text = `${event} ${keys.join(" ")}`;
-  return ELSEWHERE.test(text) && !GUJARAT.test(text) ? "india" : tier;
+  return ELSEWHERE.test(sourceWords) && !GUJARAT.test(sourceWords) ? "india" : tier;
 }
 
 function checkBatch(n: number) {
@@ -63,7 +64,7 @@ function checkBatch(n: number) {
       const keys = (Array.isArray(x.keys) ? x.keys : []).map((k) => String(k).toLowerCase().trim()).filter(Boolean).slice(0, 10);
       out.set(i, {
         score: Math.max(0, Math.min(10, Number(x.score) || 0)),
-        tier: placeTier(TIERS.includes(x.tier as Tier) ? (x.tier as Tier) : "india", String(x.event ?? ""), keys),
+        tier: TIERS.includes(x.tier as Tier) ? (x.tier as Tier) : "india",
         genres: (Array.isArray(x.genres) ? x.genres : []).filter((g): g is Genre => GENRES.includes(g as Genre)).slice(0, 2),
         sensitive: x.sensitive === true,
         event: String(x.event ?? "").slice(0, 200),
@@ -79,7 +80,9 @@ function checkBatch(n: number) {
 /** One batch through a free model (no database). */
 export async function triageBatch(sql: Sql | null, batch: TriageInput[]) {
   const user = batch.map((b) => `${b.i}. [${b.source}${b.factcheck ? ", factcheck" : ""}, ${b.lang}] ${b.title}${b.summary ? ` -- ${b.summary.slice(0, 220)}` : ""}`).join("\n");
-  return askJson(sql, { system: SYSTEM, user, maxTokens: 8000 }, checkBatch(batch.length));
+  const res = await askJson(sql, { system: SYSTEM, user, maxTokens: 8000 }, checkBatch(batch.length));
+  if (res.ok) for (const [i, tr] of res.value) tr.tier = placeTier(tr.tier, `${batch[i - 1].title} ${batch[i - 1].summary}`);
+  return res;
 }
 
 /** Every untriaged item, newest first, as far as the run's share of the allowance goes. */
