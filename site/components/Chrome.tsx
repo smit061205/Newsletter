@@ -14,8 +14,8 @@ export interface ChromeProps {
   paths: { gu: string; en: string; hi: string };
   sections: { key: string; name: string; href: string }[];
   links: { home: string; latest: string; epaper: string; archive: string; search: string; saved: string; about: string; how: string; policy: string; corrections: string; contact: string };
-  words: Record<"menu" | "sections" | "search" | "close" | "epaper" | "home" | "latest" | "latestTitle" | "archive" | "searchPlaceholder" | "settings" | "theme" |
-                 "themeAuto" | "light" | "dark" | "size" | "language" | "services" | "about" | "savedTitle" | "fHow" | "fPolicy" | "fFix" | "fContact", string>;
+  words: Record<"menu" | "sections" | "search" | "close" | "epaper" | "home" | "latest" | "latestTitle" | "archive" | "searchPlaceholder" | "settings" |
+                 "size" | "language" | "services" | "about" | "savedTitle" | "fHow" | "fPolicy" | "fFix" | "fContact", string>;
   /** the phone's bottom bar (articles have their own reading bar instead) */
   bottomBar: boolean;
   active?: "home" | "latest" | "epaper" | "archive";
@@ -24,10 +24,6 @@ export interface ChromeProps {
 const read = (k: string, d: string) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const write = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 
-export function applyTheme(v: string) {
-  const r = document.documentElement;
-  if (v === "light" || v === "dark") r.setAttribute("data-theme", v); else r.removeAttribute("data-theme");
-}
 export function applySize(n: string) {
   const r = document.documentElement;
   if (n === "2" || n === "3") r.setAttribute("data-size", n); else r.removeAttribute("data-size");
@@ -35,7 +31,6 @@ export function applySize(n: string) {
 
 export default function Chrome(p: ChromeProps) {
   const [open, setOpen] = useState(false);
-  const [theme, setTheme] = useState("auto");
   const [size, setSize] = useState("1");
   const [away, setAway] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -56,7 +51,7 @@ export default function Chrome(p: ChromeProps) {
   const q = useRef<HTMLInputElement>(null);
   const w = p.words;
 
-  useEffect(() => { setTheme(read("ck-theme", "auto")); setSize(read("ck-size", "1")); }, []);
+  useEffect(() => { setSize(read("ck-size", "1")); }, []);
   useEffect(() => {
     if (!open) return;
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
@@ -128,8 +123,6 @@ export default function Chrome(p: ChromeProps) {
           <Link href={p.links.saved} onClick={() => setOpen(false)}>{w.savedTitle}</Link>
         </div>
         <h3>{w.settings}</h3>
-        <div className="setl">{w.theme}</div>
-        {seg(w.theme, [["auto", w.themeAuto], ["light", w.light], ["dark", w.dark]], theme, (v) => { setTheme(v); write("ck-theme", v); applyTheme(v); })}
         <div className="setl">{w.size}</div>
         {seg(w.size, [["1", <span key="1" style={{ fontSize: 14 }}>અ</span>], ["2", <span key="2" style={{ fontSize: 17 }}>અ</span>], ["3", <span key="3" style={{ fontSize: 20 }}>અ</span>]],
              size, (v) => { setSize(v); write("ck-size", v); applySize(v); })}

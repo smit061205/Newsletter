@@ -69,13 +69,13 @@ export function Lead({ s, lang, more = [] }: { s: Story; lang: Lang; more?: Stor
   );
 }
 
-export function Std({ s, lang, sec = true, morph = false, photo = true }: { s: Story; lang: Lang; sec?: boolean; morph?: boolean; photo?: boolean }) {
+export function Std({ s, lang, sec = true, morph = false, photo = true, label }: { s: Story; lang: Lang; sec?: boolean; morph?: boolean; photo?: boolean; label?: string }) {
   const w = words(s, lang);
   if (!photo) s = { ...s, photo: null };
   return (
     <Link className="h std" href={storyHref(s, lang)}>
       <Photo s={s} lang={lang} morph={morph} />
-      <div><h3 className="h3">{w.headline}</h3>{w.deck && <p className="dek">{w.deck}</p>}<Meta s={s} lang={lang} sec={sec} /></div>
+      <div>{label && <span className="lbl">{label}</span>}<h3 className="h3">{w.headline}</h3>{w.deck && <p className="dek">{w.deck}</p>}<Meta s={s} lang={lang} sec={sec} /></div>
       {s.photo && <Photo s={s} lang={lang} cls="thumb" />}
     </Link>
   );
