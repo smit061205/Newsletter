@@ -228,9 +228,9 @@ async function geminiModels(pool: GeminiPool): Promise<{ id: string; daily: numb
 /** a model this run found used up (Google said 429 before our count did: its day ends at midnight in California) */
 const spent = new Set<string>();
 const geminiCounter = (id: string) => `ai_gemini:${id}`;
-async function geminiNext(sql: Sql, pool: GeminiPool): Promise<string | null> {
+async function geminiNext(sql: Sql, pool: GeminiPool, busy?: Set<string>): Promise<string | null> {
   for (const m of await geminiModels(pool)) {
-    if (!spent.has(m.id) && (await count(sql, geminiCounter(m.id), 0)) < m.daily) return m.id;
+    if (!spent.has(m.id) && !busy?.has(m.id) && (await count(sql, geminiCounter(m.id), 0)) < m.daily) return m.id;
   }
   return null;
 }
@@ -245,8 +245,19 @@ export const geminiLeft = async (sql: Sql, pool: GeminiPool) => (await geminiNex
 
 export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: string; user: string; maxTokens?: number; temperature?: number }, check: (v: unknown) => T | null): Promise<AiResult<T>> {
   if (!(await geminiModels(pool)).length) return { ok: false, why: `no Gemini ${pool} model for this key`, stop: true };
+  // a model Google says is too busy right now ("high demand", 29 Oct) is set aside for this request and the next one
+  // asked; when all are busy, once more after a minute
+  const busy = new Set<string>();
+  let lastBusy = "";
   for (;;) {
-    const model = await geminiNext(sql, pool);
+    let model = await geminiNext(sql, pool, busy);
+    if (!model && busy.size && !lastBusy.startsWith("waited")) {
+      lastBusy = `waited; ${lastBusy}`;
+      busy.clear();
+      await new Promise((r) => setTimeout(r, 60_000));
+      model = await geminiNext(sql, pool, busy);
+    }
+    if (!model && busy.size) return { ok: false, why: `every Gemini ${pool} model is busy (${lastBusy.slice(0, 160)})`, busy: true };
     if (!model) return { ok: false, why: `Gemini's free ${pool} requests for today are used up`, stop: true };
     await count(sql, geminiCounter(model));
     usedThisRun++;
@@ -263,7 +274,8 @@ export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: stri
       const text = await res.text();
       // this model's day is used up: the next one in the pool
       if (res.status === 429 && /per ?day|PerDay|daily/i.test(text)) { spent.add(model); continue; }
-      if (!res.ok) return { ok: false, why: `${model}: ${res.status} ${text.slice(0, 200)}`, busy: [429, 500, 503].includes(res.status) };
+      if ([429, 500, 503, 504].includes(res.status)) { busy.add(model); lastBusy = `${lastBusy.startsWith("waited") ? "waited; " : ""}${model}: ${res.status}`; continue; }
+      if (!res.ok) return { ok: false, why: `${model}: ${res.status} ${text.slice(0, 200)}` };
       const g = JSON.parse(text) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[] };
       const c = g.candidates?.[0];
       const out = (c?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("");
@@ -272,7 +284,8 @@ export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: stri
       const value = check(parsed);
       return value === null ? { ok: false, why: `${model}: JSON without what was asked for` } : { ok: true, value, model: `google:${model}` };
     } catch (e) {
-      return { ok: false, why: `${model}: ${e instanceof Error ? e.message : e}`, busy: true };
+      busy.add(model);
+      lastBusy = `${lastBusy.startsWith("waited") ? "waited; " : ""}${model}: ${e instanceof Error ? e.message : e}`;
     }
   }
 }

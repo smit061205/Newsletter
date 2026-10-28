@@ -110,7 +110,7 @@ export async function desk(sql: Sql | null): Promise<Desk> {
        (select count(*) from features where checks->>'rewritten' = 'true') as rewritten,
        (select count(*) from features where status = 'published' and beat <> 'politics'
           and (author <> 'desk' or photo is null or jsonb_array_length(figures) < 4)
-          and not (id = any(string_to_array(coalesce((select value from state where key = 'desk_redone'), ''), E'\n')))) as left`, [date]),
+          and not (id = any(string_to_array(coalesce((select value from state where key = 'desk_redone_2'), ''), E'\n')))) as left`, [date]),
     sql.query(`select started_at, finished_at, details from runs where kind = 'desk' order by started_at desc limit 1`),
   ]);
   const a = av[0] ?? {}, ar = avRun[0];
