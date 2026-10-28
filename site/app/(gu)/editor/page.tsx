@@ -156,6 +156,16 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
 
       <section className={`${s.block} ${s.av}`} aria-labelledby="aavtikal">
         <div className={s.brandHead}><h2 id="aavtikal">{w.av}</h2><p>{w.avNote}</p></div>
+        {d.av && <>
+          <h3 className={s.sub}>{w.avDesk}</h3>
+          <p className={d.av.running ? s.running : s.stopped}>{d.av.running ? w.avWorking : w.avResting}</p>
+          <dl className={s.use}>
+            <div><dt>{w.avNew}</dt><dd>{nn(d.av.published)} / {nn(d.av.target)}</dd></div>
+            <div><dt>{w.avOld}</dt><dd>{nn(d.av.rewritten)}{d.av.toRewrite > 0 && <small> · {nn(d.av.toRewrite)} {w.avOldLeft}</small>}</dd></div>
+          </dl>
+          {d.av.lines.length > 0 && <details className={s.more}><summary>{w.avLog}</summary>
+            <ul className={s.runs}>{d.av.lines.map((l, i) => <li key={i}>{l}</li>)}</ul></details>}
+        </>}
         <h3 className={s.sub}>{w.drafts}</h3>
         {d.drafts.length ? d.drafts.map((f) => (
           <article key={f.id} className={s.card}>

@@ -677,9 +677,16 @@ async function retranslate(sql: Sql, log: (s: string) => void, deadline: number)
 if (import.meta.url === `file://${process.argv[1]}`) {
   const started = Date.now();
   const deadline = started + Math.max(60, Number(process.argv[2] ?? 900)) * 1000;
-  const log = (s: string) => console.log(s);
-  if (!process.env.DATABASE_URL) { log("no DATABASE_URL"); process.exit(0); }
+  if (!process.env.DATABASE_URL) { console.log("no DATABASE_URL"); process.exit(0); }
   const sql = neon(process.env.DATABASE_URL);
+  // what the desk is doing, kept in its run as it goes, for the editor's page (29 Oct: a job's log can't be read while it runs)
+  const lines: string[] = [];
+  let runId: number | null = null;
+  const log = (s: string) => {
+    console.log(s);
+    lines.push(`${new Date().toISOString().slice(11, 16)} ${s}`.slice(0, 300));
+    if (runId != null) sql.query(`update runs set details = coalesce(details, '{}'::jsonb) || jsonb_build_object('log', $2::jsonb) where id = $1`, [runId, JSON.stringify(lines.slice(-30))]).catch(() => null);
+  };
   await ensureSchema(sql);
   const [paused] = await sql.query(`select value from state where key = 'engine_paused'`);
   if (paused?.value === "yes") { log("the engine is stopped by the editor"); process.exit(0); }
@@ -690,6 +697,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     await touched(sql);
   }
   const [run] = await sql.query(`insert into runs (kind) values ('desk') returning id`);
+  runId = run.id as number;
   const details: Record<string, number> = { published: 0, held: 0, skipped: 0, rewritten: 0, kept: 0 };
   try {
     let newDone = false, oldDone = false;
@@ -713,10 +721,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     // nothing more to do for now (the day's articles made, or Flash's requests used up): the job rests a while
     if (newDone && oldDone || !(await geminiLeft(sql, "writer"))) process.exitCode = 3;
     await retranslate(sql, log, deadline);
-    await sql.query(`update runs set finished_at = now(), ok = true, details = $2 where id = $1`, [run.id, JSON.stringify(details)]);
+    await sql.query(`update runs set finished_at = now(), ok = true, details = $2 where id = $1`, [run.id, JSON.stringify({ ...details, log: lines.slice(-30) })]);
   } catch (e) {
     log(`failed: ${e instanceof Error ? e.stack : e}`);
-    await sql.query(`update runs set finished_at = now(), ok = false, details = $2 where id = $1`, [run.id, JSON.stringify({ ...details, error: String(e).slice(0, 400) })]);
+    await sql.query(`update runs set finished_at = now(), ok = false, details = $2 where id = $1`, [run.id, JSON.stringify({ ...details, error: String(e).slice(0, 400), log: lines.slice(-30) })]);
   }
   if (details.published || details.held || details.rewritten) await fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) }).catch(() => null);
 }

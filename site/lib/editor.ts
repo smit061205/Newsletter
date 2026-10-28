@@ -72,8 +72,10 @@ export async function emailFrom(origin: string, code: string): Promise<string | 
 export interface DeskStory { id: string; headline: string; deck: string; body: string; reason: string; at: string; tier: string; sources: { name: string; url: string }[] }
 export interface DeskFeature { id: string; beat: string; headline: string; dek: string; body: string; status: string; at: string }
 export interface DeskRun { at: string; ok: boolean; ai: number | null; seconds: number | null }
+/** Aavtikal's desk today: new articles published (of the day's target), older ones written again (of all), what it last did. */
+export interface AvDesk { published: number; target: number; rewritten: number; toRewrite: number; at: string; running: boolean; lines: string[] }
 export interface Desk {
-  held: DeskStory[]; drafts: DeskFeature[];
+  held: DeskStory[]; drafts: DeskFeature[]; av: AvDesk | null;
   runs: DeskRun[]; paused: boolean; today: { stories: number; ai: number; aiLimit: number; uploads: number; uploadLimit: number };
 }
 
@@ -91,9 +93,10 @@ export async function desk(sql: Sql | null): Promise<Desk> {
     const s = sampleOn() ? sample().stories : [];
     const ds = (x: (typeof s)[number], reason = ""): DeskStory => ({ id: x.id, headline: x.headline, deck: x.deck, body: x.body, reason, at: x.publishedAt, tier: x.tier,
       sources: x.source ? [{ name: x.source.name, url: x.source.url }] : [] });
-    return { held: s.slice(0, 2).map((x) => ds(x, "સંવેદનશીલ સમાચાર")), drafts: [], runs: [], paused: false, today };
+    return { held: s.slice(0, 2).map((x) => ds(x, "સંવેદનશીલ સમાચાર")), drafts: [], av: null, runs: [], paused: false, today };
   }
-  const [held, drafts, runs, paused, counts] = await Promise.all([
+  const date = new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
+  const [held, drafts, runs, paused, counts, av, avRun] = await Promise.all([
     sql.query(`select id, headline, deck, body, hold_reason, published_at, tier, sources from stories where status = 'held' order by published_at desc limit 50`),
     sql.query(`select id, beat, headline, dek, body, status, published_at, created_at from features where status in ('draft', 'held') order by created_at desc limit 30`),
     sql.query(`select started_at, ok, details from runs where kind = 'engine' order by started_at desc limit 8`),
@@ -102,10 +105,21 @@ export async function desk(sql: Sql | null): Promise<Desk> {
        (select count(*) from stories where origin = 'live' and status = 'published' and published_at > now() - interval '24 hours') as stories,
        (select coalesce(sum(n), 0) from usage where day = (now() at time zone 'Asia/Kolkata')::date and kind like 'ai%') as ai,
        (select coalesce(sum(n), 0) from usage where kind = 'upload' and day >= date_trunc('month', now() at time zone 'Asia/Kolkata')) as uploads`),
+    sql.query(`select
+       (select count(*) from features where author = 'desk' and status = 'published' and (created_at at time zone 'Asia/Kolkata')::date = $1::date) as published,
+       (select count(*) from features where checks->>'rewritten' = 'true') as rewritten,
+       (select count(*) from features where status = 'published' and beat <> 'politics'
+          and (author <> 'desk' or photo is null or jsonb_array_length(figures) < 4)
+          and not (id = any(string_to_array(coalesce((select value from state where key = 'desk_redone'), ''), E'\n')))) as left`, [date]),
+    sql.query(`select started_at, finished_at, details from runs where kind = 'desk' order by started_at desc limit 1`),
   ]);
+  const a = av[0] ?? {}, ar = avRun[0];
   const c = counts[0] ?? {};
   return {
     held: held.map(story), drafts: drafts.map(feature),
+    av: { published: Number(a.published ?? 0), target: WEBSITE.deskDays[date] ?? WEBSITE.deskDaily, rewritten: Number(a.rewritten ?? 0),
+          toRewrite: Number(a.left ?? 0), at: iso(ar?.started_at), running: !!ar && !ar.finished_at && Date.now() - Date.parse(String(ar.started_at)) < 40 * 60_000,
+          lines: ((ar?.details as { log?: string[] } | null)?.log ?? []).slice(-12) },
     runs: runs.map((r) => {
       const d = (r.details ?? {}) as { aiRequests?: number; seconds?: number };
       return { at: iso(r.started_at), ok: r.ok !== false, ai: d.aiRequests ?? null, seconds: d.seconds ?? null };

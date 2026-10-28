@@ -93,3 +93,4 @@ a.title:hover { text-decoration: underline }
 .use div { padding: 14px; background: var(--surface); border-radius: var(--r) }
 .use dt { font-size: 15px; color: var(--muted) }
 .use dd { margin: 4px 0 0; font-size: 26px; font-weight: 800; color: var(--strong); font-variant-numeric: tabular-nums }
+.use dd small { font-size: 16px; font-weight: 600; color: var(--muted) }
