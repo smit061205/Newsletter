@@ -15,10 +15,10 @@ app never carries it.
 | Photos, e-paper pages and PDFs | Vercel Blob `capital-kranti-photos` (a **private** store: the site serves its files itself at `/media/…`, cached for a year by the CDN) | |
 | The hourly run | GitHub Actions `site-run.yml` | repository secrets `DATABASE_URL`, `OPENROUTER_API_KEY` |
 | Loading 20-22 Oct | GitHub Actions `site-seed.yml` (once) | `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN` |
-| **The news engine** (every 15 min) | GitHub Actions `site-engine.yml` (`engine/run.ts`) | `DATABASE_URL`, `OPENROUTER_API_KEY`, `BLOB_READ_WRITE_TOKEN`; for approvals `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS` |
+| **The news engine** (every 15 min) | GitHub Actions `site-engine.yml` (`engine/run.ts`) | `DATABASE_URL`, `OPENROUTER_API_KEY`, `BLOB_READ_WRITE_TOKEN`; for approvals `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS`. Each run queues the next itself; between rounds `engine/listen.ts` answers the bot within seconds: `/start` replies with that chat's number, the one to put in `TELEGRAM_CHAT_IDS` |
 | The engine's checks and dry run | GitHub Actions `site-engine-try.yml` (on every engine change, any branch) | `OPENROUTER_API_KEY` (stores nothing) |
 | **The editor's page** (`/editor`: approve or reject held stories and Aavtikal drafts, take a story off, the engine's stop switch, the day's use) | the site (`lib/editor.ts`, `app/(gu)/editor`), Google sign-in | Vercel: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (a Google Cloud OAuth client, redirect `https://capital-kranti.vercel.app/api/editor/callback`), `CK_EDITORS` (the allowed Google addresses, comma-separated), `CK_SESSION_SECRET` (32+ random characters) |
-| The editor's Telegram buttons, instantly (optional) | `/api/telegram` on the site | Vercel: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS`, `TELEGRAM_WEBHOOK_SECRET` (else each engine run collects the presses) |
+| The editor's Telegram buttons, instantly (optional) | `/api/telegram` on the site | Vercel: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS`, `TELEGRAM_WEBHOOK_SECRET` (else the engine collects the presses and messages, within seconds while it runs) |
 
 ## How a day gets onto the site
 

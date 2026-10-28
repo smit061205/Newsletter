@@ -67,7 +67,10 @@
 /* the menu: a drawer from the right (400 wide; the whole screen on a phone) over a shade */
 .shade { position: fixed; inset: 0; z-index: 60; background: rgba(6, 6, 6, .5); opacity: 0; pointer-events: none; transition: opacity .25s }
 .shade.open { opacity: 1; pointer-events: auto }
-.drawer { position: fixed; inset: 0 0 0 auto; z-index: 61; width: min(400px, 100%); background: var(--pg); color: var(--ink); padding: 0 20px 21px; overflow-y: auto;
+/* the drawer sits inside the header, whose beat or black bar repaints --ink for itself: the
+   drawer takes the page's own colours (--dpg, --dink, fixed on .root) so its words always show */
+.root { --dpg: var(--pg); --dink: var(--ink) }
+.drawer { position: fixed; inset: 0 0 0 auto; z-index: 61; width: min(400px, 100%); background: var(--dpg); color: var(--dink); --ink: var(--dink); --line: var(--dink); padding: 0 20px 21px; overflow-y: auto;
   transform: translateX(100%); transition: transform .3s cubic-bezier(.39, .575, .565, 1); visibility: hidden }
 .drawer.open { transform: none; visibility: visible }
 .drawerTop { display: flex; justify-content: flex-end; height: 50px; align-items: center }
@@ -151,7 +154,8 @@
 .tile { display: flex; align-items: flex-end; aspect-ratio: 3 / 2; padding: 12px 14px; background: var(--beat); color: var(--onbeat); overflow: hidden }
 .tile span { font-family: var(--ui); font-weight: 800; font-stretch: 75%; font-size: clamp(34px, 6vw, 110px); line-height: .9; letter-spacing: var(--trk) }
 .beatBand .tile { background: var(--onbeat); color: var(--beat) }
-.beatTag { display: inline-block; align-self: flex-start; margin-top: 14px; padding: 2px 8px; background: var(--beat); color: var(--onbeat); font-size: 12px; font-weight: 700 }
+/* the font keeps more room under its letters than over them: 3px over and none under puts them in the middle */
+.beatTag { display: inline-block; align-self: flex-start; margin-top: 14px; padding: 3px 8px 0; background: var(--beat); color: var(--onbeat); font-size: 12px; font-weight: 700 }
 .beatBand .beatTag { display: none }
 /* the last tile: everything */
 .dive { display: flex; flex-direction: column; justify-content: space-between; min-height: 100%; padding: 20px; background: color-mix(in srgb, var(--ink) 8%, transparent) }
