@@ -14,7 +14,9 @@ import { storePhoto } from "./publish.ts";
 type Sql = NeonQueryFunction<false, false>;
 // Wikimedia asks programs to name themselves and a way to reach them
 const UA = "CapitalKranti-news/1.0 (https://capital-kranti.vercel.app; news photos from Wikimedia Commons)";
-const FREE = /^(cc0|cc[ -]by(-sa)?( \d(\.\d)?)?|public domain|pd\b|pd-)/i;
+// free licences: Creative Commons (BY, BY-SA, 0), public domain, and the Government Open
+// Data Licence – India (most PIB and ministry photos on Commons)
+const FREE = /^(cc0|cc[ -]by(-sa)?\b|public domain|pd\b|pd-|godl)/i;
 
 export interface FreePhoto { photo: Photo; caption: { gu: string; en: string; hi: string } }
 interface Subject { title: string; gu: string; en: string; hi: string }
@@ -50,7 +52,9 @@ export async function leadPhoto(title: string): Promise<{ url: string; credit: s
   const src = page?.originalimage?.source;
   // only Commons: a photo kept on English Wikipedia itself may be someone's, used there as "fair use"
   if (!page || page.type !== "standard" || !src || !src.includes("/wikipedia/commons/")) return null;
-  const file = decodeURIComponent(new URL(src).pathname.split("/").pop()!);
+  // the file's own name: the address may be a resized copy's, ".../thumb/d/db/<file>/3840px-<file>"
+  const parts = new URL(src).pathname.split("/");
+  const file = decodeURIComponent(parts.includes("thumb") ? parts.at(-2)! : parts.at(-1)!);
   if (!/\.(jpe?g|png|webp)$/i.test(file)) return null;
   const q = new URLSearchParams({ action: "query", titles: `File:${file}`, prop: "imageinfo", iiprop: "url|extmetadata", iiurlwidth: "1600", format: "json", origin: "*" });
   const info = (await get(`https://commons.wikimedia.org/w/api.php?${q}`)) as
