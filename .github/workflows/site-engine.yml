@@ -2,10 +2,16 @@
 # it reads the sources, checks each event is genuine, writes the important ones
 # in Gujarati (English and Hindi for national and world news) with free models
 # only, and puts them on the website, or holds them for the editor on Telegram.
+#
+# GitHub starts scheduled runs late or not at all when it's busy (26-28 Oct: 11
+# runs in 2.5 days instead of 240), so one run keeps the engine's 15-minute
+# rhythm itself for almost six hours, at :04, :19, :34 and :49. The hourly
+# schedule only queues the next keeper, which starts the moment this one ends
+# (one at a time: the concurrency group), or revives the engine if a run died.
+# Each round takes main's latest engine code, so a fix is live within 15 minutes.
 name: site-engine
 on:
-  # started 26 Oct, after the dry run's stories were read and approved
-  schedule: [{ cron: "4,19,34,49 * * * *" }]
+  schedule: [{ cron: "4 * * * *" }]
   workflow_dispatch:
 
 concurrency:
@@ -15,9 +21,11 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -25,13 +33,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             site/package-lock.json
-      - name: Install
-        run: |
-          npm ci --no-audit --no-fund --ignore-scripts
-          npm ci --prefix site --no-audit --no-fund
-      - name: Self-test
-        run: node --experimental-strip-types --no-warnings site/engine/selftest.ts
-      - name: Run
+      - name: Every 15 minutes, for almost six hours
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -39,4 +41,28 @@ jobs:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
-        run: node --experimental-strip-types --no-warnings site/engine/run.ts
+        run: |
+          end=$(( $(date +%s) + 340 * 60 ))
+          installed=""
+          rounds=0; failed=0
+          while :; do
+            # main's latest code; installs again only when a lockfile changed
+            git fetch -q --depth 1 origin main && git reset -q --hard origin/main
+            locks=$(cat package-lock.json site/package-lock.json | sha256sum)
+            if [ "$locks" != "$installed" ]; then
+              npm ci --no-audit --no-fund --ignore-scripts && npm ci --prefix site --no-audit --no-fund && installed=$locks
+            fi
+            rounds=$((rounds + 1))
+            echo "::group::Round $rounds, $(date -u +%H:%M) UTC"
+            if node --experimental-strip-types --no-warnings site/engine/selftest.ts \
+               && timeout 13m node --experimental-strip-types --no-warnings site/engine/run.ts; then :; else
+              failed=$((failed + 1)); echo "::warning::Round $rounds failed"
+            fi
+            echo "::endgroup::"
+            # the next :04, :19, :34 or :49
+            now=$(date +%s); next=$(( (now - 240) / 900 * 900 + 900 + 240 ))
+            [ "$next" -ge "$end" ] && break
+            sleep $(( next - now ))
+          done
+          echo "$rounds rounds, $failed failed"
+          [ "$failed" -eq 0 ]
