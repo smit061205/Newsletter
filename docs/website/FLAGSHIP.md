@@ -139,8 +139,9 @@ At 800 the leads are 40/36, cards 26/24.7, and "Staff Writers" names 36.
     tag pills 100 px;
   - a 1 px ink border on pills.
 - **Shadows:** none.
-- **Motion:** only `transform 0.2s cubic-bezier(.39,.575,.565,1)`, the photo
-  zooming slightly on hover. The menu drawer slides in from the right over a
+- **Motion:** only `transform` and `opacity`, over 0.2 s
+  `cubic-bezier(.39,.575,.565,1)`: the arrow square splitting on hover and the
+  date fading in (§4.3). The menu drawer slides in from the right over a
   `rgba(6,6,6,.5)` shade.
 
 ### 1.5 Images
@@ -375,3 +376,140 @@ a 100 px fade above it).
 - one colour per beat;
 - whether articles come from the engine, from the editor, or both (essays need
   an editor's page; ROADMAP item 4).
+
+---
+
+## 4. Second pass (28 Oct): switch points, every page at every width, behaviour
+
+### 4.1 Where the layout switches (home page, stepped through 25 widths, 360–2560)
+
+| Width | Margin | Cards across × width | Card headline | Lead headline | Lead | Podcast | Writers band |
+|---|---|---|---|---|---|---|---|
+| 360 | 10 | 2 × 160 | 26 | 40 | stacked, photo on top 340×228 | one column | 2 × 160 |
+| 414 | 10 | 2 × 187 | 26 | 40 | stacked | one column | 2 |
+| 480 | 10 | 2 × 220 | 26 | 40 | stacked | one column | 2 |
+| 576 | 10 | 2 × 268 | 26 | 40 | stacked | one column | 2 |
+| 720 | 10 | 2 × 340 | 26 | 40 | stacked | one column | 2 |
+| **767** | 10 | 2 × 364 | 26 | 40 | stacked 747 wide | one column | 2 |
+| **768** | **20** | **3** × 216 | 26 | 40 | **side by side**, photo 488 | one column | **3** |
+| 864 | 20 | 3 × 248 | 26 | 40 | photo 552 | one column | 3 |
+| **959** | 20 | 3 × 279 | 26 | 40 | photo 616 | one column | 3 |
+| **960** | 20 | 3 × 280 | **36** | **55** | photo 616 | **two columns** 2/3 + 1/3 | 3 |
+| 1024 | 20 | 3 × 301 | 36 | 55 | 659 | two | 3 |
+| **1080** | 20 | 3 × 320 | 36 | **60** (= W/18) | 697 | two | **4** |
+| 1152 | 20 | 3 × 344 | 36 | 64 | 745 | two | 4 |
+| 1296 | 20 | 3 × 392 | 36 | 72 | 842 | two | 4 |
+| 1440 | 20 | 3 × 440 | 40 | 80 | 938 | two | 4 × 320 |
+| 1512 | 21 | 3 × 463 | 42 | 84 | 985 | two | 4 |
+| **1728** | **24** | 3 × 533 | **48** | **96** | 1126 | two | 4 × 390 |
+| 2000 | 24 | 3 × 624 | 48 | 96 | 1308 | two | 4 × 458 |
+| 2560 | 24 | 3 × 810 | 48 | 96 | 1683 | two | 4 × 598 |
+
+**The rules behind it:**
+- **Below 768:** a phone layout. Margin 10, two cards across with a gap of 20, everything stacked.
+- **From 768:** three cards across with a gap of 40, margin 20, and the lead beside its photo. The photo is about 2/3 of the width.
+- **From 960:**
+  - card headlines go to 36, then grow as W/36 from about 1296 (40 at 1440, 42 at 1512) and stop at 48 from 1728;
+  - lead headlines go to 55, then grow as W/18 from 1080 (60 at 1080, 80 at 1440) and stop at 96 from 1728;
+  - the podcast becomes two columns.
+- **From 1080:** the writers band shows four across.
+- **From about 1440 to 1728:** the margin grows as W/72 (20, then 21, then 24 from 1728).
+- **Above 1728:** nothing grows any more. Only the columns get wider, so 2560 is 2000 with wider cards.
+- **The masthead** is always the full content width, about 4.8 : 1 (340×71 at 360, 1400×291 at 1440, 2512×522 at 2560).
+- **The section tabs** (row 1): equal quarters of the width. Below 1080 they can scroll sideways, and on a phone each tab is at least 122 wide (four tabs = 419 on a 390 screen). The header is always 80 tall.
+
+### 4.2 Every page at the other widths
+
+| Page | 390 | 800 | 1024 | 2000 |
+|---|---|---|---|---|
+| **Section** title (grotesk; = W/9.6, between 60 and 180) | 60/50 | 83/70 | 107/90 | 180/151 |
+| Section lead headline | 40/36, photo on top 370×248 | 40/36, beside a 509 photo | 55/49.5 | 96/86 |
+| Section cards | 2 × 175 | 3 × 226 | 3 × 301 | 3 × 624 |
+| **Article** title | **46/46 left** | **80/80 centred** | **80/80 centred**, 900 wide | 63/63 centred, 900 wide |
+| Article reading text | 18/26.8 | 20/29.8 | 20/29.8 | 23.1/34.4 |
+| Article column (by its subheadings) | 360 at 15 | 760 (full width) | **740 centred** | 662 centred |
+| Article hero | 364×244 | 754×505 | 978×655 | 1946×1304 |
+| **Daily** title | 64/54 | 99/83 | | |
+| Daily takes | one column 370 | **two** columns 389 | three from 1024 | |
+| Daily take headline | 28/26.6 | 28/26.6 | 40/38 at 1440 | |
+| **Author** page | photo 180², name 40, cards 2 × 175 | photo 180², cards 3 × 226 | | |
+| **Writers** title / "Contributors" | 60 / 85 | 83 / 85 | | |
+| Writers, staff photos | 2 × 175 | 3 × 226 | 3 × 440 at 1440 | |
+| Writers, contributor names | 26 | 36 | 40 at 1440 | |
+| **Search** field | 370×45, full width | 393×45 centred | | |
+
+**Note on the article page:** between 768 and about 1100 the title is *bigger*
+(80) than on a desktop (60), and the reading column *wider* (740) than at 1440
+(630). A tablet held in landscape reads like a magazine. Copy this as measured.
+
+### 4.3 Behaviour
+- **Card hover** (not on touch screens):
+  - **The arrow square** is two 10×20 ink halves side by side under a light
+    10×8 arrow. On hover the left half moves up 2 px and the right half down
+    2 px, so the square "splits" behind the arrow. `transform` over 0.2 s,
+    `cubic-bezier(.39,.575,.565,1)`.
+  - **The date** ("Oct 27", 14 Med), hidden at opacity 0, fades in beside it
+    over the same 0.2 s.
+  - **Nothing else moves:** no photo zoom and no underline. The earlier note
+    about a photo zoom (§1.4) is wrong; it's only this split.
+- **Other hovers:**
+  - "See all" arrows slide 4 px right;
+  - like and comment counts turn ink on light bands and grey on dark bands;
+  - share buttons get a 6 % ink wash;
+  - × buttons fade to 70 %;
+  - black buttons lighten to `#333`.
+- **The header** is fixed, 80 tall, and never hides, shrinks or casts a shadow
+  while scrolling. There are no focus rings (they remove the outline), so **we
+  keep ours**: the BBC-style ring in `globals.css`. Their choice fails our
+  accessibility check.
+- **The menu:**
+  - **at 1440:** a 400 drawer over the 50 % shade; items 22;
+  - **on a phone:** the drawer is the full screen (390×844), padding 0 20 21,
+    items 24 (and the small links 16). The first item is 54 from the top.
+- **Section pages** show a fixed list of about 33 cards. There is no "load
+  more" and no endless scrolling. Older cards' photos load as you reach them.
+- **The footer** (413 tall, page grey or ink):
+  - the wordmark the full width;
+  - then one row 20 above the bottom: legal links on the left (14 Med, gap 20);
+    social links as words in the middle ("X (Twitter)", "Facebook", "Instagram",
+    "RSS", "Newsletter", "Advertise"; 14 Med, gap 20); "Powered by …" (12) and
+    © on the right.
+
+### 4.4 The home page's bands, in detail
+- **"From the Daily"** (cream `#F7F3E7`, padding 40 0, 690 tall at 1440):
+  - an orange date label (`#E4562C`, compressed 46, cream text, 259×58);
+  - then three takes 439 wide. Each take:
+    - the title (compressed 40/38, may mix **bold** and ~~struck~~ words);
+    - the writer's badge (a 140×35 image);
+    - the text (serif 15/20, italics for stress);
+    - "Share to X" and "Share to Substack" pills (grotesk 14, at the bottom of
+      the band).
+  - On the right of the band, an email box:
+    - the title compressed 40;
+    - two lines grotesk 14/20 in `#2A1100`;
+    - a 302×45 field (1 px border `#2A1100`, padding 0 20);
+    - a 302×40 orange button (`#E4562C`).
+
+  **Ours:** a WhatsApp channel box, no email.
+- **"Latest Podcast"** (ink, 621 tall):
+  - a 940×529 video on the left;
+  - on the right (440): "Latest Podcast" compressed 40/38, "See all podcasts"
+    20/20, then the episode title 80/72;
+  - a 1 px light rule at the foot.
+
+  **Ours:** "Watch" with a YouTube video, once there are videos.
+- **"Staff Writers"** (`#1C1C1C`, padding 40 0, 682 tall):
+  - the title compressed 120/93.6;
+  - "See all" (17.5 Med) on the right;
+  - four writers 320 wide, 40 apart. Each writer: a 320² photo, the name
+    compressed 40/38 with the arrow square, and the role serif 15/20 (−0.45).
+- **"Dive into …"** tile (the ninth card): white at 10 % on ink, padding 20, a
+  headline 80/72, then "Dive into it" (serif 14). It opens the archive.
+
+**Now covered:** the switch points, every page at phone, tablet, desktop and wide
+widths, hover and scroll behaviour, the menu on a phone, how much loads, the
+footer, and the home bands' insides.
+
+**Still not measured:** Advertise (a sales page like About), and the comments
+page (run by their newsletter service, not their site). Neither is needed for
+the flagship.
