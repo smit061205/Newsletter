@@ -97,10 +97,14 @@ export async function gather(items: ClusterItem[]): Promise<SourceText[]> {
       }
     }
     // pictures only from official sources (§2): an outlet's photo is never used
-    out.push({ source, url: it.url, title: it.title, text: text.slice(0, 5000), image: source.trust === "official" ? image : null, official: source.trust === "official" });
+    out.push({ source, url: it.url, title: it.title, text: text.slice(0, 14000), image: source.trust === "official" ? image : null, official: source.trust === "official" });
     if (out.length >= 5) break;
   }
-  return out;
+  // all the sources together stay near 24,000 letters, so one request stays within the free plan's text a minute:
+  // the longest keeps its length (the story is written as long as it), the others share what's left
+  const longest = out.reduce((a, s, i) => (s.text.length > out[a].text.length ? i : a), 0);
+  const rest = Math.max(2000, Math.floor((24_000 - (out[longest]?.text.length ?? 0)) / Math.max(1, out.length - 1)));
+  return out.map((s, i) => (i === longest ? s : { ...s, text: s.text.slice(0, rest) }));
 }
 
 const sourcesBlock = (src: SourceText[]) => src.map((s, k) =>
@@ -110,8 +114,15 @@ const sourcesBlock = (src: SourceText[]) => src.map((s, k) =>
 
 export interface Written { kicker: string; headline: string; deck: string; body: string; caption: string; model: string }
 
-const WRITER = (level: Level) => {
-  const [lo, hi] = WORDS[level];
+/** How long the story is: at least as long as its longest source (the user, 29 Oct), never shorter than its
+ *  level asks, and up to 1,200 words (as much as a free model writes well in one answer). */
+export function lengthFor(level: Level, src: SourceText[]): [number, number] {
+  const longest = Math.max(0, ...src.map((s) => s.text.split(/\s+/).filter(Boolean).length));
+  const lo = Math.min(1200, Math.max(WORDS[level][0], longest));
+  return [lo, Math.min(1500, Math.max(WORDS[level][1], Math.round(lo * 1.25)))];
+}
+
+const WRITER = (lo: number, hi: number) => {
   return `તમે ગાંધીનગરના ગુજરાતી દૈનિક "કેપિટલ ક્રાંતિ"ની વેબસાઇટના ઉપતંત્રી છો.
 You write ONE news story in Gujarati from the sources given, for the website.
 Rules:
@@ -119,8 +130,8 @@ Rules:
 - Write in your own words: never copy a sentence from a source. Quote people only where a source quotes them, and keep the quote's meaning exactly.
 - House style: headline (active, specific, no exclamation marks, up to 12 words) > deck (one line: the next most important fact) > body.
 - Body: ${lo}-${hi} words, the most important fact first, short paragraphs separated by a blank line. Plain, clear Gujarati.
-  Tell the whole story the sources tell: every fact that matters, the background they give, what happens next, who said what.
-  A reader should not need to open the sources. Only when the sources themselves say little, write less, and never pad.
+  Tell the whole story the sources tell, at least as fully as the longest source: every fact, the background they give,
+  what happens next, who said what. A reader should not need to open the sources. Never pad with anything not in them.
 - kicker: 1-3 words naming the topic or place, or "".
 - caption: one line for the photo if a source has an official photo, else "".
 - Numbers in Gujarati digits (૦-૯) as the paper prints them, with ₹, કરોડ and લાખ as Indian papers write them. Keep every number exactly as the source has it.
@@ -171,7 +182,7 @@ export async function check(sql: Sql | null, w: Written, src: SourceText[], date
     const share = copiedShare(w.body, s.text);
     if (share > 0.12) problems.push(`copies ${Math.round(share * 100)}% of ${s.source.name}'s wording`);
   }
-  const res = await askJson(sql, { system: CHECKER, user: `STORY:\n${text}\n\n===\n\n${sourcesBlock(src)}`, role: "checker", avoid: w.model, maxTokens: 4000 },
+  const res = await askJson(sql, { system: CHECKER, user: `STORY:\n${text}\n\n===\n\n${sourcesBlock(src)}`, role: "checker", avoid: w.model, maxTokens: 6000 },
     (v) => {
       const x = v as { claims?: Claim[] };
       if (!Array.isArray(x?.claims) || !x.claims.length) return null;
@@ -185,19 +196,18 @@ export async function check(sql: Sql | null, w: Written, src: SourceText[], date
 
 /** Write, check, and (once) rewrite with the problems named. */
 export async function writeChecked(sql: Sql | null, src: SourceText[], level: Level, date: string, event: string) {
+  const [lo, hi] = lengthFor(level, src);
   let note = "";
   let last: { w: Written; c: Checked } | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await askJson(sql, { system: WRITER(level), user: `EVENT: ${event}\n\n${sourcesBlock(src)}${note}`, role: "writer", temperature: 0.3, maxTokens: 7000 },
+    const res = await askJson(sql, { system: WRITER(lo, hi), user: `EVENT: ${event}\n\n${sourcesBlock(src)}${note}`, role: "writer", temperature: 0.3, maxTokens: 12000 },
       (v) => checkWritten(v));
     if (!res.ok) return { ok: false as const, why: res.why, stop: res.stop, retry: res.busy };
     const w = { ...res.value, model: res.model };
     // far shorter than the sources allow (29 Oct: a £10 billion package told in two paragraphs): written again once, before checking
     const words = (x: string) => x.split(/\s+/).filter(Boolean).length;
-    const [lo] = WORDS[level];
-    const have = src.reduce((n, s) => n + words(s.text), 0);
-    if (attempt === 0 && words(w.body) < lo * 0.7 && have >= lo * 1.5) {
-      note = `\n\nYOUR LAST VERSION WAS ONLY ${words(w.body)} WORDS. The sources say much more: write the full story, ${lo} words or more, with every fact that matters from them.`;
+    if (attempt === 0 && words(w.body) < lo * 0.75) {
+      note = `\n\nYOUR LAST VERSION WAS ONLY ${words(w.body)} WORDS. The sources say much more: write the full story, ${lo} words or more, with every fact from them.`;
       continue;
     }
     const c = await check(sql, w, src, date);
@@ -222,7 +232,7 @@ export async function translate(sql: Sql | null, w: Written, lang: "en" | "hi", 
   const source = [w.kicker, w.headline, w.deck, w.body, w.caption].join("\n\n");
   let note = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await askJson(sql, { system: TRANSLATE(lang), user: JSON.stringify({ kicker: w.kicker, headline: w.headline, deck: w.deck, body: w.body, caption: w.caption }) + note, maxTokens: 7000 },
+    const res = await askJson(sql, { system: TRANSLATE(lang), user: JSON.stringify({ kicker: w.kicker, headline: w.headline, deck: w.deck, body: w.body, caption: w.caption }) + note, maxTokens: 12000 },
       (v) => {
         const x = v as Partial<English>;
         if (!x?.headline || typeof x.body !== "string") return null;
