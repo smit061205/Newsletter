@@ -186,7 +186,10 @@ You write ONE long explainer in Gujarati about the subject, from the sources giv
 who is curious and intelligent; a technical reader must still learn something. Think of the best explainers in serious magazines.
 
 Depth and structure:
-- 1,500 to 2,500 words of body. Use "## " subheadings (in Gujarati) to divide it, for example: what happened and why it matters;
+- The length follows the subject (decided 29 Oct): 1,200 to 1,800 words of body for a smaller development (a new
+  feature, one study's result); up to 3,500 words for a big one (a major model, a space mission, a breakthrough)
+  whose sources carry that much: its design, its numbers, its prices. Never pad: no repeating, no filler, every
+  paragraph tells the reader something new; when the sources run out, the article ends. Use "## " subheadings (in Gujarati) to divide it, for example: what happened and why it matters;
   the background; how it works (the design, the architecture, the mechanism, step by step, with a good everyday analogy);
   the numbers (specifications, sizes, benchmark results, dates); what it costs or what it took; how it compares with others;
   what it means for India and for ordinary people; what is still unknown or disputed.
@@ -315,7 +318,7 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
   };
   for (let attempt = 0; attempt < 2; attempt++) {
     // Gemini Flash Lite; a Gemma when its requests are used up
-    const ask = { system: TRANSLATE(lang), user: JSON.stringify({ ...gu, strings: labels.map((l) => l.gu) }) + note, maxTokens: 20_000 };
+    const ask = { system: TRANSLATE(lang), user: JSON.stringify({ ...gu, strings: labels.map((l) => l.gu) }) + note, maxTokens: 32_000 };
     const res = await askGemini(sql, "lite", ask, take).then((r) => (r.ok || !r.stop ? r : askJson(sql, ask, take)));
     if (!res.ok) return null;
     const out = res.value;
