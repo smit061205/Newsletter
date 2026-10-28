@@ -5,6 +5,7 @@ import { Suspense, ViewTransition } from "react";
 import type { Lang } from "../lib/types.ts";
 import { href, t } from "../lib/i18n.ts";
 import { SECTIONS, sectionName } from "../lib/sections.ts";
+import { flw } from "../lib/flagship.ts";
 import { PAPER } from "../lib/site.ts";
 import { num } from "../lib/format.ts";
 import Chrome from "./Chrome.tsx";
@@ -36,12 +37,14 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
       <Chrome
         lang={lang} name={PAPER.gu.name} tagline={PAPER[lang].tagline} words={words} bottomBar={bottomBar} active={active}
         paths={{ gu: href("gu", path), en: href("en", path), hi: href("hi", path) }}
-        sections={SECTIONS.map((k) => ({ key: k, name: sectionName(k, lang), href: L(`/section/${k}`) }))}
+        sections={[...SECTIONS.map((k) => ({ key: k, name: sectionName(k, lang), href: L(`/section/${k}`) })), { key: "aavtikal", name: flw(lang).name, href: L("/aavtikal") }]}
         links={{ home: L("/"), latest: L("/latest"), epaper: L("/epaper"), archive: L("/archive"), search: L("/search"), saved: L("/saved"),
                  about: L("/about"), how: L("/how-we-check"), policy: L("/editorial-policy"), corrections: L("/corrections"), contact: L("/contact") }}
       />
       <nav className="wrap secs" aria-label={t(lang, "sections")}>
         {SECTIONS.map((k) => <Link key={k} href={L(`/section/${k}`)} className={section === k ? "on" : undefined}>{sectionName(k, lang)}</Link>)}
+        {/* the flagship section (views/Flagship.tsx), set apart at the end */}
+        <Link href={L("/aavtikal")} className="fl">{flw(lang).name}</Link>
       </nav>
       {/* the page's content crossfades into the next one (the header and footer stay put) */}
       <ViewTransition enter="page-in" exit="page-out" default="none">
@@ -55,7 +58,7 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
           <div className="fcols">
             <div><b>{t(lang, "f1")}</b><Link href={L("/about")}>{t(lang, "fAbout")}</Link><Link href={L("/editorial-policy")}>{t(lang, "fPolicy")}</Link>
               <Link href={L("/how-we-check")}>{t(lang, "fHow")}</Link><Link href={L("/corrections")}>{t(lang, "fFix")}</Link><Link href={L("/contact")}>{t(lang, "fContact")}</Link></div>
-            <div><b>{t(lang, "f2")}</b>{SECTIONS.slice(0, 6).map((k) => <Link key={k} href={L(`/section/${k}`)}>{sectionName(k, lang)}</Link>)}</div>
+            <div><b>{t(lang, "f2")}</b>{SECTIONS.slice(0, 6).map((k) => <Link key={k} href={L(`/section/${k}`)}>{sectionName(k, lang)}</Link>)}<Link href={L("/aavtikal")}>{flw(lang).name}</Link></div>
             <div><b>{t(lang, "f3")}</b><Link href={L("/epaper")}>{t(lang, "epaper")}</Link><Link href={L("/archive")}>{t(lang, "archive")}</Link>
               <a href={lang === "gu" ? "/rss.xml" : `/${lang}/rss.xml`}>{t(lang, "fRss")}</a></div>
             <div><b>{t(lang, "f4")}</b><Link href={L("/terms")}>{t(lang, "fTerms")}</Link><Link href={L("/privacy")}>{t(lang, "fPrivacy")}</Link>
