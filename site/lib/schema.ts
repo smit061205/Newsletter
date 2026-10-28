@@ -117,6 +117,27 @@ export const SCHEMA = [
      n int not null default 0,
      primary key (story_id, day)
    )`,
+  // આવતીકાલ (Aavtikal), the flagship's long articles (lib/flagship.ts): their own
+  // table, so the daily site's queries never meet them
+  `create table if not exists features (
+     id text primary key,
+     beat text not null,                            -- ai | tech | science | politics
+     status text not null default 'draft',          -- draft | held | published | withdrawn: only the editor publishes
+     headline text not null,
+     dek text not null default '',
+     body text not null,                            -- paragraphs separated by blank lines; "## " a subheading
+     caption text not null default '',
+     photo jsonb,
+     author text not null default 'desk',           -- desk (the engine's AI desk) | editor
+     en jsonb,
+     hi jsonb,
+     sources jsonb not null default '[]',
+     checks jsonb,
+     created_at timestamptz not null default now(),
+     published_at timestamptz,
+     updated_at timestamptz not null default now()
+   )`,
+  `create index if not exists features_published on features (status, published_at desc)`,
   // what was sent to the editor's phone, and what came back
   `create table if not exists approvals (
      story_id text primary key,
