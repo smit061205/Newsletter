@@ -7,6 +7,8 @@
 //   4. the most important confirmed events written in Gujarati, checked claim by claim
 //      by a second free model, English and Hindi added for national and world news;
 //   5. live at once, or held for the editor (sensitive, or a check not passed);
+//      no official photo: a free file photo of its subject from Wikimedia Commons (wikiphoto.ts);
+//   8. the last day and a half's stories still without a photo: the same, once each;
 //   9. published stories watched for 24 hours: a source correcting or withdrawing holds them.
 // Free models only: the day's allowance is spent on the most important events first.
 // Run: node --experimental-strip-types site/engine/run.ts   (DATABASE_URL, OPENROUTER_API_KEY;
@@ -20,6 +22,7 @@ import { aiLeft, aiUsed, freeModels } from "./ai.ts";
 import { collect } from "./collect.ts";
 import { gate, gather, importance, levelOf, needsTranslation, translate, writeChecked, type ClusterItem, type Debunk } from "./newsroom.ts";
 import { indiaDate, photoOf, saveLive } from "./publish.ts";
+import { freePhoto } from "./wikiphoto.ts";
 import { cluster, triage, type Triage } from "./triage.ts";
 
 const url = process.env.DATABASE_URL;
@@ -89,17 +92,29 @@ async function write() {
       if (res.stop || ("retry" in res && res.retry)) break;
       continue;
     }
-    const w = res.written;
+    let w = res.written;
     const checked = res.checked;
     const id = `live-${c.id.slice(1)}`;
     // held for the editor: sensitive, or a check not passed (ROADMAP §0.1, decided 25 Oct)
     const holdReason = c.sensitive ? "સંવેદનશીલ સમાચાર" : !checked.ok ? `ચકાસણી: ${checked.problems.slice(0, 3).join("; ")}` : null;
     const translated = needsTranslation(c.tier);
-    const en = translated ? await translate(sql, w, "en", indiaDate()) : null;
-    const hi = translated ? await translate(sql, w, "hi", indiaDate()) : null;
-    const photo = await photoOf(sql, src, id);
+    let en = translated ? await translate(sql, w, "en", indiaDate()) : null;
+    let hi = translated ? await translate(sql, w, "hi", indiaDate()) : null;
+    let photo = await photoOf(sql, src, id);
+    // no official photo: a file photo of the story's subject from Wikimedia Commons (not for sensitive news)
+    if (!photo && !c.sensitive) {
+      const free = await freePhoto(sql, w, id);
+      if (free) {
+        photo = free.photo;
+        w = { ...w, caption: free.caption.gu };
+        if (en) en = { ...en, caption: free.caption.en };
+        if (hi) hi = { ...hi, caption: free.caption.hi };
+        log(`    file photo: ${free.caption.en} (${free.photo.credit})`);
+      }
+    }
     await saveLive(sql, { id, tier: c.tier, genres: c.genres, written: w, checked, src, importance: imp, status: holdReason ? "held" : "published",
                           holdReason, en, hi, translated, photo });
+    await sql.query(`update stories set photo_tried = true where id = $1`, [id]);
     await sql.query(`update clusters set state = $2, story_id = $3, reason = $4 where id = $1`, [c.id, holdReason ? "held" : "published", id, holdReason]);
     if (holdReason) {
       await askApproval(sql, { id, headline: w.headline, deck: w.deck, body: w.body, reason: holdReason, sources: src.map((s) => ({ name: s.source.name, url: s.url })) });
@@ -109,6 +124,29 @@ async function write() {
       log(`    published: ${w.headline}`);
     }
   }
+}
+
+/** Step 8: the last day and a half's stories that went up without a photo get a file photo,
+ *  the most important first, each looked for once (engine/wikiphoto.ts). */
+async function photos() {
+  const rows = await sql.query(
+    `select id, kicker, headline, deck, body from stories where origin = 'live' and status = 'published' and photo is null and not photo_tried
+       and published_at > now() - interval '36 hours' order by importance desc nulls last, published_at desc limit 4`);
+  let added = 0;
+  for (const r of rows) {
+    if (Date.now() > deadline) break;
+    const free = await freePhoto(sql, { kicker: r.kicker, headline: r.headline, deck: r.deck, body: r.body, caption: "", model: "" }, r.id);
+    await sql.query(
+      `update stories set photo_tried = true, photo = coalesce($2::jsonb, photo), caption = coalesce($3, caption),
+          en = case when en is not null and $4::text is not null then jsonb_set(en, '{caption}', to_jsonb($4::text)) else en end,
+          hi = case when hi is not null and $5::text is not null then jsonb_set(hi, '{caption}', to_jsonb($5::text)) else hi end,
+          updated_at = case when $2::jsonb is not null then now() else updated_at end
+        where id = $1`,
+      [r.id, free ? JSON.stringify(free.photo) : null, free?.caption.gu ?? null, free?.caption.en ?? null, free?.caption.hi ?? null]);
+    if (free) { added++; log(`    ${r.id}: file photo, ${free.caption.en} (${free.photo.credit})`); }
+  }
+  if (added) await touched(sql);
+  return added;
 }
 
 /** Step 9: a published story's sources watched for 24 hours. */
@@ -156,6 +194,8 @@ try {
   await advance();
   log("writing:");
   await write();
+  log("photos:");
+  details.photos = await photos();
   await watch();
 } catch (e) {
   ok = false;

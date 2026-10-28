@@ -19,10 +19,15 @@ export const indiaDate = () => new Date(Date.now() + 5.5 * 3600_000).toISOString
 /** An official photo, made 1200 px wide, into the private photo store (the site serves it at /media/...). */
 export async function photoOf(sql: Sql, src: SourceText[], storyId: string): Promise<Photo | null> {
   const url = src.find((s) => s.official && s.image)?.image;
-  if (!url || !process.env.BLOB_READ_WRITE_TOKEN) return null;
+  return url ? storePhoto(sql, url, storyId) : null;
+}
+
+/** A photo fetched, made 1200 px wide and kept in the photo store; null when it's too small or the day's uploads are used up. */
+export async function storePhoto(sql: Sql, url: string, storyId: string, ua = UA): Promise<Photo | null> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
   if ((await count(sql, "upload", 0)) >= WEBSITE.dailyUploads) return null;
   try {
-    const res = await fetch(url, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(20_000) });
+    const res = await fetch(url, { headers: { "user-agent": ua }, signal: AbortSignal.timeout(20_000) });
     if (!res.ok) return null;
     const { data, info } = await sharp(Buffer.from(await res.arrayBuffer())).rotate()
       .resize({ width: 1200, withoutEnlargement: true }).jpeg({ quality: 78, mozjpeg: true }).toBuffer({ resolveWithObject: true });

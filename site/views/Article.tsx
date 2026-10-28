@@ -81,7 +81,7 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
                   <span className="phw"><img className="ph" src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline} /></span>
                 </ViewTransition>
               </PhotoZoom>
-              {w.caption && <figcaption>{w.caption} ({t(lang, "photo")}: {s.source?.name ?? "PIB"})</figcaption>}
+              {w.caption && <figcaption>{w.caption} ({t(lang, "photo")}: {s.photo?.credit ?? s.source?.name ?? "PIB"})</figcaption>}
             </figure>
           )}
           <div className="body">

@@ -63,8 +63,10 @@ sets a busy one aside for 10 minutes rather than retrying it):
    copied wording, then every claim by a **different** free model. One rewrite naming
    the problems; national and world stories get English and Hindi (numbers checked).
 5. **Publish** (`publish.ts`): live at once; **held** for the editor when sensitive or a
-   check failed, sent to Telegram with ✅/❌ (`lib/telegram.ts`). Photos only from official
-   sources. Each run renews the pages.
+   check failed, sent to Telegram with ✅/❌ (`lib/telegram.ts`). Photos from official
+   sources; when there's none, a file photo of the story's subject (a public figure, place
+   or thing) from Wikimedia Commons, free licence only, credited (`engine/wikiphoto.ts`);
+   the outlets' photos are never copied. Each run renews the pages.
 6. **Watch after**: for 24 hours, a source correcting or withdrawing takes the story down
    (held) and tells the editor; new sources are added to its source box.
 

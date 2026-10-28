@@ -64,6 +64,7 @@ export const SCHEMA = [
   `alter table stories add column if not exists hold_reason text`,
   `alter table stories add column if not exists hi jsonb`,                          // Hindi {kicker, headline, deck, body, caption}
   `alter table stories add column if not exists hi_status text not null default 'none'`, // none | done | failed
+  `alter table stories add column if not exists photo_tried boolean not null default false`, // a Commons file photo looked for (engine/wikiphoto.ts)
   `create index if not exists stories_live on stories (status, published_at desc)`,
   // each watched source's last answer, so a run asks only for what changed and stops asking a site that refuses us
   `create table if not exists sources_state (
