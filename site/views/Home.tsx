@@ -7,6 +7,7 @@ import { sectionName } from "../lib/sections.ts";
 import { dateText } from "../lib/format.ts";
 import { Cmp, Head, Join, LatestList, Lead, MostRead, Std } from "../components/cards.tsx";
 import Frame from "../components/Frame.tsx";
+import { PAPER } from "../lib/site.ts";
 
 const inSection = (s: Story, key: string) => s.tier === key || s.genres.includes(key as never);
 const BELOW = ["gujarat", "india", "farm", "economy", "tech", "health", "sport", "education", "entertainment"];
@@ -79,6 +80,8 @@ export default async function Home({ lang }: { lang: Lang }) {
 
   return (
     <Frame lang={lang} path="/" active="home">
+      {/* the page's name for screen readers and search engines (the wordmark above is a link) */}
+      <h1 className="vh">{PAPER[lang].name}: {PAPER[lang].tagline}</h1>
       {!lead ? <p className="empty">{t(lang, "empty")}</p> : (
         <>
           <div className="dateline"><span>{dateText(day!, lang, true)}</span><span className="upd">{t(lang, "updated")}</span></div>
