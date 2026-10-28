@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Lang } from "../lib/types.ts";
-import { Archive, Chev, Clock, CloseIcon, HomeIcon, MenuIcon, Paper, SearchIcon } from "./icons.tsx";
+import { Archive, Chev, Clock, CloseIcon, HomeIcon, LockIcon, MenuIcon, Paper, SearchIcon } from "./icons.tsx";
 
 export interface ChromeProps {
   lang: Lang;
@@ -15,7 +15,7 @@ export interface ChromeProps {
   sections: { key: string; name: string; href: string }[];
   links: { home: string; latest: string; epaper: string; archive: string; search: string; saved: string; about: string; how: string; policy: string; corrections: string; contact: string };
   words: Record<"menu" | "sections" | "search" | "close" | "epaper" | "home" | "latest" | "latestTitle" | "archive" | "searchPlaceholder" | "settings" |
-                 "size" | "language" | "services" | "about" | "savedTitle" | "fHow" | "fPolicy" | "fFix" | "fContact", string>;
+                 "size" | "language" | "services" | "about" | "savedTitle" | "fHow" | "fPolicy" | "fFix" | "fContact" | "editorPage", string>;
   /** the phone's bottom bar (articles have their own reading bar instead) */
   bottomBar: boolean;
   active?: "home" | "latest" | "epaper" | "archive";
@@ -137,6 +137,8 @@ export default function Chrome(p: ChromeProps) {
           <Link href={p.links.how}>{w.fHow}</Link><Link href={p.links.policy}>{w.fPolicy}</Link>
           <Link href={p.links.corrections}>{w.fFix}</Link><Link href={p.links.contact}>{w.fContact}</Link><Link href={p.links.about}>{w.about}</Link>
         </div>
+        {/* the editor's way in (the user, 29 Oct); the page itself asks for sign-in */}
+        <a className="edlink" href={p.lang === "en" ? "/editor?lang=en" : "/editor"}><LockIcon />{w.editorPage}</a>
       </aside>
 
       {p.bottomBar && (

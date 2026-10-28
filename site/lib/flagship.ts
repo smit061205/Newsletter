@@ -62,7 +62,7 @@ export const readMinutes = (body: string) => Math.max(1, Math.round(body.split(/
 export const FL_WORDS = {
   gu: {
     name: "આવતીકાલ", tagline: "AI, ટેક, વિજ્ઞાન અને રાજકારણ: આવતીકાલને ઘડતી વાતો",
-    home: "આવતીકાલ", daily: "કેપિટલ ક્રાંતિના સમાચાર", search: "શોધો", menu: "મેનુ", close: "બંધ કરો", look: "દેખાવ", lookAuto: "ફોન પ્રમાણે", lookLight: "આછો", lookDark: "ઘેરો", join: "WhatsApp",
+    home: "આવતીકાલ", daily: "કેપિટલ ક્રાંતિના સમાચાર", search: "શોધો", menu: "મેનુ", close: "બંધ કરો", look: "દેખાવ", editor: "સંપાદકનું પાનું", lookAuto: "ફોન પ્રમાણે", lookLight: "આછો", lookDark: "ઘેરો", join: "WhatsApp",
     joinTitle: "આવતીકાલ, તમારા ફોનમાં", joinText: "નવો લેખ આવે ત્યારે WhatsApp પર. મહિને થોડા, ધ્યાનથી લખેલા.", joinSoon: "ચેનલ ટૂંક સમયમાં",
     readMore: (b: string) => `${b} પર વધુ વાંચો.`, more: "વધુ લેખો", min: "મિનિટનું વાંચન", continue: "આગળ વાંચો",
     dive: "આવતીકાલના બધા લેખો", diveSub: "બધું વાંચો", writers: "કોણ લખે છે", seeAll: "બધા જુઓ",
@@ -75,7 +75,7 @@ export const FL_WORDS = {
   },
   en: {
     name: "Aavtikal", tagline: "AI, tech, science and politics: what shapes tomorrow",
-    home: "Aavtikal", daily: "Capital Kranti news", search: "Search", menu: "Menu", close: "Close", look: "Appearance", lookAuto: "Match phone", lookLight: "Light", lookDark: "Dark", join: "WhatsApp",
+    home: "Aavtikal", daily: "Capital Kranti news", search: "Search", menu: "Menu", close: "Close", look: "Appearance", editor: "Editor’s page", lookAuto: "Match phone", lookLight: "Light", lookDark: "Dark", join: "WhatsApp",
     joinTitle: "Aavtikal on your phone", joinText: "A message on WhatsApp when a new article is out. A few a month, written with care.", joinSoon: "Channel coming soon",
     readMore: (b: string) => `Read more on ${b}.`, more: "More articles", min: "min read", continue: "Continue reading",
     dive: "Every Aavtikal article", diveSub: "Read them all", writers: "Who writes", seeAll: "See all",
@@ -88,7 +88,7 @@ export const FL_WORDS = {
   },
   hi: {
     name: "आवतीकाल", tagline: "AI, टेक, विज्ञान और राजनीति: जो कल को गढ़ते हैं",
-    home: "आवतीकाल", daily: "कैपिटल क्रांति समाचार", search: "खोजें", menu: "मेनू", close: "बंद करें", look: "रूप", lookAuto: "फ़ोन के अनुसार", lookLight: "हल्का", lookDark: "गहरा", join: "WhatsApp",
+    home: "आवतीकाल", daily: "कैपिटल क्रांति समाचार", search: "खोजें", menu: "मेनू", close: "बंद करें", look: "रूप", editor: "संपादक का पन्ना", lookAuto: "फ़ोन के अनुसार", lookLight: "हल्का", lookDark: "गहरा", join: "WhatsApp",
     joinTitle: "आवतीकाल आपके फ़ोन में", joinText: "नया लेख आने पर WhatsApp पर संदेश। महीने में कुछ ही, ध्यान से लिखे हुए।", joinSoon: "चैनल जल्द ही",
     readMore: (b: string) => `${b} पर और पढ़ें।`, more: "और लेख", min: "मिनट का पाठ", continue: "आगे पढ़ें",
     dive: "आवतीकाल के सभी लेख", diveSub: "सब पढ़ें", writers: "कौन लिखता है", seeAll: "सब देखें",
