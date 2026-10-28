@@ -32,13 +32,25 @@ You get a numbered list of new items from news sources (Gujarati, Hindi or Engli
   meetings, reviews, courtesy calls, visits without a decision, greetings and condolence messages, book fairs, exhibitions, workshops,
   webinars, newsletters, "to visit"/"to inaugurate" announcements of minor events. A decision, a new scheme, money, a result, or a number
   that affects people is news.
-- tier: "gujarat" (about Gujarat), "india" (national), or "world" (other countries, or India abroad).
+- tier: "gujarat" ONLY when the event happens in Gujarat or is about Gujarat's government, people or places; "india" for national news and
+  for news from any other state or city (Mumbai, Delhi, Rajasthan... are "india", even when a Gujarati outlet reports them);
+  "world" for other countries, or India abroad.
 - genres: up to 2 of "farm","economy","tech","health","sport","education","entertainment"; [] if none fit.
 - sensitive: true for deaths, accidents, crime, violence, communal matters, sexual offences, allegations against named people, health scares; else false.
 - event: ONE short English line naming the specific event: who did what, where (e.g. "Gujarat cabinet approves ₹2,000 crore Narmada canal repair").
 - keys: 4-8 lowercase English keywords for that event: the people, places, organisations, numbers (e.g. ["gujarat","cabinet","narmada","canal","2000 crore"]).
 - debunk: ONLY for items marked factcheck: the false claim it debunks, in one English line; else "".
 Reply with JSON only: {"items":[{"i":1,"score":0,"tier":"india","genres":[],"sensitive":false,"event":"","keys":[],"debunk":""}, ...]} with one entry for every item.`;
+
+// The model sometimes files a Gujarati outlet's news from elsewhere under Gujarat (29 Oct: Mumbai's
+// airport). A "gujarat" event that names a place outside Gujarat and no place in it is national news.
+const GUJARAT = /\b(gujarat|ahmedabad|gandhinagar|surat|vadodara|baroda|rajkot|bhavnagar|jamnagar|junagadh|kutch|kachchh|bhuj|anand|nadiad|kheda|mehsana|patan|palanpur|banaskantha|sabarkantha|himmatnagar|panchmahal|godhra|dahod|bharuch|ankleshwar|valsad|vapi|navsari|tapi|dang|narmada|kevadia|ekta nagar|statue of unity|porbandar|dwarka|somnath|gir|amreli|botad|morbi|surendranagar|dholera|mundra|kandla|saurashtra|sabarmati|aravalli|modasa|mahisagar|chhota udepur|gift city|sanand|halol|diu|daman)\b/i;
+const ELSEWHERE = /\b(maharashtra|mumbai|pune|nagpur|thane|delhi|rajasthan|jaipur|udaipur|madhya pradesh|bhopal|indore|uttar pradesh|lucknow|noida|ayodhya|varanasi|bihar|patna|karnataka|bengaluru|bangalore|tamil nadu|chennai|kerala|kochi|west bengal|kolkata|telangana|hyderabad|andhra|punjab|chandigarh|haryana|gurugram|goa|odisha|assam|jharkhand|chhattisgarh|uttarakhand|himachal|kashmir|srinagar|ladakh|manipur|mizoram|nagaland|meghalaya|tripura|sikkim|arunachal)\b/i;
+export function placeTier(tier: Tier, event: string, keys: string[]): Tier {
+  if (tier !== "gujarat") return tier;
+  const text = `${event} ${keys.join(" ")}`;
+  return ELSEWHERE.test(text) && !GUJARAT.test(text) ? "india" : tier;
+}
 
 function checkBatch(n: number) {
   return (v: unknown): Map<number, Triage> | null => {
@@ -51,7 +63,7 @@ function checkBatch(n: number) {
       const keys = (Array.isArray(x.keys) ? x.keys : []).map((k) => String(k).toLowerCase().trim()).filter(Boolean).slice(0, 10);
       out.set(i, {
         score: Math.max(0, Math.min(10, Number(x.score) || 0)),
-        tier: TIERS.includes(x.tier as Tier) ? (x.tier as Tier) : "india",
+        tier: placeTier(TIERS.includes(x.tier as Tier) ? (x.tier as Tier) : "india", String(x.event ?? ""), keys),
         genres: (Array.isArray(x.genres) ? x.genres : []).filter((g): g is Genre => GENRES.includes(g as Genre)).slice(0, 2),
         sensitive: x.sensitive === true,
         event: String(x.event ?? "").slice(0, 200),
