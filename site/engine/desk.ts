@@ -21,7 +21,7 @@ import type { Figure, L3 } from "../lib/flagship.ts";
 import { ensureSchema } from "../lib/schema.ts";
 import type { Photo } from "../lib/types.ts";
 import { touched } from "../lib/write.ts";
-import { askGemini, askJson, geminiLeft } from "./ai.ts";
+import { askGemini, askJson, geminiLeft, geminiRemaining } from "./ai.ts";
 import { parseFeed, pageText } from "./feed.ts";
 import { ask } from "./fetch.ts";
 import { indiaDate, storePhoto } from "./publish.ts";
@@ -431,7 +431,7 @@ const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+
 /** Which beat needs an article most: the day's target shared about 4 : 3 : 3 between AI, Tech and Science. */
 async function beatToday(sql: Sql, date: string, target: number): Promise<Beat | null> {
   const rows = await sql.query(
-    `select beat, count(*)::int as n from features where author = 'desk' and status <> 'withdrawn'
+    `select beat, count(*)::int as n from features where author = 'desk' and status = 'published'
        and (created_at at time zone 'Asia/Kolkata')::date = $1::date group by beat`, [date]);
   const have = Object.fromEntries(rows.map((r) => [r.beat, r.n as number])) as Record<string, number>;
   const done = Object.values(have).reduce((a, b) => a + b, 0);
@@ -523,21 +523,18 @@ async function make(sql: Sql, subj: Subject, id: string, date: string, log: (s: 
 const sourcesJson = (src: Source[]) => JSON.stringify(src.map((s) => ({ name: s.name, url: s.url, trust: s.official ? "official" : "outlet" })));
 const madeLine = (m: Made) => `${m.words} words, ${m.figs.length} figure(s) (${m.figs.filter((g) => g.kind === "image").length} pictures), a photo${m.en ? ", English" : ""}${m.hi ? ", Hindi" : ""}`;
 
-async function oneArticle(sql: Sql, log: (s: string) => void): Promise<Outcome> {
-  const date = indiaDate();
-  const target = WEBSITE.deskDays[date] ?? WEBSITE.deskDaily;
-  const beat = await beatToday(sql, date, target);
-  if (!beat) { log(`today's ${target} articles are done`); return "done"; }
-  if (!(await geminiLeft(sql, "writer"))) { log("Gemini Flash's free requests for today are used up"); return "stop"; }
+const LASTING = (beat: Beat) => `You are the editor of Aavtikal, a Gujarati magazine of deep explainers. Today's news gave no subject for its
+${beat.toUpperCase()} section (${BEAT_WORDS[beat]}), so choose ONE lasting explainer subject Indian readers would value: an important
+technology, scientific idea, machine, mission, discovery or famous model, one with a solid English Wikipedia article full of facts and
+numbers. Never politics, a company's business, or a subject already covered (listed under COVERED).
+Give the subject in one English line and the exact titles of 1 or 2 English Wikipedia articles on it.
+Reply with JSON only: {"topic":"","wiki":[""]}`;
 
-  // 1. the subject: nothing already written about (its pages not read again, its subject not repeated)
+/** Today's news subject for a beat: nothing already written about (its pages not read again, its subject not repeated). */
+async function newsSubject(sql: Sql, beat: Beat, covered: string[], log: (s: string) => void): Promise<Subject | "stop" | null> {
   const usedUrls = new Set((await sql.query(
     `select jsonb_array_elements(sources)->>'url' as u from features where created_at > now() - interval '30 days' and status <> 'withdrawn'`)).map((r) => r.u as string));
   const list = (await leads(sql, beat)).filter((l) => !usedUrls.has(l.url)).map((l, i) => ({ ...l, n: i + 1 }));
-  const covered = [
-    ...(await sql.query(`select coalesce(topic, headline) as t from features where created_at > now() - interval '30 days' and status <> 'withdrawn' order by created_at desc limit 80`)).map((r) => r.t as string),
-    ...(await stateList(sql, "desk_skipped")),
-  ];
   const pick = await askJson(sql, {
     system: PICK(beat),
     user: `ITEMS:\n${list.map((l) => `${l.n}. [${l.from}${l.official ? ", official" : ""}, ${l.at.slice(0, 10)}] ${l.title} -- ${l.summary}`).join("\n")}\n\nCOVERED:\n${covered.join("\n") || "(nothing yet)"}`,
@@ -547,29 +544,73 @@ async function oneArticle(sql: Sql, log: (s: string) => void): Promise<Outcome> 
     const wiki = (Array.isArray(x?.wiki) ? x.wiki : [x?.wiki]).map((w) => String(w ?? "").trim()).filter(Boolean).slice(0, 2);
     return Array.isArray(x?.pick) ? { pick: x.pick.map(Number).filter((n) => n >= 1 && n <= list.length), topic: String(x.topic ?? ""), wiki } : null;
   });
-  if (!pick.ok) { log(`${beat}: no subject picked (${pick.why.slice(0, 120)})`); return pick.stop ? "stop" : "skipped"; }
-  if (!pick.value.pick.length || !pick.value.topic) { log(`${beat}: nothing today deserves an explainer`); return "skipped"; }
+  if (!pick.ok) { log(`${beat}: no subject picked (${pick.why.slice(0, 120)})`); return pick.stop ? "stop" : null; }
+  if (!pick.value.pick.length || !pick.value.topic) { log(`${beat}: nothing in today's news deserves an explainer`); return null; }
   const topic = pick.value.topic.slice(0, 200);
   log(`${beat}: ${topic}`);
   const twin = await alreadyCovered(sql, topic, covered);
-  if (twin) { log(`  already written: ${twin}`); await addToList(sql, "desk_skipped", topic); return "skipped"; }
+  if (twin) { log(`  already written: ${twin}`); await addToList(sql, "desk_skipped", topic); return null; }
+  return { beat, topic, wiki: pick.value.wiki, leads: pick.value.pick.map((n) => list[n - 1]) };
+}
 
-  let id = slug(topic);
+/** A lasting subject from Wikipedia, when the news gave none (the user, 29 Oct: ten new articles every day, without fail). */
+async function lastingSubject(sql: Sql, beat: Beat, covered: string[], log: (s: string) => void): Promise<Subject | "stop" | null> {
+  const res = await askJson(sql, { system: LASTING(beat), user: `COVERED:\n${covered.join("\n") || "(nothing yet)"}`, maxTokens: 300 }, (v) => {
+    const x = v as { topic?: string; wiki?: unknown[] };
+    const wiki = (Array.isArray(x?.wiki) ? x.wiki : []).map((w) => String(w ?? "").trim()).filter(Boolean).slice(0, 2);
+    return x?.topic && wiki.length ? { topic: String(x.topic).slice(0, 200), wiki } : null;
+  });
+  if (!res.ok) { log(`${beat}: no lasting subject (${res.why.slice(0, 120)})`); return res.stop ? "stop" : null; }
+  log(`${beat} (a lasting subject): ${res.value.topic}`);
+  const twin = await alreadyCovered(sql, res.value.topic, covered);
+  if (twin) { log(`  already written: ${twin}`); await addToList(sql, "desk_skipped", res.value.topic); return null; }
+  return { beat, topic: res.value.topic, wiki: res.value.wiki, leads: [] };
+}
+
+/** An article written on a subject and put in: published when it checks out, else held for the editor. */
+async function writeUp(sql: Sql, subj: Subject, date: string, log: (s: string) => void): Promise<Outcome> {
+  let id = slug(subj.topic);
   if ((await sql.query(`select 1 from features where id = $1`, [id])).length) id = `${id}-${date.slice(5).replace("-", "")}`;
-  const m = await make(sql, { beat, topic, wiki: pick.value.wiki, leads: pick.value.pick.map((n) => list[n - 1]) }, id, date, log);
+  const m = await make(sql, subj, id, date, log);
   if (m === "stop") return "stop";
-  if (typeof m === "string") { if (m !== "skipped") await addToList(sql, "desk_skipped", topic); return "skipped"; }
-
+  if (typeof m === "string") { if (m !== "skipped") await addToList(sql, "desk_skipped", subj.topic); return "skipped"; }
   const status = m.problems.length ? "held" : "published";
   await sql.query(
     `insert into features (id, beat, status, headline, dek, body, caption, photo, author, en, hi, sources, checks, figures, topic, published_at, updated_at)
      values ($1, $2, $3, $4, $5, $6, $7, $8, 'desk', $9, $10, $11, $12, $13, $14, case when $3 = 'published' then now() end, now())`,
-    [id, beat, status, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo),
+    [id, subj.beat, status, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo),
      m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null, sourcesJson(m.sources),
-     JSON.stringify({ problems: m.problems, writer: m.model, words: m.words }), JSON.stringify(m.figs), topic]);
+     JSON.stringify({ problems: m.problems, writer: m.model, words: m.words }), JSON.stringify(m.figs), subj.topic]);
   await touched(sql);
   log(`  ${status}: ${id} (${madeLine(m)})${m.problems.length ? `: ${m.problems.slice(0, 2).join("; ")}` : ""}`);
   return status;
+}
+
+/** How many of today's articles are still to be published (held ones don't count: the day's ten go up, 29 Oct). */
+async function stillToday(sql: Sql, date: string): Promise<number> {
+  const [r] = await sql.query(`select count(*)::int as n from features where author = 'desk' and status = 'published'
+    and (created_at at time zone 'Asia/Kolkata')::date = $1::date`, [date]);
+  return Math.max(0, (WEBSITE.deskDays[date] ?? WEBSITE.deskDaily) - (r.n as number));
+}
+
+/** One of today's articles: from the news if it has a subject worth it, else a lasting subject. */
+async function oneArticle(sql: Sql, log: (s: string) => void): Promise<Outcome> {
+  const date = indiaDate();
+  const target = WEBSITE.deskDays[date] ?? WEBSITE.deskDaily;
+  const beat = await beatToday(sql, date, target);
+  if (!beat) { log(`today's ${target} articles are done`); return "done"; }
+  if (!(await geminiLeft(sql, "writer"))) { log("Gemini Flash's free requests for today are used up"); return "stop"; }
+  const covered = [
+    ...(await sql.query(`select coalesce(topic, headline) as t from features where created_at > now() - interval '60 days' and status <> 'withdrawn' order by created_at desc limit 120`)).map((r) => r.t as string),
+    ...(await stateList(sql, "desk_skipped")),
+  ];
+  const news = await newsSubject(sql, beat, covered, log);
+  if (news === "stop") return "stop";
+  const r = news ? await writeUp(sql, news, date, log) : "skipped";
+  if (r !== "skipped") return r;
+  const lasting = await lastingSubject(sql, beat, covered, log);
+  if (lasting === "stop") return "stop";
+  return lasting ? writeUp(sql, lasting, date, log) : "skipped";
 }
 
 // ---- the older articles written again to today's standard (the user, 29 Oct) ----
@@ -654,6 +695,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     let newDone = false, oldDone = false;
     while (deadline - Date.now() > 8 * 60_000 && !(newDone && oldDone)) {
       // the older articles first (the user, 29 Oct: "trigger rewriting now"), then the day's new ones
+      // a rewrite only with writing requests to spare beyond today's articles (and a few for failed tries)
+      if (!oldDone && (await geminiRemaining(sql, "writer")) <= (await stillToday(sql, indiaDate())) + 4) oldDone = true;
       if (!oldDone) {
         const r = await redoOne(sql, log);
         if (r === "stop") break;

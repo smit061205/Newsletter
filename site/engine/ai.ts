@@ -234,6 +234,12 @@ async function geminiNext(sql: Sql, pool: GeminiPool): Promise<string | null> {
   }
   return null;
 }
+/** how many of a pool's requests are left today */
+export async function geminiRemaining(sql: Sql, pool: GeminiPool): Promise<number> {
+  let n = 0;
+  for (const m of await geminiModels(pool)) if (!spent.has(m.id)) n += Math.max(0, m.daily - (await count(sql, geminiCounter(m.id), 0)));
+  return n;
+}
 /** whether a pool has a request left today */
 export const geminiLeft = async (sql: Sql, pool: GeminiPool) => (await geminiNext(sql, pool)) !== null;
 
