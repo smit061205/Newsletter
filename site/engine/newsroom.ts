@@ -64,7 +64,8 @@ export function importance(maxScore: number, tier: Tier, groups: number, officia
   return Math.round((maxScore * weight + Math.log2(Math.max(1, groups)) * 0.8 + (official ? 0.4 : 0)) * 10) / 10;
 }
 export const levelOf = (imp: number): Level | null => (imp >= 9.5 ? "lead" : imp >= 7.5 ? "top" : imp >= 5 ? "normal" : imp >= 3 ? "brief" : null);
-const WORDS: Record<Level, [number, number]> = { lead: [300, 450], top: [300, 450], normal: [150, 250], brief: [60, 100] };
+// longer, like the sources themselves (the user, 29 Oct: "can't it have the original length?")
+const WORDS: Record<Level, [number, number]> = { lead: [450, 700], top: [400, 600], normal: [250, 400], brief: [100, 160] };
 
 // ---- gathering the facts ----
 
@@ -161,6 +162,9 @@ export async function check(sql: Sql | null, w: Written, src: SourceText[], date
   const wrong = numbersNotIn(text, all, date);
   if (wrong.length) problems.push(`numbers not in any source: ${wrong.join(", ")}`);
   if (repeats(w.body)) problems.push("says the same thing twice");
+  // letters from another script inside the Gujarati (29 Oct: Telugu letters mid-sentence) are a model's slip
+  const stray = `${w.headline} ${w.deck} ${w.body}`.match(/[\u0900-\u097F\u0980-\u0A7F\u0B00-\u0DFF_]+/g);
+  if (stray) problems.push(`letters from another script: ${[...new Set(stray)].slice(0, 3).join(", ")}`);
   for (const s of src.filter((s) => s.source.lang === "gu")) {
     const share = copiedShare(w.body, s.text);
     if (share > 0.12) problems.push(`copies ${Math.round(share * 100)}% of ${s.source.name}'s wording`);
