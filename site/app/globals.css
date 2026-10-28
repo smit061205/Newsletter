@@ -118,7 +118,8 @@ main{padding-block:8px 48px}
 /* the rail takes the stories' height, not its own: its list is laid out in a column that
    wraps, so a headline that doesn't fit whole moves to a second column out of sight */
 .rail .fit{position:absolute;inset:0;display:flex;flex-direction:column}
-.rail .fit > .list{flex:1 1 0;min-height:0;display:flex;flex-flow:column wrap;overflow:hidden;column-gap:var(--gut)}
+.rail .fit > .list{flex:1 1 0;min-height:0;display:flex;flex-flow:column wrap;overflow:hidden;column-gap:var(--gut);padding-left:8px;margin-left:-8px}
+/* the 8px on the left are room for the live dot's ring, which the clip would cut (the user, 29 Oct) */
 .rail .fit > .list > li{width:100%}
 .rail .fit > .more{padding-bottom:0;border-top:1px solid var(--rule)}
 
