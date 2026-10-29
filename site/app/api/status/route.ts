@@ -47,6 +47,7 @@ export async function GET() {
       late_minutes: r.scheduled_for ? Math.round((Date.parse(r.started_at) - Date.parse(r.scheduled_for)) / 60000) : null,
       sources: (r.details?.sources ?? []).map((s: { name: string; status: number; items?: number; ms: number }) => ({ name: s.name, status: s.status, items: s.items, ms: s.ms })),
       stories: r.details?.stories ?? null, done: r.details?.done, error: r.details?.error,
+      ...(r.kind === "engine" ? { steps: r.details?.steps ?? null, log: (r.details?.log ?? []).slice(-40) } : {}),
     })),
   }, { headers: { "cache-control": "no-store" } });
 }

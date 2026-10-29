@@ -241,7 +241,8 @@ export async function translate(sql: Sql | null, w: Written, lang: "en" | "hi", 
     };
     // Gemini Flash Lite first (29 Oct: a Gemma's 16,000 tokens a minute is shared with the writing and checking, and
     // made the engine's rounds run past their time), a Gemma when it can't
-    const res = sql ? await askGemini(sql, "lite", a, take).then((r) => (r.ok ? r : askJson(sql, a, take))) : await askJson(sql, a, take);
+    // never waiting on it: when it's busy (the desk shares its 15 requests a minute) the others at once
+    const res = sql ? await askGemini(sql, "lite", a, take, { wait: false, timeoutMs: 90_000 }).then((r) => (r.ok ? r : askJson(sql, a, take))) : await askJson(sql, a, take);
     if (!res.ok) return null;
     const out = res.value;
     const wrong = numbersNotIn([out.kicker, out.headline, out.deck, out.body, out.caption].join("\n\n"), source, date);
