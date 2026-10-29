@@ -55,7 +55,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .wm b{font-family:var(--ui);font-weight:800;font-stretch:112%;font-size:27px;line-height:1;letter-spacing:.2px}
 .wm i{display:none;font-style:normal;font-size:14px;color:var(--muted)}
 .epill{display:none;background:var(--navy);color:var(--on-navy);border-radius:999px;padding:9px 18px;font-weight:700;font-size:15px}
-.epill{transition:transform .15s ease,filter .15s ease,box-shadow .2s ease}.epill:hover{filter:brightness(1.08);box-shadow:0 6px 18px -8px var(--navy)}.epill:active{transform:scale(.96)}
+/* no glow on hover (the user, 29 Oct): just a little brighter */
+.epill{transition:transform .15s ease,filter .15s ease}.epill:hover{filter:brightness(1.08)}.epill:active{transform:scale(.96)}
 @media (min-width:1024px){ .bar{height:68px} .top.scrolled .bar{height:58px} .wm b{font-size:34px;transition:font-size .25s ease} .top.scrolled .wm b{font-size:30px} .wm i{display:inline} .ib.lbl{display:grid} .ib.menu-plain{display:none} .epill{display:inline-block} }
 @media (min-width:740px) and (max-width:1023px){ .epill{display:inline-block} }
 
