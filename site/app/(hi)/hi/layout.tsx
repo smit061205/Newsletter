@@ -14,7 +14,7 @@ const head = Hind_Vadodara({ subsets: ["gujarati", "latin"], weight: ["500", "60
 
 export default function Layout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="hi" className={`${uiHi.variable} ${serifHi.variable} ${ui.variable} ${serif.variable} ${headHi.variable} ${head.variable}`} suppressHydrationWarning>
+    <html lang="hi" data-scroll-behavior="smooth" className={`${uiHi.variable} ${serifHi.variable} ${ui.variable} ${serif.variable} ${headHi.variable} ${head.variable}`} suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: PREPAINT }} /></head>
       <body suppressHydrationWarning>{children}</body>
     </html>

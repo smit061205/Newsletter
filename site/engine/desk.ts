@@ -683,7 +683,7 @@ async function newsSubject(sql: Sql, beat: Beat, covered: string[], log: (s: str
   return { beat, topic, wiki: pick.value.wiki, leads: pick.value.pick.map((n) => list[n - 1]) };
 }
 
-/** A lasting subject from Wikipedia, when the news gave none (the user, 29 Oct: ten new articles every day, without fail). */
+/** A lasting subject from Wikipedia, when the news gave none (the user, 29 Oct: the day's articles every day, without fail; 15 from 30 Oct). */
 async function lastingSubject(sql: Sql, beat: Beat, covered: string[], log: (s: string) => void): Promise<Subject | "stop" | null> {
   const res = await askJson(sql, { system: LASTING(beat), user: `COVERED:\n${covered.join("\n") || "(nothing yet)"}`, maxTokens: 300 }, (v) => {
     const x = v as { topic?: string; wiki?: unknown[] };
