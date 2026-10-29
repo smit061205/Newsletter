@@ -143,7 +143,7 @@ function Fig({ g, lang }: { g: Figure; lang: Lang }) {
   if (g.kind === "image" && g.photo) return (
     <figure className={s.fig}>
       <img src={g.photo.url} width={g.photo.width} height={g.photo.height} alt={T(g.title)} loading="lazy" />
-      <figcaption className={s.figCap}>{T(g.title)}{g.photo.credit && <span> ({g.photo.credit})</span>}</figcaption>
+      {(T(g.title) || g.photo.credit) && <figcaption className={s.figCap}>{T(g.title)}{g.photo.credit && <span> ({g.photo.credit})</span>}</figcaption>}
     </figure>
   );
   if (g.kind === "bar" && g.rows?.length) {

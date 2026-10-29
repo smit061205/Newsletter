@@ -3,17 +3,19 @@
 // sub-heading and story, photos from the phone (made smaller here, then kept by app/api/editor/photo) and the main
 // photo's caption; AI help if wanted (undone with one button); "Put on the site" puts it up at once, word for word.
 // The unfinished words are kept on the phone, so a lost connection or a closed page loses nothing.
+// The same page writes an Aavtikal article (kind "aavtikal"): its section instead of where the news is from, "## " for
+// sub-headings, and it goes into Aavtikal under the editor's name (lib/editor.ts, addFeature).
 import { useEffect, useRef, useState } from "react";
 import s from "./editor.module.css";
 import { W } from "./words.ts";
-import { aiHelp, writeStory } from "./actions.ts";
+import { aiHelp, writeFeature, writeStory } from "./actions.ts";
 import type { Draft } from "@/lib/aihelp.ts";
 import { GENRES, TIERS, sectionName } from "@/lib/sections.ts";
 import type { Genre, Tier } from "@/lib/types.ts";
 
 type Shot = { key: string; preview: string; state: "up" | "ok" | "bad"; url?: string; width?: number; height?: number; blob?: Blob };
-type Kept = { headline: string; deck: string; body: string; caption: string; tier: Tier; genre: Genre | ""; photos: { url: string; width: number; height: number }[] };
-const KEEP = "ck_write_draft";
+type Beat = "ai" | "tech" | "science" | "politics";
+type Kept = { headline: string; deck: string; body: string; caption: string; tier: Tier; genre: Genre | ""; beat?: Beat; photos: { url: string; width: number; height: number }[] };
 const LONG = 1600;
 
 /** a phone's photo made at most 1,600 pixels on its long side, as a JPEG */
@@ -30,14 +32,18 @@ async function smaller(file: File): Promise<{ blob: Blob; width: number; height:
   return { blob, width, height };
 }
 
-export default function Write({ lang, back }: { lang: "gu" | "en"; back: string }) {
+export default function Write({ lang, back, kind = "news", beats = [] }:
+  { lang: "gu" | "en"; back: string; kind?: "news" | "aavtikal"; beats?: { key: Beat; name: string }[] }) {
   const w = W[lang];
+  const av = kind === "aavtikal";
+  const KEEP = av ? "ck_write_article" : "ck_write_draft";
   const [headline, setHeadline] = useState("");
   const [deck, setDeck] = useState("");
   const [body, setBody] = useState("");
   const [caption, setCaption] = useState("");
   const [tier, setTier] = useState<Tier>("gujarat");
   const [genre, setGenre] = useState<Genre | "">("");
+  const [beat, setBeat] = useState<Beat>("ai");
   const [shots, setShots] = useState<Shot[]>([]);
   const [kept, setKept] = useState(false);
   const [ai, setAi] = useState<{ state: "idle" | "working" | "done" | "said"; say?: string; before?: Draft }>({ state: "idle" });
@@ -54,17 +60,18 @@ export default function Write({ lang, back }: { lang: "gu" | "en"; back: string 
         setHeadline(k.headline ?? ""); setDeck(k.deck ?? ""); setBody(k.body ?? ""); setCaption(k.caption ?? "");
         if (TIERS.includes(k.tier)) setTier(k.tier);
         setGenre(GENRES.includes(k.genre as Genre) ? (k.genre as Genre) : "");
+        if (k.beat && beats.some((b) => b.key === k.beat)) setBeat(k.beat);
         setShots((k.photos ?? []).map((p, i) => ({ key: `kept-${i}`, preview: p.url, state: "ok", ...p })));
         setKept(true);
       }
     } catch { /* nothing kept */ }
     loaded.current = true;
-  }, []);
+  }, [KEEP, beats]);
   useEffect(() => {
     if (!loaded.current) return;
     const photos = shots.filter((x) => x.state === "ok" && x.url).map((x) => ({ url: x.url!, width: x.width!, height: x.height! }));
-    try { localStorage.setItem(KEEP, JSON.stringify({ headline, deck, body, caption, tier, genre, photos } satisfies Kept)); } catch { /* not kept */ }
-  }, [headline, deck, body, caption, tier, genre, shots]);
+    try { localStorage.setItem(KEEP, JSON.stringify({ headline, deck, body, caption, tier, genre, beat, photos } satisfies Kept)); } catch { /* not kept */ }
+  }, [KEEP, headline, deck, body, caption, tier, genre, beat, shots]);
 
   const change = (key: string, x: Partial<Shot>) => setShots((all) => all.map((y) => (y.key === key ? { ...y, ...x } : y)));
   async function send(key: string, blob: Blob, width: number, height: number) {
@@ -92,11 +99,11 @@ export default function Write({ lang, back }: { lang: "gu" | "en"; back: string 
   const drop = (key: string) => setShots((all) => all.filter((x) => x.key !== key));
 
   async function askAi() {
-    if (!body.trim()) { setAi({ state: "said", say: w.aiNeedsText }); return; }
+    if (!body.trim()) { setAi({ state: "said", say: av ? w.avAiNeedsText : w.aiNeedsText }); return; }
     const before = { headline, deck, body };
     setAi({ state: "working" });
     try {
-      const r = await aiHelp(before);
+      const r = await aiHelp(before, av ? "article" : "news");
       if (r.ok) {
         setHeadline(r.draft.headline); setDeck(r.draft.deck); setBody(r.draft.body);
         setAi({ state: "done", before });
@@ -116,41 +123,55 @@ export default function Write({ lang, back }: { lang: "gu" | "en"; back: string 
     setPutting(true);
     try {
       const photos = shots.filter((x) => x.state === "ok" && x.url).map((x) => ({ url: x.url!, width: x.width!, height: x.height! }));
-      const r = await writeStory({ headline, deck, body, caption, tier, genre: genre || null, photos });
+      const r = av ? await writeFeature({ headline, deck, body, caption, beat, photos })
+        : await writeStory({ headline, deck, body, caption, tier, genre: genre || null, photos });
       if ("id" in r) {
         try { localStorage.removeItem(KEEP); } catch { /* gone with the page */ }
-        location.assign(`/editor?${back ? `${back}&` : ""}written=${encodeURIComponent(r.id)}#news`);
+        location.assign(`/editor?${back ? `${back}&` : ""}${av ? "wrote" : "written"}=${encodeURIComponent(r.id)}#${av ? "aavtikal" : "news"}`);
         return;
       }
-      setProblem(r.error === "missing" ? w.missing : w.failedPut);
-    } catch { setProblem(w.failedPut); }
+      setProblem(r.error === "missing" ? w.missing : av ? w.avFailedPut : w.failedPut);
+    } catch { setProblem(av ? w.avFailedPut : w.failedPut); }
     setPutting(false);
   }
 
   return (
     <div className={s.form}>
-      <p className={s.help}>{w.writeIntro}</p>
+      <p className={s.help}>{av ? w.avWriteIntro : w.writeIntro}</p>
       {kept && <p className={s.done} role="status">{w.draftKept}</p>}
 
-      <fieldset className={s.pick}>
-        <legend>{w.where}</legend>
-        <div className={s.pills}>
-          {TIERS.map((t) => (
-            <label key={t}><input type="radio" name="tier" value={t} checked={tier === t} onChange={() => setTier(t)} /><span>{sectionName(t, lang)}</span></label>
-          ))}
-        </div>
-      </fieldset>
-      <label>{w.topic}
-        <select className={s.select} value={genre} onChange={(e) => setGenre(e.target.value as Genre | "")}>
-          <option value="">{w.noTopic}</option>
-          {GENRES.map((g) => <option key={g} value={g}>{sectionName(g, lang)}</option>)}
-        </select>
-      </label>
+      {av ? (
+        <fieldset className={s.pick}>
+          <legend>{w.beat}</legend>
+          <div className={s.pills}>
+            {beats.map((b) => (
+              <label key={b.key}><input type="radio" name="beat" value={b.key} checked={beat === b.key} onChange={() => setBeat(b.key)} /><span>{b.name}</span></label>
+            ))}
+          </div>
+        </fieldset>
+      ) : (
+        <>
+          <fieldset className={s.pick}>
+            <legend>{w.where}</legend>
+            <div className={s.pills}>
+              {TIERS.map((t) => (
+                <label key={t}><input type="radio" name="tier" value={t} checked={tier === t} onChange={() => setTier(t)} /><span>{sectionName(t, lang)}</span></label>
+              ))}
+            </div>
+          </fieldset>
+          <label>{w.topic}
+            <select className={s.select} value={genre} onChange={(e) => setGenre(e.target.value as Genre | "")}>
+              <option value="">{w.noTopic}</option>
+              {GENRES.map((g) => <option key={g} value={g}>{sectionName(g, lang)}</option>)}
+            </select>
+          </label>
+        </>
+      )}
 
       <label>{w.headline}<textarea rows={2} className={s.hl} value={headline} onChange={(e) => setHeadline(e.target.value)} /></label>
       <label>{w.deck}<textarea rows={2} value={deck} onChange={(e) => setDeck(e.target.value)} /></label>
-      <label>{w.body}<span className={s.help}>{w.bodyHelp}</span>
-        <textarea rows={14} className={s.bodyBox} value={body} onChange={(e) => setBody(e.target.value)} /></label>
+      <label>{av ? w.avBody : w.body}<span className={s.help}>{av ? w.avBodyHelp : w.bodyHelp}</span>
+        <textarea rows={av ? 22 : 14} className={s.bodyBox} value={body} onChange={(e) => setBody(e.target.value)} /></label>
 
       <div className={s.aiBox}>
         <button type="button" className={s.ghost} onClick={askAi} disabled={ai.state === "working"}>{ai.state === "working" ? w.aiWorking : w.aiHelp}</button>
@@ -160,7 +181,7 @@ export default function Write({ lang, back }: { lang: "gu" | "en"; back: string 
 
       <fieldset className={s.pick}>
         <legend>{w.photos}</legend>
-        <p className={s.help}>{w.photosHelp}</p>
+        <p className={s.help}>{av ? w.avPhotosHelp : w.photosHelp}</p>
         {shots.length > 0 && (
           <ul className={s.shots}>
             {shots.map((x, i) => (
