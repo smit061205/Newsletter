@@ -700,8 +700,9 @@ async function oneArticle(sql: Sql, log: (s: string) => void): Promise<Outcome> 
 
 // ---- the older articles written again to today's standard (the user, 29 Oct) ----
 
-/** the older articles tried (a second list from 29 Oct: the first round fell to Google's busy hour and a too-strict check) */
-const REDONE = "desk_redone_2";
+/** the older articles tried (a third list from 29 Oct: the first fell to Google's busy hour and a too-strict check, the
+ *  second lost tries to a writer Google no longer serves) */
+const REDONE = "desk_redone_3";
 const WIKI = `Give the exact titles of the English Wikipedia articles for this subject (for background facts and free photos): the 1 or 2
 that cover it best, then 1 or 2 broader ones with good photos (the place, the machine, the technology, the organisation).
 Reply with JSON only: {"titles":["",""]}`;
@@ -720,7 +721,8 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
   const tried = [...counts].filter(([, n]) => n >= 3).map(([id]) => id);
   const [r] = await sql.query(
     `select id, beat, headline, topic, en, sources from features where status = 'published' and beat <> 'politics'
-       and (author <> 'desk' or photo is null or jsonb_array_length(figures) < 4) and not (id = any($1::text[]))
+       and (author <> 'desk' or photo is null or jsonb_array_length(figures) < 4) and coalesce(checks->>'rewritten', '') <> 'true'
+       and not (id = any($1::text[]))
      order by published_at desc nulls last limit 1`, [tried]);
   if (!r) return "none";
   if (!(await geminiLeft(sql, "writer"))) return "stop";

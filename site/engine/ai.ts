@@ -279,6 +279,8 @@ export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: stri
       const text = await res.text();
       // this model's day is used up: the next one in the pool
       if (res.status === 429 && /per ?day|PerDay|daily/i.test(text)) { spent.add(model); continue; }
+      // a model the key lists but Google won't serve (29 Oct: "gemini-2.5-flash is no longer available to new users"): the next one
+      if (res.status === 403 || res.status === 404) { spent.add(model); await count(sql, geminiCounter(model), -1); continue; }
       // a busy answer wrote nothing: not counted against the day (29 Oct: Google's busy spells used up the day's count)
       if ([500, 503, 504].includes(res.status)) await count(sql, geminiCounter(model), -1);
       if ([429, 500, 503, 504].includes(res.status)) { busy.add(model); lastBusy = `${lastBusy.startsWith("waited") ? "waited; " : ""}${model}: ${res.status}`; continue; }

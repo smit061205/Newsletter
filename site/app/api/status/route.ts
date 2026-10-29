@@ -24,7 +24,7 @@ export async function GET() {
                  coalesce((checks->>'rewritten')::boolean, false) as rewritten, (checks->>'words')::int as words, published_at, updated_at
                from features where status = 'published' order by published_at desc limit 60`).catch(() => []),
     sql.query(`select count(*)::int as n from features where status = 'held'`).catch(() => [{ n: null }]),
-    sql.query(`select value from state where key = 'desk_redone_2'`).catch(() => []),
+    sql.query(`select value from state where key = 'desk_redone_3'`).catch(() => []),
   ]);
   // can the site read its private photo store? (a yes/no and the library's message, never the key)
   const [one] = await sql.query(`select photo->>'url' as url from stories where photo is not null limit 1`).catch(() => []);
