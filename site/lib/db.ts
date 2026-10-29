@@ -2,9 +2,10 @@
 // here at render time; they are kept ready (ISR) and refreshed when the
 // newsroom publishes (app/api/publish), so readers rarely wake the database.
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
-import type { Correction, English, Genre, Issue, IssuePage, Photo, Source, Story, StorySource, Tier } from "./types.ts";
+import type { Correction, English, Genre, Issue, IssuePage, Lang, Photo, Source, Story, StorySource, Tier } from "./types.ts";
 import { sample, sampleOn } from "./sample.ts";
 import { schemaReady } from "./schema.ts";
+import { SOURCES } from "../engine/sources.ts";
 
 let client: NeonQueryFunction<false, false> | null = null;
 let ready: Promise<void> | null = null;
@@ -94,6 +95,17 @@ export async function storiesIn(key: string, limit = 40): Promise<Story[]> {
   const rows = await sql.query(
     `select ${COLUMNS} from stories where status = 'published' and (tier = $1 or $1 = any(genres)) order by issue_date desc, published_at desc, rank asc nulls last limit $2`,
     [key, limit]);
+  return rows.map(storyOf);
+}
+
+/** A region's stories on one subject ("ગુજરાત › ખેતી", ROADMAP §4): the tier and the genre together. */
+export async function storiesInBoth(tier: Tier, genre: Genre, limit = 40): Promise<Story[]> {
+  if (sampleOn()) return sample().stories.filter((s) => s.tier === tier && s.genres.includes(genre)).slice(0, limit);
+  const sql = db();
+  if (!sql) return [];
+  const rows = await sql.query(
+    `select ${COLUMNS} from stories where status = 'published' and tier = $1 and $2 = any(genres) order by issue_date desc, published_at desc, rank asc nulls last limit $3`,
+    [tier, genre, limit]);
   return rows.map(storyOf);
 }
 
@@ -190,4 +202,47 @@ export async function sitemapEntries(sinceDays?: number): Promise<{ id: string; 
     : await sql.query(`select id, updated_at, published_at, headline, en_status from stories where status = 'published' order by published_at desc limit 50000`);
   return rows.map((r) => ({ id: r.id as string, updatedAt: iso(r.updated_at), publishedAt: iso(r.published_at), headline: r.headline as string,
                             en: r.en_status === "done" }));
+}
+
+/** A headline elsewhere: another trusted outlet's item, linked to its own page (ROADMAP §4, "from other outlets"). */
+export interface Elsewhere { url: string; title: string; outlet: string; at: string }
+
+/** The day's important headlines from other trusted outlets, in the reader's language: the engine's triage at 6 or more,
+ *  of the last 18 hours, one per event and two per outlet at most; never a debunked or sensitive one. Their headlines only,
+ *  each a link to the outlet's own page (their words stay theirs). */
+export async function elsewhere(lang: Lang, limit = 12): Promise<Elsewhere[]> {
+  const outlets = SOURCES.filter((x) => x.trust === "outlet" && x.lang === lang);
+  if (sampleOn()) return sample().stories.slice(0, 8).map((x, i) => ({ url: "#", title: x.headline, outlet: outlets[i % Math.max(1, outlets.length)]?.name ?? "", at: x.publishedAt }));
+  const sql = db();
+  if (!sql || !outlets.length) return [];
+  const rows = await sql.query(
+    `select url, title, source, coalesce(published_at, seen_at) as at, cluster_id from items
+      where source = any($1::text[]) and seen_at > now() - interval '18 hours' and triage is not null
+        and (triage->>'score')::float >= 6 and coalesce(triage->>'sensitive', 'false') <> 'true' and coalesce(triage->>'debunk', '') = ''
+      order by (triage->>'score')::float desc, coalesce(published_at, seen_at) desc limit 80`,
+    [outlets.map((x) => x.id)]).catch(() => []);
+  const name = new Map(outlets.map((x) => [x.id, x.name]));
+  const events = new Set<string>(), per = new Map<string, number>();
+  const out: Elsewhere[] = [];
+  for (const r of rows) {
+    if (r.cluster_id && events.has(r.cluster_id)) continue;
+    if ((per.get(r.source) ?? 0) >= 2) continue;
+    if (r.cluster_id) events.add(r.cluster_id);
+    per.set(r.source, (per.get(r.source) ?? 0) + 1);
+    out.push({ url: r.url, title: String(r.title).trim(), outlet: name.get(r.source) ?? r.source, at: new Date(r.at).toISOString() });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** The breaking story now, if there is one: a live story the engine scored 9.5 or more, published in the last three hours
+ *  (lib/push.ts); the newest. Sample stories show one only with CK_SAMPLE_BREAKING=1 (to see the bar while developing). */
+export async function breakingNow(): Promise<Story | null> {
+  if (sampleOn()) return process.env.CK_SAMPLE_BREAKING === "1" ? { ...sample().stories[0], publishedAt: new Date().toISOString() } : null;
+  const sql = db();
+  if (!sql) return null;
+  const rows = await sql.query(
+    `select ${COLUMNS} from stories where status = 'published' and origin = 'live' and importance >= 9.5
+       and published_at > now() - interval '3 hours' order by published_at desc limit 1`).catch(() => []);
+  return rows[0] ? storyOf(rows[0]) : null;
 }

@@ -2,10 +2,12 @@
 import Link from "next/link";
 import { ViewTransition } from "react";
 import type { Lang, Story } from "../lib/types.ts";
+import type { Elsewhere } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
 import { num, timeText } from "../lib/format.ts";
 import TimeAgo from "./TimeAgo.tsx";
+import Alerts from "./Alerts.tsx";
 import { Chev } from "./icons.tsx";
 
 /** A story's words in the reader's language: its English or Hindi when it has one, else the Gujarati. */
@@ -160,6 +162,31 @@ export function Join({ lang }: { lang: Lang }) {
       <h3>{t(lang, "joinTitle")}</h3>
       <p>{t(lang, "joinText")}</p>
       <span className="note">{t(lang, "joinSoon")}</span>
+      <Alerts lang={lang} words={{ on: t(lang, "alertsOn"), areOn: t(lang, "alertsAreOn"), off: t(lang, "alertsOff"), note: t(lang, "alertsNote"),
+        denied: t(lang, "alertsDenied"), ios: t(lang, "alertsIos"), failed: t(lang, "alertsFailed") }} />
     </div>
+  );
+}
+
+/** Headlines from other trusted outlets, a row to scroll (ROADMAP §4): the outlet, its headline, when; each opens on the
+ *  outlet's own site. */
+export function ElsewhereRow({ items, lang }: { items: Elsewhere[]; lang: Lang }) {
+  return (
+    <section className="ctr elsew" aria-labelledby="elsew-h">
+      <div className="head"><span id="elsew-h">{t(lang, "elsewhere")}</span></div>
+      <p className="note elsew-note">{t(lang, "elsewhereNote")}</p>
+      <ul className="elsew-row">
+        {items.map((x, i) => (
+          <li key={`${i}-${x.url}`}>
+            <a href={x.url} target="_blank" rel="noopener noreferrer nofollow">
+              <span className="elsew-from">{x.outlet}</span>
+              <span className="elsew-h">{x.title}</span>
+              <span className="elsew-when"><TimeAgo iso={x.at} lang={lang} fallback={timeText(x.at, lang)} />
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg></span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

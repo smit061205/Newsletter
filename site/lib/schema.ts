@@ -49,6 +49,8 @@ export const SCHEMA = [
    )`,
   // content_changed_at (a publish, new translations) and refreshed_at (/api/refresh)
   `create table if not exists state (key text primary key, value text not null)`,
+  // the phones and computers that asked for breaking-news alerts (lib/push.ts; ROADMAP §4, 30 Oct)
+  `create table if not exists push_subs (endpoint text primary key, keys jsonb not null, lang text not null default 'gu', created_at timestamptz not null default now())`,
   `create table if not exists usage (
      day date not null,
      kind text not null,                            -- 'upload', 'ai_free', ...
