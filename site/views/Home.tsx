@@ -8,6 +8,8 @@ import { dateText } from "../lib/format.ts";
 import { Cmp, Head, Join, LatestList, Lead, MostRead, Std } from "../components/cards.tsx";
 import Frame from "../components/Frame.tsx";
 import { PAPER } from "../lib/site.ts";
+import { features } from "../lib/flagship.ts";
+import AavtikalPromo from "../components/AavtikalPromo.tsx";
 
 const inSection = (s: Story, key: string) => s.tier === key || s.genres.includes(key as never);
 const BELOW = ["gujarat", "india", "farm", "economy", "tech", "health", "sport", "education", "entertainment"];
@@ -74,8 +76,8 @@ export default async function Home({ lang }: { lang: Lang }) {
   const fresh = stories.filter((s) => s.origin === "live" && Date.now() - Date.parse(s.publishedAt) < 12 * 3600_000 && (s.importance ?? 0) >= 7.5)
     .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
   const lead = fresh.find((s) => s.photo) ?? fresh[0] ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
-  // under the lead, its subject's other stories; below the top, what readers open most
-  const [more, most] = await Promise.all([lead ? moreOnSubject(lead.id) : [], mostRead(5)]);
+  // under the lead, its subject's other stories; below the top, what readers open most and Aavtikal's newest
+  const [more, most, articles] = await Promise.all([lead ? moreOnSubject(lead.id) : [], mostRead(5), features({ limit: 12 })]);
   // the stories under the lead: today's paper first, then the newest; whole rows of three
   // only (28 Oct: four left one card alone in its row and a hole beside the rail)
   const pool = [...today, ...stories.filter((s) => s.issueDate !== day)].filter((s) => s !== lead).slice(0, 6);
@@ -109,6 +111,8 @@ export default async function Home({ lang }: { lang: Lang }) {
             <aside className="rail vr"><div className="fit"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={16} /></div></aside>
           </div>
           <section className="ctr phone-latest"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={6} /></section>
+          {/* Aavtikal, the long reads, right under the day's top news (the user, 29 Oct) */}
+          <AavtikalPromo lang={lang} articles={articles} />
           <section className="ctr band">
             {most.length >= 3 && <div><Head label={t(lang, "mostRead")} /><MostRead stories={most} lang={lang} /></div>}
             <Join lang={lang} />

@@ -89,6 +89,8 @@ export const FL_WORDS = {
     share: "WhatsApp પર મોકલો", copy: "લિંક કૉપી કરો", copied: "લિંક કૉપી થઈ",
     aiNote: "આ લેખ આવતીકાલના AI ડેસ્કે નીચેના સ્રોતો પરથી લખ્યો છે. તેનો દરેક આંકડો અને દરેક દાવો સ્રોતો સાથે મેળવ્યા પછી જ તે પ્રકાશિત થયો છે; જે લેખ એ તપાસમાં પાસ ન થાય તે સંપાદક પાસે જાય છે.",
     sources: "સ્રોત", notTranslated: "", about: "અમારા વિશે", policy: "સંપાદકીય નીતિ", how: "અમે કેવી રીતે ચકાસીએ છીએ", contact: "સંપર્ક",
+    // the door into Aavtikal on Capital Kranti's front page (components/AavtikalPromo.tsx)
+    promoBy: "કેપિટલ ક્રાંતિ રજૂ કરે છે", promoPitch: "સમાચારની પાછળની વાત: લાંબા, સમજાવતા લેખો, ગ્રાફ અને ચિત્રો સાથે.", promoCta: "આવતીકાલ વાંચો", promoMore: "હમણાંના લેખો",
     writersText: "AI ડેસ્ક દુનિયાભરના વિશ્વસનીય સ્રોતો, કંપનીઓ અને સંસ્થાઓની પોતાની જાહેરાતો વાંચી લાંબા, સમજાવતા લેખ લખે છે. દરેક આંકડો અને દાવો સ્રોતો સાથે મેળવાય છે; જે લેખ એ તપાસમાં પાસ ન થાય તે સંપાદક વાંચે ત્યાં સુધી પ્રકાશિત થતો નથી.",
   },
   en: {
@@ -102,6 +104,7 @@ export const FL_WORDS = {
     share: "Send on WhatsApp", copy: "Copy link", copied: "Link copied",
     aiNote: "This article was written by Aavtikal's AI desk from the sources below. It was published only after every number and every claim in it was matched against them; an article that fails that check goes to the editor.",
     sources: "Sources", notTranslated: "This article isn't in English yet, so it's shown in Gujarati.", about: "About us", policy: "Editorial policy", how: "How we check", contact: "Contact",
+    promoBy: "Capital Kranti presents", promoPitch: "The story behind the news: long explainers, with graphs and pictures.", promoCta: "Read Aavtikal", promoMore: "Recent articles",
     writersText: "The AI desk reads trusted sources from around the world, and the companies' and agencies' own announcements, and writes long explainers. Every number and claim is matched against the sources; an article that fails that check isn't published until the editor has read it.",
   },
   hi: {
@@ -115,6 +118,7 @@ export const FL_WORDS = {
     share: "WhatsApp पर भेजें", copy: "लिंक कॉपी करें", copied: "लिंक कॉपी हुआ",
     aiNote: "यह लेख आवतीकाल के AI डेस्क ने नीचे दिए स्रोतों से लिखा है। इसका हर आँकड़ा और हर दावा स्रोतों से मिलाने के बाद ही यह प्रकाशित हुआ है; जो लेख इस जाँच में पास नहीं होता, वह संपादक के पास जाता है।",
     sources: "स्रोत", notTranslated: "यह लेख अभी हिंदी में नहीं है, इसलिए गुजराती में दिखाया गया है।", about: "हमारे बारे में", policy: "संपादकीय नीति", how: "हम कैसे जाँचते हैं", contact: "संपर्क",
+    promoBy: "कैपिटल क्रांति प्रस्तुत करता है", promoPitch: "ख़बर के पीछे की बात: लंबे, समझाने वाले लेख, ग्राफ़ और चित्रों के साथ।", promoCta: "आवतीकाल पढ़ें", promoMore: "हाल के लेख",
     writersText: "AI डेस्क दुनिया भर के भरोसेमंद स्रोत और कंपनियों व संस्थाओं की अपनी घोषणाएँ पढ़कर लंबे, समझाने वाले लेख लिखता है। हर आँकड़ा और दावा स्रोतों से मिलाया जाता है; जो लेख इस जाँच में पास नहीं होता, वह संपादक के पढ़ने तक प्रकाशित नहीं होता।",
   },
 } as const;
