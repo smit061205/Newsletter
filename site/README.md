@@ -100,4 +100,8 @@ that changes the website and the app together, and any website branch (`site/…
 
 `lib/` is the data and words, `components/` the design system's parts, `views/` the
 pages, and `app/` the routes: Gujarati at the root (`app/(gu)`), English under `/en`
-(`app/(en)/en`), each a thin file over the same view.
+(`app/(en)/en`) and Hindi under `/hi` (`app/(hi)/hi`), each a thin file over the same view.
+A first visit opens in the reader's language by where they are (`proxy.ts`, from Vercel's
+location headers): Gujarat in Gujarati, the rest of India in Hindi, the rest of the world in
+English. A language the reader picks is kept for a year (`ck_lang`, `components/LangLink.tsx`)
+and wins after that; search engines and link previews are never moved.

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import s from "./fl.module.css";
 import Look from "./Look.tsx";
+import LangLink from "../LangLink.tsx";
 import Menu from "./Menu.tsx";
 import { SearchIcon } from "../icons.tsx";
 import type { Lang } from "../../lib/types.ts";
@@ -65,7 +66,7 @@ export default function Frame({ lang, beat, path, children }: { lang: Lang; beat
                 <Look label={w.look} names={[w.lookAuto, w.lookLight, w.lookDark]} />
               </div>
               <div className={s.dGroup}>
-                {LANGS.map((l) => <Link key={l.lang} className={s.dSmall} href={fl(l.lang, path)} lang={l.lang} aria-current={l.lang === lang ? "true" : undefined}>{l.name}</Link>)}
+                {LANGS.map((l) => <LangLink key={l.lang} to={l.lang} className={s.dSmall} href={fl(l.lang, path)} lang={l.lang} aria-current={l.lang === lang ? "true" : undefined}>{l.name}</LangLink>)}
               </div>
             </Menu>
           </div>
