@@ -84,6 +84,7 @@ node site/test/a11y.mjs http://localhost:3200     # the accessibility check CI r
 npm run build --prefix site               # what Vercel and site.yml run
 npx --prefix site tsc -p site/engine      # the engine's typecheck (it's outside the Next build)
 node --experimental-strip-types site/engine/selftest.ts
+node site/tools/icons.mjs                 # redraws the icon in every size (public/icon*.png, favicon*)
 OPENROUTER_API_KEY=... node --experimental-strip-types site/engine/try.ts 3   # a dry run on real news
 ```
 

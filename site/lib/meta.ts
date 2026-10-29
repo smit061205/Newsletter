@@ -26,6 +26,10 @@ export function pageMeta(o: { lang: Lang; path: string; title?: string; descript
       ...(o.article ? { publishedTime: o.article.publishedAt, modifiedTime: o.article.updatedAt } : {}),
     },
     twitter: { card: "summary_large_image", title: o.title ?? name, description, images: [image] },
-    icons: { icon: "/icon.png", apple: "/icon.png" },
+    // site/tools/icons.mjs draws them; ?v=2 (29 Oct, the new icon) so browsers drop the old one they kept
+    icons: {
+      icon: [{ url: "/favicon-32.png?v=2", sizes: "32x32", type: "image/png" }, { url: "/icon.png?v=2", sizes: "512x512", type: "image/png" }],
+      shortcut: "/favicon.ico?v=2", apple: "/apple-icon.png?v=2",
+    },
   };
 }
