@@ -19,10 +19,10 @@ export const WEBSITE = {
   deskDaily: 10,
   deskDays: { "2026-10-29": 20 } as Record<string, number>,
   // each model's own free requests a day (AI Studio, 29 Oct), used in order: the writers (3.6 when 3.8's
-  // are used; the older Flashes write less well) and the translators (Gemma's 16,000 tokens a minute is too
+  // are used or it is busy, 3 when both are: Google's busy spells, 29 Oct) and the translators (Gemma's 16,000 tokens a minute is too
   // little for a long article)
   gemini: {
-    writer: [{ id: "gemini-3.8-flash", daily: 20 }, { id: "gemini-3.6-flash", daily: 20 }],
+    writer: [{ id: "gemini-3.8-flash", daily: 20 }, { id: "gemini-3.6-flash", daily: 20 }, { id: "gemini-3-flash", daily: 20 }],
     lite: [{ id: "gemini-3.5-flash-lite", daily: 500 }, { id: "gemini-3.1-flash-lite", daily: 500 }],
   },
 };
