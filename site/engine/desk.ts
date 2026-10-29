@@ -652,6 +652,7 @@ async function writeUp(sql: Sql, subj: Subject, date: string, log: (s: string) =
      m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null, sourcesJson(m.sources),
      JSON.stringify({ problems: m.problems, writer: m.model, words: m.words }), JSON.stringify(m.figs), subj.topic]);
   await touched(sql);
+  await refresh();
   log(`  ${status}: ${id} (${madeLine(m)})${m.problems.length ? `: ${m.problems.slice(0, 2).join("; ")}` : ""}`);
   return status;
 }
@@ -702,7 +703,10 @@ explainer: what it is, how it works, its history and numbers, where it stands no
  *  again. Politics is never touched. It replaces the old one only when every number and claim checks out; each is
  *  tried once. */
 async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "rewritten" | "kept" | "stop"> {
-  const tried = await stateList(sql, REDONE);
+  // each older article is tried up to three times (29 Oct: one try lost Chandrayaan to a stray Telugu word)
+  const counts = new Map<string, number>();
+  for (const id of await stateList(sql, REDONE)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  const tried = [...counts].filter(([, n]) => n >= 3).map(([id]) => id);
   const [r] = await sql.query(
     `select id, beat, headline, topic, en, sources from features where status = 'published' and beat <> 'politics'
        and (author <> 'desk' or photo is null or jsonb_array_length(figures) < 4) and not (id = any($1::text[]))
@@ -728,9 +732,14 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
     [r.id, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo), m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null,
      sourcesJson(m.sources), JSON.stringify({ problems: [], writer: m.model, words: m.words, rewritten: true }), JSON.stringify(m.figs), topic]);
   await touched(sql);
+  await refresh();
   log(`  rewritten: ${r.id} (${madeLine(m)})`);
   return "rewritten";
 }
+
+/** The site's kept-ready pages renewed now (29 Oct: translations sat in the database for an hour while the pages showed
+ *  Gujarati, since only a publish asked for new pages); the site renews only when something changed. */
+const refresh = () => fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) }).catch(() => null);
 
 /** The desk's articles of the last week, new or written again, without their English or Hindi (a translation that failed) get them. */
 async function retranslate(sql: Sql, log: (s: string) => void, deadline: number) {
@@ -747,7 +756,7 @@ async function retranslate(sql: Sql, log: (s: string) => void, deadline: number)
     await sql.query(`update features set en = $2, hi = $3, figures = $4, updated_at = now() where id = $1`,
       [r.id, en ? JSON.stringify(en) : null, hi ? JSON.stringify(hi) : null, JSON.stringify(figs)]);
     log(`  ${r.id}: translated again${en ? " (English)" : ""}${hi ? " (Hindi)" : ""}`);
-    if (en || hi) await touched(sql);
+    if (en || hi) { await touched(sql); await refresh(); }
   }
 }
 
@@ -811,5 +820,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     log(`failed: ${e instanceof Error ? e.stack : e}`);
     await sql.query(`update runs set finished_at = now(), ok = false, details = $2 where id = $1`, [run.id, JSON.stringify({ ...details, error: String(e).slice(0, 400), log: lines.slice(-30) })]);
   }
-  if (details.published || details.held || details.rewritten) await fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) }).catch(() => null);
+  await refresh();
 }

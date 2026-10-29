@@ -307,6 +307,24 @@ export async function aiLeft(sql: Sql): Promise<number> {
 /** The JSON in a model's answer: the whole of it, or inside a code fence, or
  * the outermost braces; a list cut off part-way is closed after its last
  * complete entry (a long answer that hit its length). Undefined if none. */
+/** JSON with the slips models make in long texts mended: a line break or tab written raw inside a string, and a
+ *  quotation mark inside a string left unescaped (one not followed by what may follow a string's end: , } ] :). */
+export function repairJson(t: string): string {
+  let out = "", inside = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (!inside) { out += c; if (c === '"') inside = true; continue; }
+    if (c === "\\") { out += c + (t[i + 1] ?? ""); i++; continue; }
+    if (c === '"') {
+      const next = t.slice(i + 1).match(/^\s*(.)/)?.[1];
+      if (next === undefined || ",}]:".includes(next)) { out += c; inside = false; } else out += '\\"';
+      continue;
+    }
+    out += c === "\n" ? "\\n" : c === "\r" ? "" : c === "\t" ? "\\t" : c;
+  }
+  return out;
+}
+
 export function readJson(text: string): unknown {
   const tries: string[] = [];
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -315,6 +333,10 @@ export function readJson(text: string): unknown {
   if (start >= 0) tries.push(text.slice(start, text.lastIndexOf("}") + 1), text.slice(start));
   for (const t of tries) {
     try { return JSON.parse(t); } catch { /* next */ }
+  }
+  // a long answer with a slip in it (29 Oct, Gemini Flash: "not JSON" for a whole article): repaired and read again
+  if (start >= 0) {
+    try { return JSON.parse(repairJson(text.slice(start, text.lastIndexOf("}") + 1))); } catch { /* cut off? */ }
   }
   // cut off: keep everything up to the last complete "}," inside the first list, then close it
   if (start >= 0) {
