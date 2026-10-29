@@ -76,14 +76,15 @@ async function advance() {
 
 /** stories written this round, across its two writing passes */
 let wrote = 0;
-/** Steps 4 and 5: the most important confirmed events, written, checked, translated, saved. */
-async function write() {
+/** Steps 4 and 5: the most important confirmed events, written, checked, translated, saved; no story is begun
+ *  after `until` (the first pass stops at three minutes, so the new items are still sorted that round). */
+async function write(until = deadline) {
   const left = await aiLeft(sql);
   const can = Math.min(PER_RUN, Math.floor((left - RESERVE) / 5));
   if (can <= 0) { log(`  writing: waits (${left} free requests left today)`); return; }
-  const ready = await sql.query(`select * from clusters where state = 'confirmed' order by score desc, first_seen asc limit 40`);
+  const ready = await sql.query(`select * from clusters where state = 'confirmed' order by write_tries, score desc, first_seen asc limit 40`);
   for (const c of ready) {
-    if (wrote >= can || Date.now() > deadline) break;
+    if (wrote >= can || Date.now() > until) break;
     const items = await itemsOf(c.id);
     const g = gate(items, new Date(c.first_seen).toISOString(), []);
     if (g.state !== "confirmed") continue;
@@ -106,6 +107,10 @@ async function write() {
     if (!res.ok && !("written" in res && res.written)) {
       log(`    not written${"retry" in res && res.retry ? " (the free models are busy: next run)" : ""}: ${res.why}`);
       if (res.stop || ("retry" in res && res.retry)) break;
+      // 29 Oct: a gold-price story the models kept getting wrong took four minutes of every round
+      await sql.query(`update clusters set write_tries = write_tries + 1,
+         state = case when write_tries >= 2 then 'dropped' else state end,
+         reason = case when write_tries >= 2 then 'not written in 3 tries' else reason end where id = $1`, [c.id]);
       continue;
     }
     let w = res.written;
@@ -301,14 +306,15 @@ try {
   details.collect = await collect(sql, log, started + 4 * 60_000);
   // the stories confirmed in earlier rounds written first, then the new items sorted (29 Oct: sorting slowed by the
   // Gemmas shared with Aavtikal's desk took six minutes, writing began after the round's time and no story went up
-  // for hours); the sorting has four minutes at most, and what it confirms is written after the checks if time is left
+  // for hours); no story is begun after three minutes, the sorting has two minutes at least (in run 144 the writing
+  // took seven and sorted nothing), and what it confirms is written after the checks if time is left
   log("writing:");
   await step("writing");
-  await write();
+  await write(started + 3 * 60_000);
   log("triage:");
   await step("triage");
   const left = await aiLeft(sql);
-  details.triage = await triage(sql, log, Math.max(0, Math.min(6, Math.floor((left - RESERVE) / 10))), Math.min(started + 4 * 60_000, Date.now() + 3 * 60_000));
+  details.triage = await triage(sql, log, Math.max(0, Math.min(6, Math.floor((left - RESERVE) / 10))), Math.min(deadline - 60_000, Math.max(started + 5 * 60_000, Date.now() + 2 * 60_000)));
   await cluster(sql, log);
   log("checks:");
   await step("checks");

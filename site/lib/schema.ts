@@ -111,6 +111,8 @@ export const SCHEMA = [
      story_id text
    )`,
   `create index if not exists clusters_state on clusters (state, score desc)`,
+  // the times a confirmed event's story couldn't be written (engine/run.ts: it waits behind the others, and is dropped at 3)
+  `alter table clusters add column if not exists write_tries int not null default 0`,
   // how many times each story was opened, per day (for "most read"; nothing about who)
   `create table if not exists reads (
      story_id text not null,
