@@ -19,7 +19,8 @@ export async function GET() {
   // (headlines and links are on the site already); held articles only counted
   const [deskRuns, arts, held, redone] = await Promise.all([
     sql.query(`select id, started_at, finished_at, ok, details from runs where kind = 'desk' order by id desc limit 4`).catch(() => []),
-    sql.query(`select id, beat, author, en is not null as en, hi is not null as hi, photo is not null as photo, jsonb_array_length(figures)::int as figures,
+    sql.query(`select id, beat, author, en is not null and en->>'headline' <> '' and concat_ws(' ', en->>'headline', en->>'body') !~ '[\u0980-\u0DFF]' as en,
+       hi is not null and (hi->>'headline') ~ '[\u0900-\u097F]' and concat_ws(' ', hi->>'headline', hi->>'body') !~ '[\u0980-\u0DFF]' as hi, photo is not null as photo, jsonb_array_length(figures)::int as figures,
                  coalesce((checks->>'rewritten')::boolean, false) as rewritten, (checks->>'words')::int as words, published_at, updated_at
                from features where status = 'published' order by published_at desc limit 60`).catch(() => []),
     sql.query(`select count(*)::int as n from features where status = 'held'`).catch(() => [{ n: null }]),

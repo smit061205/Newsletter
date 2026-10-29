@@ -421,9 +421,20 @@ as they are. Reply with JSON only: {"strings":[]}`;
  *  markers in one request was rejected for one slip, and most articles stayed in Gujarati): the headline, then the body
  *  a few paragraphs at a time, the "[[fig N]]" markers kept out of it and put back where they were, then the graphs'
  *  labels. Every number checked; a piece that fails is asked again; a label left untranslated shows in Gujarati. */
+/** Text in the language's own script with no Gujarati (or other Indian script) left in it (29 Oct: a model that handed
+ *  the Gujarati back unchanged was taken for English, since anything passed as English, and the English pages showed Gujarati). */
+export const inScript = (lang: "en" | "hi", t: string) =>
+  !/[\u0980-\u0DFF]/.test(t) && (lang === "en" ? /[A-Za-z]/.test(t) && !/[ऀ-ॿ]/.test(t) : /[ऀ-ॿ]/.test(t));
+/** A stored translation that really is one. */
+const translated = (lang: "en" | "hi", w: Words3 | null | undefined) => !!w?.headline && !!w.body && inScript(lang, `${w.headline} ${w.dek} ${w.body}`);
+/** The same test in SQL, for finding the articles whose translation is missing or isn't one. */
+const UNTRANSLATED = (c: "en" | "hi") =>
+  `(${c} is null or jsonb_typeof(${c}) <> 'object' or coalesce(${c}->>'headline', '') = '' or coalesce(${c}->>'body', '') = ''
+    or concat_ws(' ', ${c}->>'headline', ${c}->>'dek', ${c}->>'body') ~ '[\u0980-\u0DFF]'${c === "hi" ? ` or (${c}->>'headline') !~ '[\u0900-\u097F]'` : ""})`;
+
 async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi", date: string, log: (s: string) => void = () => {}): Promise<Words3 | null> {
   const name = lang === "en" ? "English" : "Hindi";
-  const script = (t: string) => lang === "en" || /[ऀ-ॿ]/.test(t);
+  const script = (t: string) => inScript(lang, t);
   // Gemini Flash Lite; a Gemma when its requests are used up (a piece is small enough for its minute)
   const ask = <T,>(a: { system: string; user: string; maxTokens: number }, check: (v: unknown) => T | null) =>
     askGemini(sql, "lite", a, check).then((r) => (r.ok || !r.stop ? r : askJson(sql, a, check)));
@@ -433,7 +444,7 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
   for (let k = 0; k < 2 && !head; k++) {
     const r = await ask({ system: HEAD(lang), user: JSON.stringify({ headline: gu.headline, dek: gu.dek, caption: gu.caption }), maxTokens: 2000 }, (v) => {
       const x = v as { headline?: string; dek?: string; caption?: string };
-      return x?.headline && script(x.headline) ? { headline: String(x.headline), dek: String(x.dek ?? ""), caption: String(x.caption ?? "") } : null;
+      return x?.headline && script(`${x.headline} ${x.dek ?? ""}`) && (!x.caption || script(x.caption)) ? { headline: String(x.headline), dek: String(x.dek ?? ""), caption: String(x.caption ?? "") } : null;
     });
     if (r.ok && !numbersNotIn(Object.values(r.value).join("\n"), [gu.headline, gu.dek, gu.caption].join("\n"), date).length) head = r.value;
     else if (!r.ok) log(`  ${name} headline not made: ${r.why.slice(0, 140)}`);
@@ -458,7 +469,7 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
         const x = (v as { paragraphs?: unknown[] })?.paragraphs;
         if (!Array.isArray(x) || x.length !== src.length) return null;
         const t = x.map((y) => String(y ?? "").trim());
-        return t.every((y, m) => y && words(y) >= words(src[m]) * 0.5) && script(t.join(" ")) ? t : null;
+        return t.every((y, m) => y && words(y) >= words(src[m]) * 0.5 && script(y)) ? t : null;
       });
       if (!r.ok) { log(`  ${name} piece ${n + 1} of ${pieces.length}: ${r.why.slice(0, 140)}`); if (r.stop) return null; continue; }
       const wrong = numbersNotIn(r.value.join("\n"), src.join("\n"), date);
@@ -741,18 +752,18 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
  *  Gujarati, since only a publish asked for new pages); the site renews only when something changed. */
 const refresh = () => fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) }).catch(() => null);
 
-/** The desk's articles of the last week, new or written again, without their English or Hindi (a translation that failed) get them. */
+/** Articles without a real English or Hindi (a translation that failed, or one that was the Gujarati handed back) get one. */
 async function retranslate(sql: Sql, log: (s: string) => void, deadline: number) {
   const rows = await sql.query(
-    `select id, headline, dek, caption, body, figures, en, hi from features where (author = 'desk' or checks->>'rewritten' = 'true')
-       and status in ('published', 'held') and (en is null or hi is null) and updated_at > now() - interval '7 days' order by status = 'published' desc, updated_at asc limit 6`);
+    `select id, headline, dek, caption, body, figures, en, hi from features where status in ('published', 'held')
+       and (${UNTRANSLATED("en")} or ${UNTRANSLATED("hi")}) order by status = 'published' desc, updated_at asc limit 6`);
   for (const r of rows) {
     if (Date.now() > deadline - 3 * 60_000) return;
     const figs = (r.figures ?? []) as Figure[];
     const gu = { headline: r.headline, dek: r.dek, caption: r.caption, body: r.body };
     log(`  translating again: ${r.id}`);
-    const en = r.en ?? (await translate(sql, gu, figs, "en", indiaDate(), log));
-    const hi = r.hi ?? (await translate(sql, gu, figs, "hi", indiaDate(), log));
+    const en = translated("en", r.en) ? r.en : await translate(sql, gu, figs, "en", indiaDate(), log);
+    const hi = translated("hi", r.hi) ? r.hi : await translate(sql, gu, figs, "hi", indiaDate(), log);
     await sql.query(`update features set en = $2, hi = $3, figures = $4, updated_at = now() where id = $1`,
       [r.id, en ? JSON.stringify(en) : null, hi ? JSON.stringify(hi) : null, JSON.stringify(figs)]);
     log(`  ${r.id}: translated again${en ? " (English)" : ""}${hi ? " (Hindi)" : ""}`);
