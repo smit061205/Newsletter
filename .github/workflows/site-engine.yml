@@ -12,7 +12,8 @@
 # 28 Oct: the hourly schedule didn't fire for six hours either, so each keeper also
 # queues the next one itself before it ends (a run may start another through the
 # API), and a change to this file starts one. Between rounds it listens to the
-# Telegram bot (engine/listen.ts), so the editors get answers within seconds.
+# Telegram bot (engine/listen.ts), so the editors get answers within seconds. Once an hour it also starts
+# the hourly run (site-run.yml), whose own schedule GitHub left unstarted for six hours on 29 Oct.
 name: site-engine
 on:
   schedule: [{ cron: "4 * * * *" }]
@@ -71,6 +72,13 @@ jobs:
               failed=$((failed + 1)); echo "::warning::Round $rounds failed"
             fi
             echo "::endgroup::"
+            # the hourly run (site-run: sections and English for the stories, the sources' check), started from here once an
+            # hour, since GitHub's schedule left it unstarted for six hours on 29 Oct
+            if [ $(( rounds % 4 )) -eq 1 ]; then
+              curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/site-run.yml/dispatches" -d '{"ref":"main"}' \
+                || echo "::warning::couldn't start the hourly run"
+            fi
             # the next :04, :19, :34 or :49
             now=$(date +%s); next=$(( (now - 240) / 900 * 900 + 900 + 240 ))
             [ "$next" -ge "$end" ] && break

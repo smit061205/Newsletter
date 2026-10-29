@@ -544,11 +544,13 @@ async function make(sql: Sql, subj: Subject, id: string, date: string, log: (s: 
   if (sources.reduce((n, s) => n + words(s.text), 0) < 500) { log("  too little to read about it"); return "thin"; }
   if (!pics.length) { log("  no picture to show with it"); return "nophoto"; }
 
-  // the Gujarati article (Gemini Flash)
-  const draft = await askGemini(sql, "writer", {
+  // the Gujarati article (Gemini Flash); asked once more when the answer comes back broken (29 Oct: "not JSON")
+  const writeAsk = {
     system: WRITE,
     user: `SUBJECT (${subj.beat}): ${subj.topic}${note}\n\nPICTURES:\n${pics.map((p) => `${p.n}. from ${p.from}: ${p.alt || "(no description)"}`).join("\n")}\n\n${block(sources)}`,
-  }, readDraft);
+  };
+  let draft = await askGemini(sql, "writer", writeAsk, readDraft);
+  if (!draft.ok && !draft.stop && !draft.busy) { log(`  written again: ${draft.why.slice(0, 120)}`); draft = await askGemini(sql, "writer", writeAsk, readDraft); }
   if (!draft.ok) { log(`  not written: ${draft.why.slice(0, 200)}`); return draft.stop ? "stop" : draft.busy ? "busy" : "skipped"; }
   const d = draft.value;
 
@@ -635,11 +637,12 @@ async function lastingSubject(sql: Sql, beat: Beat, covered: string[], log: (s: 
 }
 
 /** An article written on a subject and put in: published when it checks out, else held for the editor. */
-async function writeUp(sql: Sql, subj: Subject, date: string, log: (s: string) => void): Promise<Outcome> {
+async function writeUp(sql: Sql, subj: Subject, date: string, log: (s: string) => void): Promise<Outcome | "busy"> {
   let id = slug(subj.topic);
   if ((await sql.query(`select 1 from features where id = $1`, [id])).length) id = `${id}-${date.slice(5).replace("-", "")}`;
   const m = await make(sql, subj, id, date, log);
   if (m === "stop") return "stop";
+  if (m === "busy") return "busy";
   if (typeof m === "string") { if (m === "thin" || m === "nophoto") await addToList(sql, "desk_skipped", subj.topic); return "skipped"; }
   const status = m.problems.length ? "held" : "published";
   await sql.query(
@@ -674,10 +677,13 @@ async function oneArticle(sql: Sql, log: (s: string) => void): Promise<Outcome> 
   const news = await newsSubject(sql, beat, covered, log);
   if (news === "stop") return "stop";
   const r = news ? await writeUp(sql, news, date, log) : "skipped";
+  // Google too busy to write: the same subject later, not another one now (29 Oct: a busy spell sent the desk to a lasting subject)
+  if (r === "busy") return "skipped";
   if (r !== "skipped") return r;
   const lasting = await lastingSubject(sql, beat, covered, log);
   if (lasting === "stop") return "stop";
-  return lasting ? writeUp(sql, lasting, date, log) : "skipped";
+  const l = lasting ? await writeUp(sql, lasting, date, log) : "skipped";
+  return l === "busy" ? "skipped" : l;
 }
 
 // ---- the older articles written again to today's standard (the user, 29 Oct) ----
@@ -757,7 +763,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let runId: number | null = null;
   const log = (s: string) => {
     console.log(s);
-    lines.push(`${new Date().toISOString().slice(11, 16)} ${s}`.slice(0, 300));
+    // India's time, as the editor reads it
+    lines.push(`${new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(11, 16)} ${s}`.slice(0, 300));
     if (runId != null) sql.query(`update runs set details = coalesce(details, '{}'::jsonb) || jsonb_build_object('log', $2::jsonb) where id = $1`, [runId, JSON.stringify(lines.slice(-30))]).catch(() => null);
   };
   await ensureSchema(sql);
