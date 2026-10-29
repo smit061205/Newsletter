@@ -12,7 +12,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # pinned (29 Oct): ubuntu-latest is moving to Ubuntu 26, and the accessibility check's browser install failed on it
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
