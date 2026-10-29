@@ -17,19 +17,27 @@ const BELOW = ["gujarat", "india", "farm", "economy", "tech", "health", "sport",
 // headlines); the stories of the sections with only a few go together into one
 // grid of cards, each with its section's name, cut to whole rows of four so no
 // row is left half empty. A story shows once on the page, in the first section it belongs to.
+// Each section's newest stories, newest first, led by the most important of the last day, one with a photo
+// if it has one (29 Oct: farming was led by a week-old photo story above one of ten hours before).
+const newest = (a: Story, b: Story) => b.publishedAt.localeCompare(a.publishedAt);
+function freshFirst(list: Story[]): Story[] {
+  const day = list.filter((s) => Date.now() - Date.parse(s.publishedAt) < 24 * 3600_000)
+    .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || newest(a, b));
+  const lead = day.find((s) => s.photo) ?? day[0] ?? list.find((s) => s.photo) ?? list[0];
+  return lead ? [lead, ...list.filter((s) => s !== lead)] : list;
+}
 function sectionBoxes(stories: Story[], shown: Set<string>) {
   const used = new Set(shown);
   const wide: { k: string; list: Story[] }[] = [];
   const few: { k: string; s: Story }[] = [];
   for (const k of [...BELOW, "world"]) {
-    const list = stories.filter((s) => inSection(s, k) && !used.has(s.id)).slice(0, 7)
-      .sort((a, b) => Number(!!b.photo) - Number(!!a.photo));
+    const list = freshFirst(stories.filter((s) => inSection(s, k) && !used.has(s.id)).sort(newest).slice(0, 7));
     if (!list.length) continue;
     list.forEach((s) => used.add(s.id));
     if (list.length >= 4) wide.push({ k, list });
     else few.push(...list.map((s) => ({ k, s })));
   }
-  few.sort((a, b) => Number(!!b.s.photo) - Number(!!a.s.photo));
+  few.sort((a, b) => newest(a.s, b.s));
   return { wide, few: few.length >= 4 ? few.slice(0, Math.min(12, few.length - few.length % 4)) : few };
 }
 
