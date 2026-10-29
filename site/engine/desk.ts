@@ -460,25 +460,49 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
     if (last && last.reduce((n, y) => n + words(y.p), 0) + words(x.p) <= 400) last.push(x); else pieces.push([x]);
   }
   const out = [...paras];
-  for (const [n, piece] of pieces.entries()) {
-    const src = piece.map((x) => x.p);
-    let done: string[] | null = null;
+  // one piece of paragraphs translated (three tries); null when it couldn't be, "stop" when the models are spent
+  const one = async (src: string[], label: string, tries: number): Promise<string[] | null | "stop"> => {
     let note = "";
-    for (let k = 0; k < 3 && !done; k++) {
+    for (let k = 0; k < tries; k++) {
+      let why = "";
       const r = await ask({ system: TRANSLATE(lang), user: JSON.stringify({ paragraphs: src }) + note, maxTokens: 8000 }, (v) => {
         const x = (v as { paragraphs?: unknown[] })?.paragraphs;
-        if (!Array.isArray(x) || x.length !== src.length) return null;
+        if (!Array.isArray(x) || x.length !== src.length) { why = `${Array.isArray(x) ? x.length : "no"} paragraphs for ${src.length}`; return null; }
         const t = x.map((y) => String(y ?? "").trim());
         // no Gujarati left in any paragraph, the language's own letters over the piece (a paragraph of names or numbers has none)
-        return t.every((y, m) => y && words(y) >= words(src[m]) * 0.5 && !/[\u0980-\u0DFF]/.test(y)) && script(t.join(" ")) ? t : null;
+        const short = t.findIndex((y, m) => !y || words(y) < words(src[m]) * 0.5);
+        if (short >= 0) { why = `paragraph ${short + 1} too short (${words(t[short])} words for ${words(src[short])})`; return null; }
+        const gu = t.findIndex((y) => /[\u0980-\u0DFF]/.test(y));
+        if (gu >= 0) { why = `Gujarati left in paragraph ${gu + 1}: ${t[gu].match(/\S*[\u0980-\u0DFF]\S*/)?.[0]}`; return null; }
+        if (!script(t.join(" "))) { why = `not in ${name}`; return null; }
+        return t;
       });
-      if (!r.ok) { log(`  ${name} piece ${n + 1} of ${pieces.length}: ${r.why.slice(0, 140)}`); if (r.stop) return null; continue; }
+      if (!r.ok) { log(`  ${name} ${label}: ${why || r.why.slice(0, 140)}`); if (r.stop) return "stop"; continue; }
       const wrong = numbersNotIn(r.value.join("\n"), src.join("\n"), date);
-      if (!wrong.length) done = r.value;
-      else note = `\n\nYour last translation had numbers that are not in the Gujarati: ${wrong.join(", ")}. Translate again and keep every number exactly.`;
+      if (!wrong.length) return r.value;
+      log(`  ${name} ${label}: numbers not in the Gujarati: ${wrong.slice(0, 5).join(", ")}`);
+      note = `\n\nYour last translation had numbers that are not in the Gujarati: ${wrong.join(", ")}. Translate again and keep every number exactly.`;
     }
-    if (!done) { log(`  ${name} not made: piece ${n + 1} of ${pieces.length} failed three times`); return null; }
-    piece.forEach((x, m) => { out[x.i] = done![m]; });
+    return null;
+  };
+  for (const [n, piece] of pieces.entries()) {
+    const label = `piece ${n + 1} of ${pieces.length}`;
+    let done = await one(piece.map((x) => x.p), label, 3);
+    // 29 Oct: an article's first piece failed every round for hours: its paragraphs one at a time, so one awkward
+    // paragraph holds up only itself
+    if (done === null && piece.length > 1) {
+      const each: string[] = [];
+      for (const [m, x] of piece.entries()) {
+        const t = await one([x.p], `${label}, paragraph ${m + 1} alone`, 2);
+        if (t === "stop") return null;
+        if (!t) break;
+        each.push(t[0]);
+      }
+      if (each.length === piece.length) done = each;
+    }
+    if (done === "stop") return null;
+    if (!done) { log(`  ${name} not made: ${label} failed`); return null; }
+    piece.forEach((x, m) => { out[x.i] = (done as string[])[m]; });
   }
 
   // the graphs' labels, on their own
@@ -770,7 +794,7 @@ async function retranslate(sql: Sql, log: (s: string) => void, deadline: number)
     const hi = translated("hi", r.hi) ? r.hi : await translate(sql, gu, figs, "hi", indiaDate(), log);
     await sql.query(`update features set en = $2, hi = $3, figures = $4, updated_at = now() where id = $1`,
       [r.id, en ? JSON.stringify(en) : null, hi ? JSON.stringify(hi) : null, JSON.stringify(figs)]);
-    log(`  ${r.id}: translated again${en ? " (English)" : ""}${hi ? " (Hindi)" : ""}`);
+    log(en || hi ? `  ${r.id}: translated again${en ? " (English)" : ""}${hi ? " (Hindi)" : ""}` : `  ${r.id}: still not translated`);
     if (en || hi) { await touched(sql); await refresh(); }
   }
 }

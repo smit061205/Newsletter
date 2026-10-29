@@ -225,20 +225,23 @@ async function refile() {
 }
 
 /** The last three days' stories without their English or Hindi (Gujarat's news went without, before 29 Oct; or a
- *  translation failed) get them, the most important first, a few each run as the free allowance goes. */
+ *  translation failed) get them, the most important first, a few each run as the free allowance goes; then the
+ *  printed paper's stories of the last month without Hindi (29 Oct: 70 of them; their English is the hourly run's,
+ *  pipeline/run.ts, which makes no Hindi). */
 async function translations() {
   const left = await aiLeft(sql);
   const can = Math.min(6, Math.floor((left - RESERVE) / 2));
   if (can <= 0) return 0;
   const rows = await sql.query(
-    `select id, kicker, headline, deck, body, caption, en_status, hi_status from stories
-      where origin = 'live' and status = 'published' and published_at > now() - interval '3 days' and (en_status <> 'done' or hi_status <> 'done')
-      order by importance desc nulls last, published_at desc limit $1`, [can]);
+    `select id, origin, kicker, headline, deck, body, caption, en_status, hi_status from stories
+      where status = 'published' and (origin = 'live' and published_at > now() - interval '3 days' and (en_status <> 'done' or hi_status <> 'done')
+                                      or origin <> 'live' and published_at > now() - interval '30 days' and hi_status <> 'done')
+      order by origin = 'live' desc, importance desc nulls last, published_at desc limit $1`, [can]);
   let done = 0;
   for (const r of rows) {
     if (Date.now() > deadline) break;
     const w = { kicker: r.kicker, headline: r.headline, deck: r.deck, body: r.body, caption: r.caption, model: "" };
-    const en = r.en_status === "done" ? null : await translate(sql, w, "en", indiaDate());
+    const en = r.en_status === "done" || r.origin !== "live" ? null : await translate(sql, w, "en", indiaDate());
     const hi = r.hi_status === "done" ? null : await translate(sql, w, "hi", indiaDate());
     await sql.query(
       `update stories set en = coalesce($2::jsonb, en), en_status = case when $2::jsonb is not null then 'done' else en_status end,
