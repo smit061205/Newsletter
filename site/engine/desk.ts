@@ -410,7 +410,14 @@ function figureStrings(figs: Figure[]): L3[] {
 
 interface Words3 { headline: string; dek: string; caption: string; body: string }
 
-async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi", date: string): Promise<Words3 | null> {
+const LABELS = (lang: "en" | "hi") => `Translate each Gujarati label of a graph or table into ${lang === "en" ? "English" : "Hindi (Devanagari)"}: the same
+number of them, in the same order, numbers exactly as they are (in ordinary digits 0-9), names of models, companies and products
+as they are. Reply with JSON only: {"strings":[]}`;
+
+/** The article in English or Hindi, graphs included. The words and the graphs' labels are taken separately: a list of
+ *  labels a few short (29 Oct: with 4 to 8 figures there are dozens) no longer costs the whole translation; a label
+ *  left untranslated shows in Gujarati. */
+async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi", date: string, log: (s: string) => void = () => {}): Promise<Words3 | null> {
   const labels = figureStrings(figs);
   const source = [gu.headline, gu.dek, gu.caption, gu.body, ...labels.map((l) => l.gu)].join("\n\n");
   const marks = (s: string) => (s.match(/\[\[fig \d+\]\]/g) ?? []).join();
@@ -418,21 +425,34 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
   const take = (v: unknown) => {
     const x = v as Partial<Words3> & { strings?: unknown[] };
     if (!x?.headline || typeof x.body !== "string" || words(x.body) < words(gu.body) * 0.6) return null;
-    if (marks(x.body) !== marks(gu.body) || !Array.isArray(x.strings) || x.strings.length !== labels.length) return null;
+    if (marks(x.body) !== marks(gu.body)) return null;
     if (lang === "hi" && !/[ऀ-ॿ]/.test(x.headline + x.body)) return null;
-    return { headline: String(x.headline), dek: String(x.dek ?? ""), caption: String(x.caption ?? ""), body: x.body, strings: x.strings.map(String) };
+    return { headline: String(x.headline), dek: String(x.dek ?? ""), caption: String(x.caption ?? ""), body: x.body,
+             strings: Array.isArray(x.strings) ? x.strings.map(String) : [] };
+  };
+  // the labels on their own, when they didn't come back with the words
+  const labelsAlone = async () => {
+    const one = (v: unknown) => { const x = (v as { strings?: unknown[] })?.strings; return Array.isArray(x) && x.length === labels.length ? x.map(String) : null; };
+    for (let k = 0; k < 2; k++) {
+      const r = await askGemini(sql, "lite", { system: LABELS(lang), user: JSON.stringify({ strings: labels.map((l) => l.gu) }), maxTokens: 8000 }, one);
+      if (r.ok && !numbersNotIn(r.value.join("\n"), labels.map((l) => l.gu).join("\n"), date).length) return r.value;
+    }
+    return null;
   };
   for (let attempt = 0; attempt < 2; attempt++) {
     // Gemini Flash Lite; a Gemma when its requests are used up
     const ask = { system: TRANSLATE(lang), user: JSON.stringify({ ...gu, strings: labels.map((l) => l.gu) }) + note, maxTokens: 32_000 };
     const res = await askGemini(sql, "lite", ask, take).then((r) => (r.ok || !r.stop ? r : askJson(sql, ask, take)));
-    if (!res.ok) return null;
+    if (!res.ok) { log(`  ${lang === "en" ? "English" : "Hindi"} not made: ${res.why.slice(0, 160)}`); continue; }
     const out = res.value;
-    const wrong = numbersNotIn([out.headline, out.dek, out.caption, out.body, ...out.strings].join("\n"), source, date);
+    const wrong = numbersNotIn([out.headline, out.dek, out.caption, out.body].join("\n"), source, date);
     if (!wrong.length) {
-      out.strings.forEach((s, i) => { labels[i][lang] = s; });
+      const strings = out.strings.length === labels.length && !numbersNotIn(out.strings.join("\n"), source, date).length ? out.strings : await labelsAlone();
+      if (strings) strings.forEach((x, i) => { labels[i][lang] = x; });
+      else log(`  ${lang === "en" ? "English" : "Hindi"}: the graphs' labels stay in Gujarati`);
       return { headline: out.headline, dek: out.dek, caption: out.caption, body: out.body };
     }
+    log(`  ${lang === "en" ? "English" : "Hindi"} had numbers not in the Gujarati: ${wrong.slice(0, 6).join(", ")}`);
     note = `\n\nYour last translation had numbers that are not in the Gujarati: ${wrong.join(", ")}. Translate again and keep every number exactly.`;
   }
   return null;
@@ -529,8 +549,8 @@ async function make(sql: Sql, subj: Subject, id: string, date: string, log: (s: 
   // the check, then English and Hindi
   const gu = { headline: d.headline, dek: d.dek, caption, body };
   const problems = await checkArticle(sql, [d.headline, d.dek, body, figureText(figs)].join("\n\n"), sources, date);
-  const en = await translate(sql, gu, figs, "en", date);
-  const hi = await translate(sql, gu, figs, "hi", date);
+  const en = await translate(sql, gu, figs, "en", date, log);
+  const hi = await translate(sql, gu, figs, "hi", date, log);
   return { gu, photo, figs, en, hi, problems, sources, model: draft.model, words: words(body) };
 }
 
@@ -677,13 +697,14 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
 async function retranslate(sql: Sql, log: (s: string) => void, deadline: number) {
   const rows = await sql.query(
     `select id, headline, dek, caption, body, figures, en, hi from features where (author = 'desk' or checks->>'rewritten' = 'true')
-       and status in ('published', 'held') and (en is null or hi is null) and updated_at > now() - interval '7 days' order by updated_at desc limit 3`);
+       and status in ('published', 'held') and (en is null or hi is null) and updated_at > now() - interval '7 days' order by updated_at asc limit 4`);
   for (const r of rows) {
     if (Date.now() > deadline - 3 * 60_000) return;
     const figs = (r.figures ?? []) as Figure[];
     const gu = { headline: r.headline, dek: r.dek, caption: r.caption, body: r.body };
-    const en = r.en ?? (await translate(sql, gu, figs, "en", indiaDate()));
-    const hi = r.hi ?? (await translate(sql, gu, figs, "hi", indiaDate()));
+    log(`  translating again: ${r.id}`);
+    const en = r.en ?? (await translate(sql, gu, figs, "en", indiaDate(), log));
+    const hi = r.hi ?? (await translate(sql, gu, figs, "hi", indiaDate(), log));
     await sql.query(`update features set en = $2, hi = $3, figures = $4, updated_at = now() where id = $1`,
       [r.id, en ? JSON.stringify(en) : null, hi ? JSON.stringify(hi) : null, JSON.stringify(figs)]);
     log(`  ${r.id}: translated again${en ? " (English)" : ""}${hi ? " (Hindi)" : ""}`);
