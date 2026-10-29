@@ -22,15 +22,27 @@ export async function photoOf(sql: Sql, src: SourceText[], storyId: string): Pro
   return url ? storePhoto(sql, url, storyId) : null;
 }
 
-/** A photo fetched, made 1200 px wide and kept in the photo store; null when it's too small or the day's uploads are used up. */
-export async function storePhoto(sql: Sql, url: string, storyId: string, ua = UA): Promise<Photo | null> {
+/** A photo fetched, made 1200 px wide (an Aavtikal cover 1920, 30 Oct) and kept in the photo store; null when it's too
+ *  small or the day's uploads are used up. */
+export async function storePhoto(sql: Sql, url: string, storyId: string, ua = UA, width = 1200): Promise<Photo | null> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
   if ((await count(sql, "upload", 0)) >= WEBSITE.dailyUploads) return null;
   try {
     const res = await fetch(url, { headers: { "user-agent": ua }, signal: AbortSignal.timeout(20_000) });
     if (!res.ok) return null;
-    const { data, info } = await sharp(Buffer.from(await res.arrayBuffer())).rotate()
-      .resize({ width: 1200, withoutEnlargement: true }).jpeg({ quality: 78, mozjpeg: true }).toBuffer({ resolveWithObject: true });
+    return await storeImage(sql, Buffer.from(await res.arrayBuffer()), storyId, width);
+  } catch {
+    return null;
+  }
+}
+
+/** An image already in hand (Aavtikal's drawn covers, engine/drawn.ts) made a JPEG and kept in the photo store, as storePhoto. */
+export async function storeImage(sql: Sql, image: Buffer, storyId: string, width = 1200): Promise<Photo | null> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  if ((await count(sql, "upload", 0)) >= WEBSITE.dailyUploads) return null;
+  try {
+    const { data, info } = await sharp(image).rotate()
+      .resize({ width, withoutEnlargement: true }).jpeg({ quality: width > 1200 ? 82 : 78, mozjpeg: true }).toBuffer({ resolveWithObject: true });
     if (info.width < 400 || info.height < 220) return null; // an icon or a banner strip
     const name = `live/${indiaDate()}/${storyId}-${createHash("sha256").update(data).digest("hex").slice(0, 10)}.jpg`;
     await put(name, data, { access: "private", contentType: "image/jpeg", addRandomSuffix: false, allowOverwrite: true });

@@ -254,7 +254,10 @@ export const geminiLeft = async (sql: Sql, pool: GeminiPool) => (await geminiNex
 
 /** o.wait false: no minute's wait when every model is busy, and o.timeoutMs a shorter limit per request, for the news
  *  engine, whose rounds have a few minutes (29 Oct: waits for Flash Lite, shared with the desk, ran its rounds past their time) */
-export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: string; user: string; maxTokens?: number; temperature?: number }, check: (v: unknown) => T | null,
+/** A picture shown to Gemini (it sees images; Aavtikal's covers, 30 Oct): a line naming it, then the picture as a JPEG. */
+export interface GeminiImage { label: string; jpeg: string }
+
+export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: string; user: string; maxTokens?: number; temperature?: number; images?: GeminiImage[] }, check: (v: unknown) => T | null,
   o: { wait?: boolean; timeoutMs?: number } = {}): Promise<AiResult<T>> {
   if (!(await geminiModels(pool)).length) return { ok: false, why: `no Gemini ${pool} model for this key`, stop: true };
   // a model Google says is too busy right now ("high demand", 29 Oct) is set aside for this request and the next one
@@ -279,7 +282,7 @@ export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: stri
         headers: { "x-goog-api-key": GOOGLE_KEY, "content-type": "application/json" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: a.system }] },
-          contents: [{ role: "user", parts: [{ text: a.user }] }],
+          contents: [{ role: "user", parts: [{ text: a.user }, ...(a.images ?? []).flatMap((i) => [{ text: i.label }, { inlineData: { mimeType: "image/jpeg", data: i.jpeg } }])] }],
           generationConfig: { temperature: a.temperature ?? 0.4, maxOutputTokens: a.maxTokens ?? 48_000, responseMimeType: "application/json" },
         }),
       });
