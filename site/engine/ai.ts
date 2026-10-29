@@ -230,16 +230,19 @@ const spent = new Set<string>();
 /** Google's free day ends at midnight in California (12:30 pm in India), so each model's count is kept by that day */
 const googleDay = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 const geminiCounter = (id: string) => `ai_gemini:${id}:${googleDay()}`;
+/** a model's requests in Google's day so far (its count may fall on two of India's days) */
+const geminiUsed = async (sql: Sql, id: string) =>
+  Number((await sql.query(`select coalesce(sum(n), 0)::int as n from usage where kind = $1`, [geminiCounter(id)]))[0]?.n ?? 0);
 async function geminiNext(sql: Sql, pool: GeminiPool, busy?: Set<string>): Promise<string | null> {
   for (const m of await geminiModels(pool)) {
-    if (!spent.has(m.id) && !busy?.has(m.id) && (await count(sql, geminiCounter(m.id), 0)) < m.daily) return m.id;
+    if (!spent.has(m.id) && !busy?.has(m.id) && (await geminiUsed(sql, m.id)) < m.daily) return m.id;
   }
   return null;
 }
 /** how many of a pool's requests are left today */
 export async function geminiRemaining(sql: Sql, pool: GeminiPool): Promise<number> {
   let n = 0;
-  for (const m of await geminiModels(pool)) if (!spent.has(m.id)) n += Math.max(0, m.daily - (await count(sql, geminiCounter(m.id), 0)));
+  for (const m of await geminiModels(pool)) if (!spent.has(m.id)) n += Math.max(0, m.daily - (await geminiUsed(sql, m.id)));
   return n;
 }
 /** whether a pool has a request left today */
