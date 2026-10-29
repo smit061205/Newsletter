@@ -1,5 +1,6 @@
 // Aavtikal's pages (FLAGSHIP.md §2.4-2.10), one view per kind; the routes in
 // app/(gu)/aavtikal, app/(en)/en/aavtikal and app/(hi)/hi/aavtikal only pick the language.
+import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import s from "@/components/flagship/fl.module.css";
@@ -8,10 +9,13 @@ import Share from "@/components/flagship/Share.tsx";
 import { Grid, JoinBox, Lead, featureHref, gl } from "@/components/flagship/cards.tsx";
 import { SearchIcon, Chev } from "@/components/icons.tsx";
 import type { Lang } from "@/lib/types.ts";
-import { AUTHORS, BEATS, beatName, featureById, featureWords, features, flw, isAuthor, isBeat, readMinutes, searchFeatures, type Beat, type Figure, type L3 } from "@/lib/flagship.ts";
+import { AUTHORS, BEATS, beatName, featureById as loadFeature, featureWords, features, flw, isAuthor, isBeat, readMinutes, searchFeatures, type Beat, type Figure, type L3 } from "@/lib/flagship.ts";
 import { dateText, num, paragraphs } from "@/lib/format.ts";
 import { SITE_URL } from "@/lib/site.ts";
 import { pageMeta } from "@/lib/meta.ts";
+
+/** An article read once per page, though its title data and its page both ask for it */
+const featureById = cache(loadFeature);
 
 export async function FlFront({ lang }: { lang: Lang }) {
   const w = flw(lang);
