@@ -432,6 +432,11 @@ const UNTRANSLATED = (c: "en" | "hi") =>
   `(${c} is null or jsonb_typeof(${c}) <> 'object' or coalesce(${c}->>'headline', '') = '' or coalesce(${c}->>'body', '') = ''
     or concat_ws(' ', ${c}->>'headline', ${c}->>'dek', ${c}->>'body') ~ '[\u0980-\u0DFF]'${c === "hi" ? ` or (${c}->>'headline') !~ '[\u0900-\u097F]'` : ""})`;
 
+/** The numbers in a translation that aren't in the Gujarati; a number that is the Gujarati's digits with a stray space
+ *  taken out counts as there (29 Oct: an article's "૧૯૬ ૮" stopped its English and Hindi, which rightly said 1968). */
+const notInGujarati = (out: string, gu: string, date: string) =>
+  numbersNotIn(out, `${gu}\n${gu.replace(/([૦-૯0-9]) (?=[૦-૯0-9])/g, "$1")}`, date);
+
 async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi", date: string, log: (s: string) => void = () => {}): Promise<Words3 | null> {
   const name = lang === "en" ? "English" : "Hindi";
   const script = (t: string) => inScript(lang, t);
@@ -446,7 +451,7 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
       const x = v as { headline?: string; dek?: string; caption?: string };
       return x?.headline && script(`${x.headline} ${x.dek ?? ""}`) && (!x.caption || script(x.caption)) ? { headline: String(x.headline), dek: String(x.dek ?? ""), caption: String(x.caption ?? "") } : null;
     });
-    if (r.ok && !numbersNotIn(Object.values(r.value).join("\n"), [gu.headline, gu.dek, gu.caption].join("\n"), date).length) head = r.value;
+    if (r.ok && !notInGujarati(Object.values(r.value).join("\n"), [gu.headline, gu.dek, gu.caption].join("\n"), date).length) head = r.value;
     else if (!r.ok) log(`  ${name} headline not made: ${r.why.slice(0, 140)}`);
   }
   if (!head) return null;
@@ -478,7 +483,7 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
         return t;
       });
       if (!r.ok) { log(`  ${name} ${label}: ${why || r.why.slice(0, 140)}`); if (r.stop) return "stop"; continue; }
-      const wrong = numbersNotIn(r.value.join("\n"), src.join("\n"), date);
+      const wrong = notInGujarati(r.value.join("\n"), src.join("\n"), date);
       if (!wrong.length) return r.value;
       log(`  ${name} ${label}: numbers not in the Gujarati: ${wrong.slice(0, 5).join(", ")}`);
       note = `\n\nYour last translation had numbers that are not in the Gujarati: ${wrong.join(", ")}. Translate again and keep every number exactly.`;
@@ -514,7 +519,7 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
         const x = (v as { strings?: unknown[] })?.strings;
         return Array.isArray(x) && x.length === labels.length ? x.map(String) : null;
       });
-      if (r.ok && !numbersNotIn(r.value.join("\n"), labels.map((l) => l.gu).join("\n"), date).length) strings = r.value;
+      if (r.ok && !notInGujarati(r.value.join("\n"), labels.map((l) => l.gu).join("\n"), date).length) strings = r.value;
     }
     if (strings) strings.forEach((x, m) => { labels[m][lang] = x; });
     else log(`  ${name}: the graphs' labels stay in Gujarati`);
