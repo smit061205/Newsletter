@@ -30,8 +30,9 @@ if (!url) { console.error("DATABASE_URL is not set (a repository secret)"); proc
 const sql = neon(url);
 const log = (s: string) => console.log(s);
 const started = Date.now();
-/** leave room before the next run starts */
-const deadline = started + 11 * 60_000;
+/** no new work after this, so the round ends before the next starts (29 Oct: a story begun at 11 minutes ran past the
+ *  13-minute limit and a third of the rounds were cut off unfinished) */
+const deadline = started + 8 * 60_000;
 /** free requests kept back each day for the hourly run's English (site/pipeline/run.ts) */
 const RESERVE = 120;
 /** at most this many stories written in one run (each takes ~3-5 requests) */

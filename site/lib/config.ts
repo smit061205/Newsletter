@@ -5,12 +5,13 @@ export const WEBSITE = {
   url: "https://capital-kranti.vercel.app",
   freeModels: ["google/gemma-4-31b-it:free", "google/gemma-4-26b-a4b-it:free"],
   // Gemma through Google's own API with the paper's free key (GOOGLE_AI_KEY), tried first;
-  // the daily ceiling stays under the free tier's (about 1,500 a day per Gemma, 26 Oct)
+  // the daily ceiling stays under the free tier's (14,400 a day for each Gemma, AI Studio 29 Oct; it was 1,400 from an
+  // older reading, and the engine stopped writing once it was reached: the minute's 16,000 tokens is the real limit)
   // (26 Oct, measured by engine/aiprobe.ts: the 26b answers a story in 7 s when told to think
   // minimally, 100 s otherwise; the 31b refuses that setting and is slower, so it checks)
   googleModels: ["gemma-4-26b-a4b-it", "gemma-4-31b-it"],
   googleThinking: { "gemma-4-26b-a4b-it": { thinkingLevel: "minimal" } } as Record<string, Record<string, unknown>>,
-  dailyGoogleRequests: 1400,
+  dailyGoogleRequests: 12000,
   dailyFreeRequests: 900,
   dailyUploads: 50,
   // Aavtikal's desk (engine/desk.ts; the user, 29 Oct): deep explainers for AI, Tech and Science (never Politics),

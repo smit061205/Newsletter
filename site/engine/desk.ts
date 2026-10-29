@@ -781,9 +781,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const details: Record<string, number> = { published: 0, held: 0, skipped: 0, rewritten: 0, kept: 0 };
   try {
     // the missing English and Hindi first (29 Oct: left to the end of a round, they waited for hours)
-    await retranslate(sql, log, Math.min(deadline, Date.now() + 15 * 60_000));
+    await retranslate(sql, log, Math.min(deadline, Date.now() + Math.min(15 * 60_000, (deadline - started) / 3)));
     let newDone = false, oldDone = false;
-    while (deadline - Date.now() > 8 * 60_000 && !(newDone && oldDone)) {
+    // an article takes up to ten minutes (written, its figures, checked, translated in pieces): none begun in its last 15
+    // (a third of a short round), so the round isn't cut off with an article half done (29 Oct)
+    const margin = Math.min(15 * 60_000, (deadline - started) * 0.35);
+    while (deadline - Date.now() > margin && !(newDone && oldDone)) {
       // the older articles first (the user, 29 Oct: "trigger rewriting now"), then the day's new ones
       // a rewrite only with writing requests to spare beyond today's articles (and a few for failed tries)
       if (!oldDone && (await geminiRemaining(sql, "writer")) <= (await stillToday(sql, indiaDate())) + 4) oldDone = true;
@@ -793,7 +796,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         if (r === "none") oldDone = true;
         else { details[r]++; continue; }
       }
-      if (!newDone && deadline - Date.now() > 8 * 60_000) {
+      if (!newDone && deadline - Date.now() > margin) {
         const r = await oneArticle(sql, log);
         if (r === "stop") break;
         if (r === "done") newDone = true;

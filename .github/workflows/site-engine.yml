@@ -68,7 +68,7 @@ jobs:
             rounds=$((rounds + 1))
             echo "::group::Round $rounds, $(date -u +%H:%M) UTC"
             if node --experimental-strip-types --no-warnings site/engine/selftest.ts \
-               && timeout 13m node --experimental-strip-types --no-warnings site/engine/run.ts; then :; else
+               && timeout 14m node --experimental-strip-types --no-warnings site/engine/run.ts; then :; else
               failed=$((failed + 1)); echo "::warning::Round $rounds failed"
             fi
             echo "::endgroup::"
