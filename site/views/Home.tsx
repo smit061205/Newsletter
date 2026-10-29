@@ -8,7 +8,7 @@ import { dateText } from "../lib/format.ts";
 import { Cmp, Head, Join, LatestList, Lead, MostRead, Std } from "../components/cards.tsx";
 import Frame from "../components/Frame.tsx";
 import { PAPER } from "../lib/site.ts";
-import { features } from "../lib/flagship.ts";
+import { beatName, featureWords, features, flw } from "../lib/flagship.ts";
 import AavtikalPromo from "../components/AavtikalPromo.tsx";
 
 const inSection = (s: Story, key: string) => s.tier === key || s.genres.includes(key as never);
@@ -76,8 +76,8 @@ export default async function Home({ lang }: { lang: Lang }) {
   const fresh = stories.filter((s) => s.origin === "live" && Date.now() - Date.parse(s.publishedAt) < 12 * 3600_000 && (s.importance ?? 0) >= 7.5)
     .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
   const lead = fresh.find((s) => s.photo) ?? fresh[0] ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
-  // under the lead, its subject's other stories; below the top, what readers open most and Aavtikal's newest
-  const [more, most, articles] = await Promise.all([lead ? moreOnSubject(lead.id) : [], mostRead(5), features({ limit: 12 })]);
+  // under the lead, its subject's other stories; below the top, what readers open most; Aavtikal's newest
+  const [more, most, articles] = await Promise.all([lead ? moreOnSubject(lead.id) : [], mostRead(5), features({ limit: 6 })]);
   // the stories under the lead: today's paper first, then the newest; whole rows of three
   // only (28 Oct: four left one card alone in its row and a hole beside the rail)
   const pool = [...today, ...stories.filter((s) => s.issueDate !== day)].filter((s) => s !== lead).slice(0, 6);
@@ -87,6 +87,10 @@ export default async function Home({ lang }: { lang: Lang }) {
   const byTime = stories.filter((s) => !shown.has(s.id))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || (a.page ?? 9) - (b.page ?? 9) || (a.rank ?? 99) - (b.rank ?? 99));
   const { wide, few } = sectionBoxes(stories, shown);
+  // Aavtikal's newest article (one with a photo first) for the card in the corner
+  const av = articles.find((f) => f.photo) ?? articles[0];
+  const avw = av && featureWords(av, lang);
+  const fw = flw(lang);
   // photos only in whole rows, so every row's headlines line up
   const fewPhotos = Math.floor(few.filter((x) => x.s.photo).length / 4) * 4;
 
@@ -111,8 +115,6 @@ export default async function Home({ lang }: { lang: Lang }) {
             <aside className="rail vr"><div className="fit"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={16} /></div></aside>
           </div>
           <section className="ctr phone-latest"><Head label={t(lang, "latestTitle")} to={href(lang, "/latest")} /><LatestList stories={byTime} lang={lang} n={6} /></section>
-          {/* Aavtikal, the long reads, right under the day's top news (the user, 29 Oct) */}
-          <AavtikalPromo lang={lang} articles={articles} />
           <section className="ctr band">
             {most.length >= 3 && <div><Head label={t(lang, "mostRead")} /><MostRead stories={most} lang={lang} /></div>}
             <Join lang={lang} />
@@ -127,6 +129,9 @@ export default async function Home({ lang }: { lang: Lang }) {
           )}
         </>
       )}
+      <AavtikalPromo name={fw.name} by={fw.promoBy} close={fw.close} home={href(lang, "/aavtikal")} cta={av ? fw.promoRead : fw.promoCta}
+        article={av && avw ? { href: href(lang, `/aavtikal/p/${av.id}`), headline: avw.headline, beat: av.beat, beatName: beatName(av.beat, lang),
+                               lang: avw.translated || lang === "gu" ? lang : "gu" } : null} />
     </Frame>
   );
 }
