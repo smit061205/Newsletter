@@ -15,9 +15,9 @@ export const WEBSITE = {
   dailyFreeRequests: 900,
   dailyUploads: 50,
   // Aavtikal's desk (engine/desk.ts; the user, 29 Oct): deep explainers for AI, Tech and Science (never Politics),
-  // written by Gemini Flash on Google's free tier, 10 a day; more on the days named
+  // written by Gemini Flash on Google's free tier, 15 a day (the user, 30 Oct; 10 before); more on the days named
   deskBeats: ["ai", "tech", "science"] as const,
-  deskDaily: 10,
+  deskDaily: 15,
   deskDays: { "2026-10-29": 20 } as Record<string, number>,
   // each model's own free requests a day (AI Studio, 29 Oct), used in order: the writers (3.6 when 3.8's
   // are used or it is busy, then 3 (2.5 is listed but no longer served to new keys): Google's busy spells used 40 requests for 6 articles on 29 Oct) and the translators (Gemma's 16,000 tokens a minute is too
