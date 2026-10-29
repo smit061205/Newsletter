@@ -110,7 +110,7 @@ export async function desk(sql: Sql | null): Promise<Desk> {
        (select count(*) from features where checks->>'rewritten' = 'true') as rewritten,
        (select count(*) from features where status = 'published' and beat <> 'politics'
           and (author <> 'desk' or photo is null or jsonb_array_length(figures) < 4)
-          and coalesce(checks->>'rewritten', '') <> 'true'
+          and coalesce(checks->>'rewritten', '') <> 'true' and coalesce(checks->>'by', '') <> 'editor'
           and (select count(*) from unnest(string_to_array(coalesce((select value from state where key = 'desk_redone_3'), ''), E'\n')) t where t = id) < 3) as left`, [date]),
     sql.query(`select started_at, finished_at, details from runs where kind = 'desk' order by started_at desc limit 1`),
   ]);
@@ -220,6 +220,34 @@ export async function addStory(sql: Sql, x: NewStory, by: string): Promise<strin
     [id, day, x.tier, x.genre ? [x.genre] : [], x.headline, x.deck, x.body, photo ? x.caption : "", photo ? JSON.stringify(photo) : null,
      JSON.stringify(gallery), JSON.stringify({ by: "editor", who: by })]);
   console.log(`story ${id} written by ${by}`);
+  await touched(sql);
+  return id;
+}
+
+/** An Aavtikal article the editor wrote (app/(gu)/editor/write?for=aavtikal): on the site at once, word for word, as
+ *  the editor's. The first photo leads it, the others are spread through its paragraphs as pictures ("[[fig N]]",
+ *  views/Flagship.tsx); the desk adds its English and Hindi (engine/desk.ts, retranslate) and never rewrites it. */
+export interface NewFeature {
+  headline: string; deck: string; body: string; caption: string; beat: "ai" | "tech" | "science" | "politics";
+  photos: { url: string; width: number; height: number }[];
+}
+export async function addFeature(sql: Sql, x: NewFeature, by: string): Promise<string> {
+  const day = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const id = `ed-${day.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 8)}`;
+  const [photo, ...more] = x.photos;
+  // the editor's paragraphs (a "[[fig" of their own taken out), each further photo after an even share of them
+  // (after a paragraph, never between a "## " sub-heading and its text)
+  const paras = x.body.split("\n\n").filter((p) => !/^\[\[fig/.test(p.trim()));
+  const slots = paras.map((p, i) => (/^#/.test(p.trim()) ? -1 : i)).filter((i) => i >= 0);
+  const after = (j: number) => slots[Math.max(0, Math.min(slots.length - 1, Math.round(((j + 1) * slots.length) / (more.length + 1)) - 1))];
+  const body = paras.flatMap((p, i) => [p, ...more.map((_, j) => j).filter((j) => after(j) === i).map((j) => `[[fig ${j + 1}]]`)]).join("\n\n");
+  const figures = more.map((p) => ({ kind: "image", title: { gu: "", en: "", hi: "" }, photo: p }));
+  await sql.query(
+    `insert into features (id, beat, status, headline, dek, body, caption, photo, author, sources, checks, figures, published_at, updated_at)
+     values ($1, $2, 'published', $3, $4, $5, $6, $7, 'editor', '[]', $8, $9, now(), now())`,
+    [id, x.beat, x.headline, x.deck, body, photo ? x.caption : "", photo ? JSON.stringify(photo) : null,
+     JSON.stringify({ by: "editor", who: by, words: paras.join(" ").split(/\s+/).filter(Boolean).length }), JSON.stringify(figures)]);
+  console.log(`article ${id} written by ${by}`);
   await touched(sql);
   return id;
 }

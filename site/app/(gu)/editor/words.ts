@@ -42,6 +42,13 @@ export const W = {
     putUp: "સાઇટ પર મૂકો", putting: "મુકાય છે…", photoFailed: "એક ફોટો ચડ્યો નથી: તેના પર 'ફરી ચડાવો' દબાવો, અથવા 'કાઢો' દબાવીને ફોટા વગર મૂકો.", waitPhotos: "ફોટા ચડી રહ્યા છે. થોડી રાહ જુઓ, પછી દબાવો.",
     failedPut: "સમાચાર ન મુકાયા. ઇન્ટરનેટ ચાલુ છે તે જોઈને ફરી દબાવો; તમારું લખાણ સચવાયેલું છે.",
     draftKept: "તમારું અધૂરું લખાણ આ ફોનમાં સચવાયેલું છે.", written: "તમારા સમાચાર સાઇટ પર મુકાયા.", seeIt: "સાઇટ પર જુઓ",
+    // the same page for an Aavtikal article of your own
+    avWriteNew: "+ નવો લેખ લખો", avWriteTitle: "આવતીકાલ માટે નવો લેખ લખો", avBody: "લેખ",
+    avWriteIntro: "લખીને નીચે 'સાઇટ પર મૂકો' દબાવો: લેખ તરત આવતીકાલમાં જશે, જેમ લખ્યો તેમ જ, તમારા નામે. અંગ્રેજી અને હિન્દી એકાદ કલાકમાં જાતે બનશે.",
+    avBodyHelp: "દરેક ફકરા વચ્ચે એક ખાલી લીટી રાખો. પેટા મથાળા માટે લીટીની શરૂઆતમાં ## લખો.", beat: "કયા વિભાગનો લેખ?",
+    avPhotosHelp: "ફોનમાંથી એક સાથે ઘણા ફોટા પસંદ કરી શકો છો. પહેલો ફોટો મુખ્ય ફોટો બનશે; બાકીના લેખની વચ્ચે આવશે.",
+    avAiNeedsText: "પહેલાં લેખ લખો, પછી AI મદદ દબાવો.", avFailedPut: "લેખ ન મુકાયો. ઇન્ટરનેટ ચાલુ છે તે જોઈને ફરી દબાવો; તમારું લખાણ સચવાયેલું છે.",
+    avWritten: "તમારો લેખ આવતીકાલમાં મુકાયો.",
   },
   en: {
     title: "Editor's page", signIn: "Sign in with Google", signOut: "Sign out", lang: "ગુજરાતી",
@@ -83,6 +90,12 @@ export const W = {
     putUp: "Put on the site", putting: "Putting it up…", photoFailed: "A photo didn't upload: press 'Try again' on it, or 'Remove' to go without it.", waitPhotos: "Photos are still uploading. Wait a moment, then press.",
     failedPut: "The story didn't go up. Check the internet and press again; your words are kept.",
     draftKept: "Your unfinished words are kept on this phone.", written: "Your story is on the site.", seeIt: "See it on the site",
+    avWriteNew: "+ Write an article", avWriteTitle: "Write an article for Aavtikal", avBody: "Article",
+    avWriteIntro: "Write it, then press 'Put on the site' below: it goes into Aavtikal at once, exactly as written, under your name. Its English and Hindi follow by themselves within an hour or so.",
+    avBodyHelp: "Leave one empty line between paragraphs. For a sub-heading, start the line with ##.", beat: "Which section is it for?",
+    avPhotosHelp: "Pick several photos at once from the phone. The first is the main photo; the others go between the paragraphs.",
+    avAiNeedsText: "Write the article first, then press AI help.", avFailedPut: "The article didn't go up. Check the internet and press again; your words are kept.",
+    avWritten: "Your article is in Aavtikal.",
   },
 } as const;
 export type EdLang = keyof typeof W;

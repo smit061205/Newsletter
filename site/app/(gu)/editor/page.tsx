@@ -17,7 +17,7 @@ import { paragraphs } from "@/lib/format.ts";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "સંપાદક | કેપિટલ ક્રાંતિ", robots: { index: false, follow: false } };
 
-type Q = { lang?: string; signin?: string; q?: string; show?: string; n?: string; fq?: string; fshow?: string; fn?: string; saved?: string; written?: string };
+type Q = { lang?: string; signin?: string; q?: string; show?: string; n?: string; fq?: string; fshow?: string; fn?: string; saved?: string; written?: string; wrote?: string };
 
 export default async function Editor({ searchParams }: { searchParams: Promise<Q> }) {
   const q = await searchParams;
@@ -158,6 +158,8 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
 
       <section className={`${s.block} ${s.av}`} aria-labelledby="aavtikal">
         <div className={s.brandHead}><h2 id="aavtikal">{w.av}</h2><p>{w.avNote}</p></div>
+        <Link className={s.writeBtn} href={`/editor/write?for=aavtikal${back ? `&${back}` : ""}`}>{w.avWriteNew}</Link>
+        {q.wrote && <p className={s.done} role="status">{w.avWritten} <a href={`/aavtikal/p/${encodeURIComponent(q.wrote)}`} target="_blank" rel="noopener">{w.seeIt}</a></p>}
         {d.av && <>
           <h3 className={s.sub}>{w.avDesk}</h3>
           <p className={d.av.running ? s.running : s.stopped}>{d.av.running ? w.avWorking : w.avResting}</p>

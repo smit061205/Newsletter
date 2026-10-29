@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { refresh, revalidatePath } from "next/cache";
 import { db } from "@/lib/db.ts";
 import { redirect } from "next/navigation";
-import { addStory, COOKIE, decideFeature, decideStory, editorOf, restoreStory, saveFeature, saveStory, setPaused, withdrawStory, type NewStory, type Words } from "@/lib/editor.ts";
+import { addFeature, addStory, COOKIE, decideFeature, decideStory, editorOf, restoreStory, saveFeature, saveStory, setPaused, withdrawStory, type NewFeature, type NewStory, type Words } from "@/lib/editor.ts";
 import { help, type Draft, type Help } from "@/lib/aihelp.ts";
 import { GENRES, TIERS } from "@/lib/sections.ts";
 
@@ -51,6 +51,11 @@ export async function changeFeature(id: string, back: string, f: FormData) {
   redirect(`/editor?${back ? `${back}&` : ""}saved=${ok ? "1" : "0"}#aavtikal`);
 }
 
+/** only photos the write page put in the photo store (app/api/editor/photo), at most 12 */
+const editorPhotos = (list: unknown): NewStory["photos"] =>
+  (Array.isArray(list) ? (list as NewStory["photos"]) : []).filter((p) => /^\/media\/live\/\d{4}-\d{2}-\d{2}\/ed-[a-z0-9]+\.jpg$/.test(String(p?.url)))
+    .slice(0, 12).map((p) => ({ url: p.url, width: Math.round(Number(p.width)) || 1600, height: Math.round(Number(p.height)) || 1067 }));
+
 /** a story the editor wrote (app/(gu)/editor/write): on the site at once, word for word */
 export async function writeStory(x: NewStory): Promise<{ id: string } | { error: "missing" | "failed" }> {
   const { who, sql } = await signedIn();
@@ -59,9 +64,7 @@ export async function writeStory(x: NewStory): Promise<{ id: string } | { error:
     headline: clean(x.headline), deck: clean(x.deck), body: clean(x.body).replace(/\n{3,}/g, "\n\n"), caption: clean(x.caption),
     tier: TIERS.includes(x.tier) ? x.tier : "gujarat",
     genre: x.genre && (GENRES as string[]).includes(x.genre) ? x.genre : null,
-    // only photos this page put in the photo store (app/api/editor/photo)
-    photos: (Array.isArray(x.photos) ? x.photos : []).filter((p) => /^\/media\/live\/\d{4}-\d{2}-\d{2}\/ed-[a-z0-9]+\.jpg$/.test(String(p?.url)))
-      .slice(0, 12).map((p) => ({ url: p.url, width: Math.round(Number(p.width)) || 1600, height: Math.round(Number(p.height)) || 1067 })),
+    photos: editorPhotos(x.photos),
   };
   if (!story.headline || !story.body) return { error: "missing" };
   if (!sql) return { error: "failed" };
@@ -74,9 +77,29 @@ export async function writeStory(x: NewStory): Promise<{ id: string } | { error:
     return { error: "failed" };
   }
 }
+/** an Aavtikal article the editor wrote (the same page, ?for=aavtikal): in Aavtikal at once, word for word */
+export async function writeFeature(x: NewFeature): Promise<{ id: string } | { error: "missing" | "failed" }> {
+  const { who, sql } = await signedIn();
+  const clean = (t: unknown) => String(t ?? "").replace(/\r\n/g, "\n").trim();
+  const article: NewFeature = {
+    headline: clean(x.headline), deck: clean(x.deck), body: clean(x.body).replace(/\n{3,}/g, "\n\n"), caption: clean(x.caption),
+    beat: (["ai", "tech", "science", "politics"] as const).includes(x.beat) ? x.beat : "tech",
+    photos: editorPhotos(x.photos),
+  };
+  if (!article.headline || !article.body) return { error: "missing" };
+  if (!sql) return { error: "failed" };
+  try {
+    const id = await addFeature(sql, article, who);
+    renew(true);
+    return { id };
+  } catch (e) {
+    console.error(`a written article not saved: ${e}`);
+    return { error: "failed" };
+  }
+}
 /** the optional AI help on the same page: suggestions the editor may keep or undo (lib/aihelp.ts) */
-export async function aiHelp(d: Draft): Promise<Help> {
+export async function aiHelp(d: Draft, kind: "news" | "article" = "news"): Promise<Help> {
   const { sql } = await signedIn();
   if (!String(d?.body ?? "").trim()) return { ok: false, why: "failed" };
-  return help(sql, { headline: String(d.headline ?? ""), deck: String(d.deck ?? ""), body: String(d.body).slice(0, 20_000) });
+  return help(sql, { headline: String(d.headline ?? ""), deck: String(d.deck ?? ""), body: String(d.body).slice(0, 30_000) }, kind === "article" ? "article" : "news");
 }

@@ -1,4 +1,4 @@
-// The editor page's optional AI help for a story the editor writes (29 Oct): spelling, grammar and a clearer
+// The editor page's optional AI help for a story or an Aavtikal article the editor writes (29 Oct): spelling, grammar and a clearer
 // headline and sub-heading, every fact, name, number and quote kept. Gemini Flash Lite, free (lib/config.ts), with
 // the engine's own key: the website needs GOOGLE_AI_KEY among its settings for this, and says so when it hasn't.
 import type { NeonQueryFunction } from "@neondatabase/serverless";
@@ -13,6 +13,13 @@ Correct its spelling, grammar and punctuation in Gujarati and make its sentences
 strong, short headline (at most 12 words) and a one-sentence sub-heading. Keep every fact, name, number, date and quote
 exactly as written; add nothing that isn't in the text and leave nothing out. Keep the paragraphs, separated by a blank line.
 Reply with JSON only: {"headline":"","deck":"","body":""}`;
+/** for an Aavtikal article the editor writes: a long explainer, its "## " sub-headings kept */
+const ASK_ARTICLE = `You are the copy editor of a Gujarati magazine's long explainers on AI, technology, science and politics. The
+editor wrote this article himself. Correct its spelling, grammar and punctuation in Gujarati and make its sentences clear and
+readable. Give it a strong, short headline (at most 12 words) and a one-sentence sub-heading. Keep every fact, name, number,
+date and quote exactly as written; add nothing that isn't in the text and leave nothing out. Keep the paragraphs, separated by a
+blank line, and keep each line that starts with "## " (a sub-heading) as a line starting with "## ".
+Reply with JSON only: {"headline":"","deck":"","body":""}`;
 
 /** the numbers in a text, Gujarati and Devanagari digits read as ordinary ones */
 const numbers = (t: string) =>
@@ -21,7 +28,7 @@ const numbers = (t: string) =>
 /** Google's free day ends at midnight in California; the engine counts each model's requests by it (engine/ai.ts) */
 const googleDay = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 
-export async function help(sql: NeonQueryFunction<false, false> | null, d: Draft): Promise<Help> {
+export async function help(sql: NeonQueryFunction<false, false> | null, d: Draft, kind: "news" | "article" = "news"): Promise<Help> {
   const key = process.env.GOOGLE_AI_KEY;
   if (!key) return { ok: false, why: "nokey" };
   let busy = false;
@@ -31,7 +38,7 @@ export async function help(sql: NeonQueryFunction<false, false> | null, d: Draft
         method: "POST", signal: AbortSignal.timeout(50_000),
         headers: { "x-goog-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: ASK }] },
+          systemInstruction: { parts: [{ text: kind === "article" ? ASK_ARTICLE : ASK }] },
           contents: [{ role: "user", parts: [{ text: JSON.stringify(d) }] }],
           generationConfig: { temperature: 0.3, maxOutputTokens: 16_000, responseMimeType: "application/json" },
         }),

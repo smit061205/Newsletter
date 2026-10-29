@@ -713,7 +713,7 @@ const REDO = `
 explainer: what it is, how it works, its history and numbers, where it stands now, as the sources have them.)`;
 
 /** One published article from before the desk's standard (no photo, few figures, or written before the desk) written
- *  again. Politics is never touched. It replaces the old one only when every number and claim checks out; each is
+ *  again. Politics is never touched, nor an article the editor wrote on the editor page (its words are the editor's). It replaces the old one only when every number and claim checks out; each is
  *  tried once. */
 async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "rewritten" | "kept" | "stop"> {
   // each older article is tried up to three times (29 Oct: one try lost Chandrayaan to a stray Telugu word)
@@ -723,6 +723,7 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
   const [r] = await sql.query(
     `select id, beat, headline, topic, en, sources from features where status = 'published' and beat <> 'politics'
        and (author <> 'desk' or photo is null or jsonb_array_length(figures) < 4) and coalesce(checks->>'rewritten', '') <> 'true'
+       and coalesce(checks->>'by', '') <> 'editor'
        and not (id = any($1::text[]))
      order by published_at desc nulls last limit 1`, [tried]);
   if (!r) return "none";
