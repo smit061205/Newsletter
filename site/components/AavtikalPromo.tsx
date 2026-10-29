@@ -1,76 +1,47 @@
-// The door into Aavtikal on Capital Kranti's front page (the user, 29 Oct: "advertise Aavtikal on the main website"):
-// Aavtikal's own look inside the daily paper (components/flagship/fl.module.css): its near-black band, the four beats'
-// flat colours as a strip and as tags, its compressed headlines. Its name and what it is on one side; its newest article
-// with a photo on the other, and three more beneath, of other beats where there are. Nothing shows until it has articles.
+"use client";
+// Aavtikal in a corner of Capital Kranti's front page (the user, 29 Oct: "advertise Aavtikal", then "not this big:
+// small one at the end or at any corner"): a small card at the bottom left, in Aavtikal's own look (its near-black
+// ground, the four beats' colours as a strip, its compressed letters), with its newest article and a link in. It
+// comes in once the reader has scrolled past the top story (on a phone it would cover it); closed, it stays away on
+// that phone or computer for three days.
 import Link from "next/link";
-import type { Lang } from "../lib/types.ts";
-import { BEATS, beatName, featureWords, flw, readMinutes, type Feature } from "../lib/flagship.ts";
-import { href } from "../lib/i18n.ts";
-import { num } from "../lib/format.ts";
-import { Chev } from "./icons.tsx";
+import { useEffect, useState } from "react";
 
-const fl = (lang: Lang, path = "") => href(lang, `/aavtikal${path}`);
+const KEY = "ck_av_corner";
+const AWAY = 3 * 24 * 3600_000;
+const BEATS = ["ai", "tech", "science", "politics"] as const;
 
-/** the lead (the newest with a photo) and three more, a beat not yet shown before one already shown */
-export function promoPick(list: Feature[]): Feature[] {
-  const lead = list.find((f) => f.photo) ?? list[0];
-  if (!lead) return [];
-  const rest = list.filter((f) => f !== lead);
-  const seen = new Set([lead.beat]);
-  const more: Feature[] = [];
-  for (const f of rest) if (more.length < 3 && !seen.has(f.beat)) { more.push(f); seen.add(f.beat); }
-  for (const f of rest) if (more.length < 3 && !more.includes(f)) more.push(f);
-  return [lead, ...more];
-}
+export interface CornerArticle { href: string; headline: string; beat: string; beatName: string; lang: string }
 
-export default function AavtikalPromo({ lang, articles }: { lang: Lang; articles: Feature[] }) {
-  const [lead, ...more] = promoPick(articles);
-  if (!lead) return null;
-  const w = flw(lang);
-  const lw = featureWords(lead, lang);
-  const minutes = (f: Feature) => `${num(readMinutes(featureWords(f, lang).body), lang)} ${w.min}`;
+export default function AavtikalPromo({ name, by, cta, close, home, article }:
+  { name: string; by: string; cta: string; close: string; home: string; article: CornerArticle | null }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    try { if (Date.now() - Number(localStorage.getItem(KEY) ?? 0) < AWAY) return; } catch { /* shown anyway */ }
+    const past = () => { if (scrollY > innerHeight * 0.6) { setShown(true); removeEventListener("scroll", past); } };
+    addEventListener("scroll", past, { passive: true });
+    past();
+    return () => removeEventListener("scroll", past);
+  }, []);
+  const shut = () => {
+    setShown(false);
+    try { localStorage.setItem(KEY, String(Date.now())); } catch { /* closed for this visit */ }
+  };
   return (
-    <section className="ctr avp" aria-labelledby="avp-name">
-      <div className="avp-strip" aria-hidden="true">{BEATS.map((b) => <i key={b} className={`b-${b}`} />)}</div>
-      <div className="avp-in">
-        <div className="avp-about">
-          <p className="avp-by">{w.promoBy}</p>
-          <h2 className="avp-name" id="avp-name"><Link href={fl(lang)}>{w.name}</Link></h2>
-          <p className="avp-pitch">{w.promoPitch}</p>
-          <ul className="avp-beats">
-            {BEATS.map((b) => <li key={b}><Link className={`b-${b}`} href={fl(lang, `/${b}`)}>{beatName(b, lang)}</Link></li>)}
-          </ul>
-          <Link className="avp-cta" href={fl(lang)}>{w.promoCta} <Chev /></Link>
-        </div>
-        <article className="avp-lead">
-          <Link href={fl(lang, `/p/${lead.id}`)}>
-            {lead.photo && <span className="avp-ph"><img src={lead.photo.url} width={lead.photo.width} height={lead.photo.height} alt={lw.caption || lw.headline} loading="lazy" decoding="async" /></span>}
-            <span className={`avp-tag b-${lead.beat}`}>{beatName(lead.beat, lang)}</span>
-            <h3 className="avp-hl" lang={lw.translated || lang === "gu" ? lang : "gu"}>{lw.headline}</h3>
-            {lw.dek && <p className="avp-dek">{lw.dek}</p>}
-            <span className="avp-min">{minutes(lead)}</span>
-          </Link>
-        </article>
-        {more.length > 0 && (
-          <div className="avp-more">
-            <p className="avp-label">{w.promoMore}</p>
-            <ul>
-              {more.map((f) => {
-                const t = featureWords(f, lang);
-                return (
-                  <li key={f.id}>
-                    <Link href={fl(lang, `/p/${f.id}`)}>
-                      <span className={`avp-kick b-${f.beat}`}>{beatName(f.beat, lang)}</span>
-                      <span className="avp-sh" lang={t.translated || lang === "gu" ? lang : "gu"}>{t.headline}</span>
-                      <span className="avp-min">{minutes(f)}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
-    </section>
+    <aside className={`avc${shown ? " on" : ""}`} aria-label={name} aria-hidden={!shown} inert={!shown}>
+      <div className="avc-strip" aria-hidden="true">{BEATS.map((b) => <i key={b} className={`b-${b}`} />)}</div>
+      <button type="button" className="avc-x" onClick={shut} aria-label={close}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+      <Link className="avc-in" href={article?.href ?? home}>
+        <span className="avc-by">{by}</span>
+        <span className="avc-name">{name}</span>
+        {article && <>
+          <span className={`avc-tag b-${article.beat}`}>{article.beatName}</span>
+          <span className="avc-hl" lang={article.lang}>{article.headline}</span>
+        </>}
+        <span className="avc-cta">{cta} →</span>
+      </Link>
+    </aside>
   );
 }
