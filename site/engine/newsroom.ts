@@ -5,7 +5,7 @@
 // try.ts runs the same steps on live items without storing anything.
 import { numbersNotIn } from "../../backend/src/editorial/rewrite.ts";
 import { repeats } from "../../backend/src/editorial/quality.ts";
-import { askJson } from "./ai.ts";
+import { askGemini, askJson } from "./ai.ts";
 import { ask } from "./fetch.ts";
 import { pageText } from "./feed.ts";
 import { pibRelease } from "./pib.ts";
@@ -232,13 +232,16 @@ export async function translate(sql: Sql | null, w: Written, lang: "en" | "hi", 
   const source = [w.kicker, w.headline, w.deck, w.body, w.caption].join("\n\n");
   let note = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await askJson(sql, { system: TRANSLATE(lang), user: JSON.stringify({ kicker: w.kicker, headline: w.headline, deck: w.deck, body: w.body, caption: w.caption }) + note, maxTokens: 12000 },
-      (v) => {
-        const x = v as Partial<English>;
-        if (!x?.headline || typeof x.body !== "string") return null;
-        if (lang === "hi" && !/[ऀ-ॿ]/.test(x.headline + x.body)) return null;
-        return { kicker: x.kicker ?? "", headline: x.headline, deck: x.deck ?? "", body: x.body, caption: x.caption ?? "" };
-      });
+    const a = { system: TRANSLATE(lang), user: JSON.stringify({ kicker: w.kicker, headline: w.headline, deck: w.deck, body: w.body, caption: w.caption }) + note, maxTokens: 12000 };
+    const take = (v: unknown) => {
+      const x = v as Partial<English>;
+      if (!x?.headline || typeof x.body !== "string") return null;
+      if (lang === "hi" && !/[ऀ-ॿ]/.test(x.headline + x.body)) return null;
+      return { kicker: x.kicker ?? "", headline: x.headline, deck: x.deck ?? "", body: x.body, caption: x.caption ?? "" };
+    };
+    // Gemini Flash Lite first (29 Oct: a Gemma's 16,000 tokens a minute is shared with the writing and checking, and
+    // made the engine's rounds run past their time), a Gemma when it can't
+    const res = sql ? await askGemini(sql, "lite", a, take).then((r) => (r.ok ? r : askJson(sql, a, take))) : await askJson(sql, a, take);
     if (!res.ok) return null;
     const out = res.value;
     const wrong = numbersNotIn([out.kicker, out.headline, out.deck, out.body, out.caption].join("\n\n"), source, date);

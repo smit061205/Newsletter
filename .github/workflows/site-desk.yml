@@ -50,10 +50,10 @@ jobs:
             if [ "$locks" != "$installed" ]; then
               npm ci --no-audit --no-fund --ignore-scripts && npm ci --prefix site --no-audit --no-fund && installed=$locks
             fi
-            left=$(( end - $(date +%s) )); budget=$(( left < 1500 ? left : 1500 ))
+            left=$(( end - $(date +%s) )); budget=$(( left < 2700 ? left : 2700 ))
             echo "::group::Desk, $(date -u +%H:%M) UTC"
             code=0
-            timeout $(( budget + 120 )) node --experimental-strip-types --no-warnings site/engine/desk.ts $budget || code=$?
+            timeout $(( budget + 600 )) node --experimental-strip-types --no-warnings site/engine/desk.ts $budget || code=$?
             echo "::endgroup::"
             # rest (30 minutes when the day's work is done, 5 after a failure), but wake as soon as new code arrives on main
             rest=0; if [ "$code" -eq 3 ]; then rest=30; elif [ "$code" -ne 0 ]; then echo "::warning::the desk failed ($code)"; rest=5; fi
