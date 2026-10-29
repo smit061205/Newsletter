@@ -227,7 +227,9 @@ async function geminiModels(pool: GeminiPool): Promise<{ id: string; daily: numb
 }
 /** a model this run found used up (Google said 429 before our count did: its day ends at midnight in California) */
 const spent = new Set<string>();
-const geminiCounter = (id: string) => `ai_gemini:${id}`;
+/** Google's free day ends at midnight in California (12:30 pm in India), so each model's count is kept by that day */
+const googleDay = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+const geminiCounter = (id: string) => `ai_gemini:${id}:${googleDay()}`;
 async function geminiNext(sql: Sql, pool: GeminiPool, busy?: Set<string>): Promise<string | null> {
   for (const m of await geminiModels(pool)) {
     if (!spent.has(m.id) && !busy?.has(m.id) && (await count(sql, geminiCounter(m.id), 0)) < m.daily) return m.id;
@@ -274,6 +276,8 @@ export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: stri
       const text = await res.text();
       // this model's day is used up: the next one in the pool
       if (res.status === 429 && /per ?day|PerDay|daily/i.test(text)) { spent.add(model); continue; }
+      // a busy answer wrote nothing: not counted against the day (29 Oct: Google's busy spells used up the day's count)
+      if ([500, 503, 504].includes(res.status)) await count(sql, geminiCounter(model), -1);
       if ([429, 500, 503, 504].includes(res.status)) { busy.add(model); lastBusy = `${lastBusy.startsWith("waited") ? "waited; " : ""}${model}: ${res.status}`; continue; }
       if (!res.ok) return { ok: false, why: `${model}: ${res.status} ${text.slice(0, 200)}` };
       const g = JSON.parse(text) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[] };
