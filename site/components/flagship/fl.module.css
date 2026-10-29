@@ -10,12 +10,13 @@
   /* FLAGSHIP.md §4.1: margin, gutter and the two headline sizes, by width */
   --m: 10px; --g: 20px; --cardH: 26px; --leadH: 40px;
   --small: clamp(14px, .972vw, 16.8px); --dekS: clamp(14px, 1.18vw, 20.4px);
-  --hlLh: 1.1; --trk: 0; --hugeLh: 1.02; --gs: .8; /* Gujarati and Devanagari letters stand taller and wider than Latin: their headlines are set at 0.8 of the measured sizes */
+  --hlLh: 1.3; --trk: 0; --hugeLh: 1.02; --gs: .8; /* Gujarati and Devanagari letters stand taller and wider than Latin: their headlines are set at 0.8 of the measured sizes,
+     and their lines further apart (29 Oct: at 1.1 a ૂ under one line touched a ી over the next) */
   min-height: 100vh; padding-top: 80px; background: var(--pg); color: var(--ink);
   font-family: var(--ui); font-size: 16px; line-height: 1.4;
 }
 :global(html[lang="en"]) .root { --hlLh: .96; --trk: -.02em; --hugeLh: .86; --gs: 1 }
-.root [lang="gu"] { --hlLh: 1.1; --trk: 0; --gs: .8 }
+.root [lang="gu"] { --hlLh: 1.3; --trk: 0; --gs: .8 }
 @media (min-width: 768px) { .root { --m: 20px; --g: 40px } }
 @media (min-width: 960px) { .root { --cardH: max(36px, min(2.778vw, 48px)); --leadH: max(55px, min(5.556vw, 96px)) } }
 @media (min-width: 1440px) { .root { --m: clamp(20px, 1.389vw, 24px) } }
