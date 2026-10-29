@@ -28,8 +28,14 @@ import { cluster, placeTier, sameEvent, triage, type Triage } from "./triage.ts"
 const url = process.env.DATABASE_URL;
 if (!url) { console.error("DATABASE_URL is not set (a repository secret)"); process.exit(1); }
 const sql = neon(url);
-const log = (s: string) => console.log(s);
 const started = Date.now();
+/** the round's log, kept with the round (India's time) so the status page shows what a slow round was doing */
+const lines: string[] = [];
+const log = (s: string) => {
+  console.log(s);
+  lines.push(`${new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} ${s}`.slice(0, 300));
+  if (lines.length > 80) lines.shift();
+};
 /** no new work after this, so the round ends before the next starts (29 Oct: a story begun at 11 minutes ran past the
  *  13-minute limit and a third of the rounds were cut off unfinished) */
 const deadline = started + 8 * 60_000;
@@ -106,7 +112,8 @@ async function write() {
     const id = `live-${c.id.slice(1)}`;
     // held for the editor: sensitive, or a check not passed (ROADMAP §0.1, decided 25 Oct)
     const holdReason = c.sensitive ? "સંવેદનશીલ સમાચાર" : !checked.ok ? `ચકાસણી: ${checked.problems.slice(0, 3).join("; ")}` : null;
-    const translated = needsTranslation(c.tier);
+    // past the round's time: the story goes up now and its English and Hindi come with a later round (translations())
+    const translated = needsTranslation(c.tier) && Date.now() < deadline;
     let en = translated ? await translate(sql, w, "en", indiaDate()) : null;
     let hi = translated ? await translate(sql, w, "hi", indiaDate()) : null;
     let photo = await photoOf(sql, src, id);
@@ -274,12 +281,12 @@ let ok = true;
 const steps: Record<string, number> = {};
 const step = (name: string) => {
   steps[name] = Math.round((Date.now() - started) / 1000);
-  return sql.query(`update runs set details = $2 where id = $1`, [run.id, JSON.stringify({ ...details, steps })]).catch(() => null);
+  return sql.query(`update runs set details = $2 where id = $1`, [run.id, JSON.stringify({ ...details, steps, log: lines })]).catch(() => null);
 };
 const guard = setTimeout(async () => {
   const at = Object.keys(steps).at(-1) ?? "start";
   await sql.query(`update runs set finished_at = now(), ok = false, details = $2 where id = $1`,
-    [run.id, JSON.stringify({ ...details, steps, error: `stopped after 12 minutes, still at "${at}"` })]).catch(() => null);
+    [run.id, JSON.stringify({ ...details, steps, log: lines, error: `stopped after 12 minutes, still at "${at}"` })]).catch(() => null);
   await fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) }).catch(() => null);
   log(`stopped after 12 minutes, still at "${at}"`);
   process.exit(1);
@@ -320,6 +327,7 @@ try {
 }
 clearTimeout(guard);
 details.steps = steps;
+details.log = lines;
 details.aiRequests = aiUsed();
 details.seconds = Math.round((Date.now() - started) / 1000);
 await sql.query(`update runs set finished_at = now(), ok = $2, details = $3 where id = $1`, [run.id, ok, JSON.stringify(details)]);

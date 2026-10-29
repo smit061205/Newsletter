@@ -252,7 +252,10 @@ export async function geminiRemaining(sql: Sql, pool: GeminiPool): Promise<numbe
 /** whether a pool has a request left today */
 export const geminiLeft = async (sql: Sql, pool: GeminiPool) => (await geminiNext(sql, pool)) !== null;
 
-export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: string; user: string; maxTokens?: number; temperature?: number }, check: (v: unknown) => T | null): Promise<AiResult<T>> {
+/** o.wait false: no minute's wait when every model is busy, and o.timeoutMs a shorter limit per request, for the news
+ *  engine, whose rounds have a few minutes (29 Oct: waits for Flash Lite, shared with the desk, ran its rounds past their time) */
+export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: string; user: string; maxTokens?: number; temperature?: number }, check: (v: unknown) => T | null,
+  o: { wait?: boolean; timeoutMs?: number } = {}): Promise<AiResult<T>> {
   if (!(await geminiModels(pool)).length) return { ok: false, why: `no Gemini ${pool} model for this key`, stop: true };
   // a model Google says is too busy right now ("high demand", 29 Oct) is set aside for this request and the next one
   // asked; when all are busy, once more after a minute
@@ -260,7 +263,7 @@ export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: stri
   let lastBusy = "";
   for (;;) {
     let model = await geminiNext(sql, pool, busy);
-    if (!model && busy.size && !lastBusy.startsWith("waited")) {
+    if (!model && busy.size && o.wait !== false && !lastBusy.startsWith("waited")) {
       lastBusy = `waited; ${lastBusy}`;
       busy.clear();
       await new Promise((r) => setTimeout(r, 60_000));
@@ -272,7 +275,7 @@ export async function askGemini<T>(sql: Sql, pool: GeminiPool, a: { system: stri
     usedThisRun++;
     try {
       const res = await fetch(`${GOOGLE}/models/${model}:generateContent`, {
-        method: "POST", signal: AbortSignal.timeout(300_000),
+        method: "POST", signal: AbortSignal.timeout(o.timeoutMs ?? 300_000),
         headers: { "x-goog-api-key": GOOGLE_KEY, "content-type": "application/json" },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: a.system }] },
