@@ -146,10 +146,10 @@ export async function findStories(sql: Sql | null, q: string, show: Show, n: num
     return { rows: hit.slice(0, n).map((x) => ({ id: x.id, headline: x.headline, at: x.publishedAt, status: "published", kind: x.origin ?? "paper" })), more: hit.length > n };
   }
   const rows = await sql.query(
-    `select id, headline, published_at, status, origin from stories where status = $1
+    `select id, headline, published_at, status, origin, checks->>'by' as by from stories where status = $1
        and ($2 = '' or headline ilike $3 or deck ilike $3 or body ilike $3 or id = $2)
      order by published_at desc limit $4`, [want, q, `%${q}%`, n + 1]);
-  return { rows: rows.slice(0, n).map((r) => ({ id: r.id as string, headline: r.headline as string, at: iso(r.published_at), status: r.status as string, kind: r.origin as string })), more: rows.length > n };
+  return { rows: rows.slice(0, n).map((r) => ({ id: r.id as string, headline: r.headline as string, at: iso(r.published_at), status: r.status as string, kind: r.by === "editor" ? "editor" : r.origin as string })), more: rows.length > n };
 }
 
 /** Aavtikal's published or taken-down articles, likewise. */
@@ -199,6 +199,29 @@ export async function saveFeature(sql: Sql, id: string, w: Words): Promise<boole
     [id, w.headline, w.deck, w.body, w.caption]);
   if (done.length) await touched(sql);
   return done.length > 0;
+}
+
+/** A story the editor writes on the editor page (29 Oct: the editor's own reports from conferences): on the site at
+ *  once, at the top of the home page and in its section, word for word; the engine adds its English and Hindi
+ *  (engine/run.ts translations()) and never a photo of its own. */
+export interface NewStory {
+  headline: string; deck: string; body: string; caption: string;
+  tier: "gujarat" | "india" | "world"; genre: string | null;
+  photos: { url: string; width: number; height: number }[];
+}
+export async function addStory(sql: Sql, x: NewStory, by: string): Promise<string> {
+  const day = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const id = `ed-${day.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 8)}`;
+  const [photo, ...gallery] = x.photos;
+  await sql.query(
+    `insert into stories (id, origin, issue_date, tier, genres, tag_status, headline, deck, body, caption, photo, gallery, checked,
+       importance, en_status, hi_status, status, photo_tried, checks, sources)
+     values ($1, 'live', $2::date, $3, $4, 'done', $5, $6, $7, $8, $9, $10, false, 9, 'pending', 'none', 'published', true, $11, '[]')`,
+    [id, day, x.tier, x.genre ? [x.genre] : [], x.headline, x.deck, x.body, photo ? x.caption : "", photo ? JSON.stringify(photo) : null,
+     JSON.stringify(gallery), JSON.stringify({ by: "editor", who: by })]);
+  console.log(`story ${id} written by ${by}`);
+  await touched(sql);
+  return id;
 }
 
 /** A story taken down by mistake goes back up. */

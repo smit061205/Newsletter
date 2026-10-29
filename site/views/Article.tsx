@@ -45,6 +45,8 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
   // a long story carries one related story inside it, after its third paragraph (as news sites do)
   const inline = paras.length >= 5 ? others.find((x) => x.photo) ?? others[0] : undefined;
   const after = others.filter((x) => x !== inline).slice(0, 3);
+  // the further photos (the editor's own reports) spread evenly through the text, after the paragraph nearest each place
+  const shotsAfter = (i: number) => s.gallery.filter((_, j) => Math.max(0, Math.min(paras.length - 1, Math.round(((j + 1) * paras.length) / (s.gallery.length + 1)) - 1)) === i);
   const mail = `mailto:${PAPER.email}?subject=${encodeURIComponent(`${t(lang, "reportBody")} ${s.id}`)}&body=${encodeURIComponent(`${w.headline}\n${url}\n\n`)}`;
 
   return (
@@ -88,6 +90,13 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
             {paras.map((p, i) => (
               <div key={i} style={{ display: "contents" }}>
                 <p>{p}</p>
+                {shotsAfter(i).map((g) => (
+                  <figure key={g.url} className="inph">
+                    <PhotoZoom src={g.url} width={g.width} height={g.height} alt={w.headline} caption="" label={t(lang, "zoom")} close={t(lang, "close2")}>
+                      <span className="phw"><img className="ph" src={g.url} width={g.width} height={g.height} alt={w.headline} loading="lazy" /></span>
+                    </PhotoZoom>
+                  </figure>
+                ))}
                 {inline && i === 2 && (
                   <aside className="readalso"><b>{t(lang, "readAlso")}</b><Cmp s={inline} lang={lang} /></aside>
                 )}

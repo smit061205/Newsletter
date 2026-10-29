@@ -143,6 +143,8 @@ export const SCHEMA = [
   `alter table features add column if not exists figures jsonb not null default '[]'`,
   // what the desk wrote about, in English, so a subject isn't explained twice
   `alter table features add column if not exists topic text`,
+  // a story's further photos, spread through its text (the editor's own reports, written on the editor page: 29 Oct)
+  `alter table stories add column if not exists gallery jsonb not null default '[]'`,
   // what was sent to the editor's phone, and what came back
   `create table if not exists approvals (
      story_id text primary key,

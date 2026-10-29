@@ -74,15 +74,16 @@ async function advance() {
   log(`  checks: ${Object.entries(tally).map(([k, v]) => `${v} ${k}`).join(", ") || "nothing open"}`);
 }
 
+/** stories written this round, across its two writing passes */
+let wrote = 0;
 /** Steps 4 and 5: the most important confirmed events, written, checked, translated, saved. */
 async function write() {
   const left = await aiLeft(sql);
   const can = Math.min(PER_RUN, Math.floor((left - RESERVE) / 5));
   if (can <= 0) { log(`  writing: waits (${left} free requests left today)`); return; }
   const ready = await sql.query(`select * from clusters where state = 'confirmed' order by score desc, first_seen asc limit 40`);
-  let written = 0;
   for (const c of ready) {
-    if (written >= can || Date.now() > deadline) break;
+    if (wrote >= can || Date.now() > deadline) break;
     const items = await itemsOf(c.id);
     const g = gate(items, new Date(c.first_seen).toISOString(), []);
     if (g.state !== "confirmed") continue;
@@ -101,7 +102,7 @@ async function write() {
     if (!src.length) { await sql.query(`update clusters set state = 'dropped', reason = 'no source text to write from' where id = $1`, [c.id]); continue; }
     log(`  writing ${c.id} (${level}, ${imp}): ${c.event}`);
     const res = await writeChecked(sql, src, level, indiaDate(), c.event);
-    written++;
+    wrote++;
     if (!res.ok && !("written" in res && res.written)) {
       log(`    not written${"retry" in res && res.retry ? " (the free models are busy: next run)" : ""}: ${res.why}`);
       if (res.stop || ("retry" in res && res.retry)) break;
@@ -298,16 +299,22 @@ try {
   log("sources:");
   await step("sources");
   details.collect = await collect(sql, log, started + 4 * 60_000);
+  // the stories confirmed in earlier rounds written first, then the new items sorted (29 Oct: sorting slowed by the
+  // Gemmas shared with Aavtikal's desk took six minutes, writing began after the round's time and no story went up
+  // for hours); the sorting has four minutes at most, and what it confirms is written after the checks if time is left
+  log("writing:");
+  await step("writing");
+  await write();
   log("triage:");
   await step("triage");
   const left = await aiLeft(sql);
-  details.triage = await triage(sql, log, Math.max(0, Math.min(6, Math.floor((left - RESERVE) / 10))), started + 7 * 60_000);
+  details.triage = await triage(sql, log, Math.max(0, Math.min(6, Math.floor((left - RESERVE) / 10))), Math.min(started + 4 * 60_000, Date.now() + 3 * 60_000));
   await cluster(sql, log);
   log("checks:");
   await step("checks");
   await advance();
-  log("writing:");
-  await step("writing");
+  log("writing what was confirmed:");
+  await step("writing again");
   await write();
   log("photos:");
   await step("refiling");
