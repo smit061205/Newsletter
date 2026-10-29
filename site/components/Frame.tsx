@@ -9,6 +9,7 @@ import { flw } from "../lib/flagship.ts";
 import { PAPER } from "../lib/site.ts";
 import { num } from "../lib/format.ts";
 import Chrome from "./Chrome.tsx";
+import LangLink from "./LangLink.tsx";
 import NavProgress from "./NavProgress.tsx";
 import ServiceWorker from "./ServiceWorker.tsx";
 import ToTop from "./ToTop.tsx";
@@ -63,7 +64,7 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
               <a href={lang === "gu" ? "/rss.xml" : `/${lang}/rss.xml`}>{t(lang, "fRss")}</a></div>
             <div><b>{t(lang, "f4")}</b><Link href={L("/terms")}>{t(lang, "fTerms")}</Link><Link href={L("/privacy")}>{t(lang, "fPrivacy")}</Link>
               {(["gu", "hi", "en"] as const).filter((l) => l !== lang).map((l) => (
-                <Link key={l} href={href(l, path)} hrefLang={l}>{{ gu: "ગુજરાતી", hi: "हिंदी", en: "English" }[l]}</Link>))}</div>
+                <LangLink key={l} to={l} href={href(l, path)} hrefLang={l}>{{ gu: "ગુજરાતી", hi: "हिंदी", en: "English" }[l]}</LangLink>))}</div>
           </div>
           <p className="legal">© {num(PAPER.founded, lang)}–{num(new Date().getFullYear(), lang)} {PAPER[lang].name}, {PAPER[lang].place} · RNI {PAPER.rni}</p>
         </footer>

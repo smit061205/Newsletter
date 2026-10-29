@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Lang } from "../lib/types.ts";
+import LangLink from "./LangLink.tsx";
 import { Archive, Chev, Clock, CloseIcon, HomeIcon, LockIcon, MenuIcon, Paper, SearchIcon } from "./icons.tsx";
 
 export interface ChromeProps {
@@ -128,9 +129,9 @@ export default function Chrome(p: ChromeProps) {
              size, (v) => { setSize(v); write("ck-size", v); applySize(v); })}
         <div className="setl">{w.language}</div>
         <div className="seg" role="group" aria-label={w.language}>
-          <Link className="seglink" href={p.paths.gu} aria-current={p.lang === "gu" ? "true" : undefined} hrefLang="gu">ગુજરાતી</Link>
-          <Link className="seglink" href={p.paths.hi} aria-current={p.lang === "hi" ? "true" : undefined} hrefLang="hi">हिंदी</Link>
-          <Link className="seglink" href={p.paths.en} aria-current={p.lang === "en" ? "true" : undefined} hrefLang="en">English</Link>
+          <LangLink to="gu" className="seglink" href={p.paths.gu} aria-current={p.lang === "gu" ? "true" : undefined} hrefLang="gu">ગુજરાતી</LangLink>
+          <LangLink to="hi" className="seglink" href={p.paths.hi} aria-current={p.lang === "hi" ? "true" : undefined} hrefLang="hi">हिंदी</LangLink>
+          <LangLink to="en" className="seglink" href={p.paths.en} aria-current={p.lang === "en" ? "true" : undefined} hrefLang="en">English</LangLink>
         </div>
         <h3>{w.about}</h3>
         <div className="links">
