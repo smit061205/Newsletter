@@ -24,9 +24,11 @@ import { touched } from "../lib/write.ts";
 import { askGemini, askJson, geminiLeft, geminiRemaining } from "./ai.ts";
 import { parseFeed, pageText } from "./feed.ts";
 import { ask } from "./fetch.ts";
-import { indiaDate, storePhoto } from "./publish.ts";
+import { drawCover } from "./drawn.ts";
+import { indiaDate, storeImage, storePhoto } from "./publish.ts";
 import { SOURCES } from "./sources.ts";
-import { commonsPictures, commonsSearch, UA as WIKI_UA } from "./wikiphoto.ts";
+import { look, type Picture } from "./cover.ts";
+import { commonsAt, commonsPictures, commonsSearch, UA as WIKI_UA } from "./wikiphoto.ts";
 
 type Sql = NeonQueryFunction<false, false>;
 type Beat = (typeof WEBSITE.deskBeats)[number];
@@ -111,9 +113,6 @@ Reply with JSON only: {"pick":[1],"topic":"","wiki":["","",""]} or {"pick":[]} i
 // ---- reading a subject ----
 
 interface Source { name: string; url: string; text: string; official: boolean }
-/** A picture on offer: an official page's (stored in the site's own store, credited to its site) or a free-licence
- *  one from Wikimedia Commons (shown from Wikimedia's servers: it has its size and its credit already). */
-interface Picture { n: number; url: string; alt: string; from: string; credit?: string; width?: number; height?: number }
 
 /** The pictures in a page's main part (not logos, icons or avatars), its own og:image first. */
 function pictures(html: string, base: string): { url: string; alt: string }[] {
@@ -192,17 +191,15 @@ export async function research(picked: Lead[], wiki: string[] = []): Promise<{ s
     if (w) sources.push({ name: "Wikipedia", url: w.url, text: w.text, official: false });
     raw.push(...(await commonsPictures(title, 5)).map((x) => ({ ...x, from: "Wikimedia Commons" })));
   }
-  // still no picture: Wikimedia Commons searched for the subject's names (29 Oct: Dholera's chip plants had none)
-  for (const q of wiki.slice(0, 3)) {
-    if (raw.length) break;
-    raw.push(...(await commonsSearch(q, 4)).map((x) => ({ ...x, from: "Wikimedia Commons" })));
-  }
+  // Wikimedia Commons searched for the subject's own names as well (29 Oct: Dholera's chip plants had none; 30 Oct: a
+  // Wikipedia article's own pictures are often of the field, not the subject, so the cover has more to choose from)
+  for (const q of wiki.slice(0, 2)) raw.push(...(await commonsSearch(q, 3)).map((x) => ({ ...x, from: "Wikimedia Commons" })));
   // the primary pages first; all of them together near 30,000 letters, what the writer and the checker both read
   sources.sort((a, b) => Number(b.official) - Number(a.official));
   let room = 30_000;
   const kept = sources.map((s) => { const text = s.text.slice(0, Math.max(0, Math.min(12_000, room))); room -= text.length; return { ...s, text }; }).filter((s) => s.text.length > 200);
   const seen = new Set<string>();
-  const pics = raw.filter((p) => !seen.has(p.url) && !!seen.add(p.url)).slice(0, 12).map((p, i) => ({ ...p, n: i + 1 }));
+  const pics = raw.filter((p) => !seen.has(p.url) && !!seen.add(p.url)).slice(0, 16).map((p, i) => ({ ...p, n: i + 1 }));
   return { sources: kept, pics };
 }
 
@@ -251,16 +248,17 @@ whenever the sources have numbers, a "steps" diagram of how it works, and the of
 - "image": one of the numbered PICTURES offered (only if it truly shows the subject): "pick": its number, "title": a Gujarati caption.
 - Every figure has a Gujarati "title" and may have a "note" (e.g. "ઊંચું એટલે વધુ સારું", or what the numbers measure) and "source" (the SOURCE number).
 - Place each figure in the body as its own paragraph "[[fig N]]" (N counts the figures from 1), right after the paragraph it explains.
-- "cover": the number of the PICTURE for the top of the article (every article has one: the one that best shows the subject),
-  not one of the "image" figures; "caption": its Gujarati caption.
+- The picture at the top of the article is chosen already (COVER, described below): "caption": its Gujarati caption (empty
+  when the COVER is drawn). "name": the subject's name in English letters, 1 to 4 words, as the sources write it (e.g.
+  "Mistral Large 3", "James Webb Space Telescope"); "what": up to 8 plain English words on what it is, without numbers.
 
 Reply with JSON only:
 {"headline":"(Gujarati, up to 14 words, specific and inviting)","dek":"(Gujarati, one or two sentences)","body":"...",
- "cover":0,"caption":"","figures":[{"kind":"bar","title":"","note":"","unit":"","source":1,"rows":[{"label":"","value":0,"mark":false}]}]}`;
+ "caption":"","name":"","what":"","figures":[{"kind":"bar","title":"","note":"","unit":"","source":1,"rows":[{"label":"","value":0,"mark":false}]}]}`;
 
 interface DraftFigure { kind: string; title?: string; note?: string; unit?: string; source?: number; pick?: number;
   rows?: { label?: string; value?: unknown; mark?: boolean }[]; head?: string[]; cells?: unknown[][]; steps?: { title?: string; text?: string }[] }
-interface Draft { headline: string; dek: string; body: string; cover: number; caption: string; figures: DraftFigure[] }
+interface Draft { headline: string; dek: string; body: string; caption: string; name: string; what: string; figures: DraftFigure[] }
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
 const one = (gu: string): L3 => ({ gu, en: "", hi: "" });
@@ -270,7 +268,7 @@ function readDraft(v: unknown): Draft | null {
   if (!x?.headline || typeof x.body !== "string" || words(x.body) < 700) return null;
   if ((x.body.match(/[઀-૿]/g)?.length ?? 0) < x.body.replace(/\s/g, "").length * 0.5) return null;
   return { headline: String(x.headline).trim(), dek: String(x.dek ?? "").trim(), body: x.body.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim(),
-    cover: Number(x.cover) || 0, caption: String(x.caption ?? "").trim(), figures: Array.isArray(x.figures) ? (x.figures as DraftFigure[]) : [] };
+    caption: String(x.caption ?? "").trim(), name: String(x.name ?? "").trim(), what: String(x.what ?? "").trim(), figures: Array.isArray(x.figures) ? (x.figures as DraftFigure[]) : [] };
 }
 
 /** The draft's figures made into the site's, in Gujarati (the translation adds English and Hindi); a broken one is left out. */
@@ -301,10 +299,27 @@ const figureText = (figs: Figure[]) => figs.map((g) => [
   ...(g.rows ?? []).map((r) => `${r.label.gu} ${r.value}`), ...(g.cells ?? []).flat().map((c) => c.gu), ...(g.steps ?? []).map((s) => `${s.title.gu} ${s.text.gu}`),
 ].join("\n")).join("\n");
 
-/** A picture made the site's: an official one stored in the site's own store, a Commons one shown from Wikimedia's. */
-async function keep(sql: Sql, p: Picture, name: string): Promise<(Photo & { credit?: string }) | null> {
-  if (p.width && p.height) return { url: p.url, width: p.width, height: p.height, credit: p.credit ?? p.from };
-  const s = await storePhoto(sql, p.url, name);
+/** A drawn cover (engine/drawn.ts) kept in the photo store: the subject's name in English letters (else the subject's first
+ *  words), and what it is without numbers. */
+async function drawn(sql: Sql, beat: string, name: string, what: string, topic: string, id: string): Promise<(Photo & { credit?: string }) | null> {
+  const latin = (t: string) => /^[\x20-\x7E\u2018\u2019\u2013\u2014]+$/.test(t);
+  const n = latin(name) && name.length <= 40 ? name : topic.split(/\s+/).slice(0, 3).join(" ");
+  const w = latin(what) ? what.replace(/[0-9]+/g, "").replace(/\s{2,}/g, " ").trim().slice(0, 60) : "";
+  try {
+    return await storeImage(sql, await drawCover(beat, n, w), `${id}-cover`, 1920);
+  } catch {
+    return null;
+  }
+}
+
+/** A picture made the site's: an official one stored in the site's own store, a Commons one shown from Wikimedia's; the
+ *  cover (`top`) 1920 px wide when the picture is that large (30 Oct: 1280 looked soft across a wide screen). */
+async function keep(sql: Sql, p: Picture, name: string, top = false): Promise<(Photo & { credit?: string }) | null> {
+  if (p.full && p.width && p.height) {
+    const c = top ? commonsAt({ url: p.url, width: p.width, height: p.height, full: p.full }, 1920) : p;
+    return { url: c.url, width: c.width!, height: c.height!, credit: p.credit ?? p.from };
+  }
+  const s = await storePhoto(sql, p.url, name, undefined, top ? 1920 : 1200);
   return s ? { ...s, credit: p.from } : null;
 }
 
@@ -581,30 +596,35 @@ interface Made { gu: Words3; photo: Photo & { credit?: string }; figs: Figure[];
  *  "skipped" (not written), "stop" (no writing requests left today). */
 async function make(sql: Sql, subj: Subject, id: string, date: string, log: (s: string) => void, note = ""): Promise<Made | "thin" | "nophoto" | "skipped" | "busy" | "stop"> {
   // the sources and their pictures
-  const { sources, pics } = await research(subj.leads, subj.wiki);
+  const { sources, pics: offered } = await research(subj.leads, subj.wiki);
   if (sources.reduce((n, s) => n + words(s.text), 0) < 500) { log("  too little to read about it"); return "thin"; }
-  if (!pics.length) { log("  no picture to show with it"); return "nophoto"; }
+  if (!offered.length) { log("  no picture to show with it"); return "nophoto"; }
+  // every picture looked at (30 Oct): the cover must show the subject itself, sharp and large; the rest only if they fit
+  // (none: a drawn cover, the user's choice of 30 Oct, made once the writer has named the subject)
+  const seen = await look(sql, subj.topic, offered, log);
+  if (seen === "busy") return "busy";
+  const top = seen.cover;
+  if (!top) log(`  no true picture for the top (${seen.why}): a drawn cover`);
+  let photo = top && await keep(sql, top, `${id}-cover`, true);
+  const pics = seen.pics.filter((p) => p.n !== top?.n);
 
   // the Gujarati article (Gemini Flash); asked once more when the answer comes back broken (29 Oct: "not JSON")
   const writeAsk = {
     system: WRITE,
-    user: `SUBJECT (${subj.beat}): ${subj.topic}${note}\n\nPICTURES:\n${pics.map((p) => `${p.n}. from ${p.from}: ${p.alt || "(no description)"}`).join("\n")}\n\n${block(sources)}`,
+    user: `SUBJECT (${subj.beat}): ${subj.topic}${note}\n\nCOVER: ${top && photo ? top.alt : "drawn (the subject's name on Aavtikal's own design)"}\n\nPICTURES:\n${pics.map((p) => `${p.n}. from ${p.from}: ${p.alt || "(no description)"}`).join("\n")}\n\n${block(sources)}`,
   };
   let draft = await askGemini(sql, "writer", writeAsk, readDraft);
   if (!draft.ok && !draft.stop && !draft.busy) { log(`  written again: ${draft.why.slice(0, 120)}`); draft = await askGemini(sql, "writer", writeAsk, readDraft); }
   if (!draft.ok) { log(`  not written: ${draft.why.slice(0, 200)}`); return draft.stop ? "stop" : draft.busy ? "busy" : "skipped"; }
   const d = draft.value;
 
-  // the picture at the top: the writer's choice, else the first that can be shown
-  let photo: (Photo & { credit?: string }) | null = null;
-  const used = new Set<number>();
-  for (const p of [...pics.filter((x) => x.n === d.cover), ...pics.filter((x) => x.n !== d.cover)]) {
-    if (d.figures.some((g) => g.kind === "image" && Number(g.pick) === p.n) && p.n !== d.cover && pics.length > 1) continue;
-    photo = await keep(sql, p, `${id}-cover`);
-    if (photo) { used.add(p.n); break; }
+  const used = new Set<number>(top ? [top.n] : []);
+  let caption = d.caption || d.headline;
+  if (!photo) {
+    photo = await drawn(sql, subj.beat, d.name, d.what, subj.topic, id);
+    caption = "";
+    if (!photo) { log("  the drawn cover couldn't be kept"); return "nophoto"; }
   }
-  if (!photo) { log("  no picture could be kept"); return "nophoto"; }
-  const caption = d.caption || d.headline;
 
   // the figures: graphs and tables checked number by number, pictures kept; the body's markers numbered again
   const all = sources.map((s) => s.text).join("\n\n");
@@ -691,7 +711,7 @@ async function writeUp(sql: Sql, subj: Subject, date: string, log: (s: string) =
      values ($1, $2, $3, $4, $5, $6, $7, $8, 'desk', $9, $10, $11, $12, $13, $14, case when $3 = 'published' then now() end, now())`,
     [id, subj.beat, status, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo),
      m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null, sourcesJson(m.sources),
-     JSON.stringify({ problems: m.problems, writer: m.model, words: m.words }), JSON.stringify(m.figs), subj.topic]);
+     JSON.stringify({ problems: m.problems, writer: m.model, words: m.words, cover: "looked" }), JSON.stringify(m.figs), subj.topic]);
   await touched(sql);
   await refresh();
   log(`  ${status}: ${id} (${madeLine(m)})${m.problems.length ? `: ${m.problems.slice(0, 2).join("; ")}` : ""}`);
@@ -774,11 +794,103 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
     `update features set headline = $2, dek = $3, body = $4, caption = $5, photo = $6, en = $7, hi = $8, sources = $9, checks = $10,
        figures = $11, topic = $12, updated_at = now() where id = $1`,
     [r.id, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo), m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null,
-     sourcesJson(m.sources), JSON.stringify({ problems: [], writer: m.model, words: m.words, rewritten: true }), JSON.stringify(m.figs), topic]);
+     sourcesJson(m.sources), JSON.stringify({ problems: [], writer: m.model, words: m.words, rewritten: true, cover: "looked" }), JSON.stringify(m.figs), topic]);
   await touched(sql);
   await refresh();
   log(`  rewritten: ${r.id} (${madeLine(m)})`);
   return "rewritten";
+}
+
+// ---- the published articles' pictures looked at again (the user, 30 Oct: "unrelated and very bad images") ----
+
+const NAME = `An Aavtikal article (a Gujarati magazine of explainers) gets a drawn cover with its subject's name. Give the subject's
+name in English letters, 1 to 4 words, as it is usually written (e.g. "Mistral Large 3", "James Webb Space Telescope", "CRISPR"),
+and "what": up to 8 plain English words on what it is, without numbers. Reply with JSON only: {"name":"","what":""}`;
+
+const CAPTION = `Write the caption for the picture at the top of an Aavtikal article (a Gujarati magazine of explainers), in Gujarati,
+English and Hindi: one short sentence saying what the picture shows, as it bears on the article. Names of companies, products
+and models in English letters. Reply with JSON only: {"gu":"","en":"","hi":""}`;
+
+/** A picture's address without its size and query, to know the same picture in two sizes. */
+const pictureKey = (u: string) => u.replace(/\?.*$/, "").replace(/\/thumb\//, "/").replace(/\/\d+px-[^/]+$/, "");
+
+/** A body's figures numbered again after some are left out (their "[[fig N]]" paragraphs too). */
+function refigure(body: string, total: number, drop: Set<number>): string {
+  const to = new Map<number, number>();
+  for (let i = 1, k = 0; i <= total; i++) if (!drop.has(i)) to.set(i, ++k);
+  return body.split("\n\n").map((p) => {
+    const m = p.trim().match(/^\[\[fig (\d+)\]\]$/);
+    if (!m) return p;
+    const n = to.get(Number(m[1]));
+    return n ? `[[fig ${n}]]` : null;
+  }).filter((p): p is string => p !== null).join("\n\n");
+}
+
+/** One published article's pictures looked at: the top one replaced by the best that shows the subject itself (or made
+ *  1920 px wide when it is that one), pictures in the body that don't belong taken out. Never the editor's own, never
+ *  Politics. "busy" when Gemini can't look now. */
+async function lookAgain(sql: Sql, log: (s: string) => void): Promise<"none" | "done" | "busy"> {
+  const [r] = await sql.query(
+    `select id, beat, headline, topic, caption, photo, figures, body, en, hi, sources from features
+      where status in ('published', 'held') and beat <> 'politics' and coalesce(checks->>'by', '') <> 'editor'
+        and coalesce(checks->>'cover', '') = '' order by published_at desc nulls last limit 1`);
+  if (!r) return "none";
+  const topic = String(r.topic ?? (r.en as Words3 | null)?.headline ?? r.headline).slice(0, 200);
+  log(`pictures again: ${r.id}`);
+  const wiki = await askJson(sql, { system: WIKI, user: `${topic}\n${r.headline}`, maxTokens: 200 },
+    (v) => { const t = (v as { titles?: unknown[] })?.titles; return Array.isArray(t) ? t.map(String).filter(Boolean).slice(0, 4) : null; });
+  const leads: Lead[] = ((r.sources ?? []) as { name?: string; url?: string; trust?: string }[]).filter((s) => s.url && !/wikipedia\.org/.test(s.url))
+    .slice(0, 4).map((s, i) => ({ n: i + 1, title: topic, url: s.url!, summary: "", from: s.name ?? hostOf(s.url!), official: s.trust === "official", at: "" }));
+  const { pics: found } = await research(leads, wiki.ok ? wiki.value : []);
+  // the article's own pictures among them: the cover and the body's
+  const figs = (r.figures ?? []) as Figure[];
+  const own = [r.photo as (Photo & { credit?: string }) | null, ...figs.map((g) => (g.kind === "image" ? g.photo ?? null : null))]
+    .filter((p): p is Photo & { credit?: string } => !!p?.url);
+  const pics: Picture[] = [...found];
+  for (const p of own) {
+    if (pics.some((x) => pictureKey(x.url) === pictureKey(p.url))) continue;
+    pics.push({ n: 0, url: p.url.startsWith("/") ? `${WEBSITE.url}${p.url}` : p.url, alt: "", from: p.credit ?? "the article", credit: p.credit });
+  }
+  pics.forEach((p, i) => { p.n = i + 1; });
+  const seen = await look(sql, topic, pics, log);
+  // (none could be fetched just now: tried again later, not drawn over a picture that may be right)
+  if (seen === "busy" || !seen.pics.length && seen.why === "no picture could be fetched") return "busy";
+  const fits = new Set(seen.pics.map((p) => pictureKey(p.url)));
+  // the body's pictures that don't belong taken out
+  const drop = new Set<number>();
+  figs.forEach((g, i) => { if (g.kind === "image" && g.photo && !fits.has(pictureKey(g.photo.url.startsWith("/") ? `${WEBSITE.url}${g.photo.url}` : g.photo.url))) drop.add(i + 1); });
+  const en = r.en as Words3 | null, hi = r.hi as Words3 | null;
+  let photo = r.photo as (Photo & { credit?: string }) | null, caption = r.caption as string;
+  let enCap = en?.caption, hiCap = hi?.caption;
+  const top = seen.cover;
+  if (top && photo && pictureKey(top.url) === pictureKey(photo.url.startsWith("/") ? `${WEBSITE.url}${photo.url}` : photo.url)) {
+    if (top.full && top.width && top.height) photo = (await keep(sql, top, `${r.id}-cover`, true)) ?? photo;
+    log("  its top picture is right");
+  } else if (top) {
+    const kept = await keep(sql, top, `${r.id}-cover`, true);
+    const cap = kept && await askGemini(sql, "lite", { system: CAPTION, user: `ARTICLE: ${en?.headline ?? r.headline}\nPICTURE: ${top.alt}`, maxTokens: 600 },
+      (v) => { const x = v as { gu?: string; en?: string; hi?: string }; return x?.gu && x.en && x.hi ? { gu: x.gu.trim(), en: x.en.trim(), hi: x.hi.trim() } : null; });
+    if (kept && cap && cap.ok) {
+      photo = kept; caption = cap.value.gu; enCap = cap.value.en; hiCap = cap.value.hi;
+      log(`  a new top picture: ${top.alt.slice(0, 100)}`);
+    } else log("  the new top picture couldn't be put in; kept as it was");
+  } else {
+    // no true picture: a drawn cover, named by Gemini Flash Lite from the article
+    const nm = await askGemini(sql, "lite", { system: NAME, user: `${en?.headline ?? r.headline}\n${topic}`, maxTokens: 300 },
+      (v) => { const x = v as { name?: string; what?: string }; return x?.name ? { name: String(x.name).trim(), what: String(x.what ?? "").trim() } : null; });
+    const d = nm.ok ? await drawn(sql, r.beat, nm.value.name, nm.value.what, topic, r.id) : null;
+    if (d) { photo = d; caption = ""; enCap = ""; hiCap = ""; log(`  no true picture (${seen.why}): a drawn cover, "${nm.ok ? nm.value.name : ""}"`); }
+    else { log(`  no true picture (${seen.why}), and the drawn cover couldn't be made now`); return "busy"; }
+  }
+  if (drop.size) log(`  ${drop.size} picture(s) in the body taken out`);
+  const fix = (w: Words3 | null, cap: string | undefined) => w && { ...w, caption: cap ?? w.caption, body: refigure(w.body, figs.length, drop) };
+  await sql.query(
+    `update features set photo = $2, caption = $3, body = $4, figures = $5, en = $6, hi = $7,
+       checks = coalesce(checks, '{}'::jsonb) || jsonb_build_object('cover', $8::text), updated_at = now() where id = $1`,
+    [r.id, photo ? JSON.stringify(photo) : null, caption, refigure(r.body, figs.length, drop), JSON.stringify(figs.filter((_, i) => !drop.has(i + 1))),
+     en ? JSON.stringify(fix(en, enCap)) : null, hi ? JSON.stringify(fix(hi, hiCap)) : null, top ? "looked" : "drawn"]);
+  await touched(sql);
+  return "done";
 }
 
 /** The site's kept-ready pages renewed now (29 Oct: translations sat in the database for an hour while the pages showed
@@ -835,6 +947,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     // the missing English and Hindi first (29 Oct: left to the end of a round, they waited for hours)
     await retranslate(sql, log, Math.min(deadline, Date.now() + Math.min(15 * 60_000, (deadline - started) / 3)));
+    // then the published articles' pictures, looked at again (30 Oct), for up to ten minutes a round
+    const lookUntil = Math.min(deadline - 15 * 60_000, Date.now() + 10 * 60_000);
+    let looked = 0;
+    while (Date.now() < lookUntil) {
+      const r = await lookAgain(sql, log);
+      if (r !== "done") break;
+      looked++;
+    }
+    if (looked) await refresh();
     let newDone = false, oldDone = false;
     // an article takes up to ten minutes (written, its figures, checked, translated in pieces): none begun in its last 15
     // (a third of a short round), so the round isn't cut off with an article half done (29 Oct)

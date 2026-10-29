@@ -4,12 +4,15 @@
 // stopped, copied wording is caught, and items about one event group together.
 // Run: node --experimental-strip-types site/engine/selftest.ts
 import assert from "node:assert/strict";
+import sharp from "sharp";
 import { readJson } from "./ai.ts";
+import { drawCover } from "./drawn.ts";
 import { ownItem } from "./collect.ts";
 import { parseFeed, pageText } from "./feed.ts";
 import { copiedShare, gate, importance, levelOf, type ClusterItem } from "./newsroom.ts";
 import { SOURCES, sourceById } from "./sources.ts";
 import { keySet, placeTier, similarity, SAME_EVENT } from "./triage.ts";
+import { commonsAt } from "./wikiphoto.ts";
 
 let n = 0;
 const test = (name: string, fn: () => void) => { fn(); n++; console.log(`ok  ${name}`); };
@@ -109,4 +112,15 @@ test("news from outside Gujarat isn't filed under Gujarat", () => {
   assert.equal(placeTier("gujarat", "વડોદરામાં સોની પરિવારના ત્રણ સભ્યોએ આત્મહત્યા કરી"), "gujarat");
   assert.equal(placeTier("india", "Delhi air quality"), "india");
 });
+test("a cover from Commons is asked for at Wikimedia's own sizes, never larger than its original", () => {
+  const p = { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/A.jpg/1280px-A.jpg?utm_source=x", width: 1280, height: 720, full: 4000 };
+  assert.deepEqual(commonsAt(p, 1920), { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/A.jpg/1920px-A.jpg", width: 1920, height: 1080 });
+  assert.equal(commonsAt({ ...p, full: 1500 }, 1920).url, "https://upload.wikimedia.org/wikipedia/commons/c/c5/A.jpg");
+});
+// a drawn cover (no true picture of the subject, 30 Oct) is a 1920 × 1080 picture in every beat
+for (const beat of ["ai", "tech", "science"]) {
+  const meta = await sharp(await drawCover(beat, "James Webb Space Telescope", "Finding planets around other stars")).metadata();
+  assert.equal(`${meta.width}x${meta.height}`, "1920x1080");
+}
+n++; console.log("ok  a drawn cover is drawn for every beat");
 console.log(`\n${n} checks passed (${SOURCES.length} sources listed)`);

@@ -74,11 +74,15 @@ export async function leadPhoto(title: string): Promise<{ url: string; credit: s
 /** Free-licence photos from a Wikipedia article (Aavtikal's explainers, the user, 29 Oct: several pictures in each),
  * shown from Wikimedia's own servers (they allow it), so they take none of the site's daily uploads: a photo or a
  * diagram, not a logo, icon, flag or map symbol, with its description for the writer and its credit. */
-type CommonsPage = { title: string; index?: number; imageinfo?: { thumburl?: string; thumbwidth?: number; thumbheight?: number; width?: number; extmetadata?: Record<string, { value?: string }> }[] };
+type CommonsPage = { title: string; index?: number; imageinfo?: { thumburl?: string; thumbwidth?: number; thumbheight?: number; width?: number; height?: number; extmetadata?: Record<string, { value?: string }> }[] };
 
 /** The free-licence photos among Commons files: a photo or a diagram, not a logo, icon, flag or map symbol. */
-function freeOnes(pages: CommonsPage[], max: number): { url: string; width: number; height: number; alt: string; credit: string }[] {
-  const out: { url: string; width: number; height: number; alt: string; credit: string }[] = [];
+/** A free Commons picture: a 1280-pixel copy (url, width, height) and its original's width (`full`), which says how
+ *  large a copy a cover can have (bigger, below). */
+export interface CommonsPicture { url: string; width: number; height: number; full: number; alt: string; credit: string }
+
+function freeOnes(pages: CommonsPage[], max: number): CommonsPicture[] {
+  const out: CommonsPicture[] = [];
   for (const pg of pages.sort((a, b) => (a.index ?? 0) - (b.index ?? 0))) {
     const ii = pg.imageinfo?.[0];
     const meta = ii?.extmetadata ?? {};
@@ -88,7 +92,7 @@ function freeOnes(pages: CommonsPage[], max: number): { url: string; width: numb
     if (ii.thumbheight > ii.thumbwidth * 1.6 || ii.thumbwidth > ii.thumbheight * 3.5) continue;
     const alt = plain(meta.ImageDescription?.value ?? "").slice(0, 160) || pg.title.replace(/^File:|\.\w+$/g, "");
     const artist = plain(meta.Artist?.value ?? "").slice(0, 80) || "Wikimedia Commons";
-    out.push({ url: ii.thumburl, width: ii.thumbwidth, height: ii.thumbheight, alt, credit: `${artist}, ${licence}, Wikimedia Commons` });
+    out.push({ url: ii.thumburl, width: ii.thumbwidth, height: ii.thumbheight, full: ii.width ?? ii.thumbwidth, alt, credit: `${artist}, ${licence}, Wikimedia Commons` });
     if (out.length >= max) break;
   }
   return out;
@@ -97,7 +101,7 @@ function freeOnes(pages: CommonsPage[], max: number): { url: string; width: numb
 /** Free-licence photos from a Wikipedia article (Aavtikal's explainers, the user, 29 Oct: several pictures in each),
  * shown from Wikimedia's own servers (they allow it), so they take none of the site's daily uploads, with their
  * descriptions for the writer and their credits. */
-export async function commonsPictures(title: string, max = 6): Promise<{ url: string; width: number; height: number; alt: string; credit: string }[]> {
+export async function commonsPictures(title: string, max = 6): Promise<CommonsPicture[]> {
   const q = new URLSearchParams({ action: "query", generator: "images", titles: title, gimlimit: "40", redirects: "1",
     prop: "imageinfo", iiprop: "url|size|extmetadata", iiurlwidth: "1200", format: "json", origin: "*" });
   try {
@@ -110,7 +114,7 @@ export async function commonsPictures(title: string, max = 6): Promise<{ url: st
 }
 
 /** Free-licence photos found by searching Wikimedia Commons itself, for a subject whose Wikipedia articles have none. */
-export async function commonsSearch(query: string, max = 4): Promise<{ url: string; width: number; height: number; alt: string; credit: string }[]> {
+export async function commonsSearch(query: string, max = 4): Promise<CommonsPicture[]> {
   const q = new URLSearchParams({ action: "query", generator: "search", gsrsearch: `${query} filetype:bitmap`, gsrnamespace: "6", gsrlimit: "20",
     prop: "imageinfo", iiprop: "url|size|extmetadata", iiurlwidth: "1200", format: "json", origin: "*" });
   try {
@@ -138,4 +142,15 @@ export async function freePhoto(sql: Sql, w: Written, storyId: string): Promise<
   } catch {
     return null;
   }
+}
+
+/** A Commons copy of another width, from Wikimedia's steps (960 for a look, 1920 for a cover; 30 Oct: 640 and 2560
+ *  are refused): the original itself when it is narrower. */
+export function commonsAt(p: { url: string; width: number; height: number; full: number }, w: 960 | 1920): { url: string; width: number; height: number } {
+  if (!/\/thumb\//.test(p.url) || !/\/\d+px-/.test(p.url)) return p;
+  if (p.full <= w) {
+    const orig = p.url.replace("/thumb/", "/").replace(/\/\d+px-[^/]+$/, "").replace(/\?.*$/, "");
+    return { url: orig, width: p.full, height: Math.round(p.height * (p.full / p.width)) };
+  }
+  return { url: p.url.replace(/\/\d+px-/, `/${w}px-`).replace(/\?.*$/, ""), width: w, height: Math.round(p.height * (w / p.width)) };
 }
