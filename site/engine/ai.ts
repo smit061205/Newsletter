@@ -223,7 +223,11 @@ async function geminiModels(pool: GeminiPool): Promise<{ id: string; daily: numb
     } catch { return []; }
   }
   const has = geminiIds;
-  return WEBSITE.gemini[pool].filter((m) => has.includes(m.id));
+  // a model under its exact name, else under a longer one (29 Oct: 3 Flash is listed as "gemini-3-flash-preview" or the like
+  // and went unused all day); never a speech, picture or live variant
+  const named = (id: string) => has.includes(id) ? id
+    : has.filter((h) => h.startsWith(`${id}-`) && !/lite|tts|image|live|audio|thinking|exp/i.test(h.slice(id.length))).sort()[0];
+  return WEBSITE.gemini[pool].flatMap((m) => { const id = named(m.id); return id ? [{ ...m, id }] : []; });
 }
 /** a model this run found used up (Google said 429 before our count did: its day ends at midnight in California) */
 const spent = new Set<string>();
