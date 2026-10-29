@@ -224,6 +224,17 @@ a.h:active{opacity:.85}
 .cards.c1{grid-template-columns:minmax(0,1fr)}
 
 /* most read across the page, the WhatsApp channel beside it */
+/* headlines from other trusted outlets (ROADMAP §4), a row to scroll; each opens on the outlet's site (30 Oct) */
+.elsew-note{margin:-8px 0 14px}
+.elsew-row{list-style:none;margin:0;padding:0 0 6px;display:grid;grid-auto-flow:column;grid-auto-columns:min(78%,300px);gap:var(--gut);overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:thin;overscroll-behavior-x:contain}
+@media (min-width:1024px){ .elsew-row{grid-auto-columns:calc((100% - 3 * var(--gut)) / 4)} }
+.elsew-row li{scroll-snap-align:start;min-width:0}
+.elsew-row a{display:flex;flex-direction:column;gap:8px;height:100%;padding:14px 0 12px;border-top:1px solid var(--rule)}
+.elsew-from{font-size:13px;font-weight:700;color:var(--brand);letter-spacing:.2px}
+.elsew-h{font-family:var(--head);font-weight:600;font-size:17px;line-height:1.4;color:var(--strong);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;text-wrap:pretty}
+.elsew-row a:hover .elsew-h{text-decoration:underline;text-underline-offset:3px}
+.elsew-when{margin-top:auto;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted)}
+.elsew-when svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2}
 .band{display:grid;gap:var(--s8) var(--gut)}
 .band > *{position:relative;min-width:0}
 @media (min-width:740px){
@@ -267,6 +278,12 @@ a.h:active{opacity:.85}
 .chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-block:10px 4px}
 .chips::-webkit-scrollbar{display:none}
 .chips span{border:1px solid var(--rule);border-radius:999px;padding:6px 14px;font-size:14px;white-space:nowrap;color:var(--soft)}
+/* a section's other side as links (a region's subjects, a subject's regions), 30 Oct */
+.chips a{border:1px solid var(--rule);border-radius:999px;padding:7px 15px;font-size:14px;font-weight:600;white-space:nowrap;color:var(--strong);min-height:36px;display:inline-flex;align-items:center;transition:border-color .15s,background-color .15s}
+.chips a:hover{border-color:var(--rule-strong)}
+.chips a.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.sechead h1 a{color:inherit}.sechead h1 a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+.secsep{margin-inline:10px;color:var(--muted);font-weight:400}
 .river > a{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding-block:16px;border-top:1px solid var(--rule)}
 .river img{width:96px;height:96px;object-fit:cover;filter:var(--photo);border-radius:var(--r);background:var(--surface)}
 @media (min-width:740px){ .river > a{grid-template-columns:110px minmax(0,1fr) 220px;gap:var(--gut)} .river img{width:220px;height:auto;aspect-ratio:3/2} .river .when{display:block!important} }
@@ -278,6 +295,7 @@ a.h:active{opacity:.85}
 @media (min-width:1024px){ .artg{grid-template-columns:minmax(0,720px) minmax(0,300px);justify-content:space-between;gap:64px} }
 .artg > aside{display:none}
 @media (min-width:1024px){ .artg > aside{display:block;position:relative} .artg > aside::before{content:"";position:absolute;top:0;bottom:0;left:-32px;border-left:1px solid var(--rule)} .artg > aside > div{position:sticky;top:90px} }
+.crumbrow{display:flex;flex-wrap:wrap;column-gap:14px}
 .crumbs{display:inline-flex;gap:6px;align-items:center;font-size:14px;font-weight:700;color:var(--brand);min-height:40px}
 .art h1{font-family:var(--head);font-weight:700;font-size:30px;line-height:1.25;color:var(--strong);margin:8px 0 12px;text-wrap:balance}
 .art .stand{font-family:var(--serif);font-size:17px;line-height:1.6;color:var(--soft);margin:0 0 14px}
@@ -371,6 +389,14 @@ html{scroll-behavior:smooth}
 .seg .seglink[aria-current="true"]{background:var(--strong);color:var(--bg)}
 .sheet .search svg.i,.search svg.i{width:20px;height:20px;color:var(--muted)}
 .join .note{margin:0;font-weight:600}
+/* breaking-news alerts, the reader's switch (components/Alerts.tsx, 30 Oct) */
+.alerts{display:grid;gap:6px;margin-top:6px;padding-top:12px;border-top:1px solid var(--rule)}
+.alerts-btn{justify-self:start;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px;border-radius:999px;background:var(--navy);color:var(--on-navy);font-weight:700;font-size:15px}
+.alerts-btn:hover{filter:brightness(1.12)}.alerts-btn:disabled{opacity:.6}
+.alerts-on{margin:0;display:flex;align-items:center;gap:8px;font-weight:700;color:var(--checked);font-size:15px}
+.alerts-why{margin:0;font-size:13px;color:var(--muted);line-height:1.5}
+.alerts-why svg{vertical-align:-3px}
+.linkish{font:inherit;color:var(--strong);text-decoration:underline;text-underline-offset:3px;padding:0;background:none}
 .prose{max-width:680px;margin:0 auto}
 .prose .body p{font-size:calc(17px * var(--scale))}
 .empty a,.note a{color:var(--live);text-decoration:underline}

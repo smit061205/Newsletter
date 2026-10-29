@@ -13,6 +13,9 @@ import LangLink from "./LangLink.tsx";
 import NavProgress from "./NavProgress.tsx";
 import ServiceWorker from "./ServiceWorker.tsx";
 import ToTop from "./ToTop.tsx";
+import BreakingBar from "./BreakingBar.tsx";
+import { breakingNow } from "../lib/db.ts";
+import { BREAKING_HOURS } from "../lib/push.ts";
 
 export interface FrameProps {
   lang: Lang;
@@ -26,11 +29,13 @@ export interface FrameProps {
   children: React.ReactNode;
 }
 
-export default function Frame({ lang, path, section, active, bottomBar = true, children }: FrameProps) {
+export default async function Frame({ lang, path, section, active, bottomBar = true, children }: FrameProps) {
   const L = (p: string) => href(lang, p);
   const words = Object.fromEntries((["menu", "sections", "search", "close", "epaper", "home", "latest", "latestTitle", "archive", "searchPlaceholder",
     "settings", "size", "language", "services", "about", "savedTitle", "fHow", "fPolicy", "fFix", "fContact", "editorPage"] as const)
     .map((k) => [k, t(lang, k)])) as Parameters<typeof Chrome>[0]["words"];
+  const brk = await breakingNow();
+  const bw = brk && (lang === "gu" ? brk.headline : lang === "en" ? brk.en?.headline : brk.hi?.headline);
   return (
     <>
       <a className="skip" href="#main">{t(lang, "skip")}</a>
@@ -42,6 +47,8 @@ export default function Frame({ lang, path, section, active, bottomBar = true, c
         links={{ home: L("/"), latest: L("/latest"), epaper: L("/epaper"), archive: L("/archive"), search: L("/search"), saved: L("/saved"),
                  about: L("/about"), how: L("/how-we-check"), policy: L("/editorial-policy"), corrections: L("/corrections"), contact: L("/contact") }}
       />
+      {brk && <BreakingBar id={brk.id} headline={bw || brk.headline} href={L(`/news/${brk.id}`)} until={Date.parse(brk.publishedAt) + BREAKING_HOURS * 3600_000}
+        label={t(lang, "brk")} close={t(lang, "close")} />}
       <nav className="wrap secs" aria-label={t(lang, "sections")}>
         {SECTIONS.map((k) => <Link key={k} href={L(`/section/${k}`)} className={section === k ? "on" : undefined}>{sectionName(k, lang)}</Link>)}
         {/* the flagship section (views/Flagship.tsx), set apart at the end */}

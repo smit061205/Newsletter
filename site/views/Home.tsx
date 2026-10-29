@@ -1,11 +1,11 @@
 // The front page (DESIGN.md §3.3): a stack of containers. Containers with no
 // stories yet simply don't show (phase A has only the evening paper's).
 import type { Lang, Story } from "../lib/types.ts";
-import { latestStories, moreOnSubject, mostRead } from "../lib/db.ts";
+import { elsewhere, latestStories, moreOnSubject, mostRead } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
 import { dateText } from "../lib/format.ts";
-import { Cmp, Head, Join, LatestList, Lead, MostRead, Std } from "../components/cards.tsx";
+import { Cmp, ElsewhereRow, Head, Join, LatestList, Lead, MostRead, Std } from "../components/cards.tsx";
 import Frame from "../components/Frame.tsx";
 import { PAPER } from "../lib/site.ts";
 import { beatName, featureWords, features, flw } from "../lib/flagship.ts";
@@ -77,7 +77,7 @@ export default async function Home({ lang }: { lang: Lang }) {
     .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
   const lead = fresh.find((s) => s.photo) ?? fresh[0] ?? today.find((s) => s.photo && s.page === 1) ?? today.find((s) => s.photo) ?? today[0];
   // under the lead, its subject's other stories; below the top, what readers open most; Aavtikal's newest
-  const [more, most, articles] = await Promise.all([lead ? moreOnSubject(lead.id) : [], mostRead(5), features({ limit: 6 })]);
+  const [more, most, articles, others] = await Promise.all([lead ? moreOnSubject(lead.id) : [], mostRead(5), features({ limit: 6 }), elsewhere(lang)]);
   // the stories under the lead: today's paper first, then the newest; whole rows of three
   // only (28 Oct: four left one card alone in its row and a hole beside the rail)
   const pool = [...today, ...stories.filter((s) => s.issueDate !== day)].filter((s) => s !== lead).slice(0, 6);
@@ -119,6 +119,7 @@ export default async function Home({ lang }: { lang: Lang }) {
             {most.length >= 3 && <div><Head label={t(lang, "mostRead")} /><MostRead stories={most} lang={lang} /></div>}
             <Join lang={lang} />
           </section>
+          {others.length >= 4 && <ElsewhereRow items={others} lang={lang} />}
           {wide.map((b) => <WideBox key={b.k} k={b.k} list={b.list} lang={lang} />)}
           {few.length > 0 && (
             <section className="ctr"><Head label={t(lang, "moreNews")} />

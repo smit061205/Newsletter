@@ -87,3 +87,23 @@ self.addEventListener("fetch", (e) => {
     return res;
   })());
 });
+
+// Breaking-news alerts (lib/push.ts): shown as they come; a tap opens the story (in a window of the site already open,
+// if there is one)
+self.addEventListener("push", (e) => {
+  let m = {};
+  try { m = e.data ? e.data.json() : {}; } catch { m = { body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(m.title || "કેપિટલ ક્રાંતિ", {
+    body: m.body || "", tag: m.tag, data: { url: m.url || "/" }, icon: "/icon-192.png", badge: "/favicon-32.png", lang: "gu",
+  }));
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || "/", self.location.origin).href;
+  e.waitUntil((async () => {
+    for (const c of await self.clients.matchAll({ type: "window", includeUncontrolled: true })) {
+      if ("navigate" in c) { await c.focus(); return c.navigate(url); }
+    }
+    return self.clients.openWindow(url);
+  })());
+});

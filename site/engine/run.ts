@@ -22,6 +22,7 @@ import { aiLeft, aiUsed, freeModels } from "./ai.ts";
 import { collect } from "./collect.ts";
 import { gate, gather, importance, levelOf, needsTranslation, translate, writeChecked, type ClusterItem, type Debunk } from "./newsroom.ts";
 import { indiaDate, photoOf, saveLive } from "./publish.ts";
+import { alertBreaking } from "../lib/push.ts";
 import { freePhoto } from "./wikiphoto.ts";
 import { cluster, placeTier, sameEvent, triage, type Triage } from "./triage.ts";
 
@@ -144,6 +145,9 @@ async function write(until = deadline) {
     } else {
       await touched(sql);
       log(`    published: ${w.headline}`);
+      // breaking news: an alert to the phones that asked (lib/push.ts)
+      await alertBreaking(sql, { id, importance: imp, publishedAt: new Date().toISOString(), headline: { gu: w.headline, en: en?.headline ?? null, hi: hi?.headline ?? null } }, log)
+        .catch((e) => log(`    no alert: ${e instanceof Error ? e.message : e}`));
     }
   }
 }

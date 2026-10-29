@@ -2,26 +2,42 @@
 import EpaperViewer from "../components/EpaperViewer.tsx";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { Lang } from "../lib/types.ts";
-import { issueDates, issueOn, latestIssue, latestStories, search, storiesIn, storiesOn } from "../lib/db.ts";
+import type { Genre, Lang, Tier } from "../lib/types.ts";
+import { issueDates, issueOn, latestIssue, latestStories, search, storiesIn, storiesInBoth, storiesOn } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
-import { isSection, sectionName } from "../lib/sections.ts";
+import { GENRES, isSection, sectionName, TIERS } from "../lib/sections.ts";
 import { dateText, num, todayInIndia } from "../lib/format.ts";
 import { Lead, River, Std } from "../components/cards.tsx";
 import Frame from "../components/Frame.tsx";
 import Saved from "../components/Saved.tsx";
 
-export async function Section({ k, lang }: { k: string; lang: Lang }) {
+/** A section, or a region on one subject (`sub`: "ગુજરાત › ખેતી", /section/gujarat/farm; ROADMAP §4), with chips to the
+ *  section's other side: a region's subjects, a subject's regions, only those with stories. */
+export async function Section({ k, sub, lang }: { k: string; sub?: string; lang: Lang }) {
   if (!isSection(k)) notFound();
-  const list = await storiesIn(k, 60);
+  const tier = TIERS.includes(k as Tier) ? (k as Tier) : null;
+  if (sub && !(tier && GENRES.includes(sub as Genre))) notFound();
+  const list = sub ? await storiesInBoth(tier!, sub as Genre, 60) : await storiesIn(k, 60);
+  // the chips: from the whole section's stories (a region-and-subject page shows its region's other subjects)
+  const all = sub ? await storiesIn(k, 120) : list;
+  const others: { key: string; href: string; on: boolean }[] = tier
+    ? GENRES.filter((g) => all.some((s) => s.genres.includes(g))).map((g) => ({ key: g, href: `/section/${tier}/${g}`, on: g === sub }))
+    : TIERS.filter((t) => all.some((s) => s.tier === t)).map((t) => ({ key: t, href: `/section/${t}/${k}`, on: false }));
   // the lead is the day's news (the user, 29 Oct: an old story never heads a section): the most important of
   // the last 24 hours, one with a photo first; only a section with nothing new leads with its newest
   const fresh = list.filter((s) => Date.now() - Date.parse(s.publishedAt) < 24 * 3600_000)
     .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0) || b.publishedAt.localeCompare(a.publishedAt));
   const top = fresh.find((s) => s.photo) ?? fresh[0] ?? list[0];
   return (
-    <Frame lang={lang} path={`/section/${k}`} section={k}>
-      <div className="sechead"><h1>{sectionName(k, lang)}</h1></div>
+    <Frame lang={lang} path={sub ? `/section/${k}/${sub}` : `/section/${k}`} section={k}>
+      <div className="sechead">
+        <h1>{sub ? <><Link href={href(lang, `/section/${k}`)}>{sectionName(k, lang)}</Link><span className="secsep" aria-hidden="true">›</span>{sectionName(sub, lang)}</> : sectionName(k, lang)}</h1>
+      </div>
+      {others.length > 1 && (
+        <nav className="chips" aria-label={sectionName(k, lang)}>
+          {others.map((o) => <Link key={o.key} href={href(lang, o.href)} className={o.on ? "on" : undefined} aria-current={o.on ? "page" : undefined}>{sectionName(o.key, lang)}</Link>)}
+        </nav>
+      )}
       {top ? (
         <>
           <div className="ctr" style={{ marginTop: 20 }}>{top.photo ? <Lead s={top} lang={lang} /> : <Std s={top} lang={lang} sec={false} />}</div>

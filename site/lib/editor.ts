@@ -9,6 +9,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import { WEBSITE } from "./config.ts";
 import { sample, sampleOn } from "./sample.ts";
+import { alertBreaking } from "./push.ts";
 import { touched } from "./write.ts";
 
 type Sql = NeonQueryFunction<false, false>;
@@ -268,7 +269,13 @@ export async function decideStory(sql: Sql, id: string, approve: boolean, by: st
   if (!done.length) return false;
   await sql.query(`insert into approvals (story_id, decided_at, decision, decided_by) values ($1, now(), $2, $3)
                    on conflict (story_id) do update set decided_at = now(), decision = $2, decided_by = $3`, [id, approve ? "approve" : "reject", by]);
-  if (approve) await touched(sql);
+  if (approve) {
+    await touched(sql);
+    // an approved breaking story still fresh: its alert (lib/push.ts)
+    const [r] = await sql.query(`select headline, en, hi, importance, published_at from stories where id = $1`, [id]);
+    if (r) await alertBreaking(sql, { id, importance: r.importance, publishedAt: new Date(r.published_at).toISOString(),
+      headline: { gu: r.headline, en: r.en?.headline ?? null, hi: r.hi?.headline ?? null } }).catch(() => 0);
+  }
   return true;
 }
 
