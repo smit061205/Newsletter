@@ -269,30 +269,57 @@ if (paused?.value === "yes") { log("the editor has paused the engine: nothing to
 const [run] = await sql.query(`insert into runs (kind, started_at) values ('engine', now()) returning id`);
 const details: Record<string, unknown> = { models: await freeModels() };
 let ok = true;
+// each step's start kept as it goes, and the round ended by itself at 12 minutes, so a slow step is named and the round still
+// finishes (29 Oct: rounds cut off by the keeper's 14-minute limit left nothing saved to say why)
+const steps: Record<string, number> = {};
+const step = (name: string) => {
+  steps[name] = Math.round((Date.now() - started) / 1000);
+  return sql.query(`update runs set details = $2 where id = $1`, [run.id, JSON.stringify({ ...details, steps })]).catch(() => null);
+};
+const guard = setTimeout(async () => {
+  const at = Object.keys(steps).at(-1) ?? "start";
+  await sql.query(`update runs set finished_at = now(), ok = false, details = $2 where id = $1`,
+    [run.id, JSON.stringify({ ...details, steps, error: `stopped after 12 minutes, still at "${at}"` })]).catch(() => null);
+  await fetch(`${WEBSITE.url}/api/refresh`, { method: "POST", signal: AbortSignal.timeout(30_000) }).catch(() => null);
+  log(`stopped after 12 minutes, still at "${at}"`);
+  process.exit(1);
+}, 12 * 60_000);
 try {
   log(`engine run ${run.id}; free models: ${(details.models as string[]).join(", ")}`);
+  await step("presses");
   details.presses = await pollUpdates(sql);
   log("sources:");
+  await step("sources");
   details.collect = await collect(sql, log, started + 4 * 60_000);
   log("triage:");
+  await step("triage");
   const left = await aiLeft(sql);
   details.triage = await triage(sql, log, Math.max(0, Math.min(6, Math.floor((left - RESERVE) / 10))), started + 7 * 60_000);
   await cluster(sql, log);
   log("checks:");
+  await step("checks");
   await advance();
   log("writing:");
+  await step("writing");
   await write();
   log("photos:");
+  await step("refiling");
   details.refiled = await refile();
+  await step("duplicates");
   details.deduped = await dedupe();
+  await step("photos");
   details.photos = await photos();
+  await step("translations");
   details.translated = await translations();
+  await step("watch");
   await watch();
 } catch (e) {
   ok = false;
   details.error = e instanceof Error ? `${e.message}\n${e.stack?.split("\n").slice(1, 4).join("\n")}` : String(e);
   log(`failed: ${details.error}`);
 }
+clearTimeout(guard);
+details.steps = steps;
 details.aiRequests = aiUsed();
 details.seconds = Math.round((Date.now() - started) / 1000);
 await sql.query(`update runs set finished_at = now(), ok = $2, details = $3 where id = $1`, [run.id, ok, JSON.stringify(details)]);
