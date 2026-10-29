@@ -393,14 +393,17 @@ async function checkArticle(sql: Sql, text: string, src: Source[], date: string)
 
 // ---- translating (Gemini Flash Lite), graphs included ----
 
-const TRANSLATE = (lang: "en" | "hi") => `You translate a long Gujarati explainer from Aavtikal into ${lang === "en"
+const LANG = (lang: "en" | "hi") => lang === "en"
   ? "English, in the clear, precise style of a serious science and technology magazine"
-  : "Hindi (Devanagari), in the clear, precise style of a serious Hindi science and technology magazine"}.
-Translate faithfully and completely: every fact, name and number exactly as the Gujarati has it (numbers in ordinary digits 0-9),
-every paragraph, every "## " subheading; keep each "[[fig N]]" paragraph exactly as it is. Technical terms as a careful
-${lang === "en" ? "English" : "Hindi"} writer would use them. Add nothing, leave nothing out.
-"strings" are the labels of the article's graphs and tables: translate each, in the same order, the same number of them.
-Reply with JSON only: {"headline":"","dek":"","caption":"","body":"","strings":[]}`;
+  : "Hindi (Devanagari), in the clear, precise style of a serious Hindi science and technology magazine";
+const TRANSLATE = (lang: "en" | "hi") => `You translate part of a long Gujarati explainer from Aavtikal into ${LANG(lang)}.
+You get its paragraphs as a list. Translate each one faithfully and completely, in the same order, one for one: every fact,
+name and number exactly as the Gujarati has it (numbers in ordinary digits 0-9; a "## " subheading stays a "## " subheading).
+Technical terms as a careful ${lang === "en" ? "English" : "Hindi"} writer would use them; names of models, companies and
+products as they are. Add nothing, leave nothing out, never join or split paragraphs.
+Reply with JSON only: {"paragraphs":["",""]} with exactly as many paragraphs as you got.`;
+const HEAD = (lang: "en" | "hi") => `Translate a Gujarati magazine article's headline, sub-heading and photo caption into ${LANG(lang)}:
+faithfully, numbers and names exactly as they are (numbers in ordinary digits 0-9). Reply with JSON only: {"headline":"","dek":"","caption":""}`;
 
 /** Every text in the figures, in order (and back again). */
 function figureStrings(figs: Figure[]): L3[] {
@@ -414,48 +417,73 @@ const LABELS = (lang: "en" | "hi") => `Translate each Gujarati label of a graph 
 number of them, in the same order, numbers exactly as they are (in ordinary digits 0-9), names of models, companies and products
 as they are. Reply with JSON only: {"strings":[]}`;
 
-/** The article in English or Hindi, graphs included. The words and the graphs' labels are taken separately: a list of
- *  labels a few short (29 Oct: with 4 to 8 figures there are dozens) no longer costs the whole translation; a label
- *  left untranslated shows in Gujarati. */
+/** The article in English or Hindi, graphs included, in pieces (29 Oct: a whole 2,000-word article with its figure
+ *  markers in one request was rejected for one slip, and most articles stayed in Gujarati): the headline, then the body
+ *  a few paragraphs at a time, the "[[fig N]]" markers kept out of it and put back where they were, then the graphs'
+ *  labels. Every number checked; a piece that fails is asked again; a label left untranslated shows in Gujarati. */
 async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi", date: string, log: (s: string) => void = () => {}): Promise<Words3 | null> {
-  const labels = figureStrings(figs);
-  const source = [gu.headline, gu.dek, gu.caption, gu.body, ...labels.map((l) => l.gu)].join("\n\n");
-  const marks = (s: string) => (s.match(/\[\[fig \d+\]\]/g) ?? []).join();
-  let note = "";
-  const take = (v: unknown) => {
-    const x = v as Partial<Words3> & { strings?: unknown[] };
-    if (!x?.headline || typeof x.body !== "string" || words(x.body) < words(gu.body) * 0.6) return null;
-    if (marks(x.body) !== marks(gu.body)) return null;
-    if (lang === "hi" && !/[ऀ-ॿ]/.test(x.headline + x.body)) return null;
-    return { headline: String(x.headline), dek: String(x.dek ?? ""), caption: String(x.caption ?? ""), body: x.body,
-             strings: Array.isArray(x.strings) ? x.strings.map(String) : [] };
-  };
-  // the labels on their own, when they didn't come back with the words
-  const labelsAlone = async () => {
-    const one = (v: unknown) => { const x = (v as { strings?: unknown[] })?.strings; return Array.isArray(x) && x.length === labels.length ? x.map(String) : null; };
-    for (let k = 0; k < 2; k++) {
-      const r = await askGemini(sql, "lite", { system: LABELS(lang), user: JSON.stringify({ strings: labels.map((l) => l.gu) }), maxTokens: 8000 }, one);
-      if (r.ok && !numbersNotIn(r.value.join("\n"), labels.map((l) => l.gu).join("\n"), date).length) return r.value;
-    }
-    return null;
-  };
-  for (let attempt = 0; attempt < 2; attempt++) {
-    // Gemini Flash Lite; a Gemma when its requests are used up
-    const ask = { system: TRANSLATE(lang), user: JSON.stringify({ ...gu, strings: labels.map((l) => l.gu) }) + note, maxTokens: 32_000 };
-    const res = await askGemini(sql, "lite", ask, take).then((r) => (r.ok || !r.stop ? r : askJson(sql, ask, take)));
-    if (!res.ok) { log(`  ${lang === "en" ? "English" : "Hindi"} not made: ${res.why.slice(0, 160)}`); continue; }
-    const out = res.value;
-    const wrong = numbersNotIn([out.headline, out.dek, out.caption, out.body].join("\n"), source, date);
-    if (!wrong.length) {
-      const strings = out.strings.length === labels.length && !numbersNotIn(out.strings.join("\n"), source, date).length ? out.strings : await labelsAlone();
-      if (strings) strings.forEach((x, i) => { labels[i][lang] = x; });
-      else log(`  ${lang === "en" ? "English" : "Hindi"}: the graphs' labels stay in Gujarati`);
-      return { headline: out.headline, dek: out.dek, caption: out.caption, body: out.body };
-    }
-    log(`  ${lang === "en" ? "English" : "Hindi"} had numbers not in the Gujarati: ${wrong.slice(0, 6).join(", ")}`);
-    note = `\n\nYour last translation had numbers that are not in the Gujarati: ${wrong.join(", ")}. Translate again and keep every number exactly.`;
+  const name = lang === "en" ? "English" : "Hindi";
+  const script = (t: string) => lang === "en" || /[ऀ-ॿ]/.test(t);
+  // Gemini Flash Lite; a Gemma when its requests are used up (a piece is small enough for its minute)
+  const ask = <T,>(a: { system: string; user: string; maxTokens: number }, check: (v: unknown) => T | null) =>
+    askGemini(sql, "lite", a, check).then((r) => (r.ok || !r.stop ? r : askJson(sql, a, check)));
+
+  // the headline, sub-heading and caption
+  let head: { headline: string; dek: string; caption: string } | null = null;
+  for (let k = 0; k < 2 && !head; k++) {
+    const r = await ask({ system: HEAD(lang), user: JSON.stringify({ headline: gu.headline, dek: gu.dek, caption: gu.caption }), maxTokens: 2000 }, (v) => {
+      const x = v as { headline?: string; dek?: string; caption?: string };
+      return x?.headline && script(x.headline) ? { headline: String(x.headline), dek: String(x.dek ?? ""), caption: String(x.caption ?? "") } : null;
+    });
+    if (r.ok && !numbersNotIn(Object.values(r.value).join("\n"), [gu.headline, gu.dek, gu.caption].join("\n"), date).length) head = r.value;
+    else if (!r.ok) log(`  ${name} headline not made: ${r.why.slice(0, 140)}`);
   }
-  return null;
+  if (!head) return null;
+
+  // the body: its text paragraphs in pieces of about 400 words, the figure markers left where they are
+  const paras = gu.body.split("\n\n");
+  const text = paras.map((p, i) => ({ p, i })).filter((x) => !/^\[\[fig \d+\]\]$/.test(x.p.trim()));
+  const pieces: { p: string; i: number }[][] = [];
+  for (const x of text) {
+    const last = pieces.at(-1);
+    if (last && last.reduce((n, y) => n + words(y.p), 0) + words(x.p) <= 400) last.push(x); else pieces.push([x]);
+  }
+  const out = [...paras];
+  for (const [n, piece] of pieces.entries()) {
+    const src = piece.map((x) => x.p);
+    let done: string[] | null = null;
+    let note = "";
+    for (let k = 0; k < 3 && !done; k++) {
+      const r = await ask({ system: TRANSLATE(lang), user: JSON.stringify({ paragraphs: src }) + note, maxTokens: 8000 }, (v) => {
+        const x = (v as { paragraphs?: unknown[] })?.paragraphs;
+        if (!Array.isArray(x) || x.length !== src.length) return null;
+        const t = x.map((y) => String(y ?? "").trim());
+        return t.every((y, m) => y && words(y) >= words(src[m]) * 0.5) && script(t.join(" ")) ? t : null;
+      });
+      if (!r.ok) { log(`  ${name} piece ${n + 1} of ${pieces.length}: ${r.why.slice(0, 140)}`); if (r.stop) return null; continue; }
+      const wrong = numbersNotIn(r.value.join("\n"), src.join("\n"), date);
+      if (!wrong.length) done = r.value;
+      else note = `\n\nYour last translation had numbers that are not in the Gujarati: ${wrong.join(", ")}. Translate again and keep every number exactly.`;
+    }
+    if (!done) { log(`  ${name} not made: piece ${n + 1} of ${pieces.length} failed three times`); return null; }
+    piece.forEach((x, m) => { out[x.i] = done![m]; });
+  }
+
+  // the graphs' labels, on their own
+  const labels = figureStrings(figs);
+  if (labels.length) {
+    let strings: string[] | null = null;
+    for (let k = 0; k < 2 && !strings; k++) {
+      const r = await ask({ system: LABELS(lang), user: JSON.stringify({ strings: labels.map((l) => l.gu) }), maxTokens: 8000 }, (v) => {
+        const x = (v as { strings?: unknown[] })?.strings;
+        return Array.isArray(x) && x.length === labels.length ? x.map(String) : null;
+      });
+      if (r.ok && !numbersNotIn(r.value.join("\n"), labels.map((l) => l.gu).join("\n"), date).length) strings = r.value;
+    }
+    if (strings) strings.forEach((x, m) => { labels[m][lang] = x; });
+    else log(`  ${name}: the graphs' labels stay in Gujarati`);
+  }
+  return { ...head, body: out.join("\n\n") };
 }
 
 // ---- one article ----
@@ -746,7 +774,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const details: Record<string, number> = { published: 0, held: 0, skipped: 0, rewritten: 0, kept: 0 };
   try {
     // the missing English and Hindi first (29 Oct: left to the end of a round, they waited for hours)
-    await retranslate(sql, log, Math.min(deadline, Date.now() + 12 * 60_000));
+    await retranslate(sql, log, Math.min(deadline, Date.now() + 15 * 60_000));
     let newDone = false, oldDone = false;
     while (deadline - Date.now() > 8 * 60_000 && !(newDone && oldDone)) {
       // the older articles first (the user, 29 Oct: "trigger rewriting now"), then the day's new ones
