@@ -469,7 +469,8 @@ async function translate(sql: Sql, gu: Words3, figs: Figure[], lang: "en" | "hi"
         const x = (v as { paragraphs?: unknown[] })?.paragraphs;
         if (!Array.isArray(x) || x.length !== src.length) return null;
         const t = x.map((y) => String(y ?? "").trim());
-        return t.every((y, m) => y && words(y) >= words(src[m]) * 0.5 && script(y)) ? t : null;
+        // no Gujarati left in any paragraph, the language's own letters over the piece (a paragraph of names or numbers has none)
+        return t.every((y, m) => y && words(y) >= words(src[m]) * 0.5 && !/[\u0980-\u0DFF]/.test(y)) && script(t.join(" ")) ? t : null;
       });
       if (!r.ok) { log(`  ${name} piece ${n + 1} of ${pieces.length}: ${r.why.slice(0, 140)}`); if (r.stop) return null; continue; }
       const wrong = numbersNotIn(r.value.join("\n"), src.join("\n"), date);
