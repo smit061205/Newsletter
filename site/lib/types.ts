@@ -39,6 +39,8 @@ export interface Story {
   sources: StorySource[];
   /** the engine's measure of how much it matters (live stories) */
   importance: number | null;
+  /** further photos, spread through the story (the editor's own reports) */
+  gallery: Photo[];
 }
 
 export interface IssuePage { number: number; url: string; width: number; height: number }

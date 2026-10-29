@@ -17,7 +17,7 @@ import { paragraphs } from "@/lib/format.ts";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "સંપાદક | કેપિટલ ક્રાંતિ", robots: { index: false, follow: false } };
 
-type Q = { lang?: string; signin?: string; q?: string; show?: string; n?: string; fq?: string; fshow?: string; fn?: string; saved?: string };
+type Q = { lang?: string; signin?: string; q?: string; show?: string; n?: string; fq?: string; fshow?: string; fn?: string; saved?: string; written?: string };
 
 export default async function Editor({ searchParams }: { searchParams: Promise<Q> }) {
   const q = await searchParams;
@@ -105,7 +105,7 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
                     ? <span className={s.title}>{x.headline}</span>
                     : <a className={s.title} href={kind === "story" ? `/news/${x.id}` : `/aavtikal/p/${x.id}`} target="_blank" rel="noopener">{x.headline}</a>}
                   <span className={s.when}>
-                    {time(x.at)} · {kind === "story" ? (x.kind === "live" ? w.fromEngine : w.fromPaper) : isBeat(x.kind) ? beatName(x.kind, lang) : x.kind}
+                    {time(x.at)} · {kind === "story" ? (x.kind === "editor" ? w.fromYou : x.kind === "live" ? w.fromEngine : w.fromPaper) : isBeat(x.kind) ? beatName(x.kind, lang) : x.kind}
                   </span>
                 </div>
                 <div className={s.acts}>
@@ -142,6 +142,8 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
         <a href="#aavtikal" className={s.jAV}>{w.av}</a>
         <a href="#engine">{w.engine}</a>
       </nav>
+      <Link className={s.writeBtn} href={`/editor/write${back ? `?${back}` : ""}`}>{w.writeNew}</Link>
+      {q.written && <p className={s.done} role="status">{w.written} <a href={`/news/${encodeURIComponent(q.written)}`} target="_blank" rel="noopener">{w.seeIt}</a></p>}
       {q.saved && <p className={q.saved === "1" ? s.done : s.stopped} role="status">{q.saved === "1" ? w.saved : w.notSaved}</p>}
 
       <section className={s.block} aria-labelledby="waiting">

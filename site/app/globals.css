@@ -294,6 +294,8 @@ a.h:active{opacity:.85}
 .sizes button{transition:background-color .15s ease,color .15s ease}.sizes button:hover{color:var(--strong)}
 .sizes button[aria-pressed="true"]{background:color-mix(in srgb,var(--brand) 14%,transparent);color:var(--brand)}
 .art figure{margin:0 0 20px}
+.body .inph{margin:.2em 0 1.4em}
+.inph .ph{aspect-ratio:auto;height:auto}
 .art figcaption{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5}
 @media (max-width:739px){ .art figure{margin-inline:calc(-1 * var(--side))} .art figcaption{padding-inline:var(--side)} }
 .byline{font-size:15px;color:var(--soft);margin:0 0 18px}.byline b{color:var(--strong)}
