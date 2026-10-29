@@ -485,6 +485,9 @@ const addToList = (sql: Sql, key: string, item: string) => sql.query(
 /** The proper names and numbers in a subject's line ("Gemini", "4", "Carbon"): two subjects sharing two are compared. */
 const nameWords = (t: string) => new Set((t.match(/[A-Za-z0-9][\w.+-]*/g) ?? [])
   .filter((w) => /[A-Z0-9]/.test(w) && !/^(The|A|An|In|On|Of|And|For|With|New|How|Why|What|Its|Is|To|AI)$/.test(w)));
+/** names too common to tell two subjects apart */
+const COMMON = new Set(["Google", "OpenAI", "Microsoft", "Amazon", "Apple", "Meta", "NVIDIA", "Nvidia", "NASA", "ISRO", "India", "Indian", "China",
+  "Chinese", "American", "Gemini", "ChatGPT", "Model", "Models", "Space", "Science", "Research", "Launch", "Launches", "Explained", "Inside", "Future"]);
 const SAME = `Is the NEW subject the same as one of the EARLIER ones: the same product, model, mission, study or discovery, even if worded
 differently? A different version, a different product or a different event is NOT the same.
 Reply with JSON only: {"same": N} with the EARLIER number, or {"same": 0}.`;
@@ -492,7 +495,9 @@ Reply with JSON only: {"same": N} with the EARLIER number, or {"same": 0}.`;
 /** The earlier subject this one repeats, if any (29 Oct: "Gemini 4 Carbon" was written twice, worded differently). */
 async function alreadyCovered(sql: Sql, topic: string, covered: string[]): Promise<string | null> {
   const mine = nameWords(topic);
-  const near = covered.filter((c) => { const o = nameWords(c); return [...mine].filter((w) => o.has(w)).length >= 2; }).slice(0, 8);
+  // two shared names, or one that names a particular thing ("GLM-5.3", "XREAL": 29 Oct, GLM-5.3 was written twice)
+  const particular = (w: string) => /\d/.test(w) && /[A-Za-z]/.test(w) || /^[A-Z]{3,}$/.test(w) && !COMMON.has(w) || w.length >= 6 && !COMMON.has(w);
+  const near = covered.filter((c) => { const shared = [...mine].filter((w) => nameWords(c).has(w)); return shared.length >= 2 || shared.some(particular); }).slice(0, 8);
   if (!near.length) return null;
   const res = await askJson(sql, { system: SAME, user: `NEW: ${topic}\n\nEARLIER:\n${near.map((c, i) => `${i + 1}. ${c}`).join("\n")}`, maxTokens: 60 },
     (v) => { const x = v as { same?: unknown }; return typeof x?.same === "number" ? x.same : null; });
@@ -697,7 +702,7 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
 async function retranslate(sql: Sql, log: (s: string) => void, deadline: number) {
   const rows = await sql.query(
     `select id, headline, dek, caption, body, figures, en, hi from features where (author = 'desk' or checks->>'rewritten' = 'true')
-       and status in ('published', 'held') and (en is null or hi is null) and updated_at > now() - interval '7 days' order by updated_at asc limit 4`);
+       and status in ('published', 'held') and (en is null or hi is null) and updated_at > now() - interval '7 days' order by status = 'published' desc, updated_at asc limit 6`);
   for (const r of rows) {
     if (Date.now() > deadline - 3 * 60_000) return;
     const figs = (r.figures ?? []) as Figure[];
@@ -740,6 +745,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   runId = run.id as number;
   const details: Record<string, number> = { published: 0, held: 0, skipped: 0, rewritten: 0, kept: 0 };
   try {
+    // the missing English and Hindi first (29 Oct: left to the end of a round, they waited for hours)
+    await retranslate(sql, log, Math.min(deadline, Date.now() + 12 * 60_000));
     let newDone = false, oldDone = false;
     while (deadline - Date.now() > 8 * 60_000 && !(newDone && oldDone)) {
       // the older articles first (the user, 29 Oct: "trigger rewriting now"), then the day's new ones
