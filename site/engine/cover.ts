@@ -24,7 +24,7 @@ type Sql = NeonQueryFunction<false, false>;
  *  one from Wikimedia Commons (shown from Wikimedia's servers: it has its size, its original's width and its credit). */
 export interface Picture { n: number; url: string; alt: string; from: string; credit?: string; width?: number; height?: number; full?: number; official?: boolean; hotlink?: boolean }
 
-interface Seen { n: number; about: string; shows: string; kind: string; cover: number }
+interface Seen { n: number; about: string; shows: string; kind: string; cover: number; other: boolean }
 /** `covers`: the pictures fit for the top, best first. `refused`: the addresses of those seen and found not to belong. */
 export interface Looked { pics: Picture[]; covers: Picture[]; refused: string[]; why: string }
 
@@ -44,11 +44,14 @@ You get an article's subject and the pictures on offer, each after a line naming
 - "kind": "photo" (taken by a camera of something real), "illustration" (a drawing, render or artwork), "generated" (it looks
   made by an AI image generator, or is a glossy stock render: glowing brains, faces of light, robot hands, floating circuits),
   "diagram", "chart", "screenshot", "logo" or "text" (mostly words);
+- "other": true if it shows anything made, flown or owned by someone else than the subject's own maker or owner, whatever the
+  article says about it (Nvidia hardware for an article on Iluvatar's chip, a US shuttle for an article on China's spaceplane, a
+  rival's product it is compared with), or a different product of the same kind that you can't tell is the subject's; else false;
 - "cover": 0 to 10, how good it would be across the top of the article: 9-10 only for a sharp, well-composed, striking picture
   of the subject itself; 7-8 for a sharp, well-composed picture of something the article names; 0-3 for anything blurry, small,
   cluttered, mostly words, a logo, a screenshot, a chart or a diagram.
 Be strict: a reader must see at once that the top picture belongs to this article.
-Reply with JSON only: {"pictures":[{"n":1,"about":"","shows":"subject","kind":"photo","cover":0}]}`;
+Reply with JSON only: {"pictures":[{"n":1,"about":"","shows":"subject","kind":"photo","other":false,"cover":0}]}`;
 
 /** A small copy of a picture for Gemini to look at, and its full width (a Commons one's original; an official one's own). */
 async function small(p: Picture): Promise<{ jpeg: string; full: number; ratio: number; width: number; height: number } | null> {
@@ -68,8 +71,8 @@ async function small(p: Picture): Promise<{ jpeg: string; full: number; ratio: n
 
 /** How a picture does for the top: 0 not fit, else higher is better (3 a photo of the subject, 2 an official image of it, 1 a
  *  photo of something the article names). Across the top it must be landscape and large, and real. */
-export function coverTier(x: { shows: string; kind: string; cover: number }, p: { full: number; ratio: number; official: boolean }): number {
-  if (x.cover < 7 || p.full < COVER_WIDE || p.ratio < COVER_RATIO) return 0;
+export function coverTier(x: { shows: string; kind: string; cover: number; other?: boolean }, p: { full: number; ratio: number; official: boolean }): number {
+  if (x.other || x.cover < 7 || p.full < COVER_WIDE || p.ratio < COVER_RATIO) return 0;
   if (x.kind === "photo") return x.shows === "subject" ? 3 : x.shows === "related" ? 1 : 0;
   return x.kind === "illustration" && x.shows === "subject" && p.official ? 2 : 0;
 }
@@ -94,7 +97,7 @@ export async function look(sql: Sql, subject: string, pics: Picture[], log: (s: 
   if (!images.length) return { pics: [], covers: [], refused: [], why: "no picture could be fetched" };
   const res = await askGemini(sql, "lite", { system: LOOK, user: `SUBJECT: ${subject}`, images, maxTokens: 4000, temperature: 0.1 }, (v) => {
     const x = (v as { pictures?: Partial<Seen>[] })?.pictures;
-    return Array.isArray(x) && x.length ? x.map((y) => ({ n: Number(y.n), about: String(y.about ?? "").slice(0, 200), shows: String(y.shows ?? ""), kind: String(y.kind ?? ""), cover: Number(y.cover) || 0 })) : null;
+    return Array.isArray(x) && x.length ? x.map((y) => ({ n: Number(y.n), about: String(y.about ?? "").slice(0, 200), shows: String(y.shows ?? ""), kind: String(y.kind ?? ""), cover: Number(y.cover) || 0, other: y.other === true })) : null;
   });
   if (!res.ok) { log(`  the pictures weren't looked at (${res.why.slice(0, 120)})`); return "busy"; }
   const seen = new Map(res.value.map((x) => [x.n, x]));
