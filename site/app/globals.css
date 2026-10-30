@@ -1,3 +1,10 @@
+/* Small fonts of our own (30 Oct: a 440 KB font with every width was fetched for a few words; the paper's name is the 8 KB "CK Mark",
+   made from Anek at 112% width and only its letters; Aavtikal's headlines are the one style they use, 800 at 75%: site/app/fonts). */
+@font-face{font-family:"CK Mark";src:url("./fonts/mark.woff2") format("woff2");font-weight:800;font-display:swap}
+@font-face{font-family:"CK Mark Cond";src:url("./fonts/mark-cond.woff2") format("woff2");font-weight:800;font-display:swap}
+@font-face{font-family:"CK Cond";src:url("./fonts/cond-gu.woff2") format("woff2");font-weight:800;font-display:swap;unicode-range:U+0951-0952,U+0964-0965,U+0A80-0AFF,U+200C-200D,U+20B9,U+25CC,U+A830-A839}
+@font-face{font-family:"CK Cond";src:url("./fonts/cond-hi.woff2") format("woff2");font-weight:800;font-display:swap;unicode-range:U+0900-0950,U+0953-0963,U+0966-097F,U+1CD0-1CF9,U+20A8,U+A8E0-A8FF}
+@font-face{font-family:"CK Cond";src:url("./fonts/cond-latin.woff2") format("woff2");font-weight:800;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2212}
 /* Capital Kranti's own design system (docs/website/DESIGN.md), as in the approved
    sample (docs/website/sample/page_template.html): phone first; a 4/8/12-column grid
    whose 1px rules sit in the middle of the gutters; the front page as a stack of
@@ -9,6 +16,7 @@
   --live:#0b6f99; --breaking:#b3261e; --checked:#1d7a46; --whatsapp:#1a7f45; --shade:rgba(17,17,20,.45); --photo:none;
   --serif:var(--font-serif),'Gujarati Sangam MN','Shruti',Georgia,serif;
   --ui:var(--font-ui),'Gujarati MT','Shruti',system-ui,sans-serif;
+  --cond:"CK Cond",var(--ui);--mark:"CK Mark",var(--ui);--mark-cond:"CK Mark Cond",var(--ui);
   /* headlines (29 Oct): Hind Vadodara; the stories themselves stay in the serif */
   --head:var(--font-head),'Gujarati Sangam MN','Shruti',system-ui,sans-serif;
   --gut:16px; --side:16px; --scale:1;
@@ -52,7 +60,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* the header's outer icons line up with the page's edges (their round hover stays outside it) */
 .bar .l > .ib:first-child,.bar .l > .ib.menu-plain{margin-left:-12px}.bar .l > .ib.lbl{margin-left:-10px}@media (max-width:739px){ .bar .r > .ib{margin-right:-12px} }
 .wm{display:flex;align-items:baseline;gap:12px;color:var(--brand);white-space:nowrap}
-.wm b{font-family:var(--ui);font-weight:800;font-stretch:112%;font-size:27px;line-height:1;letter-spacing:.2px}
+.wm b{font-family:var(--mark);font-weight:800;font-size:27px;line-height:1;letter-spacing:.2px}
 .wm i{display:none;font-style:normal;font-size:14px;color:var(--muted)}
 .epill{display:none;background:var(--navy);color:var(--on-navy);border-radius:999px;padding:9px 18px;font-weight:700;font-size:15px}
 /* no glow on hover (the user, 29 Oct): just a little brighter */
@@ -63,7 +71,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 /* the section row's rule runs exactly as wide as the page's content, like every rule below it */
 .secs{display:flex;gap:4px 22px;overflow-x:auto;scrollbar-width:none;white-space:nowrap;background:linear-gradient(var(--rule),var(--rule)) content-box bottom/100% 1px no-repeat;font-weight:600;font-size:15px;color:var(--strong)}
 .secs::-webkit-scrollbar{display:none}
-.secs a.fl{margin-left:auto;padding-left:22px;border-left:1px solid var(--rule);font-weight:800;font-stretch:80%}
+.secs a.fl{margin-left:auto;padding-left:22px;border-left:1px solid var(--rule);font-family:var(--mark-cond);font-weight:800}
 .secs a.fl::after{left:22px} /* the bar under its words, not under the space before them */
 .secs a{position:relative;padding-block:13px 11px;transition:color .15s ease}
 .secs a::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:3px 3px 0 0;background:var(--brand);transform:scaleX(0);transition:transform .25s cubic-bezier(.2,.7,.2,1)}
@@ -273,7 +281,7 @@ a.h:active{opacity:.85}
 
 /* ---------- section page ---------- */
 .sechead{display:flex;align-items:center;gap:12px;margin:20px 0 6px}
-.sechead h1{font-family:var(--ui);font-weight:800;font-stretch:105%;font-size:34px;line-height:1.2;color:var(--brand);margin:0}
+.sechead h1{font-family:var(--ui);font-weight:800;font-size:34px;line-height:1.2;color:var(--brand);margin:0}
 .follow{border:1px solid var(--rule-strong);border-radius:999px;padding:6px 14px;font-weight:700;font-size:14px;color:var(--strong);min-height:36px}
 .chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-block:10px 4px}
 .chips::-webkit-scrollbar{display:none}
@@ -342,7 +350,7 @@ a.h:active{opacity:.85}
 .sheet:not([hidden]){animation:slidein .28s cubic-bezier(.2,.7,.2,1) both;box-shadow:12px 0 40px -20px rgba(0,0,0,.35)}
 @keyframes slidein{from{transform:translateX(-104%)}}@keyframes fade{from{opacity:0}}
 .sheet .x{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.sheet .x b{font-family:var(--ui);font-weight:800;font-stretch:112%;font-size:22px;color:var(--brand)}
+.sheet .x b{font-family:var(--mark);font-weight:800;font-size:22px;color:var(--brand)}
 .search{display:flex;align-items:center;gap:8px;border:1px solid var(--rule-strong);border-radius:6px;padding:0 12px;margin-bottom:8px}
 .search input{flex:1;min-width:0;background:none;border:0;color:var(--strong);font:inherit;font-size:16px;padding:12px 0;outline:none}
 .results{margin-bottom:var(--s2);animation:rise var(--d2) var(--ease) both}
@@ -431,7 +439,7 @@ time.fresh{color:var(--breaking);font-weight:700;display:inline-flex;align-items
 /* the page on its way: its shapes, shimmering */
 .sk{display:block;border-radius:6px;background:linear-gradient(100deg,var(--surface) 30%,color-mix(in srgb,var(--surface) 55%,var(--bg)) 50%,var(--surface) 70%) 0 0/300% 100%;animation:shimmer 1.4s linear infinite}
 .skel-top{border-bottom:1px solid var(--rule)}.skel-bar{display:flex;justify-content:space-between;align-items:center;height:56px}
-.skel-wm{font-family:var(--ui);font-weight:800;font-stretch:112%;font-size:27px;color:var(--brand);opacity:.55}
+.skel-wm{font-family:var(--mark);font-weight:800;font-size:27px;color:var(--brand);opacity:.55}
 .sk-ib{width:32px;height:32px;border-radius:50%}
 .skel-secs{display:flex;gap:18px;padding-block:14px;border-bottom:1px solid var(--rule);overflow:hidden}.sk-chip{width:56px;height:16px;flex:none}
 .skel-lead{display:grid;gap:16px;margin-top:20px}.skel-lead > div{display:grid;gap:10px;align-content:start}
@@ -527,10 +535,10 @@ time.fresh{color:var(--breaking);font-weight:700;display:inline-flex;align-items
 .avc-in{display:flex;flex-direction:column;align-items:flex-start;padding:12px 16px 14px;color:inherit;text-decoration:none}
 .avc-in:focus-visible,.avc-x:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
 .avc-by{font-size:11.5px;font-weight:700;letter-spacing:.05em;color:var(--av-soft);padding-right:36px}
-.avc-name{font-family:var(--ui);font-weight:800;font-stretch:75%;font-size:30px;line-height:1.2}
+.avc-name{font-family:var(--mark-cond);font-weight:800;font-size:30px;line-height:1.2}
 html[lang="en"] .avc-name{line-height:1;letter-spacing:-.02em;margin-top:2px}
 .avc-tag{margin-top:8px;padding:3px 7px 1px;background:var(--bc);color:var(--av-bg);font-size:11.5px;font-weight:700;line-height:1.2}
-.avc-hl{margin-top:6px;font-family:var(--ui);font-weight:800;font-stretch:75%;font-size:17px;line-height:1.22;
+.avc-hl{margin-top:6px;font-family:var(--cond);font-weight:800;font-size:17px;line-height:1.22;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .avc-cta{margin-top:10px;font-size:14px;font-weight:700}
 .avc-in:hover .avc-cta{text-decoration:underline;text-underline-offset:3px}
