@@ -404,7 +404,8 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     const { lines: set, size } = await fitLines(m, profile.editorial.columnTitle!, rw * 0.84, font, ribbon * 0.74, ribbon * 0.5, 1);
     const st = await stackLines(m, set, `${aid}-k-title`, aid, rw * 0.08, edge + (ribbon - size * 1.2) / 2, rw * 0.84, font, size, size * 1.2);
     banner = [{ id: `${aid}-k-ribbon`, kind: "rect", articleId: aid, x: edge, y: edge, width: rw, height: ribbon, fill: INK, radius: ribbon * 0.3 },
-              ...st.elements.map((e) => (e.kind === "text" ? { ...e, color: "#ffffff", align: "left" as const } : e))];
+              // (thickened: the font's own bold italic printed lighter than the paper's title, 30 Oct)
+              ...st.elements.map((e) => (e.kind === "text" ? { ...e, color: "#ffffff", align: "left" as const, thicken: 0.6 * PT } : e))];
   }
   const inside = (e: Element): Element => (!inset || e.kind === "path" ? e : e.kind === "line" ? { ...e, x1: e.x1 + inset, x2: e.x2 + inset } : { ...e, x: e.x + inset });
   return {
