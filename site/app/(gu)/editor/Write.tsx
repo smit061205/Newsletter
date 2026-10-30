@@ -19,7 +19,7 @@ type Kept = { headline: string; deck: string; body: string; caption: string; tie
 const LONG = 1600;
 
 /** a phone's photo made at most 1,600 pixels on its long side, as a JPEG */
-async function smaller(file: File): Promise<{ blob: Blob; width: number; height: number }> {
+export async function smaller(file: File): Promise<{ blob: Blob; width: number; height: number }> {
   const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
   const k = Math.min(1, LONG / Math.max(bmp.width, bmp.height));
   const width = Math.round(bmp.width * k), height = Math.round(bmp.height * k);
