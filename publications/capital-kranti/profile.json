@@ -168,6 +168,9 @@
     "leadStories": 3,
     "translateModel": "google/gemini-3.8-flash",
     "fillTarget": 1.35,
+    "columnTitle": "તંત્રી સ્થાનેથી.....",
+    "columnTitleFont": "gopika-bolditalic",
+    "columnPrefers": "ગુજરાત|અમદાવાદ|ગાંધીનગર|સુરત|વડોદરા|રાજકોટ|ભાવનગર|કચ્છ|સૌરાષ્ટ્ર",
     "minWords": 100
   },
   "fontLicence": "Bharati Gopika fonts (Oasis Systems, 2002), commercial. Their embedding flag (fsType 1, a pre-OpenType value) does not forbid embedding, so the print PDF embeds them. They are still kept server-side ('restricted' here): never at a public URL, so the website shows page images, until the paper confirms its licence covers web-font use.",

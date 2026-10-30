@@ -141,6 +141,12 @@ export const ProfileSchema = z.object({
     workhorseModel: z.string().min(1),
     leadModel: z.string().min(1),
     leadStories: z.number().int().nonnegative(),
+    /** the title of the editor's boxed column, once in a paper on an inside page (none: no column) */
+    columnTitle: z.string().min(1).optional(),
+    /** the font of that title on its bar */
+    columnTitleFont: z.string().min(1).optional(),
+    /** the news it prefers: a pattern of words in a story's headline and opening */
+    columnPrefers: z.string().min(1).optional(),
     /** translates Hindi releases into the paper's language when its own don't fill it */
     translateModel: z.string().min(1).default("google/gemini-3.8-flash"),
     /** the copy wanted, as a share of the pages at natural size: over 1, so the

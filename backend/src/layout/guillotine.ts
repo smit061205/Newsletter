@@ -14,6 +14,7 @@ import type { Measurer } from "./measure.ts";
 import { atPitch, columnLines, HEAD_SPREAD, PITCH_STRETCH, type Option } from "./blocks.ts";
 import type { Module } from "./module.ts";
 import { colX, type PlacedModule } from "./pack.ts";
+import { profile } from "../profile.ts";
 import { BODY, GAP, GRID, PT } from "./typography.ts";
 import type { Element } from "@ck/shared/contract";
 
@@ -38,6 +39,9 @@ const GAP_STRETCH = 3;
 // (never less than a filler item needs -- a headline and a few lines, six lines in
 // all: a 70pt slot by an ad that nothing could fill stayed white, 24 Oct)
 export const FILL_MIN = Math.max(70 * PT, 6 * BODY.pitch);
+/** The shortest gap of a width: room for a headline, a sub-heading and the paper's
+ * shortest story, about five words to a line (a smaller one has no story to fill it). */
+export const fillMin = (cols: number) => Math.max(FILL_MIN, (8 + profile.editorial.minWords / (5 * cols)) * BODY.pitch);
 /** ... at most this tall: a hole a short item can fill */
 export const FILL_MAX = 420 * PT;
 /** (a point of a column's filler costs more than any story's setting: the last resort) */
@@ -138,7 +142,7 @@ export class Solver {
       case "fill": {
         // any height from a few lines up: what's written for it is fitted to it
         const cost = new Float64Array(H).fill(INF);
-        const lo = Math.ceil(FILL_MIN / PT);
+        const lo = Math.ceil(fillMin(t.cols) / PT);
         for (let h = lo; h < H && h * PT <= (this.input.fillMax ?? FILL_MAX); h++) cost[h] = FILL_COST + (h * t.cols) / 40;
         out = { cost };
         break;

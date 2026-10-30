@@ -41,7 +41,7 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
   /** another arrangement of the same day (a repair after a layout check failed): 0 the day's own */
   seedShift?: number;
   /** a paper that failed its checks laid out again another way (pipeline.ts; layout/engine.ts mend) */
-  mend?: { narrowLead?: boolean; shortItems?: boolean };
+  mend?: { narrowLead?: boolean };
               /** how far the build has got: planning the pages, finishing each, checking (pipeline.ts) */
               progress?: (p: Progress) => void;
               /** page images even when the fonts may be served (tests read them) */
@@ -58,6 +58,8 @@ const SHORT_WORDS = 200;
 /** Two reports sharing this much of their opening words and figures are the same
  * news (30 Oct's day: the same news 0.49 and over, different news 0.28 at most). */
 const SAME_STORY = 0.4;
+/** The fewest words of a story set as the editor's column. */
+const COLUMN_WORDS = 200;
 /** Most important first; of equal rank, one with a photo first (28 Oct: the
  * editor's own pages put a photo with nearly every story), then the longest. */
 const byRank = (a: Story, b: Story) => a.priority - b.priority || Number(!a.photo) - Number(!b.photo) || b.bodies.long.length - a.bodies.long.length;
@@ -302,7 +304,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       const eventOf = new Map((planned?.plan ?? []).filter((p) => p.event?.trim()).map((p) => [p.id, p.event!.trim().toLowerCase()]));
       const report = (s: Story) => ({ headline: s.headline, body: s.bodies.long });
       const same = (a: Story, b: Story) => (!!eventOf.get(a.id) && eventOf.get(a.id) === eventOf.get(b.id)) || newsOverlap(report(a), report(b)) >= SAME_STORY;
-      const { kept, twins } = oneReportOfEach(pool, same, (s) => rankedByEditor.has(s.id) || alwaysPrinted(s));
+      const { kept, twins, twinsOf } = oneReportOfEach(pool, same, (s) => rankedByEditor.has(s.id) || alwaysPrinted(s));
+      // (the reports left out are the kept one's facts too, for a longer version of it)
+      for (const [id, others] of twinsOf) {
+        const r = releases.get(id);
+        if (r) releases.set(id, { ...r, body: [r.body, ...others.map((t) => releases.get(t.id)?.body ?? t.bodies.long)].join("\n\n") });
+      }
       if (twins.length) log(`  the same news as a story kept, left out: ${twins.map((s) => s.id).join(", ")}`);
       pool = kept.map((s) => ({ ...s, photos: s.photos ?? [] })).sort(byRank);
       sameNews.push(...twins);
@@ -354,6 +361,21 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         const [s] = pool.splice(k, 1);
         log(`  the lead: ${s.id} (${pool[0].id} has no photo)`);
         pool.unshift({ ...s, priority: Math.min(s.priority, pool[0].priority) });
+      }
+    }
+    // the editor's column, once in the paper: a story of the day, no photo, on an
+    // inside page's edge in two columns (the editor, 30 Oct; layout/designs.ts): Gujarat's
+    // own news first, one with no photo of its own, the longest (the lead and what the editor sent stay as they are)
+    const columnTitle = profile.editorial.columnTitle;
+    if (columnTitle && !opts.copy) {
+      const fit = pool.slice(1).filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && wordCount(s.bodies.long) >= COLUMN_WORDS);
+      const prefers = profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null;
+      const local = (s: Story) => Number(!!prefers?.test(`${s.headline} ${s.bodies.long.slice(0, 300)}`));
+      const pick = fit.sort((a, b) => local(b) - local(a) || Number(!!a.translatedFrom) - Number(!!b.translatedFrom) || Number(!!a.photo) - Number(!!b.photo)
+                                      || b.bodies.long.length - a.bodies.long.length || a.id.localeCompare(b.id))[0];
+      if (pick) {
+        log(`  the editor's column: ${pick.id}`);
+        pool = pool.map((s) => (s === pick ? { ...s, editorsColumn: true, photo: null, photos: [], priority: 3 } : s));
       }
     }
     // feature articles print like the news: no kicker, no special title (24 Oct, the editor's wish)
@@ -528,7 +550,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // after a change to either, the paper is meant to differ
   // (another arrangement on purpose, a repair: compared only with its like)
   const fingerprint = buildFingerprint(store, date) + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
-    + (opts.mend?.narrowLead ? "|narrow lead" : "") + (opts.mend?.shortItems ? "|short items" : "");
+    + (opts.mend?.narrowLead ? "|narrow lead" : "");
   // (a copy is meant to differ from the day's paper)
   const previous = opts.copy ? null : store.latestIssue(date);
   const comparable = previous && (previous.report as { fingerprint?: string }).fingerprint === fingerprint;

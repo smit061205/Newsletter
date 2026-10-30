@@ -16,7 +16,7 @@ import type { Line, Measurer } from "./measure.ts";
 import { setDisplay, type DisplaySpec } from "./display.ts";
 import { normalizeStory } from "./text.ts";
 import { profile } from "../profile.ts";
-import { BODY, CAPTION, DECK, GAP, GRID, HEADLINE, KICKER, PHOTO, PT } from "./typography.ts";
+import { INK, BODY, CAPTION, DECK, GAP, GRID, HEADLINE, KICKER, PHOTO, PT } from "./typography.ts";
 import { wordForWord, type Story } from "../store.ts";
 
 export type Variant = "long" | "medium" | "short";
@@ -106,6 +106,13 @@ function balance(tops: number[], n: number, pitch: number): { bottom: number; ca
 
 const imageSizes = new Map<string, { width: number; height: number } | null>();
 
+/** How tall the ribbon with the editor's column's title is (px). */
+const RIBBON_HEIGHT = 32 * PT;
+/** How far the editor's column's text stands in from its frame (px). */
+const COLUMN_INSET = 7 * PT;
+/** The fewest lines a column under a side photo holds, if it holds any. */
+const UNDER_PHOTO = 4;
+
 async function sizeOf(url: string, m: Measurer) {
   if (!imageSizes.has(url)) imageSizes.set(url, await m.imageSize(url));
   return imageSizes.get(url) ?? null;
@@ -141,7 +148,9 @@ export async function buildModule(story: Story, rank: number, cols: number, vari
 async function build(story: Story, rank: number, cols: number, variant: Variant, m: Measurer,
                      photoMode: PhotoMode, pitch: number, head?: HeadBand): Promise<Module> {
   const aid = story.id;
-  const w = spanWidth(cols);
+  // (the editor's column: its text inside its frame, in from the line)
+  const inset = story.editorsColumn ? COLUMN_INSET : 0;
+  const w = spanWidth(cols) - 2 * inset;
   const text = normalizeStory(story); // what's printed: the paper's digits, clean spacing
   const els: Element[] = [];
 
@@ -181,11 +190,13 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   // headline as set when that came out smaller (a long one fitted to its lines:
   // 23 Oct's copy printed a 43pt kicker over a 40pt headline)
   const kicker = KICKER.none ? "" : text.kicker.trim();
+  // the editor's column: its title on a ribbon at the top left, the story under it, in one wide column
+  const ribbon = story.editorsColumn && profile.editorial.columnTitle ? RIBBON_HEIGHT : 0;
   const title = text.headline.trim();
   let kickerMax = Math.max(KICKER.min, hd * KICKER.ratio);
   for (let pass = 0; pass < 2; pass++) {
     els.splice(0);
-    cursor = GAP.top;
+    cursor = GAP.top + (ribbon ? ribbon + 3 * PT : 0);
     displayFill = 1;
     headSize = 0;
     let kickerSize = 0;
@@ -216,7 +227,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     kickerMax = most;
   }
   const headlineHeight = cursor;
-  const deck = text.deck.trim();
+  const deck = story.editorsColumn ? "" : text.deck.trim(); // (the editor's column has none, as the paper prints it)
   if (deck) {
     // the sub-heading: clearly smaller than the headline, clearly larger than the body
     const ds = Math.min(Math.max(DECK.min, (headSize || hd) * DECK.ratio), (headSize || hd) / 1.3);
@@ -240,7 +251,9 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   // that sets well (linebreak.ts looseness) -- to end the columns level
   // (a kerned script, Hindi or Urdu, prints about a percent wider than it measures:
   // its lines broken that much short of the column, so none runs past it -- 24 Oct)
-  const req = (loose: number) => ({ paras, width: KERNED_PAPER ? GRID.column * 0.985 : GRID.column, font: BODY.font, size: BODY.size, indent: BODY.indent, optimal: true,
+  const columns = story.editorsColumn ? 1 : cols;
+  const measure = columns === 1 ? w : GRID.column;
+  const req = (loose: number) => ({ paras, width: KERNED_PAPER ? measure * 0.985 : measure, font: BODY.font, size: BODY.size, indent: BODY.indent, optimal: true,
                                     looseness: paras.map(() => loose) });
   const [lines, tighter, looser] = paras.length ? await m.breakLines([req(0), req(-1), req(1)]) : [[], [], []] as Line[][];
   const byPara = (ls: Line[]) => paras.map((_, i) => ls.filter((l) => l.para === i));
@@ -281,7 +294,8 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   const sharp = photo ? Array.from({ length: cols }, (_, i) => cols - i).find((k) => photo.width / (spanWidth(k) / 300) >= PHOTO.minPpi) ?? 0 : 0;
   const spans = !photo ? [0]
     : photoMode === 1 ? [cols]
-    : cols === 1 ? [1, 0]
+    // (no photo in a one-column story: the editor, 30 Oct)
+    : cols === 1 ? [0]
     // (a third of a wide story too: a small photo set in a full-width lead, 28 Oct)
     : [...new Set([Math.ceil(cols / 2), cols - 1, cols, Math.max(PHOTO.minCols, Math.floor(cols / 2)), ...(cols >= 6 ? [Math.ceil(cols / 3)] : []), sharp])]
         .filter((k) => k >= PHOTO.minCols && k <= cols).concat(0);
@@ -355,7 +369,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
       out.push(...captionEls);
     }
     // columns under the photo start below it; the rest right under the header
-    const tops = Array.from({ length: cols }, (_, i) => (k && i >= cols - k ? photoBottom : cursor));
+    const tops = Array.from({ length: columns }, (_, i) => (k && i >= cols - k ? photoBottom : cursor));
     const { lines: body, bottom, caps } = level(tops);
     const height = Math.max(bottom, k ? photoFoot : cursor);
     // (a customer's article always shows its photo, however short its text)
@@ -363,12 +377,15 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     // the text beside a photo must reach (about) its foot: a photo taller
     // than its story's text leaves a hole beside it -- try a smaller one
     if (k && k < cols && photoFoot - bottom > 1.5 * pitch) continue;
+    // the columns under a side photo hold a real piece of text or none: a line in
+    // each, a sentence broken across them, looked like a stray line (30 Oct)
+    if (k && k < cols && caps.slice(cols - k).some((c) => c > 0 && c < UNDER_PHOTO)) continue;
     let li = 0;
     tops.forEach((top, i) => {
       const take = body.slice(li, li + caps[i]);
       li += take.length;
       if (!take.length) return;
-      const f: Frame = { x: i * (GRID.column + GRID.gutter), y: top, w: GRID.column, h: bottom - top };
+      const f: Frame = { x: i * (GRID.column + GRID.gutter), y: top, w: measure, h: bottom - top };
       out.push(...columnElements(take, `${aid}-c${i}`, aid, f, BODY.size, pitch, m.isLegacy(BODY.font)));
     });
     best = { elements: out, height, k, lines: body.length };
@@ -379,9 +396,20 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill, deckSize };
   }
 
+  // the editor's column: a black bar with rounded ends across its frame, the title white and italic
+  let banner: Element[] = [];
+  if (ribbon) {
+    const edge = 1.5 * PT, rw = spanWidth(cols) - 2 * edge;
+    const font = profile.editorial.columnTitleFont ?? HEADLINE.font;
+    const { lines: set, size } = await fitLines(m, profile.editorial.columnTitle!, rw * 0.84, font, ribbon * 0.74, ribbon * 0.5, 1);
+    const st = await stackLines(m, set, `${aid}-k-title`, aid, rw * 0.08, edge + (ribbon - size * 1.2) / 2, rw * 0.84, font, size, size * 1.2);
+    banner = [{ id: `${aid}-k-ribbon`, kind: "rect", articleId: aid, x: edge, y: edge, width: rw, height: ribbon, fill: INK, radius: ribbon * 0.3 },
+              ...st.elements.map((e) => (e.kind === "text" ? { ...e, color: "#ffffff", align: "left" as const } : e))];
+  }
+  const inside = (e: Element): Element => (!inset || e.kind === "path" ? e : e.kind === "line" ? { ...e, x1: e.x1 + inset, x2: e.x2 + inset } : { ...e, x: e.x + inset });
   return {
-    story, rank, cols, variant, photoMode, width: w, height: best.height,
-    elements: [...els, ...best.elements],
+    story, rank, cols, variant, photoMode, width: w + 2 * inset, height: best.height + inset,
+    elements: [...banner, ...[...els, ...best.elements].map(inside)],
     photoDropped: !!photo && best.k === 0,
     headlineHeight, bodyLines: best.lines, pitch, headSize, displayFill, deckSize,
   };
