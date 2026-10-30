@@ -166,7 +166,7 @@ CK_PUBLICATION=dev-test DATA_DIR=/tmp/ck-test node --experimental-strip-types --
 1. Push the code to `main`.
 2. Push a new version tag from `main`: `git tag vX.Y.Z && git push origin vX.Y.Z` (from 23 Oct, every finished improvement is released this way; CLAUDE.md).
 3. The **release** workflow creates the release and builds two installers and attaches them to it in about 30 minutes:
-   - Mac Apple silicon on `macos-14`;
+   - Mac Apple silicon on `macos-15`;
    - Windows on `windows-latest`.
 
 The installer names never change, so these links always serve the newest release:
