@@ -54,6 +54,8 @@ export const TextElementSchema = z.object({
   letterSpacing: num.optional(),
   // Extra space added to every word space (on top of the font's own).
   wordSpacing: num.optional(),
+  /** Letters spread this wide in their own colour, to make a thin font print heavier. */
+  thicken: z.number().positive().optional(),
   // One line set by the backend to exactly its width (its spacing and hScale
   // already computed): it never wraps, and the plotter checks it fills the box.
   nowrap: z.boolean().optional(),

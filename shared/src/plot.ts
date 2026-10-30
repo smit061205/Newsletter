@@ -44,6 +44,11 @@ function textHtml(el: TextElement, px: (v: number) => string): string {
   ];
   if (el.letterSpacing) styles.push(`letter-spacing:${px(el.letterSpacing)}`);
   if (el.wordSpacing) styles.push(`word-spacing:${px(el.wordSpacing)}`);
+  // (hard shadows round the letters, not an outline: an outlined font isn't embedded in the PDF)
+  if (el.thicken) {
+    const t = el.thicken / 2, c = el.color ?? "#000";
+    styles.push(`text-shadow:${[[t, 0], [-t, 0], [0, t], [0, -t]].map(([x, y]) => `${px(x)} ${px(y)} 0 ${c}`).join(",")}`);
+  }
   if (el.nowrap) styles.push("white-space:nowrap");
   if (h !== 1) styles.push(`transform:scaleX(${h})`, "transform-origin:0 0");
   if (el.vAlign && el.vAlign !== "top") {
