@@ -173,7 +173,6 @@
 @media (min-width: 768px) { .writers { grid-template-columns: 1fr 1fr 2fr } }
 .writer { position: relative; display: flex; flex-direction: column; gap: 8px }
 .writerName { font-size: calc(var(--cardH) * var(--gs)) }
-.writerRole { font-family: var(--serif); font-size: 15px; opacity: .85 }
 .writersText { font-family: var(--serif); font-weight: 300; font-size: clamp(17px, 1.25vw, 21px); line-height: 1.55; margin: 0; max-width: 34em }
 
 /* ---------- a beat's page / an author's page ---------- */
@@ -181,7 +180,6 @@
 @media (min-width: 768px) { .pageHead { padding: 40px 0 0 } }
 .authorHead { text-align: center; padding: 50px var(--m) 30px }
 .authorName { font-size: calc(max(48px, min(5.56vw, 96px)) * var(--gs)) }
-.authorRole { margin-top: 12px; font-family: var(--serif); font-size: 18px }
 
 /* ---------- search ---------- */
 .searchForm { display: flex; justify-content: center; padding: 30px var(--m) 8px }

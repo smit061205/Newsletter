@@ -10,7 +10,7 @@ import { dateText, minutes, num, paragraphs, timeText } from "../lib/format.ts";
 import { PAPER, SITE_URL } from "../lib/site.ts";
 import { Cmp, Head, Join, LatestList, MoreOn, MostRead, Std, words } from "../components/cards.tsx";
 import CountRead from "../components/CountRead.tsx";
-import { Check, Chev, Flag } from "../components/icons.tsx";
+import { Chev, Flag } from "../components/icons.tsx";
 import ArticleTools from "../components/ArticleTools.tsx";
 import ReadProgress from "../components/ReadProgress.tsx";
 import PhotoZoom from "../components/PhotoZoom.tsx";
@@ -77,7 +77,6 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
                 {" · "}{num(minutes(w.body), lang)} {t(lang, "min")}</span>
             </div>
           </div>
-          {s.checked && <div className="chk"><Check />{t(lang, "checked")}</div>}
           <ArticleTools id={s.id} url={url} headline={w.headline} words={toolWords} />
           {s.photo && (
             <figure>
@@ -114,7 +113,6 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
               <ul className="srcs">{s.sources.map((x) => <li key={x.url}><a href={x.url} target="_blank" rel="noopener">{x.name}</a></li>)}</ul>
             ) : s.source ? <a href={s.source.url} target="_blank" rel="noopener">{s.source.name}{s.source.office ? `, ${s.source.office}` : ""}</a>
                       : <span>{t(lang, "desk")}</span>}
-            {s.checked && <p className="how">{t(lang, "how")}</p>}
             <a className="report" href={mail}><Flag />{t(lang, "report")}</a>
           </div>
           {after.length > 0 && (
