@@ -617,7 +617,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         return send(res, 200, {
           today: day, now: time, ...s, nextRun: s.autoRun ? `${store.setting("lastScheduledRun", "") === day || time >= s.runAt ? "tomorrow" : "today"} ${s.runAt}` : null,
           running: currentJob(), lastJob: store.jobs(undefined, 1)[0] ?? null,
-          openrouterKey: envHas("OPENROUTER_API_KEY"),
+          openrouterKey: envHas("OPENROUTER_API_KEY"), aiOutOfMoney: store.setting("aiOutOfMoney", false),
           issue: latest ? { version: latest.version, status: latest.status, ready: (latest.report as { ready?: boolean }).ready,
                             issueNumber: (latest.report as { issueNumber?: number }).issueNumber } : null,
           version: gitVersion(),

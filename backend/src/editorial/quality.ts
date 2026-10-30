@@ -29,6 +29,21 @@ export function repeats(body: string): boolean {
   return false;
 }
 
+/** The text with each sentence that says an earlier one again taken out (a
+ * speech's chant, a release that says its opening again at its end: 30 Oct). */
+export function withoutRepeats(body: string): string {
+  const said: Set<string>[] = [];
+  const repeated = (s: string) => {
+    const a = new Set(s.split(/\s+/).filter((w) => w.length > 2));
+    if (a.size < 6) return false;
+    if (said.some((b) => [...a].filter((w) => b.has(w)).length / Math.max(a.size, b.size) >= 0.5)) return true;
+    said.push(a);
+    return false;
+  };
+  return body.split(/\n\s*\n/).map((para) => (para.match(/[\s\S]*?[.!?।]+["'”’)]*(?:\s+|$)|[\s\S]+$/g) ?? [para]).filter((s) => !repeated(s)).join("").trim())
+    .filter(Boolean).join("\n\n");
+}
+
 /** Can the paper's own fonts print this text? (A legacy-encoded paper's
  * encoder sets every letter; a Unicode paper's fonts are checked by gate F.) */
 let encoder: BharatiEncoder | null | undefined;

@@ -19,7 +19,7 @@ export interface Report {
 export interface IssueInfo { date: string; version: number; status: string; report: Report }
 export interface Status {
   today: string; now: string; runAt: string; autoRun: boolean; nextRun: string | null;
-  running: Job | null; lastJob: Job | null; openrouterKey: boolean;
+  running: Job | null; lastJob: Job | null; openrouterKey: boolean; aiOutOfMoney?: boolean;
   lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number; inrAuto: boolean; inrUpdated: string; notify: boolean; siteUrl: string;
   /** what a story costs in each kind of copy (US$), learned from real batches, and a copy's minutes */
   costRates: Record<string, number>; copyMinutes: number; samplesOn: boolean;

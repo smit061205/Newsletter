@@ -33,14 +33,18 @@ const tokens = (t: string) => {
                   ...[...digits(head)].map((n) => `#${n.replace(/,/g, "")}`).filter((n) => n.length > 3)]);
 };
 /** The Gujarati release that is the same news as `r`, if any. */
+/** How much of two reports' opening words and figures they share (0 to 1). */
+export function newsOverlap(x: Pick<Release, "headline" | "body">, y: Pick<Release, "headline" | "body">): number {
+  const a = tokens(`${x.headline} ${x.body}`), b = tokens(`${y.headline} ${y.body}`);
+  let both = 0;
+  for (const w of a) if (b.has(w)) both++;
+  return both / Math.max(1, Math.min(a.size, b.size));
+}
+
 export function sameNewsIn(r: Pick<Release, "headline" | "body">, gujarati: Release[]): Release | null {
-  const a = tokens(`${r.headline} ${r.body}`);
   let best: { g: Release; score: number } | null = null;
   for (const g of gujarati) {
-    const b = tokens(`${g.headline} ${g.body}`);
-    let both = 0;
-    for (const w of a) if (b.has(w)) both++;
-    const score = both / Math.max(1, Math.min(a.size, b.size));
+    const score = newsOverlap(r, g);
     if (score >= SAME_NEWS && (!best || score > best.score)) best = { g, score };
   }
   return best?.g ?? null;

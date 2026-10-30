@@ -45,6 +45,23 @@ export function dedupe(stories: Story[]): Story[] {
   return stories.filter((s) => kept.includes(s));
 }
 
+/** The same news reported more than once (`same` says which): the best report
+ * stays, given another's photo if it has none, the others go. An editor's own
+ * choice (`fixed`) is never taken out. */
+export function oneReportOfEach(pool: Story[], same: (a: Story, b: Story) => boolean, fixed: (s: Story) => boolean): { kept: Story[]; twins: Story[] } {
+  const kept: Story[] = [], twins: Story[] = [];
+  const best = [...pool].sort((a, b) => Number(fixed(b)) - Number(fixed(a)) || a.priority - b.priority || Number(!a.photo) - Number(!b.photo)
+                                        || b.bodies.long.length - a.bodies.long.length);
+  for (const s of best) {
+    const k = kept.findIndex((o) => same(o, s));
+    if (k < 0 || fixed(s)) { kept.push(s); continue; }
+    if (!kept[k].photo && s.photo) kept[k] = { ...kept[k], photo: s.photo, photos: s.photos ?? [s.photo], caption: s.caption };
+    twins.push(s);
+  }
+  const by = new Map(kept.map((s) => [s.id, s]));
+  return { kept: pool.flatMap((s) => by.get(s.id) ?? []), twins };
+}
+
 const scriptShare = (s: string, re: RegExp) => (s.match(re)?.length ?? 0) / Math.max(1, s.replace(/\s/g, "").length);
 /** Is this story in the paper's own language? */
 export function inPaperLanguage(s: Story): boolean {

@@ -13,7 +13,7 @@
 // Every rung passes editorial/quality.ts (never says a thing twice, every
 // letter printable) and is in the paper's language.
 import { fitLength, paragraphs } from "./rewrite.ts";
-import { repeats, settable, wordCount } from "./quality.ts";
+import { repeats, settable, withoutRepeats, wordCount } from "./quality.ts";
 import { inPaperLanguage } from "../layout/stories.ts";
 import { profile } from "../profile.ts";
 import { wordForWord, type Release, type Store, type Story } from "../store.ts";
@@ -59,7 +59,11 @@ export async function ladderOf(store: Store, story: Story, release: Release | un
   if (wordForWord(story)) return { rungs: [{ body: story.bodies.long, words: wordCount(story.bodies.long), from: "long" }], cost: 0 };
   let cost = 0;
   const bases: Rung[] = [];
-  const own = (["long", "medium", "short"] as const).map((v) => ({ body: story.bodies[v], words: wordCount(story.bodies[v]), from: v }));
+  // (a sentence said twice comes out here: 30 Oct, a story printed saying the same thing twice)
+  const own = (["long", "medium", "short"] as const).map((v) => {
+    const body = repeats(story.bodies[v]) ? withoutRepeats(story.bodies[v]) : story.bodies[v];
+    return { body, words: wordCount(body), from: v };
+  });
   const longest = Math.max(...own.map((r) => r.words));
   if (release && opts.longer) {
     const have = wordCount(paragraphs(release.body).join(" "));
@@ -90,17 +94,45 @@ export async function ladderOf(store: Store, story: Story, release: Release | un
   }
   const printable = (r: Rung) => r.words >= Math.min(MIN_WORDS, longest) && !repeats(r.body) && settable(r.body)
     && inPaperLanguage({ ...story, bodies: { long: r.body, medium: r.body, short: r.body } });
-  const kept: Rung[] = [];
-  for (const r of all.filter(printable).sort((a, b) => b.words - a.words)) {
-    const last = kept[kept.length - 1];
-    if (last && last.words - r.words < Math.max(3, last.words * STEP)) continue;
-    kept.push(r);
-  }
+  // (each a step shorter than the one before)
+  const steps = (list: Rung[]) => {
+    const out: Rung[] = [];
+    for (const r of [...list].sort((a, b) => b.words - a.words)) {
+      const last = out[out.length - 1];
+      if (last && last.words - r.words < Math.max(3, last.words * STEP)) continue;
+      out.push(r);
+    }
+    return out;
+  };
+  const sound = steps(all.filter(printable));
+  // a story whose every length failed the checks keeps all its lengths (the
+  // gates report it): only its longest, a 3,060-word speech the AI couldn't
+  // write up, fitted no page, and page 4 came out blank (30 Oct)
+  const kept = sound.length ? sound : steps(all.filter((r) => r.words >= Math.min(MIN_WORDS, longest)));
   // at most MOST, evenly over the range (the longest and shortest kept)
   const rungs = kept.length <= MOST ? kept
     : Array.from({ length: MOST }, (_, k) => kept[Math.round(k * (kept.length - 1) / (MOST - 1))]);
-  // a story whose every length failed the checks keeps its own long one (the gates report it)
   return { rungs: rungs.length ? rungs : [own[0]], cost };
+}
+
+/** A story written longer for a gap on its page (layout/engine.ts): its ladder
+ * with the new length and that length's cuts added. Facts from its release only:
+ * null if the release has no more to say, or the new text can't be printed. */
+export async function grown(store: Store, story: Story, release: Release, ladder: Rung[], more: number,
+                            log?: (s: string) => void): Promise<{ rungs: Rung[]; cost: number } | null> {
+  if (wordForWord(story)) return null;
+  const top = ladder[0]?.words ?? 0;
+  const target = Math.round(Math.min(wordCount(paragraphs(release.body).join(" ")), top + more));
+  if (target < top + 10) return null;
+  const got = await fitLength(store, story, release, target, { log });
+  if (!got || got.factCheck) return null;
+  const rungs: Rung[] = [{ body: got.body, words: wordCount(got.body), from: "longer" }];
+  for (let body = dropLastSentence(got.body); body && wordCount(body) > top; body = dropLastSentence(body)) {
+    rungs.push({ body, words: wordCount(body), from: "cut" });
+  }
+  const fine = rungs.filter((r) => r.words > top && !repeats(r.body) && settable(r.body)
+                                   && inPaperLanguage({ ...story, bodies: { long: r.body, medium: r.body, short: r.body } }));
+  return fine.length ? { rungs: [...fine, ...ladder], cost: got.cost } : null;
 }
 
 /** A story set at one rung. */

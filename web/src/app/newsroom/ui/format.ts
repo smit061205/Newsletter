@@ -33,7 +33,9 @@ export function checkName(lang: Lang, gate: string): string {
   const k = gate.split(" ")[0];
   if (k === "3") return tr(lang, /tombstone/.test(gate) ? "check.3a" : /importance/.test(gate) ? "check.3b" : "check.3c");
   const key = `check.${k}` as StringKey;
-  return tr(lang, key);
+  // (a check with no plain name yet never shows its code: "check.S8" did, 30 Oct)
+  const name = tr(lang, key);
+  return name === key ? tr(lang, "check.other") : name;
 }
 
 export interface Problem { kind: "numbers" | "space" | "review" | "layout" | "other"; text: string; story?: string; page?: number;
