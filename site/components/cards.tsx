@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { ViewTransition } from "react";
 import type { Lang, Story } from "../lib/types.ts";
+import { pic, SIZES } from "../lib/photo.ts";
 import type { Elsewhere } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
@@ -30,8 +31,8 @@ function Meta({ s, lang, sec = true }: { s: Story; lang: Lang; sec?: boolean }) 
 function Photo({ s, lang, cls = "ph", eager = false, morph = false }: { s: Story; lang: Lang; cls?: string; eager?: boolean; morph?: boolean }) {
   if (!s.photo) return null;
   const w = words(s, lang);
-  const img = <img className={cls} src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline}
-                   loading={eager ? "eager" : "lazy"} decoding="async" />;
+  const img = <img className={cls} {...pic(s.photo, cls === "thumb" ? SIZES.thumb : eager ? SIZES.lead : SIZES.card)} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline}
+                   loading={eager ? "eager" : "lazy"} fetchPriority={eager ? "high" : undefined} decoding="async" />;
   // the standard photo sits in a frame that shimmers while it loads and lets it zoom gently on hover
   if (cls !== "ph") return img;
   const framed = <span className="phw">{img}</span>;
@@ -88,7 +89,7 @@ export function Cmp({ s, lang, sec = false }: { s: Story; lang: Lang; sec?: bool
   return (
     <Link className="h cmp" href={storyHref(s, lang)}>
       <div><h3 className="h4">{w.headline}</h3><Meta s={s} lang={lang} sec={sec} /></div>
-      {s.photo && <img src={s.photo.url} alt="" loading="lazy" decoding="async" />}
+      {s.photo && <img {...pic(s.photo, SIZES.thumb)} alt="" loading="lazy" decoding="async" />}
     </Link>
   );
 }
@@ -148,7 +149,7 @@ export function River({ stories, lang, sec = false }: { stories: Story[]; lang: 
           <Link key={s.id} className="h" href={storyHref(s, lang)}>
             <span className="when"><TimeAgo iso={s.publishedAt} lang={lang} fallback={timeText(s.publishedAt, lang)} /></span>
             <div><h3 className="h3">{w.headline}</h3>{w.deck && <p className="dek">{w.deck}</p>}<Meta s={s} lang={lang} sec={sec} /></div>
-            {s.photo ? <img src={s.photo.url} alt="" loading="lazy" decoding="async" /> : <span />}
+            {s.photo ? <img {...pic(s.photo, SIZES.thumb)} alt="" loading="lazy" decoding="async" /> : <span />}
           </Link>
         );
       })}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import s from "./fl.module.css";
 import { fl } from "./Frame.tsx";
 import type { Lang } from "../../lib/types.ts";
+import { pic, SIZES } from "../../lib/photo.ts";
 import { AUTHORS, beatName, featureWords, flw, readMinutes, type Feature } from "../../lib/flagship.ts";
 import { num, shortDate } from "../../lib/format.ts";
 
@@ -34,8 +35,8 @@ function Meta({ f, lang }: { f: Feature; lang: Lang }) {
 function Picture({ f, lang, cls, eager }: { f: Feature; lang: Lang; cls: string; eager?: boolean }) {
   const w = featureWords(f, lang);
   if (!f.photo) return <div className={`${s.tile} ${s[f.beat]}`} aria-hidden="true"><span>{beatName(f.beat, lang)}</span></div>;
-  return <img className={cls} src={f.photo.url} width={f.photo.width} height={f.photo.height} alt={w.caption || w.headline}
-              loading={eager ? "eager" : "lazy"} decoding="async" />;
+  return <img className={cls} {...pic(f.photo, eager ? SIZES.lead : SIZES.card)} width={f.photo.width} height={f.photo.height} alt={w.caption || w.headline}
+              loading={eager ? "eager" : "lazy"} fetchPriority={eager ? "high" : undefined} decoding="async" />;
 }
 
 export function Lead({ f, lang }: { f: Feature; lang: Lang }) {

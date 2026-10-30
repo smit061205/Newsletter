@@ -13,6 +13,7 @@ import { AUTHORS, BEATS, beatName, featureById as loadFeature, featureWords, fea
 import { dateText, num, paragraphs } from "@/lib/format.ts";
 import { SITE_URL } from "@/lib/site.ts";
 import { pageMeta } from "@/lib/meta.ts";
+import { pic, SIZES } from "@/lib/photo.ts";
 
 /** An article read once per page, though its title data and its page both ask for it */
 const featureById = cache(loadFeature);
@@ -142,7 +143,7 @@ function Fig({ g, lang }: { g: Figure; lang: Lang }) {
   const head = <figcaption className={s.figHead}><b>{T(g.title)}</b>{g.note && <span>{T(g.note)}</span>}</figcaption>;
   if (g.kind === "image" && g.photo) return (
     <figure className={s.fig}>
-      <img src={g.photo.url} width={g.photo.width} height={g.photo.height} alt={T(g.title)} loading="lazy" />
+      <img {...pic(g.photo, SIZES.inside)} width={g.photo.width} height={g.photo.height} alt={T(g.title)} loading="lazy" decoding="async" />
       {(T(g.title) || g.photo.credit) && <figcaption className={s.figCap}>{T(g.title)}{g.photo.credit && <span> ({g.photo.credit})</span>}</figcaption>}
     </figure>
   );
@@ -205,7 +206,7 @@ export async function FlArticle({ lang, id }: { lang: Lang; id: string }) {
         </header>
         {f.photo && (
           <figure className={s.hero} style={{ margin: 0 }}>
-            <img src={f.photo.url} width={f.photo.width} height={f.photo.height} alt={t.caption || t.headline} />
+            <img {...pic(f.photo, SIZES.full)} fetchPriority="high" width={f.photo.width} height={f.photo.height} alt={t.caption || t.headline} />
             {t.caption && <figcaption>{t.caption}</figcaption>}
           </figure>
         )}

@@ -3,7 +3,10 @@
    compressed headlines, 0.5px rules in the middle of the gutters, square corners.
    Scoped to these pages: the daily site's look (globals.css) is untouched. */
 
+:global(html[lang="hi"]) .root { --ui: var(--font-cond-hi), var(--font-cond), system-ui, sans-serif }
 .root {
+  /* Aavtikal's condensed headlines need the Anek with a width axis; the news pages use the lighter one */
+  --ui: var(--font-cond), 'Gujarati MT', 'Shruti', system-ui, sans-serif;
   --pg: #E6E5EA; --pg2: #D9D8DE; --ink: #0B0B0F; --ink2: rgba(11, 11, 15, .7); --line: #0B0B0F; --band: #0B0B0F; --band2: #1C1C21; --onband: #E6E5EA;
   --ai: #B58BD9; --tech: #2BB3E6; --science: #9CCB45; --politics: #93A6BA; --onbeat: #0B0B0F; --beat: var(--tech);
   --bandbg: var(--pg);

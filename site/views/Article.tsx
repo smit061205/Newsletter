@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Lang, Story } from "../lib/types.ts";
+import { pic, SIZES } from "../lib/photo.ts";
 import { latestStories, moreOnSubject, mostRead, storiesIn, storyById } from "../lib/db.ts";
 import { href, t } from "../lib/i18n.ts";
 import { sectionName } from "../lib/sections.ts";
@@ -83,7 +84,7 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
               <PhotoZoom src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline}
                          caption={w.caption} label={t(lang, "zoom")} close={t(lang, "close2")}>
                 <ViewTransition name={`photo-${s.id}`} share="morph" default="none">
-                  <span className="phw"><img className="ph" src={s.photo.url} width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline} /></span>
+                  <span className="phw"><img className="ph" {...pic(s.photo, SIZES.inside)} fetchPriority="high" width={s.photo.width} height={s.photo.height} alt={w.caption || w.headline} /></span>
                 </ViewTransition>
               </PhotoZoom>
               {w.caption && <figcaption>{w.caption} ({t(lang, "photo")}: {s.photo?.credit ?? s.source?.name ?? "PIB"})</figcaption>}
@@ -96,7 +97,7 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
                 {shotsAfter(i).map((g) => (
                   <figure key={g.url} className="inph">
                     <PhotoZoom src={g.url} width={g.width} height={g.height} alt={w.headline} caption="" label={t(lang, "zoom")} close={t(lang, "close2")}>
-                      <span className="phw"><img className="ph" src={g.url} width={g.width} height={g.height} alt={w.headline} loading="lazy" /></span>
+                      <span className="phw"><img className="ph" {...pic(g, SIZES.inside)} width={g.width} height={g.height} alt={w.headline} loading="lazy" /></span>
                     </PhotoZoom>
                   </figure>
                 ))}
