@@ -1,22 +1,22 @@
 // The engine's run, every 15 minutes on GitHub (.github/workflows/site-engine.yml;
 // ROADMAP §3, decided 25 Oct). In order, each step stopping in time for the next run:
-//   0. the editor's Telegram presses since the last run (lib/telegram.ts);
+//   0. messages to the Telegram bot since the last run (lib/telegram.ts);
 //   1. every source asked what's new (collect.ts);
 //   2. new items ranked and grouped into events (triage.ts);
 //   3. each event's checks: fresh, not debunked, official or 2+ independent outlets (newsroom.ts gate);
 //   4. the most important confirmed events written in Gujarati, checked claim by claim
 //      by a second free model, English and Hindi added for national and world news;
-//   5. live at once, or held for the editor (sensitive, or a check not passed);
+//   5. live at once, with no one to approve it (the user, 30 Oct); a story that doesn't pass its checks doesn't go up;
 //      no official photo: a free file photo of its subject from Wikimedia Commons (wikiphoto.ts);
 //   8. the last day and a half's stories still without a photo: the same, once each;
-//   9. published stories watched for 24 hours: a source correcting or withdrawing holds them.
+//   9. published stories watched for 24 hours: a source correcting or withdrawing takes them down.
 // Free models only: the day's allowance is spent on the most important events first.
 // Run: node --experimental-strip-types site/engine/run.ts   (DATABASE_URL, OPENROUTER_API_KEY;
-//      BLOB_READ_WRITE_TOKEN for photos; TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_IDS for approvals)
+//      BLOB_READ_WRITE_TOKEN for photos; TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_IDS for notes to the editor)
 import { neon } from "@neondatabase/serverless";
 import { WEBSITE } from "../lib/config.ts";
 import { ensureSchema } from "../lib/schema.ts";
-import { askApproval, pollUpdates, tell } from "../lib/telegram.ts";
+import { pollUpdates, tell } from "../lib/telegram.ts";
 import { touched } from "../lib/write.ts";
 import { aiLeft, aiUsed, freeModels } from "./ai.ts";
 import { collect } from "./collect.ts";
@@ -106,7 +106,8 @@ async function write(until = deadline) {
     log(`  writing ${c.id} (${level}, ${imp}): ${c.event}`);
     const res = await writeChecked(sql, src, level, indiaDate(), c.event);
     wrote++;
-    if (!res.ok && !("written" in res && res.written)) {
+    // not written, or written and still failing its checks: it doesn't go up, and it's tried again up to three times
+    if (!res.ok) {
       log(`    not written${"retry" in res && res.retry ? " (the free models are busy: next run)" : ""}: ${res.why}`);
       if (res.stop || ("retry" in res && res.retry)) break;
       // 29 Oct: a gold-price story the models kept getting wrong took four minutes of every round
@@ -118,8 +119,6 @@ async function write(until = deadline) {
     let w = res.written;
     const checked = res.checked;
     const id = `live-${c.id.slice(1)}`;
-    // held for the editor: sensitive, or a check not passed (ROADMAP §0.1, decided 25 Oct)
-    const holdReason = c.sensitive ? "સંવેદનશીલ સમાચાર" : !checked.ok ? `ચકાસણી: ${checked.problems.slice(0, 3).join("; ")}` : null;
     // past the round's time: the story goes up now and its English and Hindi come with a later round (translations())
     const translated = needsTranslation(c.tier) && Date.now() < deadline;
     let en = translated ? await translate(sql, w, "en", indiaDate()) : null;
@@ -136,20 +135,15 @@ async function write(until = deadline) {
         log(`    file photo: ${free.caption.en} (${free.photo.credit})`);
       }
     }
-    await saveLive(sql, { id, tier: c.tier, genres: c.genres, written: w, checked, src, importance: imp, status: holdReason ? "held" : "published",
-                          holdReason, en, hi, translated, photo });
+    await saveLive(sql, { id, tier: c.tier, genres: c.genres, written: w, checked, src, importance: imp, status: "published",
+                          holdReason: null, en, hi, translated, photo });
     await sql.query(`update stories set photo_tried = true where id = $1`, [id]);
-    await sql.query(`update clusters set state = $2, story_id = $3, reason = $4 where id = $1`, [c.id, holdReason ? "held" : "published", id, holdReason]);
-    if (holdReason) {
-      await askApproval(sql, { id, headline: w.headline, deck: w.deck, body: w.body, reason: holdReason, sources: src.map((s) => ({ name: s.source.name, url: s.url })) });
-      log(`    held for the editor: ${holdReason}`);
-    } else {
-      await touched(sql);
-      log(`    published: ${w.headline}`);
-      // breaking news: an alert to the phones that asked (lib/push.ts)
-      await alertBreaking(sql, { id, importance: imp, publishedAt: new Date().toISOString(), headline: { gu: w.headline, en: en?.headline ?? null, hi: hi?.headline ?? null } }, log)
-        .catch((e) => log(`    no alert: ${e instanceof Error ? e.message : e}`));
-    }
+    await sql.query(`update clusters set state = $2, story_id = $3, reason = $4 where id = $1`, [c.id, "published", id, null]);
+    await touched(sql);
+    log(`    published: ${w.headline}`);
+    // breaking news: an alert to the phones that asked (lib/push.ts)
+    await alertBreaking(sql, { id, importance: imp, publishedAt: new Date().toISOString(), headline: { gu: w.headline, en: en?.headline ?? null, hi: hi?.headline ?? null } }, log)
+      .catch((e) => log(`    no alert: ${e instanceof Error ? e.message : e}`));
   }
 }
 
@@ -181,6 +175,24 @@ async function photos() {
   }
   if (added) await touched(sql);
   return added;
+}
+
+/** Once (30 Oct, approvals removed): what was waiting for the editor is settled. Stories held only for being sensitive go up
+ *  at their own time; anything that failed a check, or that a source corrected, goes to the removed list, where the editor
+ *  can put it back. Articles waiting for a real picture stay: they come back by themselves. */
+async function settleWaiting() {
+  const [done] = await sql.query(`select value from state where key = 'no_approval_once'`);
+  if (done) return;
+  const up = await sql.query(
+    `update stories set status = 'published', hold_reason = null, updated_at = now()
+      where status = 'held' and hold_reason = 'સંવેદનશીલ સમાચાર' and jsonb_array_length(coalesce(checks->'problems', '[]')) = 0 returning id`);
+  if (up.length) await sql.query(`update clusters set state = 'published', reason = null where story_id = any($1)`, [up.map((r) => r.id)]);
+  const off = await sql.query(`update stories set status = 'withdrawn', updated_at = now() where status = 'held' returning id`);
+  const arts = await sql.query(
+    `update features set status = 'withdrawn', updated_at = now() where status = 'draft' or (status = 'held' and coalesce(checks->>'held_for', '') <> 'picture') returning id`);
+  await sql.query(`insert into state (key, value) values ('no_approval_once', '1') on conflict (key) do nothing`);
+  log(`waiting stories settled: ${up.length} up, ${off.length} removed; ${arts.length} waiting articles removed`);
+  if (up.length) await touched(sql);
 }
 
 /** Once (29 Oct): a story that went up twice (Spain's train crash) keeps its first copy; the later one comes down. */
@@ -282,7 +294,7 @@ async function watch() {
     const add = fresh.filter((f) => !have.has(f.url));
     const corrected = fresh.find((f) => CORRECTION.test(`${f.title} ${f.summary}`));
     if (corrected && c.status === "published") {
-      await sql.query(`update stories set status = 'held', hold_reason = $2, updated_at = now() where id = $1`,
+      await sql.query(`update stories set status = 'withdrawn', hold_reason = $2, updated_at = now() where id = $1`,
         [c.story_id, `a source corrected or withdrew it: ${corrected.title}`]);
       await touched(sql);
       await tell(`⚠️ <b>સમાચાર રોક્યા:</b> સ્રોતે સુધારો કર્યો કે પાછા ખેંચ્યા.\n${corrected.title}\n${corrected.url}`);
@@ -319,6 +331,7 @@ const guard = setTimeout(async () => {
 }, 12 * 60_000);
 try {
   log(`engine run ${run.id}; free models: ${(details.models as string[]).join(", ")}`);
+  await settleWaiting();
   await step("presses");
   details.presses = await pollUpdates(sql);
   log("sources:");

@@ -132,7 +132,7 @@ export const SCHEMA = [
   `create table if not exists features (
      id text primary key,
      beat text not null,                            -- ai | tech | science | politics
-     status text not null default 'draft',          -- draft | held | published | withdrawn: only the editor publishes
+     status text not null default 'draft',          -- held (waiting for a real picture) | published | withdrawn
      headline text not null,
      dek text not null default '',
      body text not null,                            -- paragraphs separated by blank lines; "## " a subheading

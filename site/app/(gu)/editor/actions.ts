@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { refresh, revalidatePath } from "next/cache";
 import { db } from "@/lib/db.ts";
 import { redirect } from "next/navigation";
-import { addFeature, addStory, COOKIE, decideFeature, decideStory, editorOf, restoreStory, saveFeature, saveStory, setPaused, withdrawStory, type NewFeature, type NewStory, type Words } from "@/lib/editor.ts";
+import { addFeature, addStory, COOKIE, decideFeature, editorOf, restoreStory, saveFeature, saveStory, setPaused, withdrawStory, type NewFeature, type NewStory, type Words } from "@/lib/editor.ts";
 import { help, type Draft, type Help } from "@/lib/aihelp.ts";
 import { GENRES, TIERS } from "@/lib/sections.ts";
 import { dropLeader, findLeader, saveLeader, type FoundLeader, type Leader } from "@/lib/leaders.ts";
@@ -22,8 +22,6 @@ function renew(aavtikal = false) {
   refresh();
 }
 
-export async function approveStory(id: string) { const { who, sql } = await signedIn(); if (sql) await decideStory(sql, id, true, who); renew(); }
-export async function rejectStory(id: string) { const { who, sql } = await signedIn(); if (sql) await decideStory(sql, id, false, who); renew(); }
 export async function removeStory(id: string) { const { who, sql } = await signedIn(); if (sql) await withdrawStory(sql, id, who); renew(); }
 export async function publishFeature(id: string) { const { sql } = await signedIn(); if (sql) await decideFeature(sql, id, "published"); renew(true); }
 export async function removeFeature(id: string) { const { sql } = await signedIn(); if (sql) await decideFeature(sql, id, "withdrawn"); renew(true); }
