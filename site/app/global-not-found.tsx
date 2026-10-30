@@ -2,7 +2,7 @@
 import "./globals.css";
 import { Anek_Gujarati } from "next/font/google";
 
-const ui = Anek_Gujarati({ subsets: ["gujarati", "latin"], variable: "--font-ui" });
+const ui = Anek_Gujarati({ subsets: ["gujarati", "latin"], variable: "--font-ui", preload: false });
 export const metadata = { title: "પાનું મળ્યું નહીં | કેપિટલ ક્રાંતિ", robots: { index: false } };
 
 export default function GlobalNotFound() {
