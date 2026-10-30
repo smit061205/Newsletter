@@ -68,7 +68,6 @@ for (const r of ranked.filter((r) => r.gt.state === "confirmed")) {
   console.log(`\n[${w.kicker}]\n# ${w.headline}\n## ${w.deck}\n\n${w.body}\n\nwriter: ${w.model}; checker: ${res.checked.model ?? "-"}`);
   console.log(`checks: ${res.checked.ok ? "all passed" : res.checked.problems.join("; ")}`);
   console.log(`claims: ${res.checked.claims.map((c) => `${c.supported ? "✓" : "✗"} ${c.claim}`).join("\n        ")}`);
-  if (r.g[0].triage.sensitive) console.log("→ would be HELD for the editor (sensitive)");
   if (needsTranslation(r.g[0].triage.tier)) {
     const en = await translate(null, w, "en", today);
     const hi = await translate(null, w, "hi", today);

@@ -9,13 +9,12 @@ import s from "./editor.module.css";
 import { W } from "./words.ts";
 import Birthday from "./Birthday.tsx";
 import LeaderForm from "./LeaderForm.tsx";
-import { approveStory, dropLeaderAction, pauseEngine, publishFeature, putBackStory, rejectStory, removeFeature, removeStory } from "./actions.ts";
+import { dropLeaderAction, pauseEngine, publishFeature, putBackStory, removeFeature, removeStory } from "./actions.ts";
 import { db } from "@/lib/db.ts";
-import { COOKIE, desk, editorOf, findFeatures, findStories, PAGE, signInReady, type DeskStory, type Found, type Show } from "@/lib/editor.ts";
+import { COOKIE, desk, editorOf, findFeatures, findStories, PAGE, signInReady, type Found, type Show } from "@/lib/editor.ts";
 import { beatName, isBeat } from "@/lib/flagship.ts";
 import { birthdays, draftEmail, leaders } from "@/lib/leaders.ts";
 import { num, timeText, shortDate } from "@/lib/format.ts";
-import { paragraphs } from "@/lib/format.ts";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "સંપાદક | કેપિટલ ક્રાંતિ", robots: { index: false, follow: false } };
@@ -65,24 +64,6 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
 
   const time = (iso: string) => (iso ? `${shortDate(iso, "gu")}, ${timeText(iso, "gu")}` : "");
   const nn = (x: number) => (lang === "gu" ? num(x, "gu") : String(x));
-
-  const Held = ({ x }: { x: DeskStory }) => (
-    <article className={s.card}>
-      <h3>{x.headline}</h3>
-      {x.reason && <p className={s.why}><b>{w.why}:</b> {x.reason}</p>}
-      {x.deck && <p className={s.deck}>{x.deck}</p>}
-      <details className={s.more}>
-        <summary>{w.read}</summary>
-        {paragraphs(x.body).map((p, i) => <p key={i}>{p}</p>)}
-        {x.sources.length > 0 && <p><b>{w.sources}:</b> {x.sources.map((src, i) => <span key={src.url}>{i > 0 && ", "}<a href={src.url} target="_blank" rel="noopener">{src.name}</a></span>)}</p>}
-      </details>
-      <div className={s.buttons}>
-        <form action={approveStory.bind(null, x.id)}><button className={s.yes}>{w.publish}</button></form>
-        <Link className={s.ghost} href={`/editor/story/${x.id}${back ? `?${back}` : ""}`}>{w.edit}</Link>
-        <form action={rejectStory.bind(null, x.id)}><button className={s.no}>{w.reject}</button></form>
-      </div>
-    </article>
-  );
 
   // one searchable list (Capital Kranti's news or Aavtikal's articles)
   const Finder = ({ at, kind, found, value, which, more }: { at: string; kind: "story" | "feature"; found: { rows: Found[]; more: boolean }; value: string; which: Show; more: string }) => {
@@ -141,7 +122,6 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
         </div>
       </header>
       <nav className={s.jump} aria-label={w.jump}>
-        <a href="#waiting">{w.waiting}{d.held.length > 0 && ` (${nn(d.held.length)})`}</a>
         <a href="#leaders">{w.leadersShort}{bday.today.length > 0 && ` (${nn(bday.today.length)})`}</a>
         <a href="#news" className={s.jCK}>{w.ck}</a>
         <a href="#aavtikal" className={s.jAV}>{w.av}</a>
@@ -150,11 +130,6 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
       <Link className={s.writeBtn} href={`/editor/write${back ? `?${back}` : ""}`}>{w.writeNew}</Link>
       {q.written && <p className={s.done} role="status">{w.written} <a href={`/news/${encodeURIComponent(q.written)}`} target="_blank" rel="noopener">{w.seeIt}</a></p>}
       {q.saved && <p className={q.saved === "1" ? s.done : s.stopped} role="status">{q.saved === "1" ? w.saved : w.notSaved}</p>}
-
-      <section className={s.block} aria-labelledby="waiting">
-        <h2 id="waiting">{w.waiting} {d.held.length > 0 && <span className={s.count}>{nn(d.held.length)}</span>}</h2>
-        {d.held.length ? d.held.map((x) => <Held key={x.id} x={x} />) : <p className={s.empty}>{w.waitingNone}</p>}
-      </section>
 
       <section className={s.block} aria-labelledby="leaders">
         <h2 id="leaders">{w.leaders} {bday.today.length > 0 && <span className={s.count}>{nn(bday.today.length)}</span>}</h2>
@@ -209,20 +184,6 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
           {d.av.lines.length > 0 && <details className={s.more}><summary>{w.avLog}</summary>
             <ul className={s.runs}>{d.av.lines.map((l, i) => <li key={i}>{l}</li>)}</ul></details>}
         </>}
-        <h3 className={s.sub}>{w.drafts}</h3>
-        {d.drafts.length ? d.drafts.map((f) => (
-          <article key={f.id} className={s.card}>
-            <p className={s.tag}>{isBeat(f.beat) ? beatName(f.beat, lang) : f.beat}</p>
-            <h3>{f.headline}</h3>
-            {f.dek && <p className={s.deck}>{f.dek}</p>}
-            <details className={s.more}><summary>{w.read}</summary>{paragraphs(f.body).map((p, i) => <p key={i}>{p.replace(/^#+\s*/, "")}</p>)}</details>
-            <div className={s.buttons}>
-              <form action={publishFeature.bind(null, f.id)}><button className={s.yes}>{w.publish}</button></form>
-              <Link className={s.ghost} href={`/editor/feature/${f.id}${back ? `?${back}` : ""}`}>{w.edit}</Link>
-              <form action={removeFeature.bind(null, f.id)}><button className={s.no}>{w.reject}</button></form>
-            </div>
-          </article>
-        )) : <p className={s.empty}>{w.none}</p>}
         <h3 className={s.sub}>{w.published}</h3>
         <Finder at="aavtikal" kind="feature" found={arts} value={fwords} which={fshow} more={link({ fn: String(fn + PAGE) }, "aavtikal")} />
       </section>

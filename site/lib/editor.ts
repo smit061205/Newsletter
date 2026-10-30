@@ -9,7 +9,6 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { NeonQueryFunction } from "@neondatabase/serverless";
 import { WEBSITE } from "./config.ts";
 import { sample, sampleOn } from "./sample.ts";
-import { alertBreaking } from "./push.ts";
 import { touched } from "./write.ts";
 
 type Sql = NeonQueryFunction<false, false>;
@@ -70,36 +69,23 @@ export async function emailFrom(origin: string, code: string): Promise<string | 
 
 // ---- what the page shows ----
 
-export interface DeskStory { id: string; headline: string; deck: string; body: string; reason: string; at: string; tier: string; sources: { name: string; url: string }[] }
-export interface DeskFeature { id: string; beat: string; headline: string; dek: string; body: string; status: string; at: string }
 export interface DeskRun { at: string; ok: boolean; ai: number | null; seconds: number | null }
 /** Aavtikal's desk today: new articles published (of the day's target), older ones written again (of all), what it last did. */
 export interface AvDesk { published: number; target: number; rewritten: number; toRewrite: number; at: string; running: boolean; lines: string[] }
 export interface Desk {
-  held: DeskStory[]; drafts: DeskFeature[]; av: AvDesk | null;
+  av: AvDesk | null;
   runs: DeskRun[]; paused: boolean; today: { stories: number; ai: number; aiLimit: number; uploads: number; uploadLimit: number };
 }
 
 type Row = Record<string, unknown>;
 const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : "");
-const story = (r: Row): DeskStory => ({ id: r.id as string, headline: r.headline as string, deck: (r.deck as string) ?? "", body: (r.body as string) ?? "",
-  reason: (r.hold_reason as string) ?? "", at: iso(r.published_at), tier: (r.tier as string) ?? "", sources: (r.sources as DeskStory["sources"]) ?? [] });
-const feature = (r: Row): DeskFeature => ({ id: r.id as string, beat: r.beat as string, headline: r.headline as string, dek: (r.dek as string) ?? "",
-  body: (r.body as string) ?? "", status: r.status as string, at: iso(r.published_at ?? r.created_at) });
-
 export async function desk(sql: Sql | null): Promise<Desk> {
   const today = { stories: 0, ai: 0, aiLimit: WEBSITE.dailyGoogleRequests + WEBSITE.dailyFreeRequests, uploads: 0, uploadLimit: 2000 };
   if (!sql) {
-    // local checking: the sample stories stand in
-    const s = sampleOn() ? sample().stories : [];
-    const ds = (x: (typeof s)[number], reason = ""): DeskStory => ({ id: x.id, headline: x.headline, deck: x.deck, body: x.body, reason, at: x.publishedAt, tier: x.tier,
-      sources: x.source ? [{ name: x.source.name, url: x.source.url }] : [] });
-    return { held: s.slice(0, 2).map((x) => ds(x, "સંવેદનશીલ સમાચાર")), drafts: [], av: null, runs: [], paused: false, today };
+    return { av: null, runs: [], paused: false, today };
   }
   const date = new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
-  const [held, drafts, runs, paused, counts, av, avRun] = await Promise.all([
-    sql.query(`select id, headline, deck, body, hold_reason, published_at, tier, sources from stories where status = 'held' order by published_at desc limit 50`),
-    sql.query(`select id, beat, headline, dek, body, status, published_at, created_at from features where status in ('draft', 'held') order by created_at desc limit 30`),
+  const [runs, paused, counts, av, avRun] = await Promise.all([
     sql.query(`select started_at, ok, details from runs where kind = 'engine' order by started_at desc limit 8`),
     sql.query(`select value from state where key = 'engine_paused'`),
     sql.query(`select
@@ -118,7 +104,6 @@ export async function desk(sql: Sql | null): Promise<Desk> {
   const a = av[0] ?? {}, ar = avRun[0];
   const c = counts[0] ?? {};
   return {
-    held: held.map(story), drafts: drafts.map(feature),
     av: { published: Number(a.published ?? 0), target: WEBSITE.deskDays[date] ?? WEBSITE.deskDaily, rewritten: Number(a.rewritten ?? 0),
           toRewrite: Number(a.left ?? 0), at: iso(ar?.started_at), running: !!ar && !ar.finished_at && Date.now() - Date.parse(String(ar.started_at)) < 40 * 60_000,
           lines: ((ar?.details as { log?: string[] } | null)?.log ?? []).slice(-12) },
@@ -260,24 +245,7 @@ export async function restoreStory(sql: Sql, id: string): Promise<boolean> {
   return done.length > 0;
 }
 
-// ---- what the editor decides (each recorded with who decided) ----
-
-export async function decideStory(sql: Sql, id: string, approve: boolean, by: string): Promise<boolean> {
-  const done = approve
-    ? await sql.query(`update stories set status = 'published', published_at = now(), updated_at = now(), hold_reason = null where id = $1 and status = 'held' returning id`, [id])
-    : await sql.query(`update stories set status = 'withdrawn', hold_reason = 'rejected by the editor' where id = $1 and status = 'held' returning id`, [id]);
-  if (!done.length) return false;
-  await sql.query(`insert into approvals (story_id, decided_at, decision, decided_by) values ($1, now(), $2, $3)
-                   on conflict (story_id) do update set decided_at = now(), decision = $2, decided_by = $3`, [id, approve ? "approve" : "reject", by]);
-  if (approve) {
-    await touched(sql);
-    // an approved breaking story still fresh: its alert (lib/push.ts)
-    const [r] = await sql.query(`select headline, en, hi, importance, published_at from stories where id = $1`, [id]);
-    if (r) await alertBreaking(sql, { id, importance: r.importance, publishedAt: new Date(r.published_at).toISOString(),
-      headline: { gu: r.headline, en: r.en?.headline ?? null, hi: r.hi?.headline ?? null } }).catch(() => 0);
-  }
-  return true;
-}
+// ---- what the editor changes ----
 
 export async function withdrawStory(sql: Sql, id: string, by: string): Promise<boolean> {
   const done = await sql.query(`update stories set status = 'withdrawn', hold_reason = $2, updated_at = now() where id = $1 and status = 'published' returning id`,

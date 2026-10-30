@@ -294,6 +294,9 @@ older notes below disagree, this block is right.*
   wider; a new subject with no real picture is set aside; a published article with none comes
   off the site (held) and returns by itself once one is found. On 30 Oct the re-check of every old
   article used up Flash's free allowance by 6:27 AM IST; it resets about 1:30 PM IST.
+- **No approvals (the user, 30 Oct):** news and Aavtikal go up by themselves, sensitive stories
+  too. What fails its checks doesn't go up at all; a story a source corrects comes down to the
+  removed list. Telegram only sends notes. The readers' pages say so (`views/Policy.tsx`, `lib/flagship.ts`).
 - **Speed (30 Oct):** the site runs in Singapore (`site/vercel.json`, beside the database;
   `/api/status` shows `speed`). No font is loaded ahead, and the wide name and Aavtikal's condensed
   headlines are small files of our own (`site/app/fonts/`). Pictures come at the size shown
@@ -301,7 +304,7 @@ older notes below disagree, this block is right.*
   Each language has its own root layout, so changing language is a full page load:
   `components/LangLink.tsx` is a plain link and fetches the page on touch, and `proxy.ts` lets that through.
 - **The editor's page** (`/editor`, Google sign-in for the addresses in Vercel's
-  `CK_EDITORS`): approve or reject held stories, change or take down any story or article,
+  `CK_EDITORS`): change or take down any story or article,
   write their own news or Aavtikal article with photos, the engine's stop switch, the day's
   use, and the leaders list with birthday greetings and Gujarati email drafts. **The site
   never sends an email**; the editor sends it from their own Gmail.

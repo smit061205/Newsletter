@@ -19,12 +19,12 @@ export const BEAT_NAMES: Record<Beat, Record<Lang, string>> = {
 };
 export const beatName = (b: Beat, lang: Lang) => BEAT_NAMES[b][lang];
 
-/** Who wrote it: the engine's AI desk (always checked by the editor before it goes out) or the editor. */
+/** Who wrote it: the engine's AI desk (checked against its sources before it goes out) or the editor. */
 export type AuthorKey = "desk" | "editor";
 export const AUTHORS: Record<AuthorKey, { name: Record<Lang, string>; role: Record<Lang, string> }> = {
   desk: {
     name: { gu: "આવતીકાલ AI ડેસ્ક", en: "Aavtikal AI desk", hi: "आवतीकाल AI डेस्क" },
-    role: { gu: "AIએ લખેલું, સંપાદકે તપાસેલું", en: "Written by AI, checked by the editor", hi: "AI ने लिखा, संपादक ने जाँचा" },
+    role: { gu: "AIએ લખેલું, સ્રોતો સાથે ચકાસેલું", en: "Written by AI, checked against its sources", hi: "AI ने लिखा, स्रोतों से जाँचा" },
   },
   editor: {
     name: { gu: "સંપાદક", en: "The editor", hi: "संपादक" },
@@ -87,11 +87,11 @@ export const FL_WORDS = {
     searchPlaceholder: "આવતીકાલમાં શોધો…", showing: (n: number) => `છેલ્લા ${n} લેખ`, found: (n: number) => `${n} લેખ મળ્યા`, notFound: "કોઈ લેખ ન મળ્યો. બીજો શબ્દ અજમાવો.",
     empty: "આવતીકાલના પહેલા લેખો તૈયાર થઈ રહ્યા છે. ટૂંક સમયમાં અહીં આવશે.",
     share: "WhatsApp પર મોકલો", copy: "લિંક કૉપી કરો", copied: "લિંક કૉપી થઈ",
-    aiNote: "આ લેખ આવતીકાલના AI ડેસ્કે નીચેના સ્રોતો પરથી લખ્યો છે. તેનો દરેક આંકડો અને દરેક દાવો સ્રોતો સાથે મેળવ્યા પછી જ તે પ્રકાશિત થયો છે; જે લેખ એ તપાસમાં પાસ ન થાય તે સંપાદક પાસે જાય છે.",
+    aiNote: "આ લેખ આવતીકાલના AI ડેસ્કે નીચેના સ્રોતો પરથી લખ્યો છે. તેનો દરેક આંકડો અને દરેક દાવો સ્રોતો સાથે મેળવ્યા પછી જ તે પ્રકાશિત થયો છે; જે લેખ એ તપાસમાં પાસ ન થાય તે પ્રકાશિત થતો નથી.",
     sources: "સ્રોત", notTranslated: "", about: "અમારા વિશે", policy: "સંપાદકીય નીતિ", how: "અમે કેવી રીતે ચકાસીએ છીએ", contact: "સંપર્ક",
     // Aavtikal in a corner of Capital Kranti's front page (components/AavtikalPromo.tsx)
     promoBy: "કેપિટલ ક્રાંતિ રજૂ કરે છે", promoPitch: "સમાચારની પાછળની વાત: લાંબા, સમજાવતા લેખો, ગ્રાફ અને ચિત્રો સાથે.", promoCta: "આવતીકાલ વાંચો", promoRead: "લેખ વાંચો",
-    writersText: "AI ડેસ્ક દુનિયાભરના વિશ્વસનીય સ્રોતો, કંપનીઓ અને સંસ્થાઓની પોતાની જાહેરાતો વાંચી લાંબા, સમજાવતા લેખ લખે છે. દરેક આંકડો અને દાવો સ્રોતો સાથે મેળવાય છે; જે લેખ એ તપાસમાં પાસ ન થાય તે સંપાદક વાંચે ત્યાં સુધી પ્રકાશિત થતો નથી.",
+    writersText: "AI ડેસ્ક દુનિયાભરના વિશ્વસનીય સ્રોતો, કંપનીઓ અને સંસ્થાઓની પોતાની જાહેરાતો વાંચી લાંબા, સમજાવતા લેખ લખે છે. દરેક આંકડો અને દાવો સ્રોતો સાથે મેળવાય છે; જે લેખ એ તપાસમાં પાસ ન થાય તે પ્રકાશિત થતો નથી.",
   },
   en: {
     name: "Aavtikal", tagline: "AI, tech, science and politics: what shapes tomorrow",
@@ -102,10 +102,10 @@ export const FL_WORDS = {
     searchPlaceholder: "Search Aavtikal…", showing: (n: number) => `The latest ${n} articles`, found: (n: number) => `${n} articles found`, notFound: "No articles found. Try another word.",
     empty: "Aavtikal's first articles are being written. They'll be here soon.",
     share: "Send on WhatsApp", copy: "Copy link", copied: "Link copied",
-    aiNote: "This article was written by Aavtikal's AI desk from the sources below. It was published only after every number and every claim in it was matched against them; an article that fails that check goes to the editor.",
+    aiNote: "This article was written by Aavtikal's AI desk from the sources below. It was published only after every number and every claim in it was matched against them; an article that fails that check isn’t published.",
     sources: "Sources", notTranslated: "This article isn't in English yet, so it's shown in Gujarati.", about: "About us", policy: "Editorial policy", how: "How we check", contact: "Contact",
     promoBy: "Capital Kranti presents", promoPitch: "The story behind the news: long explainers, with graphs and pictures.", promoCta: "Read Aavtikal", promoRead: "Read the article",
-    writersText: "The AI desk reads trusted sources from around the world, and the companies' and agencies' own announcements, and writes long explainers. Every number and claim is matched against the sources; an article that fails that check isn't published until the editor has read it.",
+    writersText: "The AI desk reads trusted sources from around the world, and the companies' and agencies' own announcements, and writes long explainers. Every number and claim is matched against the sources; an article that fails that check isn’t published.",
   },
   hi: {
     name: "आवतीकाल", tagline: "AI, टेक, विज्ञान और राजनीति: जो कल को गढ़ते हैं",
@@ -116,10 +116,10 @@ export const FL_WORDS = {
     searchPlaceholder: "आवतीकाल में खोजें…", showing: (n: number) => `पिछले ${n} लेख`, found: (n: number) => `${n} लेख मिले`, notFound: "कोई लेख नहीं मिला। कोई और शब्द आज़माएँ।",
     empty: "आवतीकाल के पहले लेख लिखे जा रहे हैं। जल्द ही यहाँ होंगे।",
     share: "WhatsApp पर भेजें", copy: "लिंक कॉपी करें", copied: "लिंक कॉपी हुआ",
-    aiNote: "यह लेख आवतीकाल के AI डेस्क ने नीचे दिए स्रोतों से लिखा है। इसका हर आँकड़ा और हर दावा स्रोतों से मिलाने के बाद ही यह प्रकाशित हुआ है; जो लेख इस जाँच में पास नहीं होता, वह संपादक के पास जाता है।",
+    aiNote: "यह लेख आवतीकाल के AI डेस्क ने नीचे दिए स्रोतों से लिखा है। इसका हर आँकड़ा और हर दावा स्रोतों से मिलाने के बाद ही यह प्रकाशित हुआ है; जो लेख इस जाँच में पास नहीं होता, वह प्रकाशित नहीं होता।",
     sources: "स्रोत", notTranslated: "यह लेख अभी हिंदी में नहीं है, इसलिए गुजराती में दिखाया गया है।", about: "हमारे बारे में", policy: "संपादकीय नीति", how: "हम कैसे जाँचते हैं", contact: "संपर्क",
     promoBy: "कैपिटल क्रांति प्रस्तुत करता है", promoPitch: "ख़बर के पीछे की बात: लंबे, समझाने वाले लेख, ग्राफ़ और चित्रों के साथ।", promoCta: "आवतीकाल पढ़ें", promoRead: "लेख पढ़ें",
-    writersText: "AI डेस्क दुनिया भर के भरोसेमंद स्रोत और कंपनियों व संस्थाओं की अपनी घोषणाएँ पढ़कर लंबे, समझाने वाले लेख लिखता है। हर आँकड़ा और दावा स्रोतों से मिलाया जाता है; जो लेख इस जाँच में पास नहीं होता, वह संपादक के पढ़ने तक प्रकाशित नहीं होता।",
+    writersText: "AI डेस्क दुनिया भर के भरोसेमंद स्रोत और कंपनियों व संस्थाओं की अपनी घोषणाएँ पढ़कर लंबे, समझाने वाले लेख लिखता है। हर आँकड़ा और दावा स्रोतों से मिलाया जाता है; जो लेख इस जाँच में पास नहीं होता, वह प्रकाशित नहीं होता।",
   },
 } as const;
 export const flw = (lang: Lang) => FL_WORDS[lang];

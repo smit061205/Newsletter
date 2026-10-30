@@ -1,5 +1,5 @@
 // Between the engine's rounds (.github/workflows/site-engine.yml sleeps here): the
-// editors' Telegram messages and button presses, answered within seconds instead of
+// editors' Telegram messages, answered within seconds instead of
 // at the next round. Ends by itself after the seconds it's given.
 // Run: node --experimental-strip-types site/engine/listen.ts 840   (DATABASE_URL, TELEGRAM_BOT_TOKEN)
 import { neon } from "@neondatabase/serverless";

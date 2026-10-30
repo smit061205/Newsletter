@@ -547,7 +547,7 @@ async function beatToday(sql: Sql, date: string, target: number): Promise<Beat |
   return [...WEBSITE.deskBeats].sort((a, b) => ((have[a] ?? 0) - share[a] * target) - ((have[b] ?? 0) - share[b] * target))[0];
 }
 
-type Outcome = "published" | "held" | "skipped" | "done" | "stop";
+type Outcome = "published" | "skipped" | "done" | "stop";
 
 const stateList = async (sql: Sql, key: string) =>
   String((await sql.query(`select value from state where key = $1`, [key]))[0]?.value ?? "").split("\n").filter(Boolean);
@@ -684,7 +684,7 @@ async function lastingSubject(sql: Sql, beat: Beat, covered: string[], log: (s: 
   return { beat, topic: res.value.topic, wiki: res.value.wiki, leads: [] };
 }
 
-/** An article written on a subject and put in: published when it checks out, else held for the editor. */
+/** An article written on a subject: published when it checks out, else not put in at all (no approvals, the user, 30 Oct). */
 async function writeUp(sql: Sql, subj: Subject, date: string, log: (s: string) => void): Promise<Outcome | "busy"> {
   let id = slug(subj.topic);
   if ((await sql.query(`select 1 from features where id = $1`, [id])).length) id = `${id}-${date.slice(5).replace("-", "")}`;
@@ -692,20 +692,26 @@ async function writeUp(sql: Sql, subj: Subject, date: string, log: (s: string) =
   if (m === "stop") return "stop";
   if (m === "busy") return "busy";
   if (typeof m === "string") { if (m === "thin" || m === "nophoto") await addToList(sql, "desk_skipped", subj.topic); return "skipped"; }
-  const status = m.problems.length ? "held" : "published";
+  // the check couldn't run: the subject waits for the next round
+  if (m.problems.some((p) => p.startsWith("the claim check didn't answer"))) return "busy";
+  if (m.problems.length) {
+    await addToList(sql, "desk_skipped", subj.topic);
+    log(`  not put up: ${id}: ${m.problems.slice(0, 2).join("; ")}`);
+    return "skipped";
+  }
   await sql.query(
     `insert into features (id, beat, status, headline, dek, body, caption, photo, author, en, hi, sources, checks, figures, topic, published_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, 'desk', $9, $10, $11, $12, $13, $14, case when $3 = 'published' then now() end, now())`,
-    [id, subj.beat, status, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo),
+     values ($1, $2, 'published', $3, $4, $5, $6, $7, 'desk', $8, $9, $10, $11, $12, $13, now(), now())`,
+    [id, subj.beat, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo),
      m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null, sourcesJson(m.sources),
      JSON.stringify({ problems: m.problems, writer: m.model, words: m.words, cover: COVER_CHECKED }), JSON.stringify(m.figs), subj.topic]);
   await touched(sql);
   await refresh();
-  log(`  ${status}: ${id} (${madeLine(m)})${m.problems.length ? `: ${m.problems.slice(0, 2).join("; ")}` : ""}`);
-  return status;
+  log(`  published: ${id} (${madeLine(m)})`);
+  return "published";
 }
 
-/** How many of today's articles are still to be published (held ones don't count: the day's ten go up, 29 Oct). */
+/** How many of today's articles are still to be published. */
 async function stillToday(sql: Sql, date: string): Promise<number> {
   const [r] = await sql.query(`select count(*)::int as n from features where author = 'desk' and status = 'published'
     and (created_at at time zone 'Asia/Kolkata')::date = $1::date`, [date]);
@@ -945,7 +951,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   const [run] = await sql.query(`insert into runs (kind) values ('desk') returning id`);
   runId = run.id as number;
-  const details: Record<string, number> = { published: 0, held: 0, skipped: 0, rewritten: 0, kept: 0 };
+  const details: Record<string, number> = { published: 0, skipped: 0, rewritten: 0, kept: 0 };
   try {
     // the missing English and Hindi first (29 Oct: left to the end of a round, they waited for hours)
     await retranslate(sql, log, Math.min(deadline, Date.now() + Math.min(15 * 60_000, (deadline - started) / 3)));
