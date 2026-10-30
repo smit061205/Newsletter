@@ -851,12 +851,17 @@ async function lookAgain(sql: Sql, log: (s: string) => void): Promise<"none" | "
     if (top.full && top.width && top.height) photo = (await keep(sql, top, `${r.id}-cover`, true)) ?? photo;
     log("  its top picture is right");
   } else if (top) {
-    const kept = await keep(sql, top, `${r.id}-cover`, true);
-    const cap = kept && await askGemini(sql, "lite", { system: CAPTION, user: `ARTICLE: ${en?.headline ?? r.headline}\nPICTURE: ${top.alt}`, maxTokens: 600 },
+    // the next best when one can't be kept (the day's uploads used up: a Commons picture needs none)
+    let chosen = top, kept: (Photo & { credit?: string }) | null = null;
+    for (const c of seen.covers) {
+      kept = await keep(sql, c, `${r.id}-cover`, true);
+      if (kept) { chosen = c; break; }
+    }
+    const cap = kept && await askGemini(sql, "lite", { system: CAPTION, user: `ARTICLE: ${en?.headline ?? r.headline}\nPICTURE: ${chosen.alt}`, maxTokens: 600 },
       (v) => { const x = v as { gu?: string; en?: string; hi?: string }; return x?.gu && x.en && x.hi ? { gu: x.gu.trim(), en: x.en.trim(), hi: x.hi.trim() } : null; });
     if (kept && cap && cap.ok) {
       photo = kept; caption = cap.value.gu; enCap = cap.value.en; hiCap = cap.value.hi;
-      log(`  a new top picture: ${top.alt.slice(0, 100)}`);
+      log(`  a new top picture: ${chosen.alt.slice(0, 100)}`);
     } else { real = false; log("  the new top picture couldn't be put in; kept as it was"); }
   } else if (wasDrawn || (photo && seen.refused.some((u) => pictureKey(u) === pictureKey(photo!.url.startsWith("/") ? `${WEBSITE.url}${photo!.url}` : photo!.url)))) {
     photo = null; caption = ""; enCap = ""; hiCap = "";
@@ -935,13 +940,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     // the missing English and Hindi first (29 Oct: left to the end of a round, they waited for hours)
     await retranslate(sql, log, Math.min(deadline, Date.now() + Math.min(15 * 60_000, (deadline - started) / 3)));
-    // then the published articles' pictures, looked at again (30 Oct), for up to ten minutes a round
-    const lookUntil = Math.min(deadline - 15 * 60_000, Date.now() + 10 * 60_000);
+    // then the published articles' pictures, looked at again (30 Oct): up to ten minutes a round while the day's articles
+    // are still to write, else all the round (the user, 30 Oct: all of them, not a few each hour)
+    const lookUntil = await stillToday(sql, indiaDate()) ? Math.min(deadline - 15 * 60_000, Date.now() + 10 * 60_000) : deadline - 2 * 60_000;
     let looked = 0;
     while (Date.now() < lookUntil) {
       const r = await lookAgain(sql, log);
       if (r !== "done") break;
-      looked++;
+      // the pages renewed as it goes, so the new pictures show within minutes
+      if (++looked % 4 === 0) await refresh();
     }
     if (looked) await refresh();
     let newDone = false, oldDone = false;
