@@ -5,6 +5,8 @@
 // and says what it really shows, whether it shows the article's subject itself, and how it would do at the top. The
 // top picture must show the subject itself, be a photo or an illustration (not a chart, a screenshot, a logo or words),
 // score 7 of 10 or more, and be large.
+// (Real isn't enough: a US shuttle went on an article about China's spaceplane, Nvidia's cards on a Chinese chip's, so a look-alike
+// counts as unrelated. NASA's pictures are shown from NASA's servers, taking none of the day's uploads.)
 // The user, 30 Oct, later: "i want real images with accuracy to the topic and high quality. not this ai generated slop".
 // Covers are real pictures only: nothing drawn, nothing that looks made by an image generator. The top one is a landscape
 // photo 1200 px wide or more (of the subject itself first, then of something the article names); an official launch
@@ -20,7 +22,7 @@ type Sql = NeonQueryFunction<false, false>;
 
 /** A picture on offer: an official page's (stored in the site's own store, credited to its site) or a free-licence
  *  one from Wikimedia Commons (shown from Wikimedia's servers: it has its size, its original's width and its credit). */
-export interface Picture { n: number; url: string; alt: string; from: string; credit?: string; width?: number; height?: number; full?: number; official?: boolean }
+export interface Picture { n: number; url: string; alt: string; from: string; credit?: string; width?: number; height?: number; full?: number; official?: boolean; hotlink?: boolean }
 
 interface Seen { n: number; about: string; shows: string; kind: string; cover: number }
 /** `covers`: the pictures fit for the top, best first. `refused`: the addresses of those seen and found not to belong. */
@@ -34,9 +36,11 @@ You get an article's subject and the pictures on offer, each after a line naming
 - "about": what it actually shows, in one plain English sentence (what you see, not what its description claims);
 - "shows": "subject" if it shows the article's subject itself: the very product, device or chip, the model's or company's own
   launch image for it, the mission, spacecraft or instrument, the place, the people or the phenomenon the article is about;
-  "related" if it shows something the article explains or names (a part of it, the technology inside it, a person in it)
-  and would help a reader understand; "unrelated" otherwise: a generic picture of the field (a robot hand or a server room
-  for any AI story, a circuit board for any chip), an office building, another company's product, anything else;
+  "related" only if it truly belongs to the subject and can't mislead: a part of it, the technology inside it, its own maker's
+  people, lab or hardware, the rocket or site it uses; "unrelated" otherwise: anything a reader could take for the subject but
+  isn't (a rival's or a similar product, another country's spacecraft, another company's chip, even one the article compares
+  it with), a generic picture of the field (a robot hand or a server room for any AI story, a circuit board for any chip), an
+  office building, anything else;
 - "kind": "photo" (taken by a camera of something real), "illustration" (a drawing, render or artwork), "generated" (it looks
   made by an AI image generator, or is a glossy stock render: glowing brains, faces of light, robot hands, floating circuits),
   "diagram", "chart", "screenshot", "logo" or "text" (mostly words);
@@ -47,7 +51,7 @@ Be strict: a reader must see at once that the top picture belongs to this articl
 Reply with JSON only: {"pictures":[{"n":1,"about":"","shows":"subject","kind":"photo","cover":0}]}`;
 
 /** A small copy of a picture for Gemini to look at, and its full width (a Commons one's original; an official one's own). */
-async function small(p: Picture): Promise<{ jpeg: string; full: number; ratio: number } | null> {
+async function small(p: Picture): Promise<{ jpeg: string; full: number; ratio: number; width: number; height: number } | null> {
   try {
     const url = isCommons(p) ? commonsAt(p as Picture & { width: number; height: number; full: number }, 960).url : p.url;
     const res = await fetch(url, { headers: { "user-agent": isCommons(p) ? WIKI_UA : UA }, signal: AbortSignal.timeout(20_000) });
@@ -56,7 +60,7 @@ async function small(p: Picture): Promise<{ jpeg: string; full: number; ratio: n
     const meta = await img.metadata();
     const jpeg = await img.resize({ width: 640, height: 640, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 72 }).toBuffer();
     const ratio = isCommons(p) ? p.width! / p.height! : (meta.width ?? 0) / (meta.height || 1);
-    return { jpeg: jpeg.toString("base64"), full: isCommons(p) ? p.full! : meta.width ?? 0, ratio };
+    return { jpeg: jpeg.toString("base64"), full: isCommons(p) ? p.full! : meta.width ?? 0, ratio, width: meta.width ?? 0, height: meta.height ?? 0 };
   } catch {
     return null;
   }
@@ -81,7 +85,8 @@ export async function look(sql: Sql, subject: string, pics: Picture[], log: (s: 
     // Wikimedia asks programs not to rush it (29 Oct: bursts were refused)
     if (isCommons(p)) await new Promise((r) => setTimeout(r, 250));
     if (!s) continue;
-    const q = { ...p, full: s.full };
+    // (a picture shown from its own server needs its size, as a Commons one has)
+    const q = p.hotlink ? { ...p, full: s.full, width: s.width, height: s.height } : { ...p, full: s.full };
     shown.push(q);
     ratios.set(p.n, s.ratio);
     images.push({ label: `PICTURE ${p.n} (from ${p.from}, ${s.full} px wide; its description: ${p.alt || "none"})`, jpeg: s.jpeg });
@@ -121,7 +126,7 @@ place, laboratory, or the company or person it is about), the most exact first. 
 Reply with JSON only: {"phrases":["","","",""]}`;
 
 /** NASA's image library (free of copyright, its own terms: no key): pictures of a space or science subject, the large copy
- *  of each, leaving out any it credits to a news agency. Stored like an official picture. */
+ *  of each, leaving out any it credits to a news agency. Shown from NASA's servers. */
 export async function nasaPictures(query: string, max = 4): Promise<Omit<Picture, "n">[]> {
   const get = async (u: string) => {
     const r = await fetch(u, { headers: { "user-agent": WIKI_UA }, signal: AbortSignal.timeout(15_000) });
@@ -136,10 +141,10 @@ export async function nasaPictures(query: string, max = 4): Promise<Omit<Picture
       const d = item.data?.[0];
       if (!d || !item.href || /getty|reuters|associated press|\bafp\b|\bap photo\b/i.test(`${d.secondary_creator} ${d.description}`)) continue;
       const files = await get(item.href) as string[] | null;
-      const url = files?.find((f) => /~large\.jpe?g$/i.test(f)) ?? files?.find((f) => /~orig\.jpe?g$/i.test(f));
+      const url = files?.find((f) => /~large\.jpe?g$/i.test(f));
       if (!url) continue;
       const who = (d.secondary_creator ?? "").slice(0, 60);
-      out.push({ url: url.replace(/^http:/, "https:"), alt: (d.title ?? "").slice(0, 140), from: /nasa/i.test(who) ? who : who ? `NASA / ${who}` : "NASA", official: true });
+      out.push({ url: url.replace(/^http:/, "https:"), alt: (d.title ?? "").slice(0, 140), from: /nasa/i.test(who) ? who : who ? `NASA / ${who}` : "NASA", official: true, hotlink: true });
     }
     return out;
   } catch {
