@@ -66,7 +66,6 @@ function Writers({ lang }: { lang: Lang }) {
         {(Object.keys(AUTHORS) as (keyof typeof AUTHORS)[]).map((k) => (
           <Link prefetch={false} key={k} className={s.writer} href={fl(lang, `/author/${k}`)}>
             <span className={`${s.hl} ${s.writerName}`}>{AUTHORS[k].name[lang]}</span>
-            <span className={s.writerRole}>{AUTHORS[k].role[lang]}</span>
           </Link>
         ))}
         <p className={s.writersText}>{w.writersText}</p>
@@ -101,7 +100,6 @@ export async function FlAuthor({ lang, author }: { lang: Lang; author: string })
     <Frame lang={lang} path={`/author/${author}`}>
       <header className={s.authorHead}>
         <h1 className={`${s.hl} ${s.authorName}`}>{AUTHORS[author].name[lang]}</h1>
-        <p className={s.authorRole}>{AUTHORS[author].role[lang]}</p>
       </header>
       {mine.length ? <Grid items={mine} lang={lang} /> : <p className={s.empty}>{w.empty}</p>}
     </Frame>
@@ -215,13 +213,10 @@ export async function FlArticle({ lang, id }: { lang: Lang; id: string }) {
           <div className={s.body}>
             {lang !== "gu" && !t.translated && <p className={s.translated}>{w.notTranslated}</p>}
             <Body text={t.body} figures={f.figures ?? []} lang={lang} />
-            {(f.author === "desk" || f.sources.length > 0) && (
+            {f.sources.length > 0 && (
               <aside className={s.note}>
-                {f.author === "desk" && <p style={{ margin: 0 }}>{w.aiNote}</p>}
-                {f.sources.length > 0 && <>
-                  <h4>{w.sources}</h4>
-                  <ol>{f.sources.map((x) => <li key={x.url}><a href={x.url} rel="noopener" target="_blank">{x.name}</a></li>)}</ol>
-                </>}
+                <h4>{w.sources}</h4>
+                <ol>{f.sources.map((x) => <li key={x.url}><a href={x.url} rel="noopener" target="_blank">{x.name}</a></li>)}</ol>
               </aside>
             )}
           </div>
