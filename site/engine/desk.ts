@@ -297,7 +297,7 @@ const figureText = (figs: Figure[]) => figs.map((g) => [
 ].join("\n")).join("\n");
 
 /** An article whose cover passed today's check; a stricter check gets a new word, so all are looked at once more. */
-const COVER_CHECKED = "true-to-subject";
+const COVER_CHECKED = "own-subject";
 /** One try a day at each article, and a new try whenever the check changes. */
 const coverTry = () => `${indiaDate()} ${COVER_CHECKED}`;
 

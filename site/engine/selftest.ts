@@ -128,5 +128,6 @@ test("only a real, large, landscape picture goes at the top", () => {
   assert.equal(coverTier({ shows: "subject", kind: "photo", cover: 9 }, { ...big, ratio: 0.73 }), 0);
   assert.equal(coverTier({ shows: "subject", kind: "photo", cover: 9 }, { ...big, full: 900 }), 0);
   assert.equal(coverTier({ shows: "unrelated", kind: "photo", cover: 9 }, big), 0);
+  assert.equal(coverTier({ shows: "subject", kind: "photo", cover: 9, other: true }, big), 0);
 });
 console.log(`\n${n} checks passed (${SOURCES.length} sources listed)`);
