@@ -296,6 +296,9 @@ const figureText = (figs: Figure[]) => figs.map((g) => [
   ...(g.rows ?? []).map((r) => `${r.label.gu} ${r.value}`), ...(g.cells ?? []).flat().map((c) => c.gu), ...(g.steps ?? []).map((s) => `${s.title.gu} ${s.text.gu}`),
 ].join("\n")).join("\n");
 
+/** An article whose cover passed today's check; a stricter check gets a new word, so all are looked at once more. */
+const COVER_CHECKED = "true-to-subject";
+
 /** A picture made the site's: an official one stored in the site's own store, a Commons one shown from Wikimedia's; the
  *  cover (`top`) 1920 px wide when the picture is that large (30 Oct: 1280 looked soft across a wide screen). */
 async function keep(sql: Sql, p: Picture, name: string, top = false): Promise<(Photo & { credit?: string }) | null> {
@@ -693,7 +696,7 @@ async function writeUp(sql: Sql, subj: Subject, date: string, log: (s: string) =
      values ($1, $2, $3, $4, $5, $6, $7, $8, 'desk', $9, $10, $11, $12, $13, $14, case when $3 = 'published' then now() end, now())`,
     [id, subj.beat, status, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo),
      m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null, sourcesJson(m.sources),
-     JSON.stringify({ problems: m.problems, writer: m.model, words: m.words, cover: "real" }), JSON.stringify(m.figs), subj.topic]);
+     JSON.stringify({ problems: m.problems, writer: m.model, words: m.words, cover: COVER_CHECKED }), JSON.stringify(m.figs), subj.topic]);
   await touched(sql);
   await refresh();
   log(`  ${status}: ${id} (${madeLine(m)})${m.problems.length ? `: ${m.problems.slice(0, 2).join("; ")}` : ""}`);
@@ -753,7 +756,7 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
   const tried = [...counts].filter(([, n]) => n >= 3).map(([id]) => id);
   const [r] = await sql.query(
     `select id, beat, headline, topic, en, sources from features where status = 'published' and beat <> 'politics'
-       and (author <> 'desk' or photo is null or jsonb_array_length(figures) < 4) and coalesce(checks->>'rewritten', '') <> 'true'
+       and (author <> 'desk' or (photo is null and coalesce(checks->>'cover', '') <> 'none') or jsonb_array_length(figures) < 4) and coalesce(checks->>'rewritten', '') <> 'true'
        and coalesce(checks->>'by', '') <> 'editor'
        and not (id = any($1::text[]))
      order by published_at desc nulls last limit 1`, [tried]);
@@ -776,7 +779,7 @@ async function redoOne(sql: Sql, log: (s: string) => void): Promise<"none" | "re
     `update features set headline = $2, dek = $3, body = $4, caption = $5, photo = $6, en = $7, hi = $8, sources = $9, checks = $10,
        figures = $11, topic = $12, updated_at = now() where id = $1`,
     [r.id, m.gu.headline, m.gu.dek, m.gu.body, m.gu.caption, JSON.stringify(m.photo), m.en ? JSON.stringify(m.en) : null, m.hi ? JSON.stringify(m.hi) : null,
-     sourcesJson(m.sources), JSON.stringify({ problems: [], writer: m.model, words: m.words, rewritten: true, cover: "real" }), JSON.stringify(m.figs), topic]);
+     sourcesJson(m.sources), JSON.stringify({ problems: [], writer: m.model, words: m.words, rewritten: true, cover: COVER_CHECKED }), JSON.stringify(m.figs), topic]);
   await touched(sql);
   await refresh();
   log(`  rewritten: ${r.id} (${madeLine(m)})`);
@@ -812,8 +815,8 @@ async function lookAgain(sql: Sql, log: (s: string) => void): Promise<"none" | "
   const [r] = await sql.query(
     `select id, beat, headline, topic, caption, photo, figures, body, en, hi, sources from features
       where status in ('published', 'held') and beat <> 'politics' and coalesce(checks->>'by', '') <> 'editor'
-        and coalesce(checks->>'cover', '') <> 'real' and coalesce(checks->>'cover_tried', '') <> $1
-      order by published_at desc nulls last limit 1`, [indiaDate()]);
+        and coalesce(checks->>'cover', '') <> $2 and coalesce(checks->>'cover_tried', '') <> $1
+      order by published_at desc nulls last limit 1`, [indiaDate(), COVER_CHECKED]);
   if (!r) return "none";
   const topic = String(r.topic ?? (r.en as Words3 | null)?.headline ?? r.headline).slice(0, 200);
   log(`pictures again: ${r.id}`);
@@ -873,7 +876,7 @@ async function lookAgain(sql: Sql, log: (s: string) => void): Promise<"none" | "
     `update features set photo = $2, caption = $3, body = $4, figures = $5, en = $6, hi = $7,
        checks = coalesce(checks, '{}'::jsonb) || jsonb_build_object('cover', $8::text, 'cover_tried', $9::text), updated_at = now() where id = $1`,
     [r.id, photo ? JSON.stringify(photo) : null, caption, refigure(r.body, figs.length, drop), JSON.stringify(figs.filter((_, i) => !drop.has(i + 1))),
-     en ? JSON.stringify(fix(en, enCap)) : null, hi ? JSON.stringify(fix(hi, hiCap)) : null, real ? "real" : "none", indiaDate()]);
+     en ? JSON.stringify(fix(en, enCap)) : null, hi ? JSON.stringify(fix(hi, hiCap)) : null, real ? COVER_CHECKED : "none", indiaDate()]);
   await touched(sql);
   return "done";
 }
