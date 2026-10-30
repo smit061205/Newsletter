@@ -259,6 +259,61 @@ The desktop app's open items:
 
 ## 8. The website: start here in a new session
 
+### Where it stands now (30 Oct; read this first, then the older notes below)
+
+*Written for a new Claude Code session or account taking over. Where this block and the
+older notes below disagree, this block is right.*
+
+- **Live:** https://capital-kranti.vercel.app. Vercel deploys `main`. The site's status, with
+  the engine's and the Aavtikal desk's latest logs, is public at `/api/status`.
+- **Working copy:** the website is worked on in its own clone, `/Users/smitthakkar/NewsPaper_Site`,
+  on a branch (`site/phase-b` until now; start a new one for new work). The app's folder
+  `/Users/smitthakkar/NewsPaper_Project` is for the app. Merge pattern, after the checks:
+  `git fetch -q && git checkout -q --detach origin/main && git merge -q --no-ff <branch> -m "Merge: …" && git push -q origin HEAD:main && git checkout -q <branch>`.
+- **Checks before every merge:** `npx --prefix site tsc -p site --noEmit`,
+  `npx --prefix site tsc -p site/engine --noEmit`,
+  `node --experimental-strip-types --no-warnings site/engine/selftest.ts` (18 checks), and
+  `(cd site && env -u CK_SAMPLE npm run -s build)`.
+- **Seeing it locally:** the preview "flagship-dev" (port 3200, `CK_SAMPLE=1`, in
+  `NewsPaper_Project/.claude/launch.json`). In sample mode the editor page signs in by itself.
+  When the app's browser pane is hidden, pages don't finish loading there: check with headless
+  Playwright instead (`createRequire` on `site/package.json`; the Chromium in
+  `~/Library/Caches/ms-playwright`). `CK_SAMPLE_BREAKING=1` shows the breaking-news bar.
+- **Roadmap Phase B is built** (30 Oct; `docs/website/ROADMAP.md` §6): Hindi, the editor's
+  page, tier × genre pages, the "from other outlets" row, breaking news (bar plus opt-in
+  alerts, `site/lib/push.ts`), and the leaders' birthdays (`site/lib/leaders.ts`). **What's
+  left of Phase B is its review:** a day of real running, every story checked, ₹0 spent.
+- **The news engine** (`site/engine/run.ts`, `site-engine.yml`): each run queues the next
+  (GitHub's own schedule was unreliable), with an hourly schedule as a backstop.
+- **Aavtikal's desk** (`site/engine/desk.ts`, `site-desk.yml`, 45-minute rounds that queue the
+  next): writes **15 explainers a day** on AI, Tech and Science (never Politics on its own;
+  never touches the editor's own articles). Gemini Flash writes on Google's free tier; Gemini
+  Flash Lite looks at every picture before it is used (`site/engine/cover.ts`): the top
+  picture must show the subject itself, or the article gets a **drawn cover**
+  (`site/engine/drawn.ts`; the user chose this on 30 Oct). On 30 Oct the re-check of every old
+  article used up Flash's free allowance by 6:27 AM IST; it resets about 1:30 PM IST.
+- **The editor's page** (`/editor`, Google sign-in for the addresses in Vercel's
+  `CK_EDITORS`): approve or reject held stories, change or take down any story or article,
+  write their own news or Aavtikal article with photos, the engine's stop switch, the day's
+  use, and the leaders list with birthday greetings and Gujarati email drafts. **The site
+  never sends an email**; the editor sends it from their own Gmail.
+
+**Next (30 Oct):**
+1. Phase B's review (above): read the next days' stories and the desk's logs; fix what they show.
+2. **The domain:** the user will say where `capitalkranti.co.in` (or their chosen name) is
+   registered and whether it carries email. Then point it at Vercel and change the site's
+   own address everywhere it is written: `site/lib/config.ts` (`WEBSITE.url`),
+   `site-seed.yml` and `site-features.yml` (their `curl`), `site/pipeline/seed.ts`,
+   `site/pipeline/features.ts`, the user agent in `site/engine/wikiphoto.ts` and
+   `site/lib/leaders.ts`, `site/README.md` and this file; set `SITE_URL`; send
+   `capital-kranti.vercel.app` there.
+3. Small: one drawn cover from before 30 Oct (Google's AURA glasses) has its line cut inside
+   a word ("artificial intelli"). New covers are fine. The editor may fix the typo "૧૯૬ ૮" in
+   one article. The Hindi backfill of old stories continues on its own.
+4. The editor fills in the leaders list (it starts empty).
+5. **Only when the user says:** Phase C, the social media desk.
+
+
 *(Rewritten 26 Oct, evening, when the website moved from a cloud session to a local one.
 Everything below is on `main`, at or after commit `f0bb961`.)*
 
