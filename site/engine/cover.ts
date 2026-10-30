@@ -120,10 +120,12 @@ export async function look(sql: Sql, subject: string, pics: Picture[], log: (s: 
   };
 }
 
-const FIND = `You find real photographs for a magazine article. Give 4 short English search phrases, 2 to 4 words each, for a library of
-real photographs: what a camera could actually photograph for this subject (the object, device, machine, instrument, spacecraft,
-place, laboratory, or the company or person it is about), the most exact first. No abstract words like "technology" or "future".
-Reply with JSON only: {"phrases":["","","",""]}`;
+const FIND = `You find real photographs for a magazine article, in a library searched by name. Give 6 short English search phrases, 1 to 4
+words each. First the exact proper names: the product, mission or spacecraft; the company, lab or agency; its best-known leaders or
+scientists by full name; the rocket, site or machine it uses. Then what a camera could photograph of it (the device, instrument or
+place). Plain names work best ("OpenAI", "Sam Altman", "Dragonfly Titan rotorcraft"), never descriptions like "OpenAI office
+interior", and no abstract words like "technology" or "future".
+Reply with JSON only: {"phrases":["","","","","",""]}`;
 
 /** NASA's image library (free of copyright, its own terms: no key): pictures of a space or science subject, the large copy
  *  of each, leaving out any it credits to a news agency. Shown from NASA's servers. */
@@ -155,9 +157,9 @@ export async function nasaPictures(query: string, max = 4): Promise<Omit<Picture
 /** More pictures for a subject the first look found no cover for: Commons searched for what a camera could have taken, and
  *  NASA's library for science and space. Only large landscape ones, each search represented, numbered after those on offer. */
 async function findMore(sql: Sql, subject: string, beat: string, have: Picture[], log: (s: string) => void): Promise<Picture[]> {
-  const res = await askJson(sql, { system: FIND, user: subject, maxTokens: 200 }, (v) => {
+  const res = await askJson(sql, { system: FIND, user: subject, maxTokens: 300 }, (v) => {
     const x = (v as { phrases?: unknown[] })?.phrases;
-    return Array.isArray(x) ? x.map(String).filter(Boolean).slice(0, 4) : null;
+    return Array.isArray(x) ? x.map(String).filter(Boolean).slice(0, 6) : null;
   });
   const phrases = res.ok ? res.value : [subject.split(/\s+/).slice(0, 5).join(" ")];
   log(`  looking wider for a real picture: ${phrases.join("; ")}`);
@@ -169,8 +171,8 @@ async function findMore(sql: Sql, subject: string, beat: string, have: Picture[]
   }
   const seen = new Set(have.map((p) => p.url));
   const out: Omit<Picture, "n">[] = [];
-  for (let i = 0; out.length < 14 && lists.some((l) => l[i]); i++) {
-    for (const l of lists) if (l[i] && out.length < 14 && !seen.has(l[i].url)) { seen.add(l[i].url); out.push(l[i]); }
+  for (let i = 0; out.length < 18 && lists.some((l) => l[i]); i++) {
+    for (const l of lists) if (l[i] && out.length < 18 && !seen.has(l[i].url)) { seen.add(l[i].url); out.push(l[i]); }
   }
   const last = Math.max(0, ...have.map((p) => p.n));
   return out.map((p, i) => ({ ...p, n: last + i + 1 }));

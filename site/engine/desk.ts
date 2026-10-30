@@ -298,6 +298,8 @@ const figureText = (figs: Figure[]) => figs.map((g) => [
 
 /** An article whose cover passed today's check; a stricter check gets a new word, so all are looked at once more. */
 const COVER_CHECKED = "true-to-subject";
+/** One try a day at each article, and a new try whenever the check changes. */
+const coverTry = () => `${indiaDate()} ${COVER_CHECKED}`;
 
 /** A picture made the site's: an official one stored in the site's own store, a Commons one shown from Wikimedia's; the
  *  cover (`top`) 1920 px wide when the picture is that large (30 Oct: 1280 looked soft across a wide screen). */
@@ -809,14 +811,14 @@ function refigure(body: string, total: number, drop: Set<number>): string {
 
 /** One published article's pictures looked at: the top one replaced by the best real picture (or made 1920 px wide when it
  *  is that one), pictures in the body that don't belong taken out. With no real picture a drawn cover or one that doesn't
- *  belong comes off (the article shows no picture) and it's tried again the next day. Never the editor's own, never
- *  Politics. "busy" when Gemini can't look now. */
+ *  belong comes off, and the article with it (the user, 30 Oct: a coloured block is no better): it's held, tried again each
+ *  day, and back on the site by itself once it has one. Never the editor's own, never Politics. "busy" when Gemini can't look now. */
 async function lookAgain(sql: Sql, log: (s: string) => void): Promise<"none" | "done" | "busy"> {
   const [r] = await sql.query(
-    `select id, beat, headline, topic, caption, photo, figures, body, en, hi, sources from features
+    `select id, beat, status, checks, headline, topic, caption, photo, figures, body, en, hi, sources from features
       where status in ('published', 'held') and beat <> 'politics' and coalesce(checks->>'by', '') <> 'editor'
         and coalesce(checks->>'cover', '') <> $2 and coalesce(checks->>'cover_tried', '') <> $1
-      order by published_at desc nulls last limit 1`, [indiaDate(), COVER_CHECKED]);
+      order by published_at desc nulls last limit 1`, [coverTry(), COVER_CHECKED]);
   if (!r) return "none";
   const topic = String(r.topic ?? (r.en as Words3 | null)?.headline ?? r.headline).slice(0, 200);
   log(`pictures again: ${r.id}`);
@@ -871,12 +873,16 @@ async function lookAgain(sql: Sql, log: (s: string) => void): Promise<"none" | "
     log(`  no real picture (${seen.why}): the top picture is taken off for now`);
   } else log(`  no better real picture (${seen.why}); kept as it was`);
   if (drop.size) log(`  ${drop.size} picture(s) in the body taken out`);
+  // held for its picture: off the site without one, back with one; a story held for another reason stays held
+  const waiting = (r.checks as { held_for?: string } | null)?.held_for === "picture";
+  const status = !photo && r.status === "published" ? "held" : photo && waiting ? "published" : r.status as string;
+  if (status !== r.status) log(status === "held" ? "  off the site until it has a real picture" : "  back on the site with a real picture");
   const fix = (w: Words3 | null, cap: string | undefined) => w && { ...w, caption: cap ?? w.caption, body: refigure(w.body, figs.length, drop) };
   await sql.query(
-    `update features set photo = $2, caption = $3, body = $4, figures = $5, en = $6, hi = $7,
-       checks = coalesce(checks, '{}'::jsonb) || jsonb_build_object('cover', $8::text, 'cover_tried', $9::text), updated_at = now() where id = $1`,
+    `update features set photo = $2, caption = $3, body = $4, figures = $5, en = $6, hi = $7, status = $10,
+       checks = coalesce(checks, '{}'::jsonb) || jsonb_build_object('cover', $8::text, 'cover_tried', $9::text, 'held_for', $11::text), updated_at = now() where id = $1`,
     [r.id, photo ? JSON.stringify(photo) : null, caption, refigure(r.body, figs.length, drop), JSON.stringify(figs.filter((_, i) => !drop.has(i + 1))),
-     en ? JSON.stringify(fix(en, enCap)) : null, hi ? JSON.stringify(fix(hi, hiCap)) : null, real ? COVER_CHECKED : "none", indiaDate()]);
+     en ? JSON.stringify(fix(en, enCap)) : null, hi ? JSON.stringify(fix(hi, hiCap)) : null, real ? COVER_CHECKED : "none", coverTry(), status, !photo && status === "held" ? "picture" : ""]);
   await touched(sql);
   return "done";
 }
