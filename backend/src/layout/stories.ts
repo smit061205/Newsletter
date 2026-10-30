@@ -48,8 +48,10 @@ export function dedupe(stories: Story[]): Story[] {
 /** The same news reported more than once (`same` says which): the best report
  * stays, given another's photo if it has none, the others go. An editor's own
  * choice (`fixed`) is never taken out. */
-export function oneReportOfEach(pool: Story[], same: (a: Story, b: Story) => boolean, fixed: (s: Story) => boolean): { kept: Story[]; twins: Story[] } {
+export function oneReportOfEach(pool: Story[], same: (a: Story, b: Story) => boolean, fixed: (s: Story) => boolean):
+  { kept: Story[]; twins: Story[]; twinsOf: Map<string, Story[]> } {
   const kept: Story[] = [], twins: Story[] = [];
+  const twinsOf = new Map<string, Story[]>();
   const best = [...pool].sort((a, b) => Number(fixed(b)) - Number(fixed(a)) || a.priority - b.priority || Number(!a.photo) - Number(!b.photo)
                                         || b.bodies.long.length - a.bodies.long.length);
   for (const s of best) {
@@ -57,9 +59,10 @@ export function oneReportOfEach(pool: Story[], same: (a: Story, b: Story) => boo
     if (k < 0 || fixed(s)) { kept.push(s); continue; }
     if (!kept[k].photo && s.photo) kept[k] = { ...kept[k], photo: s.photo, photos: s.photos ?? [s.photo], caption: s.caption };
     twins.push(s);
+    twinsOf.set(kept[k].id, [...(twinsOf.get(kept[k].id) ?? []), s]);
   }
   const by = new Map(kept.map((s) => [s.id, s]));
-  return { kept: pool.flatMap((s) => by.get(s.id) ?? []), twins };
+  return { kept: pool.flatMap((s) => by.get(s.id) ?? []), twins, twinsOf };
 }
 
 const scriptShare = (s: string, re: RegExp) => (s.match(re)?.length ?? 0) / Math.max(1, s.replace(/\s/g, "").length);

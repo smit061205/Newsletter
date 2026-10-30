@@ -32,8 +32,9 @@ export interface FillContext {
 }
 
 const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
-/** The fewest words an item filling a gap has (30 Oct: an 11-word item with 32 stories held). */
-const ITEM_WORDS = 15;
+/** The fewest words anything filling a gap has: the paper's shortest story (the
+ * editor, 30 Oct: no short stories; an 11-word item had gone in with 32 stories held). */
+const ITEM_WORDS = profile.editorial.minWords;
 /** Does it end where a sentence ends? (an item never stops in mid-thought) */
 const whole = (t: string) => /[.।!?]["'”’)]*\s*$/.test(t);
 
@@ -87,8 +88,6 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   // before anything written: 25 Oct wrote a cooking tip with eight stories held)
   {
     let best: { s: Story; mod: Module } | null = null;
-    // (down to its first sentence alone, ITEM_WORDS or more: 26 Oct's copies wrote
-    // 20-word items with 35 stories held -- a cut had to keep two sentences and 15 words)
     for (const s of ctx.held.slice(0, 30)) {
       const sentences = s.bodies.long.split(/(?<=[.।!?])\s+/);
       for (let k = sentences.length; k >= 1; k--) {
@@ -115,12 +114,12 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   // sub-heading and body, from its release's facts only (26 Oct's copies left
   // six-line gaps white with 35 stories held: every one's headline and
   // sub-heading alone were taller than the gap, and a tip is no news)
-  if (h >= 5 * pitch) {
+  if ((h / pitch - 4) * cols * 5 >= ITEM_WORDS * 0.8) {
     const size = { head: cols === 1 ? 3 : cols === 2 ? 5 : 7, deck: cols === 1 ? 4 : cols === 2 ? 7 : 10 };
-    for (const s of ctx.held.filter((x) => !wordForWord(x)).slice(0, 3)) {
+    for (const s of ctx.held.filter((x) => !wordForWord(x)).slice(0, 8)) {
       const release = (s.releaseId ? ctx.store.release(s.releaseId) : null)
         ?? ({ id: 0, date: s.date, headline: s.headline, subhead: s.deck, body: s.bodies.long } as unknown as Release);
-      let target = Math.max(ITEM_WORDS + 5, Math.round((h / pitch - 4) * cols * 5));
+      let target = Math.max(ITEM_WORDS + 10, Math.round((h / pitch - 4) * cols * 5));
       // (written to fill the hole: 30 Oct's first try, cut to the sentence that fitted,
       // was 16 words over a slogan; the next tries' lengths from what it measured)
       let mod: Module | null = null;
@@ -155,9 +154,10 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
     }
   }
   // 2. an item written to its size, its length from what a first try measured
-  if (h >= (cols >= 3 ? 4 : 6) * pitch) {
+  // (never with real news waiting: 30 Oct's was a tip on storing grain, 28 stories held)
+  if (!ctx.held.length && (h / pitch - 5) * cols * 5 >= ITEM_WORDS * 0.8) {
     const slot = `${page}-${col}-${cols}-${n}`;
-    let target = Math.max(12, Math.round((h / pitch - 5) * cols * 5));
+    let target = Math.max(ITEM_WORDS + 10, Math.round((h / pitch - 5) * cols * 5));
     let best: Module | null = null;
     for (let attempt = 0; attempt < 4; attempt++) {
       const got = await writeBrief(ctx.store, ctx.date, `${slot}-${attempt}`, target, [...avoid, ...ctx.written], { log: ctx.log });
@@ -182,17 +182,17 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
         const body = sentences.slice(0, k).join(" ");
         brief = await set({ ...got.story, bodies: { long: body, medium: body, short: body } });
       }
-      const fitsHere = brief.height <= h + 0.5 && (brief.displayFill >= 0.97 || cols === 1);
+      const fitsHere = brief.height <= h + 0.5 && (brief.displayFill >= 0.97 || cols === 1) && words(brief.story.bodies.long) >= ITEM_WORDS;
       if (fitsHere && (!best || brief.height > best.height)) best = brief;
       if (best && h - best.height < 1.5 * pitch) break;
       const perLine = words(got.story.bodies.long) / Math.max(1, brief.bodyLines);
-      target = Math.max(8, Math.round(words(brief.story.bodies.long) + Math.floor((h - brief.height) / pitch) * cols * perLine * 0.9));
+      target = Math.max(ITEM_WORDS, Math.round(words(brief.story.bodies.long) + Math.floor((h - brief.height) / pitch) * cols * perLine * 0.9));
     }
     // over a line and a half short, yet too little room for another item:
     // a sentence or two off it, so one fits under it
     for (let k = 0; best && !close(best) && k < 4; k++) {
       const cut = best.story.bodies.long.split(/(?<=[.।!?])\s+/).slice(0, -1).join(" ");
-      if (!cut || words(cut) < 8) break;
+      if (!cut || words(cut) < ITEM_WORDS) break;
       const shorter = await buildModule({ ...best.story, bodies: { long: cut, medium: cut, short: cut } }, best.rank, cols, "long", ctx.m, 0, BODY.pitch, HEADLINE.filler);
       if (!(shorter.displayFill >= 0.97 || cols === 1)) break;
       best = shorter;

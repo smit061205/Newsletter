@@ -82,28 +82,37 @@ const RETRY_EVERY_MS = 10 * 60_000;
 const RETRIES = 12;
 
 // layout checks a new arrangement of the paper can mend (gate names, report.gates)
-const REPAIR_BY_LAYOUT = /^(1 plotter|2 no empty space|3 no tombstoned|3 headline sizes|3 no headline over|S2 |S4 |S9 |W )/;
+const REPAIR_BY_LAYOUT = /^(1 plotter|2 no empty space|3 no tombstoned|3 headline sizes|3 no headline over|S2 |S4 |S9 |S10 |S11 |W )/;
 
 /** The other ways the paper is laid out when its checks fail, in turn: other
  * arrangements; then, against empty space, the front page's lead in its usual
  * width, the short items let in to fill gaps, and both (28 Oct: two more
  * arrangements left page 1 a fifth empty, and the last, the worst, was kept). */
-const MENDS: { seedShift: number; mend?: { narrowLead?: boolean; shortItems?: boolean }; why: string }[] = [
+const MENDS: { seedShift: number; mend?: { narrowLead?: boolean }; why: string }[] = [
   { seedShift: 1, why: "another arrangement" },
   { seedShift: 2, why: "another arrangement" },
   { seedShift: 0, mend: { narrowLead: true }, why: "the front page's lead in its usual width" },
-  { seedShift: 0, mend: { shortItems: true }, why: "short items let in to fill the gaps" },
-  { seedShift: 3, mend: { narrowLead: true, shortItems: true }, why: "the lead in its usual width and the short items let in" },
+  { seedShift: 3, why: "another arrangement" },
+  { seedShift: 3, mend: { narrowLead: true }, why: "the lead in its usual width" },
+  { seedShift: 4, why: "another arrangement" },
+  { seedShift: 5, why: "another arrangement" },
+  { seedShift: 5, mend: { narrowLead: true }, why: "the lead in its usual width" },
+  { seedShift: 6, why: "another arrangement" },
+  { seedShift: 7, why: "another arrangement" },
 ];
 /** Mending stops after this long (minutes): the paper is wanted the same evening. */
-const MEND_MINUTES = 10;
+const MEND_MINUTES = 15;
+
+type Scored = { gates: { gate: string; pass: boolean }[]; whiteSpace: { height: number }[]; placed: { story: string }[] };
 
 /** How far a build is from clean: each check failing (not the page review,
  * which comes after, nor gate 7, which only compares builds), and every point
  * of a column left empty. 0 is clean. */
-function badness(r: { gates: { gate: string; pass: boolean }[]; whiteSpace: { height: number }[] }): number {
-  return r.gates.filter((g) => !g.pass && !/^[57] /.test(g.gate)).length * 1000 + r.whiteSpace.reduce((a, w) => a + w.height, 0);
+function badness(r: Scored): number {
+  return r.gates.filter((g) => !g.pass && !/^[57] /.test(g.gate)).length * 1000 + r.whiteSpace.reduce((a, w) => a + w.height, 0) + writtenItems(r) * 300;
 }
+/** Items in the paper written for a gap, not the day's news (layout/fill.ts: id b-...). */
+const writtenItems = (r: Scored) => r.placed.filter((p) => p.story.startsWith("b-")).length;
 
 /** Runs `job`, noting how long it took as one of the step's parts (the time meter). */
 type Timed = <T>(name: string, job: () => Promise<T>) => Promise<T>;
@@ -263,17 +272,19 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       for (let round = 1; best.bad > 0 && Date.now() - began < MEND_MINUTES * 60_000; round++) {
         const failing = r.report.gates.filter((g) => !g.pass);
         const layout = failing.filter((g) => REPAIR_BY_LAYOUT.test(g.gate));
+        // (a gap in the paper filled by an item written for it passes the checks, but another way may need none)
+        const padded = writtenItems(r.report) > 0;
         let mended = 0;
         if (failing.some((g) => g.gate.startsWith("6 "))) {
           const { repairFacts } = await import("./editorial/repair.ts");
           mended = await timed(`mending numbers ${round}`, () => repairFacts(store, date, say));
         }
         // (a story written again is laid out the best way so far; a layout failing, the next way)
-        const next: Way | undefined = layout.length ? MENDS[MENDS.indexOf(way!) + 1] : mended ? best.way : undefined;
+        const next: Way | undefined = layout.length || padded ? MENDS[MENDS.indexOf(way!) + 1] : mended ? best.way : undefined;
         if (next === undefined) break;
         way = next;
         const w = way;
-        say(`mending ${round}: ${[...layout.map((g) => g.gate.replace(/^\S+ /, "")), ...(mended ? [`${mended} story(ies) written again`] : [])].join("; ")}` +
+        say(`mending ${round}: ${[...layout.map((g) => g.gate.replace(/^\S+ /, "")), ...(padded ? ["an item written for a gap"] : []), ...(mended ? [`${mended} story(ies) written again`] : [])].join("; ")}` +
             ` -- laying out again${w ? `: ${w.why}` : ""}`);
         r = await timed(`laying out again ${round}`, () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: w?.seedShift ?? 0, ...(w?.mend ? { mend: w.mend } : {}) }));
         const bad = badness(r.report);

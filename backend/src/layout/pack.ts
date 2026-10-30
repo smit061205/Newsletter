@@ -75,7 +75,16 @@ export function renderPlaced(placed: PlacedModule[], extra: Element[] = []): Ele
     // the story above, sharing columns, ending in the space just over this one
     // (exactly the gap, or a little short of it): the rule halfway between
     const above = placed.filter((q) => q !== p && Math.min(q.col + q.module.cols, p.col + p.module.cols) > Math.max(q.col, p.col))
+      .filter((q) => !q.module.story.editorsColumn) // (its frame is the rule)
       .map((q) => q.y + q.module.height).filter((b) => b <= p.y - gap + 2 && b > p.y - gap - 2 * BODY.pitch);
+    // the editor's column framed: a thin line round the whole of it
+    if (p.module.story.editorsColumn) {
+      const id = p.module.story.id, x0 = p.x, x1 = p.x + p.module.width, y1 = p.y + p.module.height;
+      for (const [k, [a, b, c, d]] of [[x0, p.y, x1, p.y], [x1, p.y, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, p.y]].entries()) {
+        elements.push({ id: `${id}-frame${k}`, kind: "line", articleId: id, x1: a, y1: b, x2: c, y2: d, color: INK, width: 1 * PT });
+      }
+      continue;
+    }
     if (above.length && GAP.storyRule > 0) {
       const ry = (Math.max(...above) + p.y) / 2;
       elements.push({ id: `${p.module.story.id}-rule`, kind: "line", articleId: p.module.story.id,

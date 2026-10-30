@@ -46,6 +46,9 @@ export function stretchOf(mod: Module): number {
 /** How much a story's copy matters, by rank: losing a lead's copy costs most. */
 const WEIGHT = [3, 2, 1.5, 1, 0.7];
 
+/** The most lines a headline down one column runs to. */
+const ONE_COLUMN_HEAD_LINES = 6;
+
 export class Blocks {
   private tables = new Map<string, Promise<Option[]>>();
   private m: Measurer;
@@ -68,6 +71,7 @@ export class Blocks {
    * three columns, a story two or more (a lead three or more; a lesser one one), up to the
    * widest a story may be. Its usual widths (pack.ts spansFor) cost least. */
   widths(story: Story, rank: number): number[] {
+    if (story.editorsColumn) return [2]; // (two columns, always: the editor, 30 Oct)
     const most = story.fullWidth ? GRID.columns : MAX_STORY_COLS;
     // (a less important story may run down one column too, beside a narrow ad: at a cost)
     const [from, to] = rank >= 5 ? [1, 3] : rank === 1 ? [3, most] : rank === 2 ? [2, most] : [1, most];
@@ -108,12 +112,15 @@ export class Blocks {
           const head = f === 1 ? undefined : { max: Math.max(HEADLINE.min, full * f), min: Math.max(HEADLINE.min, full * f * 0.72) };
           const mod = await buildModule(atRung(story, r), rank, cols, "long", this.m, mode, BODY.pitch, head);
           if (!Number.isFinite(mod.height)) break; // a photo layout the rules don't allow
-          if (mod.displayFill < 0.97 && !(rank === 5 && cols === 1)) continue;
+          // (one column's headline can't fill its lines: a long story beside a narrow ad)
+          if (mod.displayFill < 0.97 && cols !== 1) continue;
           if (headlineHeavy(mod)) continue;
           // a brief's headline too: at most four lines, under half the brief
           // (22 Oct: a one-column brief under a nine-line headline)
           const headLines = mod.elements.filter((e) => new RegExp(`^${story.id}-h\\d+$`).test(e.id)).length;
           if (rank >= 5 && (headLines > 4 || mod.headlineHeight > 0.45 * mod.height)) continue;
+          // (a headline down one column that runs on and on, eight lines on 30 Oct: a wider setting for that story)
+          if (cols === 1 && headLines > ONE_COLUMN_HEAD_LINES) continue;
           const loose = storyLooseness(mod.elements);
           if (loose > STORY_P90_EM) break;
           // a wide photo that comes out like the usual one adds nothing
@@ -127,7 +134,9 @@ export class Blocks {
       }
     }
     // a customer's article always shows its photo: a width where it can't is no option for it
-    return (wordForWord(story) && story.photo ? out.filter((o) => !o.module.photoDropped) : out).sort((a, b) => a.height - b.height);
+    // (and any story keeps its photo at a width with lengths that show it: the editor's pages have one with every story)
+    const shown = out.filter((o) => !o.module.photoDropped);
+    return (story.photo && (wordForWord(story) || shown.length >= 2) ? shown : out).sort((a, b) => a.height - b.height);
   }
 
   /** The heights a story can take at its widths (px), for planning a page: [shortest, longest]. */

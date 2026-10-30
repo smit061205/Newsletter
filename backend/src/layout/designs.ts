@@ -14,6 +14,8 @@ import { GAP } from "./typography.ts";
 export interface DesignStory {
   /** not a story: room for a filler (a page short of copy) */
   fill?: boolean;
+  /** it stands at the page's edge, at the top: the editor's column */
+  edge?: boolean;
   /** the widths it may take */
   widths: number[];
   /** its area at its middle length (px²), a width's own */
@@ -24,17 +26,22 @@ export interface DesignStory {
  * foot, or wherever the editor put it (layout/engine.ts). */
 export interface DesignAd { index: number; c0: number; c1: number; y: number; height: number }
 
+/** This drawing leaves no gap: no story is left without an ad's column to stand over, and the reverse. */
+let storiesOnly = false;
+
 /** A part of the page: its columns, its top (from the story area's) and height, its ads and stories. */
 interface Region { c0: number; c1: number; top: number; height: number; ads: DesignAd[]; items: number[] }
 
 /** Up to `count` different designs for a page of `cols` columns `height` tall. */
 export function designs(stories: DesignStory[], ads: DesignAd[], cols: number, height: number, rng: () => number,
-                        count = 300, attempts = 6000): Tree[] {
+                        count = 300, attempts = 6000, gaps = true): Tree[] {
   const out = new Map<string, Tree>();
   const items = stories.map((_, i) => i);
+  storiesOnly = !gaps;
   for (let n = 0; n < attempts && out.size < count; n++) {
-    const t = grow({ c0: 0, c1: cols, top: 0, height, ads, items }, stories, rng);
-    if (t && fills(t) <= 2) out.set(key(t), t);
+    const edge = stories.some((s) => s.edge);
+    const t = ((edge ? n % 4 !== 3 : !gaps && n % 2 === 0) ? footRow(stories, ads, cols, height, rng) : null) ?? grow({ c0: 0, c1: cols, top: 0, height, ads, items }, stories, rng);
+    if (t && fills(t) <= (gaps ? 2 : 0)) out.set(key(t), t);
   }
   return [...out.values()];
 }
@@ -43,6 +50,70 @@ const key = (t: Tree): string => (t.kind === "story" ? `s${t.story}:${t.cols}` :
   : t.kind === "fix" ? `x${Math.round(t.height)}(${key(t.child)})` : `${t.kind}(${t.children.map(key).join(",")})`);
 const fills = (t: Tree): number => (t.kind === "fill" ? 1 : t.kind === "fix" ? fills(t.child)
   : t.kind === "stack" || t.kind === "row" ? t.children.reduce((a, c) => a + fills(c), 0) : 0);
+
+/** The page the way a desk lays out ads of different heights: a row along the
+ * foot, a story standing on each ad and in each stretch of free columns, the rest
+ * of the page over the row. (Grown at random, the room over a short ad was a strip
+ * only a filler could take: 30 Oct's page 4, its one-column ad beside two tall ones.) */
+function footRow(stories: DesignStory[], ads: DesignAd[], cols: number, height: number, rng: () => number): Tree | null {
+  const column = stories.findIndex((s) => s.edge);
+  if ((!ads.length && column < 0) || ads.some((a) => a.y + a.height < height - 1)) return null;
+  const sorted = [...ads].sort((a, b) => a.c0 - b.c0);
+  if (sorted.some((a, i) => i > 0 && a.c0 < sorted[i - 1].c1)) return null; // (stacked)
+  const parts: { c0: number; c1: number; ad?: DesignAd }[] = [];
+  let at = 0;
+  for (const a of sorted) {
+    if (a.c0 > at) parts.push({ c0: at, c1: a.c0 });
+    parts.push({ c0: a.c0, c1: a.c1, ad: a });
+    at = a.c1;
+  }
+  if (ads.length && at < cols) parts.push({ c0: at, c1: cols });
+  // the row's stories: never the page's first, each at a width it may take
+  const free = stories.map((_, i) => i).slice(1).filter((i) => !stories[i].fill && !stories[i].edge);
+  const row: { part: (typeof parts)[number]; story: number }[] = [];
+  for (const part of [...parts].sort((a, b) => a.c1 - a.c0 - (b.c1 - b.c0))) {
+    const able = free.filter((i) => stories[i].widths.includes(part.c1 - part.c0));
+    if (!able.length) return null;
+    const story = able[Math.floor(rng() * able.length)];
+    free.splice(free.indexOf(story), 1);
+    row.push({ part, story });
+  }
+  const rest = stories.map((_, i) => i).filter((i) => !stories[i].fill && !row.some((r) => r.story === i));
+  if (!rest.length) return null;
+  const tall = (r: (typeof row)[number]) => {
+    const k = r.part.c1 - r.part.c0;
+    return stories[r.story].area(k) / spanOf(k) + (r.part.ad ? r.part.ad.height + GAP.betweenStories : 0);
+  };
+  const rowHeight = row.length ? Math.max(...row.map(tall)) : -GAP.betweenStories;
+  const topHeight = height - rowHeight - GAP.betweenStories;
+  if (topHeight < 60) return null;
+  const top = column >= 0 ? besideColumn(stories, column, rest, cols, topHeight, rng)
+    : grow({ c0: 0, c1: cols, top: 0, height: topHeight, ads: [], items: rest }, stories, rng);
+  if (!top) return null;
+  if (!row.length) return top;
+  const blocks = row.sort((a, b) => a.part.c0 - b.part.c0).map(({ part, story }) => {
+    const k = part.c1 - part.c0;
+    const leaf: Tree = { kind: "story", story, cols: k };
+    return part.ad ? join("stack", k, [leaf, { kind: "ad", ad: part.ad.index, cols: k }]) : leaf;
+  });
+  return join("stack", cols, [top, join("row", cols, blocks)]);
+}
+
+/** The top of a page with the editor's column: the column at the left or right
+ * edge, in its two columns (another story of that width under it, at times), the
+ * other stories beside it. */
+function besideColumn(stories: DesignStory[], column: number, items: number[], cols: number, height: number, rng: () => number): Tree | null {
+  const k = stories[column].widths[0];
+  const rest = items.filter((i) => i !== column);
+  if (!rest.length) return null;
+  const under = rest.length > 2 && rng() < 0.5 ? rest.filter((i, n) => n > 0 && stories[i].widths.includes(k)) : [];
+  const also = under.length ? under[Math.floor(rng() * under.length)] : -1;
+  const leaf: Tree = { kind: "story", story: column, cols: k };
+  const side = also >= 0 ? join("stack", k, [leaf, { kind: "story", story: also, cols: k }]) : leaf;
+  const left = rng() < 0.6;
+  const main = grow({ c0: left ? k : 0, c1: left ? cols : cols - k, top: 0, height, ads: [], items: rest.filter((i) => i !== also) }, stories, rng);
+  return main ? join("row", cols, left ? [side, main] : [main, side]) : null;
+}
 
 /** A child's blocks taken into its parent when they're the same kind (a stack in a stack is one stack). */
 function join(kind: "stack" | "row", cols: number, parts: Tree[]): Tree {
@@ -75,7 +146,7 @@ function grow(r: Region, stories: DesignStory[], rng: () => number): Tree | null
       const under = r.top + r.height - (f.y + f.height);
       if (under >= 30) return around(r, f, rest, leaf, stories, rng);
       // an ad with nothing over it: the ad alone (it must end level by itself), or a filler over it
-      if (!r.items.length && !rest.length) return rng() < 0.5 ? leaf : join("stack", cols, [{ kind: "fill", cols }, leaf]);
+      if (!r.items.length && !rest.length) return storiesOnly || rng() < 0.5 ? leaf : join("stack", cols, [{ kind: "fill", cols }, leaf]);
       const above = grow({ ...r, height: r.height - f.height - GAP.betweenStories, ads: rest }, stories, rng);
       return above ? join("stack", cols, [above, leaf]) : null;
     }
@@ -182,10 +253,17 @@ function rowAt(r: Region, c: number, stories: DesignStory[], rng: () => number, 
   }
   // a side with ads needs a story over them: ads of fixed heights side by
   // side can't end level with their neighbours by themselves (22 Oct, page 4)
+  // (a story that can take the side's width, when a gap isn't to be left: over a
+  // one-column ad, a long story down one column, 30 Oct's page 4)
   for (const [k, s] of sides.entries()) {
     if (!s.ads.length || s.items.length) continue;
     const other = sides[1 - k];
-    if (other.items.length >= 2 && rng() < 0.7) s.items.push(other.items.pop()!);
+    if (other.items.length < 2 || (!storiesOnly && rng() >= 0.7)) continue;
+    const narrow = s.c1 - s.c0;
+    const able = storiesOnly ? other.items.filter((i) => stories[i].widths.includes(narrow) || s.ads.every((a) => a.c1 - a.c0 < narrow)) : [];
+    const i = able.length ? able[Math.floor(rng() * able.length)] : other.items[other.items.length - 1];
+    other.items.splice(other.items.indexOf(i), 1);
+    s.items.push(i);
   }
   const parts: Tree[] = [];
   for (const s of sides) {

@@ -82,6 +82,8 @@ export interface Story {
   mergedFrom?: number[];
   /** The editor let it run the full width of the front page. */
   fullWidth?: boolean;
+  /** the paper's "તંત્રી સ્થાનેથી" box: a framed story with its title on a ribbon, no photo, one wide column (build.ts) */
+  editorsColumn?: boolean;
   /** Translated from another language (its code, e.g. "hi"): the editor checks it against the original. */
   translatedFrom?: string;
 }

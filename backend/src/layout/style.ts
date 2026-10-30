@@ -17,7 +17,7 @@ import { normalizeText } from "./text.ts";
 import { BODY, GRID, PT } from "./typography.ts";
 import { profile } from "../profile.ts";
 import { repeats } from "../editorial/quality.ts";
-import { wordForWord } from "../store.ts";
+import { alwaysPrinted, wordForWord } from "../store.ts";
 
 // Hindi and Urdu lines justify in their word spaces alone (never letter-
 // spaced: layout/measure.ts), so their papers set looser word spacing: their
@@ -89,9 +89,17 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
   const repeating = plans.flatMap((p) => p.placed.filter((x) => repeats(x.module.story.bodies[x.module.variant]))
     .map((x) => `p${p.page} ${x.module.story.id}`));
 
+  // a short story: the paper's shortest length is a floor (the editor, 30 Oct)
+  const under = plans.flatMap((p) => p.placed.filter((x) => !alwaysPrinted(x.module.story) && !wordForWord(x.module.story)
+    && x.module.story.bodies[x.module.variant].split(/\s+/).filter(Boolean).length < profile.editorial.minWords)
+    .map((x) => `p${p.page} ${x.module.story.id}`));
+
+  const column = plans.filter((p) => p.page > 1).flatMap((p) => p.placed)
+    .filter((x) => x.module.story.editorsColumn && (x.col === 0 || x.col + x.module.cols === GRID.columns)).length;
+
   // the display lines' fill, as each module recorded it
   // (a one-column brief centres a headline too short to justify, as the paper does)
-  const unfilled = plans.flatMap((p) => p.placed.filter((x) => x.module.displayFill < FILL && !(x.module.rank === 5 && x.module.cols === 1))
+  const unfilled = plans.flatMap((p) => p.placed.filter((x) => x.module.displayFill < FILL && x.module.cols !== 1)
     .map((x) => `p${p.page} ${x.module.story.id} (${Math.round(x.module.displayFill * 100)}%)`));
 
   // column ends per story: the bottoms of each column's last line
@@ -119,6 +127,7 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
   const structure = plans.flatMap((p) => p.placed.filter((x) => {
     const mod = x.module;
     // (a customer's article given without a sub-heading prints without one: its words are his)
+    if (mod.story.editorsColumn) return !(mod.headSize > 0 && mod.bodyLines > 0); // (printed with no sub-heading)
     if (wordForWord(mod.story) && !mod.story.deck.trim()) return !(mod.headSize > 0 && mod.bodyLines > 0);
     return !(mod.headSize > 0 && mod.deckSize > 0 && mod.bodyLines > 0
              && mod.headSize >= mod.deckSize * 1.25 - 0.01 && mod.deckSize >= BODY.size * 1.15 - 0.01);
@@ -134,6 +143,9 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
       detail: short.map((x) => `p${x.page} ${Math.round(x.share * 100)}% fillers -- add releases or print fewer pages`).join("; ") || "ok" },
     { gate: "S7 every story: headline, smaller sub-heading, smaller body", pass: structure.length === 0, detail: structure.join(", ") || "ok" },
     { gate: "S8 no story says the same thing twice", pass: repeating.length === 0, detail: repeating.join(", ") || "ok" },
+    { gate: `S10 no story under ${profile.editorial.minWords} words`, pass: under.length === 0, detail: under.join(", ") || "ok" },
+    { gate: "S11 the editor's column once, at an inside page's edge", pass: !profile.editorial.columnTitle || column === 1,
+      detail: column === 1 ? "ok" : `${column} printed at an edge of pages 2 and after` },
     { gate: "S9 no story set loosely", pass: looseStories.length === 0, detail: looseStories.join(", ") || "ok" },
     { gate: "S6 numbers in the paper's digits", pass: latinDigits.length === 0, detail: latinDigits.slice(0, 8).join(", ") || "ok" },
   ];
