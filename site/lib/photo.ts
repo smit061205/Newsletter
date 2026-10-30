@@ -28,6 +28,8 @@ export function pic(p: { url: string; width: number }, sizes: string): { src: st
 export const SIZES = {
   thumb: "160px",
   card: "(max-width: 800px) 60vw, 33vw",
+  /** Aavtikal's cards: two across on a phone, three on a tablet */
+  pair: "(max-width: 560px) 45vw, (max-width: 800px) 28vw, 33vw",
   lead: "(max-width: 800px) 70vw, 66vw",
   full: "(max-width: 800px) 70vw, 100vw",
   inside: "(max-width: 800px) 70vw, 760px",

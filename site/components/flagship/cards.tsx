@@ -35,7 +35,7 @@ function Meta({ f, lang }: { f: Feature; lang: Lang }) {
 function Picture({ f, lang, cls, eager }: { f: Feature; lang: Lang; cls: string; eager?: boolean }) {
   const w = featureWords(f, lang);
   if (!f.photo) return <div className={`${s.tile} ${s[f.beat]}`} aria-hidden="true"><span>{beatName(f.beat, lang)}</span></div>;
-  return <img className={cls} {...pic(f.photo, eager ? SIZES.lead : SIZES.card)} width={f.photo.width} height={f.photo.height} alt={w.caption || w.headline}
+  return <img className={cls} {...pic(f.photo, eager ? SIZES.lead : SIZES.pair)} width={f.photo.width} height={f.photo.height} alt={w.caption || w.headline}
               loading={eager ? "eager" : "lazy"} fetchPriority={eager ? "high" : undefined} decoding="async" />;
 }
 
