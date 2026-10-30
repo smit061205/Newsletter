@@ -33,7 +33,7 @@ export default function AavtikalPromo({ name, by, cta, close, home, article }:
       <button type="button" className="avc-x" onClick={shut} aria-label={close}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
       </button>
-      <Link className="avc-in" href={article?.href ?? home}>
+      <Link prefetch={false} className="avc-in" href={article?.href ?? home}>
         <span className="avc-by">{by}</span>
         <span className="avc-name">{name}</span>
         {article && <>

@@ -21,8 +21,9 @@ function fromPlace(req: NextRequest): Lang | null {
 }
 
 export function proxy(req: NextRequest) {
-  // pages opened in the browser only: not the app's own page loads, not search engines or previews
-  if (req.method !== "GET" || req.headers.has("rsc") || req.headers.has("next-router-state-tree") || req.nextUrl.searchParams.has("_rsc") || !(req.headers.get("accept") ?? "").includes("text/html")
+  // pages opened in the browser only: not the app's own page loads, not search engines or previews, not a page
+  // fetched ahead of a change of language (components/LangLink.tsx: the choice is kept only on the click)
+  if (req.method !== "GET" || req.headers.get("sec-purpose")?.includes("prefetch") || req.headers.has("rsc") || req.headers.has("next-router-state-tree") || req.nextUrl.searchParams.has("_rsc") || !(req.headers.get("accept") ?? "").includes("text/html")
       || BOTS.test(req.headers.get("user-agent") ?? "")) return NextResponse.next();
   const path = req.nextUrl.pathname;
   const here = langOf(path);
