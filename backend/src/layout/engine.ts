@@ -13,7 +13,8 @@
 //      pages tried again; then with room for a filler, and the nearest design
 //      if none is exact (its gap reported). No other engine lays out a page.
 import type { Element } from "@ck/shared/contract";
-import { ladderOf, MIN_WORDS, type Rung } from "../editorial/ladder.ts";
+import { grown, ladderOf, MIN_WORDS, type Rung } from "../editorial/ladder.ts";
+import { wordCount } from "../editorial/quality.ts";
 import { alwaysPrinted, type Ad, type Release, type Store, type Story } from "../store.ts";
 import { Blocks, type Option } from "./blocks.ts";
 import { spanWidth } from "./module.ts";
@@ -24,7 +25,7 @@ import type { FillerCount } from "./fit.ts";
 import type { Measurer } from "./measure.ts";
 import { outranks, rankOf, renderPlaced, tombstoned, type Band, type PlacedModule } from "./pack.ts";
 import { related } from "./stories.ts";
-import { GAP, GRID, LEAD_FULL_WIDTH, PT } from "./typography.ts";
+import { BODY, GAP, GRID, LEAD_FULL_WIDTH, PT } from "./typography.ts";
 
 export interface EnginePage {
   page: number;
@@ -221,6 +222,34 @@ export async function layOut(args: {
   log(`  pages: ${shares.map((p, i) => `${i + 1}: ${p.length} stories (${Math.round(p.reduce((a, s) => a + s.mid, 0) / rooms[i] * 100)}%)`).join(", ")}` +
       (held.length ? `; held: ${held.map((s) => s.story.id).join(", ")}` : "") + ` (${secs(t1)}s)`);
 
+  // a gap on a page: the stories nearest it written longer by the AI, from their
+  // releases' facts, to fill it, before any short item goes in (the developer,
+  // 30 Oct: an 11-word item was set with stories on the page that had more to say)
+  const grow: Grow | undefined = !args.longer ? undefined : async (placed, gaps) => {
+    const room = gaps.reduce((a, f) => a + (f.height / BODY.pitch) * f.cols, 0); // lines of a column
+    const near = (p: PlacedModule) => Math.min(...gaps.map((f) => {
+      const x = GRID.left + f.col * GRID.pitch;
+      const across = Math.max(0, p.x - (x + spanWidth(f.cols)), x - (p.x + p.module.width));
+      const down = Math.max(0, p.y - (f.y + f.height), f.y - (p.y + p.module.height));
+      return across + down;
+    }));
+    const got = await Promise.all([...placed].sort((a, b) => near(a) - near(b)).slice(0, GROW_STORIES).map(async (p) => {
+      const s = p.module.story;
+      const release = args.releases.get(s.id);
+      const ladder = ladders.get(s.id);
+      if (!release || !ladder) return false;
+      const perLine = wordCount(s.bodies.long) / Math.max(1, p.module.bodyLines);
+      const more = await grown(args.store, s, release, ladder, Math.ceil(room * perLine * 1.1), log);
+      if (!more) return false;
+      ladders.set(s.id, more.rungs);
+      blocks.forget(s.id);
+      cost += more.cost;
+      log(`  ${s.id} written longer for a gap: up to ${more.rungs[0].words} words`);
+      return true;
+    }));
+    return got.some(Boolean);
+  };
+
   // 3. each page designed and solved; a page no design fills: other designs,
   // then a story more (one held back, or the smallest from a page with copy
   // to spare) or one fewer (the least important, held back), and again
@@ -247,7 +276,7 @@ export async function layOut(args: {
       // to the old engine, which left the copies' white space (24 Oct)
       const slot = shortBy.get(i) ?? (round >= LAST ? (FILL_MAX / 2) * spanOf(1) : 0);
       const got = await solvePage(n, shares[i].map((s) => s.story), args.bands[i], pageAds(n), blocks, m,
-                                  seeded(args.seed * 31 + n + round * 7919), args.avoid, log, Math.min(round, LAST), fill, slot, round >= LAST, !args.mend?.narrowLead);
+                                  seeded(args.seed * 31 + n + round * 7919), args.avoid, log, Math.min(round, LAST), fill, slot, round >= LAST, !args.mend?.narrowLead, grow);
       pages[i] = got.page;
       diag.set(i, got.diagnosis);
       if (got.page) args.progress?.(++pagesDone, total, "pages");
@@ -261,6 +290,18 @@ export async function layOut(args: {
       const d = diag.get(i)!;
       const sum = (k: number, f: "min" | "max" | "mid") => shares[k].reduce((a, s) => a + s[f], 0);
       const isShort = sum(i, "mid") < rooms[i];
+      // a page's one story won't fit it: another in its place, the page never
+      // left blank (30 Oct: page 4's one story, a speech, fitted no design)
+      if (shares[i].length === 1 && d.long >= d.short && (d.long > 0 || narrowed.has(i))) {
+        const other = held.filter((s) => s.min < rooms[i]).sort((a, b) => toBring(a, b) || b.mid - a.mid)[0];
+        if (other) {
+          const [s] = shares[i];
+          held.splice(held.indexOf(other), 1, s);
+          shares[i] = [other];
+          log(`  page ${i + 1}: ${s.story.id} fits no design: ${other.story.id} in its place`);
+          continue;
+        }
+      }
       // no design could be made at all (narrow strips by the ads no story of
       // the page can take): a reserve story that runs in one or two columns
       if (d.short === 0 && d.long === 0 && narrowed.has(i) && shares[i].length > 1) {
@@ -327,7 +368,9 @@ export async function layOut(args: {
   }
   cost += fill.cost;
   log(`  layout: ${pages.filter(Boolean).length} of ${total} pages solved exactly (${secs(t0)}s in all)`);
-  return { pages, leftOut: [...held.map((s) => s.story), ...tooShort], cost, assigned: shares.map((p) => p.map((s) => s.story)), factChecks };
+  // (a page's stories, if it couldn't be laid out at all, are reported too)
+  const unset = shares.flatMap((p, i) => (pages[i] ? [] : p.map((s) => s.story)));
+  return { pages, leftOut: [...held.map((s) => s.story), ...tooShort, ...unset], cost, assigned: shares.map((p) => p.map((s) => s.story)), factChecks };
 }
 
 /** Rounds of tries for a page; from LAST on, a filler slot and the nearest design if none is exact. */
@@ -336,6 +379,11 @@ const LAST = 3;
 
 /** The tallest the front page's lead across the page may be, a share of the page. */
 const LEAD_MAX_SHARE = 0.4;
+
+/** The stories written longer for a gap, at most: the ones nearest it. */
+const GROW_STORIES = 4;
+/** Stories on a page written longer for its gaps; true if any was. */
+type Grow = (placed: PlacedModule[], gaps: Extract<Block, { kind: "fill" }>[]) => Promise<boolean>;
 
 /** Why a page found no design: how many designs came out too short for it, and too tall. */
 interface Diagnosis { short: number; long: number }
@@ -348,7 +396,11 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
                          /** the last try: no exact design, the nearest one */
                          last = false,
                          /** the front page's lead across the page (the profile's leadFullWidth) */
-                         leadWide = true):
+                         leadWide = true,
+                         /** the page's stories written longer for its gaps, then the page designed again */
+                         grow?: Grow,
+                         /** designed again: only a design with less gap than this will do */
+                         beat = Infinity):
   Promise<{ page: EnginePage | null; diagnosis: Diagnosis }> {
   const t0 = Date.now();
   const none = { page: null, diagnosis: { short: 0, long: 0 } };
@@ -373,6 +425,13 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   const table = new Map<string, Option[]>();
   for (const [i, s] of stories.entries()) {
     for (const cols of blocks.widths(s, ranks[i])) table.set(`${i}|${cols}`, await blocks.options(s, ranks[i], cols));
+  }
+  // the front page's lead keeps its photo (the editor, 30 Oct: a setting
+  // without it was shorter, so it won), at any width that can show it
+  if (n === 1 && stories[0].photo) {
+    const widths = blocks.widths(stories[0], ranks[0]);
+    const shown = widths.map((c) => (table.get(`0|${c}`) ?? []).filter((o) => !o.module.photoDropped));
+    if (shown.some((o) => o.length)) widths.forEach((c, k) => table.set(`0|${c}`, shown[k]));
   }
   // the front page's lead across the page leaves room for the rest: its photo
   // across all the columns made it two thirds of the page, no design had room
@@ -471,6 +530,12 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
       best = { page: { page: n, placed, ads: got.ads, elements, blocks: boxes, design: sig }, cost: total, fills: got.fills };
     }
     if (penalty === 0) break;
+  }
+  const gapOf = (fills: Extract<Block, { kind: "fill" }>[]) => fills.reduce((a, f) => a + f.height * f.cols, 0);
+  if (beat < Infinity && (!best || gapOf(best.fills) >= beat)) return none;
+  if (best?.fills.length && grow && await grow(best.page.placed, best.fills)) {
+    const again = await solvePage(n, stories, band, ads, blocks, m, rng, avoid, log, round, fill, shortBy, last, leadWide, undefined, gapOf(best.fills));
+    if (again.page) return again;
   }
   // the design's filler blocks, filled with copy (layout/fill.ts)
   if (best?.fills.length) {

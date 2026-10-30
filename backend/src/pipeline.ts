@@ -343,6 +343,9 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
           try { return await job(); } finally { part(name, (Date.now() - t) / 1000); }
         };
         await step(store, date, s.name, say, progress, timed, part, job.by);
+        // (the AI's money run out shows on Today: 30 Oct, the screen only said to press "Make it again")
+        const { aiMoney } = await import("./editorial/rewrite.ts");
+        if (aiMoney()) store.putSetting("aiOutOfMoney", aiMoney() === "out");
         s.status = "done";
       } catch (e) {
         s.status = "failed";

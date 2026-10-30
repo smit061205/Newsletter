@@ -276,11 +276,14 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
 
   // ---- photo options: natural shape, the print desk's rules
   const photo = story.photo ? await sizeOf(story.photo, m) : null;
+  // (the widest a small photo still prints sharp: PIB's often come 400-odd pixels
+  // wide, the wider spans all passed them over, and 30 Oct's lead printed without one)
+  const sharp = photo ? Array.from({ length: cols }, (_, i) => cols - i).find((k) => photo.width / (spanWidth(k) / 300) >= PHOTO.minPpi) ?? 0 : 0;
   const spans = !photo ? [0]
     : photoMode === 1 ? [cols]
     : cols === 1 ? [1, 0]
     // (a third of a wide story too: a small photo set in a full-width lead, 28 Oct)
-    : [...new Set([Math.ceil(cols / 2), cols - 1, cols, Math.max(PHOTO.minCols, Math.floor(cols / 2)), ...(cols >= 6 ? [Math.ceil(cols / 3)] : [])])]
+    : [...new Set([Math.ceil(cols / 2), cols - 1, cols, Math.max(PHOTO.minCols, Math.floor(cols / 2)), ...(cols >= 6 ? [Math.ceil(cols / 3)] : []), sharp])]
         .filter((k) => k >= PHOTO.minCols && k <= cols).concat(0);
   // the wider layouts may give the picture more of the story -- only a
   // landscape picture: a tall one spread across the story would take it over

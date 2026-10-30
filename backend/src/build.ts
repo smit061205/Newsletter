@@ -13,6 +13,7 @@ import { chromeFor, printedDate } from "./chrome/chrome.ts";
 import { Measurer } from "./layout/measure.ts";
 
 import { planDay } from "./editorial/plan.ts";
+import { newsOverlap } from "./editorial/translate.ts";
 import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
@@ -21,7 +22,7 @@ import type { FillerCount } from "./layout/fit.ts";
 import { layOut, type EngineResult } from "./layout/engine.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
 import { removed } from "./layout/text.ts";
-import { applyTextEdits, dedupe, droppedBy, inPaperLanguage, referenceAds, standInsMovable } from "./layout/stories.ts";
+import { applyTextEdits, dedupe, droppedBy, inPaperLanguage, oneReportOfEach, referenceAds, standInsMovable } from "./layout/stories.ts";
 import { arrangeAds } from "./layout/ads.ts";
 import { findGaps } from "./layout/occupancy.ts";
 import { styleChecks } from "./layout/style.ts";
@@ -54,6 +55,9 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
 const LEAD_WORDS = 250;
 /** Under this a story is a short item, ranked below the day's ordinary stories (set as a brief). */
 const SHORT_WORDS = 200;
+/** Two reports sharing this much of their opening words and figures are the same
+ * news (30 Oct's day: the same news 0.49 and over, different news 0.28 at most). */
+const SAME_STORY = 0.4;
 /** Most important first; of equal rank, one with a photo first (28 Oct: the
  * editor's own pages put a photo with nearly every story), then the longest. */
 const byRank = (a: Story, b: Story) => a.priority - b.priority || Number(!a.photo) - Number(!b.photo) || b.bodies.long.length - a.bodies.long.length;
@@ -228,6 +232,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const m = await Measurer.open(FONTS, FACES);
   let planCost = 0;
   let planEntries: BuildReport["plan"] = [];
+  // (stories taken out as the same news as one kept: reported with those left out)
+  const sameNews: Story[] = [];
   let result!: { pages: Map<number, Element[]>; placed: { page: number; story: Story; variant: string; cols: number; rank: number }[];
                  gaps: { page: number; col: number; y0: number; y1: number }[]; leftOut: Story[];
                  plans: PagePlan[]; spent: number; factChecks: { story: string; detail: string }[] };
@@ -289,6 +295,18 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         .sort(byRank);
       log(`  editorial plan: leads ${planned.plan.filter((p) => p.rank === 1).map((p) => p.id).join(", ") || "none"}`);
     }
+    // the same news once in the paper (30 Oct: the PM's Banaskantha visit printed
+    // three times, the news, the works and the speech): the plan says which stories
+    // are one event, and two reports sharing most of their words are one anyway
+    {
+      const eventOf = new Map((planned?.plan ?? []).filter((p) => p.event?.trim()).map((p) => [p.id, p.event!.trim().toLowerCase()]));
+      const report = (s: Story) => ({ headline: s.headline, body: s.bodies.long });
+      const same = (a: Story, b: Story) => (!!eventOf.get(a.id) && eventOf.get(a.id) === eventOf.get(b.id)) || newsOverlap(report(a), report(b)) >= SAME_STORY;
+      const { kept, twins } = oneReportOfEach(pool, same, (s) => rankedByEditor.has(s.id) || alwaysPrinted(s));
+      if (twins.length) log(`  the same news as a story kept, left out: ${twins.map((s) => s.id).join(", ")}`);
+      pool = kept.map((s) => ({ ...s, photos: s.photos ?? [] })).sort(byRank);
+      sameNews.push(...twins);
+    }
     planCost = planned?.cost ?? 0;
     planEntries = planned?.plan ?? [];
     // a few of the day's biggest national and world stories always in the
@@ -323,6 +341,18 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       if (k > 0) {
         const [s] = pool.splice(k, 1);
         log(`  the lead: ${s.id} (${pool[0].id} is too short for one)`);
+        pool.unshift({ ...s, priority: Math.min(s.priority, pool[0].priority) });
+      }
+    }
+    // the front page's lead has a photo (the editor, 30 Oct), an important story
+    // first, else any long enough for a lead -- the editor's own lead stands
+    if (pool[0] && !rankedByEditor.has(pool[0].id) && !pool[0].photo) {
+      const lead = (s: Story) => !!s.photo && wordCount(s.bodies.long) >= LEAD_WORDS;
+      const near = pool.findIndex((s) => lead(s) && s.priority <= Math.max(2, pool[0].priority));
+      const k = near > 0 ? near : pool.findIndex(lead);
+      if (k > 0) {
+        const [s] = pool.splice(k, 1);
+        log(`  the lead: ${s.id} (${pool[0].id} has no photo)`);
         pool.unshift({ ...s, priority: Math.min(s.priority, pool[0].priority) });
       }
     }
@@ -412,7 +442,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
           `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" ")}`);
     }
     timing.fitting = Date.now() - t1;
-    result = { pages: pagesOut, placed, gaps, leftOut: pool, plans: finalPlans, spent: spent + rewordCost, factChecks };
+    result = { pages: pagesOut, placed, gaps, leftOut: [...pool, ...sameNews], plans: finalPlans, spent: spent + rewordCost, factChecks };
   } finally {
     await m.close();
   }

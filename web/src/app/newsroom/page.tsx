@@ -161,6 +161,13 @@ export default function Today() {
         </div>
       )}
 
+      {status?.aiOutOfMoney && !running && (
+        <div className={s.card}>
+          <h2 className={s.cardTitle}>{t("today.money.title")}</h2>
+          <p className={s.muted}>{t("today.money.body")}</p>
+        </div>
+      )}
+
       <section className={`${s.card} ${s.hero}`}>
         {running && job ? <Making job={job} previous={lastDone} ticker={ticker} />
           : failed && failed.error === "stopped by the editor" ? (

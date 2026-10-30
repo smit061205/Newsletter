@@ -33,6 +33,11 @@ export const LEAD_MODEL = profile.editorial.leadModel;
  * request that never answers would otherwise hold up the whole build. A
  * timeout or network failure comes back as a 504, which every caller already
  * treats as a failed call (the story keeps what it had). */
+/** What OpenRouter last said of the account: "out" of money (or over the key's
+ * limit), "ok", or null if it wasn't asked (pipeline.ts keeps it for the newsroom). */
+let money: "out" | "ok" | null = null;
+export const aiMoney = () => money;
+
 export async function openRouter(init: RequestInit, seconds = 90): Promise<Response> {
   // every AI call of a step goes out at once (no cap of our own: OpenRouter
   // sets none for paid models): one turned away as too many, or a provider's
@@ -41,7 +46,10 @@ export async function openRouter(init: RequestInit, seconds = 90): Promise<Respo
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", { ...init, signal: AbortSignal.timeout(seconds * 1000) });
-      last = new Response(await res.text(), { status: res.status });
+      const said = await res.text();
+      last = new Response(said, { status: res.status });
+      if (res.ok) money = "ok";
+      else if (res.status === 402 || (res.status === 403 && /limit|credit/i.test(said))) money = "out";
       if (res.status !== 429 && res.status !== 502 && res.status !== 503) return last;
       const asked = Number(res.headers.get("retry-after"));
       await new Promise((r) => setTimeout(r, (Number.isFinite(asked) && asked > 0 ? asked * 1000 : 1000 * 2 ** attempt) + Math.random() * 500));

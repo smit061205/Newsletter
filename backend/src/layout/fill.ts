@@ -32,6 +32,10 @@ export interface FillContext {
 }
 
 const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
+/** The fewest words an item filling a gap has (30 Oct: an 11-word item with 32 stories held). */
+const ITEM_WORDS = 15;
+/** Does it end where a sentence ends? (an item never stops in mid-thought) */
+const whole = (t: string) => /[.।!?]["'”’)]*\s*$/.test(t);
 
 /** Copy for a hole `cols` wide and `h` tall at (col, y): briefs (one, or one
  * under another where one alone leaves room), or a panel. Null if nothing fits. */
@@ -83,13 +87,14 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   // before anything written: 25 Oct wrote a cooking tip with eight stories held)
   {
     let best: { s: Story; mod: Module } | null = null;
-    // (down to its first sentence alone, 10 words or more: 26 Oct's copies wrote
+    // (down to its first sentence alone, ITEM_WORDS or more: 26 Oct's copies wrote
     // 20-word items with 35 stories held -- a cut had to keep two sentences and 15 words)
     for (const s of ctx.held.slice(0, 30)) {
       const sentences = s.bodies.long.split(/(?<=[.।!?])\s+/);
       for (let k = sentences.length; k >= 1; k--) {
         const body = sentences.slice(0, k).join(" ");
-        if (words(body) < 10) break;
+        if (words(body) < ITEM_WORDS) break;
+        if (!whole(body)) continue;
         const mod = await buildModule({ ...s, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0, BODY.pitch, HEADLINE.filler);
         if (!Number.isFinite(mod.height) || mod.height > h + 0.5) continue;
         const heads = mod.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length;
@@ -115,9 +120,12 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
     for (const s of ctx.held.filter((x) => !wordForWord(x)).slice(0, 3)) {
       const release = (s.releaseId ? ctx.store.release(s.releaseId) : null)
         ?? ({ id: 0, date: s.date, headline: s.headline, subhead: s.deck, body: s.bodies.long } as unknown as Release);
-      let target = Math.max(10, Math.round((h / pitch - 4) * cols * 5));
+      let target = Math.max(ITEM_WORDS + 5, Math.round((h / pitch - 4) * cols * 5));
+      // (written to fill the hole: 30 Oct's first try, cut to the sentence that fitted,
+      // was 16 words over a slogan; the next tries' lengths from what it measured)
       let mod: Module | null = null;
-      for (let attempt = 0; attempt < 2 && !mod; attempt++) {
+      let filled = false;
+      for (let attempt = 0; attempt < 3 && !filled; attempt++) {
         const got = await newsBrief(ctx.store, s, release, { ...size, words: target }, { log: ctx.log });
         if (!got) break;
         ctx.cost += got.cost;
@@ -126,18 +134,19 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
         let tried: Module | null = null;
         for (let k = sentences.length; k >= 1; k--) {
           const body = sentences.slice(0, k).join(" ");
-          if (words(body) < 8) break;
+          if (words(body) < ITEM_WORDS) break;
+          if (!whole(body)) continue;
           tried = await buildModule({ ...got.story, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0, BODY.pitch, HEADLINE.filler);
           if (Number.isFinite(tried.height) && tried.height <= h + 0.5) break;
         }
         const heads = tried ? tried.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length : 0;
         if (tried && tried.height <= h + 0.5 && (tried.displayFill >= 0.97 || cols === 1) && heads <= 4
-            && tried.headlineHeight <= 0.45 * tried.height && close(tried)) mod = tried;
-        else if (tried && Number.isFinite(tried.height)) {
-          // the next try's length from what this one measured
-          const perLine = words(tried.story.bodies.long) / Math.max(1, tried.bodyLines);
-          target = Math.max(8, Math.round(words(tried.story.bodies.long) + Math.floor((h - tried.height) / pitch) * cols * perLine * 0.9));
-        } else break;
+            && tried.headlineHeight <= 0.45 * tried.height && close(tried) && (!mod || tried.height > mod.height)) mod = tried;
+        filled = !!mod && h - mod.height < 1.5 * pitch;
+        if (filled || !tried || !Number.isFinite(tried.height)) break;
+        // the next try's length from what this one measured, short of the hole or over it
+        const perLine = words(tried.story.bodies.long) / Math.max(1, tried.bodyLines);
+        target = Math.max(ITEM_WORDS, Math.round(words(tried.story.bodies.long) + Math.floor((h - tried.height) / pitch) * cols * perLine * 0.9));
       }
       if (!mod || !ctx.held.includes(s)) continue;
       ctx.held.splice(ctx.held.indexOf(s), 1);
