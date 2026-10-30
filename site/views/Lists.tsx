@@ -31,11 +31,11 @@ export async function Section({ k, sub, lang }: { k: string; sub?: string; lang:
   return (
     <Frame lang={lang} path={sub ? `/section/${k}/${sub}` : `/section/${k}`} section={k}>
       <div className="sechead">
-        <h1>{sub ? <><Link href={href(lang, `/section/${k}`)}>{sectionName(k, lang)}</Link><span className="secsep" aria-hidden="true">›</span>{sectionName(sub, lang)}</> : sectionName(k, lang)}</h1>
+        <h1>{sub ? <><Link prefetch={false} href={href(lang, `/section/${k}`)}>{sectionName(k, lang)}</Link><span className="secsep" aria-hidden="true">›</span>{sectionName(sub, lang)}</> : sectionName(k, lang)}</h1>
       </div>
       {others.length > 1 && (
         <nav className="chips" aria-label={sectionName(k, lang)}>
-          {others.map((o) => <Link key={o.key} href={href(lang, o.href)} className={o.on ? "on" : undefined} aria-current={o.on ? "page" : undefined}>{sectionName(o.key, lang)}</Link>)}
+          {others.map((o) => <Link prefetch={false} key={o.key} href={href(lang, o.href)} className={o.on ? "on" : undefined} aria-current={o.on ? "page" : undefined}>{sectionName(o.key, lang)}</Link>)}
         </nav>
       )}
       {top ? (
@@ -43,7 +43,7 @@ export async function Section({ k, sub, lang }: { k: string; sub?: string; lang:
           <div className="ctr" style={{ marginTop: 20 }}>{top.photo ? <Lead s={top} lang={lang} /> : <Std s={top} lang={lang} sec={false} />}</div>
           <div className="ctr"><River stories={list.filter((s) => s !== top)} lang={lang} /></div>
         </>
-      ) : <><p className="empty">{t(lang, "none")}</p><Link className="more" href={href(lang, "/")}>{t(lang, "back")}</Link></>}
+      ) : <><p className="empty">{t(lang, "none")}</p><Link prefetch={false} className="more" href={href(lang, "/")}>{t(lang, "back")}</Link></>}
     </Frame>
   );
 }
@@ -85,7 +85,7 @@ export async function Epaper({ date, lang }: { date?: string; lang: Lang }) {
           <p className="note" style={{ margin: 0 }}>{dateText(issue.date, lang, true)} · {t(lang, "issue")} {num(issue.number, lang)}</p>
           <div className="tools" style={{ marginBottom: 16 }}>
             {issue.pdf && <a className="tool" href={issue.pdf} target="_blank" rel="noopener">{t(lang, "pdf")}</a>}
-            <Link className="tool" href={href(lang, "/archive")}>{t(lang, "archive")}</Link>
+            <Link prefetch={false} className="tool" href={href(lang, "/archive")}>{t(lang, "archive")}</Link>
           </div>
           <EpaperViewer pages={issue.pages.map((p) => ({ ...p, label: `${t(lang, "page")} ${num(p.number, lang)}` }))}
             lang={lang} words={{ open: t(lang, "epOpen"), close: t(lang, "close2"), prev: t(lang, "prev"), next: t(lang, "next"), zoom: t(lang, "zoomIn") }} />
@@ -104,7 +104,7 @@ export async function Archive({ lang }: { lang: Lang }) {
       {days.length ? (
         <div className="river">
           {days.map((d) => (
-            <Link key={d.date} className="h" href={href(lang, `/archive/${d.date}`)}>
+            <Link prefetch={false} key={d.date} className="h" href={href(lang, `/archive/${d.date}`)}>
               <span className="when">{t(lang, "issue")} {num(d.number, lang)}</span>
               <div><h3 className="h3">{dateText(d.date, lang, true)}</h3><div className="meta">{num(d.stories, lang)} {t(lang, "storiesCount")}</div></div>
               <span />
@@ -123,7 +123,7 @@ export async function ArchiveDay({ date, lang }: { date: string; lang: Lang }) {
   return (
     <Frame lang={lang} path={`/archive/${date}`} active="archive">
       <div className="sechead"><h1>{dateText(date, lang, true)}</h1></div>
-      {issue && <p className="note" style={{ margin: 0 }}>{t(lang, "issue")} {num(issue.number, lang)} · <Link href={href(lang, `/epaper/${date}`)}>{t(lang, "epaper")}</Link></p>}
+      {issue && <p className="note" style={{ margin: 0 }}>{t(lang, "issue")} {num(issue.number, lang)} · <Link prefetch={false} href={href(lang, `/epaper/${date}`)}>{t(lang, "epaper")}</Link></p>}
       <div className="ctr" style={{ marginTop: 16 }}><River stories={list} lang={lang} sec /></div>
     </Frame>
   );

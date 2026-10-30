@@ -42,10 +42,10 @@ export async function FlFront({ lang }: { lang: Lang }) {
               <section key={b} className={`${s.band} ${i % 2 ? s.inkBand : s.beatBand} ${s[b]}`} aria-labelledby={`band-${b}`}>
                 <div className={s.bandHead}>
                   <h2 id={`band-${b}`} className={s.bandName}>{beatName(b, lang)}</h2>
-                  <Link className={s.seeAll} href={fl(lang, `/${b}`)}>{w.seeAll}<Chev /></Link>
+                  <Link prefetch={false} className={s.seeAll} href={fl(lang, `/${b}`)}>{w.seeAll}<Chev /></Link>
                 </div>
                 <Grid items={mine} lang={lang} tag={false} />
-                <Link className={`${s.hl} ${s.readMore}`} href={fl(lang, `/${b}`)}>{w.readMore(beatName(b, lang))}</Link>
+                <Link prefetch={false} className={`${s.hl} ${s.readMore}`} href={fl(lang, `/${b}`)}>{w.readMore(beatName(b, lang))}</Link>
               </section>
             );
           })}
@@ -64,7 +64,7 @@ function Writers({ lang }: { lang: Lang }) {
       <div className={s.bandHead}><h2 id="writers-h" className={s.bandName}>{w.writers}</h2></div>
       <div className={s.writers}>
         {(Object.keys(AUTHORS) as (keyof typeof AUTHORS)[]).map((k) => (
-          <Link key={k} className={s.writer} href={fl(lang, `/author/${k}`)}>
+          <Link prefetch={false} key={k} className={s.writer} href={fl(lang, `/author/${k}`)}>
             <span className={`${s.hl} ${s.writerName}`}>{AUTHORS[k].name[lang]}</span>
             <span className={s.writerRole}>{AUTHORS[k].role[lang]}</span>
           </Link>
@@ -200,7 +200,7 @@ export async function FlArticle({ lang, id }: { lang: Lang; id: string }) {
           <h1 className={`${s.hl} ${s.artTitle}`} lang={gl(lang, t.translated)}>{t.headline}</h1>
           {t.dek && <p className={`${s.artDek} ${s.serif}`}>{t.dek}</p>}
           <div className={s.artMeta}>
-            <Link href={fl(lang, `/author/${f.author}`)}>{AUTHORS[f.author].name[lang]}</Link>
+            <Link prefetch={false} href={fl(lang, `/author/${f.author}`)}>{AUTHORS[f.author].name[lang]}</Link>
             <span><time dateTime={f.publishedAt}>{dateText(f.publishedAt, lang)}</time> · {num(readMinutes(t.body), lang)} {w.min}</span>
           </div>
         </header>
@@ -232,7 +232,7 @@ export async function FlArticle({ lang, id }: { lang: Lang; id: string }) {
         <section className={`${s.band} ${s.beatBand} ${s[f.beat as Beat]}`} aria-labelledby="more-h">
           <div className={s.bandHead}>
             <h2 id="more-h" className={s.bandName}>{beatName(f.beat, lang)}</h2>
-            <Link className={s.seeAll} href={fl(lang, `/${f.beat}`)}>{w.seeAll}<Chev /></Link>
+            <Link prefetch={false} className={s.seeAll} href={fl(lang, `/${f.beat}`)}>{w.seeAll}<Chev /></Link>
           </div>
           <Grid items={more} lang={lang} tag={false} />
         </section>
