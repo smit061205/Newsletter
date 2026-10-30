@@ -5,9 +5,9 @@ name: apps
 on:
   push:
     branches: [main, newsroom]
-    paths-ignore: ["site/**", ".github/workflows/site.yml", "docs/**"]
+    paths-ignore: ["docs/**"]
   pull_request:
-    paths-ignore: ["site/**", ".github/workflows/site.yml", "docs/**"]
+    paths-ignore: ["docs/**"]
   workflow_dispatch:
 
 jobs:

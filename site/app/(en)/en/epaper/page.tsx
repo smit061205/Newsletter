@@ -1,7 +1,0 @@
-import { Epaper } from "@/views/Lists.tsx";
-import { pageMeta } from "@/lib/meta.ts";
-import { t } from "@/lib/i18n.ts";
-
-export const revalidate = 3600;
-export const metadata = pageMeta({ lang: "en", path: "/epaper", title: t("en", "epaper") });
-export default function Page() { return <Epaper lang="en" />; }
