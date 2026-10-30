@@ -4,14 +4,13 @@
 // stopped, copied wording is caught, and items about one event group together.
 // Run: node --experimental-strip-types site/engine/selftest.ts
 import assert from "node:assert/strict";
-import sharp from "sharp";
 import { readJson } from "./ai.ts";
-import { drawCover } from "./drawn.ts";
 import { ownItem } from "./collect.ts";
 import { parseFeed, pageText } from "./feed.ts";
 import { copiedShare, gate, importance, levelOf, type ClusterItem } from "./newsroom.ts";
 import { SOURCES, sourceById } from "./sources.ts";
 import { keySet, placeTier, similarity, SAME_EVENT } from "./triage.ts";
+import { coverTier } from "./cover.ts";
 import { commonsAt } from "./wikiphoto.ts";
 
 let n = 0;
@@ -116,11 +115,18 @@ test("a cover from Commons is asked for at Wikimedia's own sizes, never larger t
   const p = { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/A.jpg/1280px-A.jpg?utm_source=x", width: 1280, height: 720, full: 4000 };
   assert.deepEqual(commonsAt(p, 1920), { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/A.jpg/1920px-A.jpg", width: 1920, height: 1080 });
   assert.equal(commonsAt({ ...p, full: 1500 }, 1920).url, "https://upload.wikimedia.org/wikipedia/commons/c/c5/A.jpg");
+  // an original is never asked for on the thumbnail server (30 Oct: a broken picture)
+  assert.equal(commonsAt({ ...p, url: p.url.replace("upload.", "thumb."), full: 1500 }, 1920).url, "https://upload.wikimedia.org/wikipedia/commons/c/c5/A.jpg");
 });
-// a drawn cover (no true picture of the subject, 30 Oct) is a 1920 × 1080 picture in every beat
-for (const beat of ["ai", "tech", "science"]) {
-  const meta = await sharp(await drawCover(beat, "James Webb Space Telescope", "Finding planets around other stars")).metadata();
-  assert.equal(`${meta.width}x${meta.height}`, "1920x1080");
-}
-n++; console.log("ok  a drawn cover is drawn for every beat");
+test("only a real, large, landscape picture goes at the top", () => {
+  const big = { full: 3000, ratio: 1.5, official: false };
+  assert.equal(coverTier({ shows: "subject", kind: "photo", cover: 9 }, big), 3);
+  assert.equal(coverTier({ shows: "related", kind: "photo", cover: 8 }, big), 1);
+  assert.equal(coverTier({ shows: "subject", kind: "generated", cover: 10 }, big), 0);
+  assert.equal(coverTier({ shows: "subject", kind: "illustration", cover: 9 }, big), 0);
+  assert.equal(coverTier({ shows: "subject", kind: "illustration", cover: 9 }, { ...big, official: true }), 2);
+  assert.equal(coverTier({ shows: "subject", kind: "photo", cover: 9 }, { ...big, ratio: 0.73 }), 0);
+  assert.equal(coverTier({ shows: "subject", kind: "photo", cover: 9 }, { ...big, full: 900 }), 0);
+  assert.equal(coverTier({ shows: "unrelated", kind: "photo", cover: 9 }, big), 0);
+});
 console.log(`\n${n} checks passed (${SOURCES.length} sources listed)`);

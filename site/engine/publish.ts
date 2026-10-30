@@ -36,7 +36,7 @@ export async function storePhoto(sql: Sql, url: string, storyId: string, ua = UA
   }
 }
 
-/** An image already in hand (Aavtikal's drawn covers, engine/drawn.ts) made a JPEG and kept in the photo store, as storePhoto. */
+/** An image already in hand made a JPEG and kept in the photo store (storePhoto's second half). */
 export async function storeImage(sql: Sql, image: Buffer, storyId: string, width = 1200): Promise<Photo | null> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
   if ((await count(sql, "upload", 0)) >= WEBSITE.dailyUploads) return null;

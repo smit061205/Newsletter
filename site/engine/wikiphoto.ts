@@ -149,7 +149,8 @@ export async function freePhoto(sql: Sql, w: Written, storyId: string): Promise<
 export function commonsAt(p: { url: string; width: number; height: number; full: number }, w: 960 | 1920): { url: string; width: number; height: number } {
   if (!/\/thumb\//.test(p.url) || !/\/\d+px-/.test(p.url)) return p;
   if (p.full <= w) {
-    const orig = p.url.replace("/thumb/", "/").replace(/\/\d+px-[^/]+$/, "").replace(/\?.*$/, "");
+    // originals are only on upload.wikimedia.org (30 Oct: thumb.wikimedia.org sends them to Commons' front page, a broken picture)
+    const orig = p.url.replace("//thumb.wikimedia.org/", "//upload.wikimedia.org/").replace("/thumb/", "/").replace(/\/\d+px-[^/]+$/, "").replace(/\?.*$/, "");
     return { url: orig, width: p.full, height: Math.round(p.height * (p.full / p.width)) };
   }
   return { url: p.url.replace(/\/\d+px-/, `/${w}px-`).replace(/\?.*$/, ""), width: w, height: Math.round(p.height * (w / p.width)) };
