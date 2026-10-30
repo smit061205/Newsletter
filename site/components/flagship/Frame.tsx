@@ -37,29 +37,29 @@ export default function Frame({ lang, beat, path, children }: { lang: Lang; beat
       <a className="skip" href="#main">{{ gu: "મુખ્ય લેખ પર જાઓ", en: "Skip to the articles", hi: "मुख्य लेखों पर जाएँ" }[lang]}</a>
       <header className={s.hdr}>
         <nav className={s.tabs} aria-label={w.name}>
-          <Link className={`${s.tab} ${s.tabHome} ${!beat && path === "" ? s.tabOn : ""}`} href={fl(lang)}>{w.home}</Link>
+          <Link prefetch={false} className={`${s.tab} ${s.tabHome} ${!beat && path === "" ? s.tabOn : ""}`} href={fl(lang)}>{w.home}</Link>
           {BEATS.map((b) => (
-            <Link key={b} className={`${s.tab} ${s[b]} ${beat === b ? s.tabOn : ""}`} href={fl(lang, `/${b}`)} aria-current={beat === b ? "page" : undefined}>{beatName(b, lang)}</Link>
+            <Link prefetch={false} key={b} className={`${s.tab} ${s[b]} ${beat === b ? s.tabOn : ""}`} href={fl(lang, `/${b}`)} aria-current={beat === b ? "page" : undefined}>{beatName(b, lang)}</Link>
           ))}
-          <Link className={`${s.tab} ${s.tabEnd}`} href={fl(lang, "/search")} aria-label={w.search}><span className={s.iconBtn} style={{ margin: 0 }}><SearchIcon /></span></Link>
+          <Link prefetch={false} className={`${s.tab} ${s.tabEnd}`} href={fl(lang, "/search")} aria-label={w.search}><span className={s.iconBtn} style={{ margin: 0 }}><SearchIcon /></span></Link>
         </nav>
         <div className={`${s.bar} ${beat ? s.barBeat : ""}`}>
-          <Link className={s.brand} href={fl(lang)}>
+          <Link prefetch={false} className={s.brand} href={fl(lang)}>
             <span className={s.brandMark}>{w.name}</span>
             {beat && <span className={s.brandBeat}>/ {beatName(beat, lang)}</span>}
           </Link>
           <div className={s.barR}>
-            <Link className={s.hideS} href={href(lang, "/")}>{w.daily}</Link>
+            <Link prefetch={false} className={s.hideS} href={href(lang, "/")}>{w.daily}</Link>
             <a className={`${s.pill} ${s.hideS}`} href="#join">{w.join}</a>
             <Menu label={w.menu} close={w.close}>
               <div className={s.dGroup}>
-                <Link className={s.dBig} href={fl(lang)} aria-current={!beat && path === "" ? "page" : undefined}>{w.home}</Link>
-                {BEATS.map((b) => <Link key={b} className={s.dBig} href={fl(lang, `/${b}`)} aria-current={beat === b ? "page" : undefined}>{beatName(b, lang)}</Link>)}
+                <Link prefetch={false} className={s.dBig} href={fl(lang)} aria-current={!beat && path === "" ? "page" : undefined}>{w.home}</Link>
+                {BEATS.map((b) => <Link prefetch={false} key={b} className={s.dBig} href={fl(lang, `/${b}`)} aria-current={beat === b ? "page" : undefined}>{beatName(b, lang)}</Link>)}
               </div>
               <div className={s.dGroup}>
-                <Link className={s.dSmall} href={fl(lang, "/search")}>{w.search}</Link>
-                <Link className={s.dSmall} href={fl(lang, "/author/desk")}>{w.writers}</Link>
-                <Link className={s.dSmall} href={href(lang, "/")}>{w.daily}</Link>
+                <Link prefetch={false} className={s.dSmall} href={fl(lang, "/search")}>{w.search}</Link>
+                <Link prefetch={false} className={s.dSmall} href={fl(lang, "/author/desk")}>{w.writers}</Link>
+                <Link prefetch={false} className={s.dSmall} href={href(lang, "/")}>{w.daily}</Link>
                 <a className={s.dSmall} href={lang === "en" ? "/editor?lang=en" : "/editor"}>{w.editor}</a>
               </div>
               <div className={s.dGroup}>
@@ -77,14 +77,14 @@ export default function Frame({ lang, beat, path, children }: { lang: Lang; beat
         <Wordmark lang={lang} cls={s.footMark} />
         <div className={s.footRow}>
           <nav aria-label={w.name}>
-            {BEATS.map((b) => <Link key={b} href={fl(lang, `/${b}`)}>{beatName(b, lang)}</Link>)}
-            <Link href={href(lang, "/")}>{w.daily}</Link>
+            {BEATS.map((b) => <Link prefetch={false} key={b} href={fl(lang, `/${b}`)}>{beatName(b, lang)}</Link>)}
+            <Link prefetch={false} href={href(lang, "/")}>{w.daily}</Link>
           </nav>
           <nav aria-label={PAPER[lang].name}>
-            <Link href={href(lang, "/about")}>{w.about}</Link>
-            <Link href={href(lang, "/editorial-policy")}>{w.policy}</Link>
-            <Link href={href(lang, "/how-we-check")}>{w.how}</Link>
-            <Link href={href(lang, "/contact")}>{w.contact}</Link>
+            <Link prefetch={false} href={href(lang, "/about")}>{w.about}</Link>
+            <Link prefetch={false} href={href(lang, "/editorial-policy")}>{w.policy}</Link>
+            <Link prefetch={false} href={href(lang, "/how-we-check")}>{w.how}</Link>
+            <Link prefetch={false} href={href(lang, "/contact")}>{w.contact}</Link>
           </nav>
         </div>
         <div className={`${s.footRow} ${s.footSmall}`}>© {num(2026, lang)} {PAPER[lang].name}</div>

@@ -89,10 +89,10 @@ export default function Chrome(p: ChromeProps) {
             <button type="button" className="ib menu-plain" aria-label={w.menu} onClick={() => openMenu(false)}><MenuIcon /></button>
             <button type="button" className="ib lbl" onClick={() => openMenu(false)}><MenuIcon /><span>{w.sections}</span></button>
           </div>
-          <Link className="wm" href={p.links.home}><b>{p.name}</b><i>{p.tagline}</i></Link>
+          <Link prefetch={false} className="wm" href={p.links.home}><b>{p.name}</b><i>{p.tagline}</i></Link>
           <div className="r">
             <button type="button" className="ib" aria-label={w.search} onClick={() => openMenu(true)}><SearchIcon /></button>
-            <Link className="epill" href={p.links.epaper}>{w.epaper}</Link>
+            <Link prefetch={false} className="epill" href={p.links.epaper}>{w.epaper}</Link>
           </div>
         </div>
       </header>
@@ -107,21 +107,21 @@ export default function Chrome(p: ChromeProps) {
         {found && (
           <div className="results" aria-live="polite">
             {found.map((r) => (
-              <Link key={r.id} href={storyLink(r.id)} onClick={() => setOpen(false)}><span className="h4">{r.headline}</span><small>{r.when}</small></Link>
+              <Link prefetch={false} key={r.id} href={storyLink(r.id)} onClick={() => setOpen(false)}><span className="h4">{r.headline}</span><small>{r.when}</small></Link>
             ))}
-            {found.length > 0 && <Link className="more" href={`${p.links.search}?q=${encodeURIComponent(query.trim())}`} onClick={() => setOpen(false)}>{w.search} <Chev /></Link>}
+            {found.length > 0 && <Link prefetch={false} className="more" href={`${p.links.search}?q=${encodeURIComponent(query.trim())}`} onClick={() => setOpen(false)}>{w.search} <Chev /></Link>}
           </div>
         )}
-        <Link className="srow" href={p.links.home} onClick={() => setOpen(false)}>{w.home}</Link>
-        <Link className="srow" href={p.links.latest} onClick={() => setOpen(false)}>{w.latestTitle}</Link>
+        <Link prefetch={false} className="srow" href={p.links.home} onClick={() => setOpen(false)}>{w.home}</Link>
+        <Link prefetch={false} className="srow" href={p.links.latest} onClick={() => setOpen(false)}>{w.latestTitle}</Link>
         {p.sections.map((s) => (
-          <Link key={s.key} className="srow" href={s.href} onClick={() => setOpen(false)}>{s.name}<span className="chev"><Chev /></span></Link>
+          <Link prefetch={false} key={s.key} className="srow" href={s.href} onClick={() => setOpen(false)}>{s.name}<span className="chev"><Chev /></span></Link>
         ))}
         <h3>{w.services}</h3>
         <div className="links">
-          <Link href={p.links.epaper} onClick={() => setOpen(false)}>{w.epaper}</Link>
-          <Link href={p.links.archive} onClick={() => setOpen(false)}>{w.archive}</Link>
-          <Link href={p.links.saved} onClick={() => setOpen(false)}>{w.savedTitle}</Link>
+          <Link prefetch={false} href={p.links.epaper} onClick={() => setOpen(false)}>{w.epaper}</Link>
+          <Link prefetch={false} href={p.links.archive} onClick={() => setOpen(false)}>{w.archive}</Link>
+          <Link prefetch={false} href={p.links.saved} onClick={() => setOpen(false)}>{w.savedTitle}</Link>
         </div>
         <h3>{w.settings}</h3>
         <div className="setl">{w.size}</div>
@@ -135,8 +135,8 @@ export default function Chrome(p: ChromeProps) {
         </div>
         <h3>{w.about}</h3>
         <div className="links">
-          <Link href={p.links.how}>{w.fHow}</Link><Link href={p.links.policy}>{w.fPolicy}</Link>
-          <Link href={p.links.corrections}>{w.fFix}</Link><Link href={p.links.contact}>{w.fContact}</Link><Link href={p.links.about}>{w.about}</Link>
+          <Link prefetch={false} href={p.links.how}>{w.fHow}</Link><Link prefetch={false} href={p.links.policy}>{w.fPolicy}</Link>
+          <Link prefetch={false} href={p.links.corrections}>{w.fFix}</Link><Link prefetch={false} href={p.links.contact}>{w.fContact}</Link><Link prefetch={false} href={p.links.about}>{w.about}</Link>
         </div>
         {/* the editor's way in (the user, 29 Oct); the page itself asks for sign-in */}
         <a className="edlink" href={p.lang === "en" ? "/editor?lang=en" : "/editor"}><LockIcon />{w.editorPage}</a>
@@ -144,10 +144,10 @@ export default function Chrome(p: ChromeProps) {
 
       {p.bottomBar && (
         <nav className={`bnav${away ? " away" : ""}`} aria-label={w.menu}>
-          <Link href={p.links.home} className={p.active === "home" ? "on" : ""}><HomeIcon />{w.home}</Link>
-          <Link href={p.links.latest} className={p.active === "latest" ? "on" : ""}><Clock />{w.latest}</Link>
-          <Link href={p.links.epaper} className={p.active === "epaper" ? "on" : ""}><Paper />{w.epaper}</Link>
-          <Link href={p.links.archive} className={p.active === "archive" ? "on" : ""}><Archive />{w.archive}</Link>
+          <Link prefetch={false} href={p.links.home} className={p.active === "home" ? "on" : ""}><HomeIcon />{w.home}</Link>
+          <Link prefetch={false} href={p.links.latest} className={p.active === "latest" ? "on" : ""}><Clock />{w.latest}</Link>
+          <Link prefetch={false} href={p.links.epaper} className={p.active === "epaper" ? "on" : ""}><Paper />{w.epaper}</Link>
+          <Link prefetch={false} href={p.links.archive} className={p.active === "archive" ? "on" : ""}><Archive />{w.archive}</Link>
           <button type="button" onClick={() => openMenu(false)}><MenuIcon />{w.sections}</button>
         </nav>
       )}

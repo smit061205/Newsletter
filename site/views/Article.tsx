@@ -58,8 +58,8 @@ export default async function Article({ id, lang }: { id: string; lang: Lang }) 
       <div className="artg">
         <article className="art" lang={w.translated || lang === "gu" ? lang : "gu"}>
           <div className="crumbrow">
-            <Link className="crumbs" href={href(lang, `/section/${s.tier}`)}>{sectionName(s.tier, lang)} <Chev /></Link>
-            {s.genres[0] && <Link className="crumbs" href={href(lang, `/section/${s.tier}/${s.genres[0]}`)}>{sectionName(s.genres[0], lang)} <Chev /></Link>}
+            <Link prefetch={false} className="crumbs" href={href(lang, `/section/${s.tier}`)}>{sectionName(s.tier, lang)} <Chev /></Link>
+            {s.genres[0] && <Link prefetch={false} className="crumbs" href={href(lang, `/section/${s.tier}/${s.genres[0]}`)}>{sectionName(s.genres[0], lang)} <Chev /></Link>}
           </div>
           {lang !== "gu" && !w.translated && <p className="fix" lang={lang}>{t(lang, "noEnglish")}</p>}
           {s.corrections.map((c, i) => (

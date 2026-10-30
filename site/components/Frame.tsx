@@ -50,9 +50,9 @@ export default async function Frame({ lang, path, section, active, bottomBar = t
       {brk && <BreakingBar id={brk.id} headline={bw || brk.headline} href={L(`/news/${brk.id}`)} until={Date.parse(brk.publishedAt) + BREAKING_HOURS * 3600_000}
         label={t(lang, "brk")} close={t(lang, "close")} />}
       <nav className="wrap secs" aria-label={t(lang, "sections")}>
-        {SECTIONS.map((k) => <Link key={k} href={L(`/section/${k}`)} className={section === k ? "on" : undefined}>{sectionName(k, lang)}</Link>)}
+        {SECTIONS.map((k) => <Link prefetch={false} key={k} href={L(`/section/${k}`)} className={section === k ? "on" : undefined}>{sectionName(k, lang)}</Link>)}
         {/* the flagship section (views/Flagship.tsx), set apart at the end */}
-        <Link href={L("/aavtikal")} className="fl">{flw(lang).name}</Link>
+        <Link prefetch={false} href={L("/aavtikal")} className="fl">{flw(lang).name}</Link>
       </nav>
       {/* the page's content crossfades into the next one (the header and footer stay put) */}
       <ViewTransition enter="page-in" exit="page-out" default="none">
@@ -62,14 +62,14 @@ export default async function Frame({ lang, path, section, active, bottomBar = t
       <ServiceWorker />
       <div className="foot"><div className="wrap">
         <footer>
-          <Link className="wm" href={L("/")}><b>{PAPER.gu.name}</b></Link>
+          <Link prefetch={false} className="wm" href={L("/")}><b>{PAPER.gu.name}</b></Link>
           <div className="fcols">
-            <div><b>{t(lang, "f1")}</b><Link href={L("/about")}>{t(lang, "fAbout")}</Link><Link href={L("/editorial-policy")}>{t(lang, "fPolicy")}</Link>
-              <Link href={L("/how-we-check")}>{t(lang, "fHow")}</Link><Link href={L("/corrections")}>{t(lang, "fFix")}</Link><Link href={L("/contact")}>{t(lang, "fContact")}</Link></div>
-            <div><b>{t(lang, "f2")}</b>{SECTIONS.slice(0, 6).map((k) => <Link key={k} href={L(`/section/${k}`)}>{sectionName(k, lang)}</Link>)}<Link href={L("/aavtikal")}>{flw(lang).name}</Link></div>
-            <div><b>{t(lang, "f3")}</b><Link href={L("/epaper")}>{t(lang, "epaper")}</Link><Link href={L("/archive")}>{t(lang, "archive")}</Link>
+            <div><b>{t(lang, "f1")}</b><Link prefetch={false} href={L("/about")}>{t(lang, "fAbout")}</Link><Link prefetch={false} href={L("/editorial-policy")}>{t(lang, "fPolicy")}</Link>
+              <Link prefetch={false} href={L("/how-we-check")}>{t(lang, "fHow")}</Link><Link prefetch={false} href={L("/corrections")}>{t(lang, "fFix")}</Link><Link prefetch={false} href={L("/contact")}>{t(lang, "fContact")}</Link></div>
+            <div><b>{t(lang, "f2")}</b>{SECTIONS.slice(0, 6).map((k) => <Link prefetch={false} key={k} href={L(`/section/${k}`)}>{sectionName(k, lang)}</Link>)}<Link prefetch={false} href={L("/aavtikal")}>{flw(lang).name}</Link></div>
+            <div><b>{t(lang, "f3")}</b><Link prefetch={false} href={L("/epaper")}>{t(lang, "epaper")}</Link><Link prefetch={false} href={L("/archive")}>{t(lang, "archive")}</Link>
               <a href={lang === "gu" ? "/rss.xml" : `/${lang}/rss.xml`}>{t(lang, "fRss")}</a></div>
-            <div><b>{t(lang, "f4")}</b><Link href={L("/terms")}>{t(lang, "fTerms")}</Link><Link href={L("/privacy")}>{t(lang, "fPrivacy")}</Link>
+            <div><b>{t(lang, "f4")}</b><Link prefetch={false} href={L("/terms")}>{t(lang, "fTerms")}</Link><Link prefetch={false} href={L("/privacy")}>{t(lang, "fPrivacy")}</Link>
               {(["gu", "hi", "en"] as const).filter((l) => l !== lang).map((l) => (
                 <LangLink key={l} to={l} href={href(l, path)} hrefLang={l}>{{ gu: "ગુજરાતી", hi: "हिंदी", en: "English" }[l]}</LangLink>))}</div>
           </div>

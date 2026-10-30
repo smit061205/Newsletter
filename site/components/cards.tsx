@@ -54,7 +54,7 @@ export function Lead({ s, lang, more = [] }: { s: Story; lang: Lang; more?: Stor
   return (
     <article className={`lead b-${boostOf(s)}${s.photo ? "" : " nopic"}`}>
       <div className="txt">
-        <Link className="h" href={storyHref(s, lang)}>
+        <Link prefetch={false} className="h" href={storyHref(s, lang)}>
           {w.kicker && <span className="kick">{w.kicker}</span>}
           <h2 className="display">{w.headline}</h2>
           {w.deck && <p className="dek">{w.deck}</p>}
@@ -64,7 +64,7 @@ export function Lead({ s, lang, more = [] }: { s: Story; lang: Lang; more?: Stor
       </div>
       {s.photo && (
         <div className="pic">
-          <Link href={storyHref(s, lang)} tabIndex={-1}><Photo s={s} lang={lang} eager morph /></Link>
+          <Link prefetch={false} href={storyHref(s, lang)} tabIndex={-1}><Photo s={s} lang={lang} eager morph /></Link>
           {w.caption && <p className="cap">{w.caption} ({t(lang, "photo")}: {s.photo?.credit ?? s.source?.name ?? "PIB"})</p>}
         </div>
       )}
@@ -76,7 +76,7 @@ export function Std({ s, lang, sec = true, morph = false, photo = true, label }:
   const w = words(s, lang);
   if (!photo) s = { ...s, photo: null };
   return (
-    <Link className="h std" href={storyHref(s, lang)}>
+    <Link prefetch={false} className="h std" href={storyHref(s, lang)}>
       <Photo s={s} lang={lang} morph={morph} />
       <div>{label && <span className="lbl">{label}</span>}<h3 className="h3">{w.headline}</h3>{w.deck && <p className="dek">{w.deck}</p>}<Meta s={s} lang={lang} sec={sec} /></div>
       {s.photo && <Photo s={s} lang={lang} cls="thumb" />}
@@ -87,7 +87,7 @@ export function Std({ s, lang, sec = true, morph = false, photo = true, label }:
 export function Cmp({ s, lang, sec = false }: { s: Story; lang: Lang; sec?: boolean }) {
   const w = words(s, lang);
   return (
-    <Link className="h cmp" href={storyHref(s, lang)}>
+    <Link prefetch={false} className="h cmp" href={storyHref(s, lang)}>
       <div><h3 className="h4">{w.headline}</h3><Meta s={s} lang={lang} sec={sec} /></div>
       {s.photo && <img {...pic(s.photo, SIZES.thumb)} alt="" loading="lazy" decoding="async" />}
     </Link>
@@ -99,11 +99,11 @@ export function LatestList({ stories, lang, n }: { stories: Story[]; lang: Lang;
     <>
       <ul className="list">
         {stories.slice(0, n).map((s) => (
-          <li key={s.id}><Link className="h" href={storyHref(s, lang)}><TimeAgo iso={s.publishedAt} lang={lang} fallback={timeText(s.publishedAt, lang)} />
+          <li key={s.id}><Link prefetch={false} className="h" href={storyHref(s, lang)}><TimeAgo iso={s.publishedAt} lang={lang} fallback={timeText(s.publishedAt, lang)} />
             <h3 className="h4">{words(s, lang).headline}</h3></Link></li>
         ))}
       </ul>
-      <Link className="more" href={href(lang, "/latest")}>{t(lang, "allLatest")} <Chev /></Link>
+      <Link prefetch={false} className="more" href={href(lang, "/latest")}>{t(lang, "allLatest")} <Chev /></Link>
     </>
   );
 }
@@ -113,7 +113,7 @@ export function MostRead({ stories, lang }: { stories: Story[]; lang: Lang }) {
   return (
     <ol className="mostread">
       {stories.map((s, i) => (
-        <li key={s.id}><Link className="h" href={storyHref(s, lang)}><span className="n" aria-hidden="true">{num(i + 1, lang)}</span>
+        <li key={s.id}><Link prefetch={false} className="h" href={storyHref(s, lang)}><span className="n" aria-hidden="true">{num(i + 1, lang)}</span>
           <h3 className="h4">{words(s, lang).headline}</h3></Link></li>
       ))}
     </ol>
@@ -125,7 +125,7 @@ export function MoreOn({ stories, lang }: { stories: Story[]; lang: Lang }) {
   return (
     <div className="moreon">
       <b>{t(lang, "moreOn")}</b>
-      <ul>{stories.map((s) => <li key={s.id}><Link href={storyHref(s, lang)}>{words(s, lang).headline}</Link></li>)}</ul>
+      <ul>{stories.map((s) => <li key={s.id}><Link prefetch={false} href={storyHref(s, lang)}>{words(s, lang).headline}</Link></li>)}</ul>
     </div>
   );
 }
@@ -133,7 +133,7 @@ export function MoreOn({ stories, lang }: { stories: Story[]; lang: Lang }) {
 export function Head({ label, to, extra }: { label: string; to?: string; extra?: React.ReactNode }) {
   return (
     <div className="head">
-      {to ? <Link href={to}>{label} <Chev /></Link> : <span>{label}</span>}
+      {to ? <Link prefetch={false} href={to}>{label} <Chev /></Link> : <span>{label}</span>}
       {extra}
     </div>
   );
@@ -146,7 +146,7 @@ export function River({ stories, lang, sec = false }: { stories: Story[]; lang: 
       {stories.map((s) => {
         const w = words(s, lang);
         return (
-          <Link key={s.id} className="h" href={storyHref(s, lang)}>
+          <Link prefetch={false} key={s.id} className="h" href={storyHref(s, lang)}>
             <span className="when"><TimeAgo iso={s.publishedAt} lang={lang} fallback={timeText(s.publishedAt, lang)} /></span>
             <div><h3 className="h3">{w.headline}</h3>{w.deck && <p className="dek">{w.deck}</p>}<Meta s={s} lang={lang} sec={sec} /></div>
             {s.photo ? <img {...pic(s.photo, SIZES.thumb)} alt="" loading="lazy" decoding="async" /> : <span />}

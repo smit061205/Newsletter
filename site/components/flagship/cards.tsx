@@ -43,8 +43,8 @@ export function Lead({ f, lang }: { f: Feature; lang: Lang }) {
   const w = featureWords(f, lang);
   return (
     <article className={`${s.lead} ${s[f.beat]}`}>
-      <Link href={featureHref(f, lang)} tabIndex={-1} aria-hidden="true"><Picture f={f} lang={lang} cls={s.leadPh} eager /></Link>
-      <Link className={s.leadText} href={featureHref(f, lang)}>
+      <Link prefetch={false} href={featureHref(f, lang)} tabIndex={-1} aria-hidden="true"><Picture f={f} lang={lang} cls={s.leadPh} eager /></Link>
+      <Link prefetch={false} className={s.leadText} href={featureHref(f, lang)}>
         <span className={s.beatTag} style={{ marginTop: 0, marginBottom: 14 }}>{beatName(f.beat, lang)}</span>
         <h2 className={`${s.hl} ${s.leadHl}`} lang={gl(lang, w.translated)}>{w.headline}</h2>
         {w.dek && <p className={`${s.leadDek} ${s.serif}`}>{w.dek}</p>}
@@ -58,7 +58,7 @@ export function Card({ f, lang, tag = true }: { f: Feature; lang: Lang; tag?: bo
   const w = featureWords(f, lang);
   return (
     <article className={`${s.card} ${s[f.beat]}`}>
-      <Link className={s.cardLink} href={featureHref(f, lang)}>
+      <Link prefetch={false} className={s.cardLink} href={featureHref(f, lang)}>
         <Picture f={f} lang={lang} cls={s.cardPh} />
         {tag && <span className={s.beatTag}>{beatName(f.beat, lang)}</span>}
         <h3 lang={gl(lang, w.translated)} className={`${s.hl} ${s.cardHl}`} style={tag ? { marginTop: 10 } : undefined}>{w.headline}</h3>
@@ -74,7 +74,7 @@ export function Dive({ lang }: { lang: Lang }) {
   const w = flw(lang);
   return (
     <article className={s.card}>
-      <Link className={`${s.cardLink} ${s.dive}`} href={fl(lang, "/search")}>
+      <Link prefetch={false} className={`${s.cardLink} ${s.dive}`} href={fl(lang, "/search")}>
         <h3 className={`${s.hl} ${s.diveHl}`}>{w.dive}</h3>
         <span className={s.meta}><span>{w.diveSub}</span><Go /></span>
       </Link>
