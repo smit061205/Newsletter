@@ -291,8 +291,8 @@ older notes below disagree, this block is right.*
   Flash Lite looks at every picture before it is used (`site/engine/cover.ts`). **Covers are
   real pictures only (the user, 30 Oct, replacing the drawn covers of that morning):** nothing
   drawn, nothing AI-looking. If the first pictures have none, Commons and NASA are searched
-  wider; a new subject with no real picture is set aside; a published article with none shows
-  no picture and is tried again daily. On 30 Oct the re-check of every old
+  wider; a new subject with no real picture is set aside; a published article with none comes
+  off the site (held) and returns by itself once one is found. On 30 Oct the re-check of every old
   article used up Flash's free allowance by 6:27 AM IST; it resets about 1:30 PM IST.
 - **The editor's page** (`/editor`, Google sign-in for the addresses in Vercel's
   `CK_EDITORS`): approve or reject held stories, change or take down any story or article,
