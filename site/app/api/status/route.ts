@@ -26,6 +26,11 @@ export async function GET() {
     sql.query(`select count(*)::int as n from features where status = 'held'`).catch(() => [{ n: null }]),
     sql.query(`select value from state where key = 'desk_redone_3'`).catch(() => []),
   ]);
+  // how long one small question to the database takes from where the site runs (30 Oct: pages not kept ready took seconds)
+  const dbT = Date.now();
+  await sql.query(`select 1`).catch(() => null);
+  await sql.query(`select 1`).catch(() => null);
+  const dbMs = Math.round((Date.now() - dbT) / 2);
   // can the site read its private photo store? (a yes/no and the library's message, never the key)
   const [one] = await sql.query(`select photo->>'url' as url from stories where photo is not null limit 1`).catch(() => []);
   const name = (one?.url as string | undefined)?.replace(/^\/media\//, "");
@@ -33,7 +38,7 @@ export async function GET() {
     head: name ? await head(name).then((b) => `found (${b.size} bytes)`, (e) => `failed: ${e instanceof Error ? e.message : e}`) : null,
     get: name ? await get(name, { access: "private" }).then((r) => (r ? "found" : "null"), (e) => `failed: ${e instanceof Error ? e.message : e}`) : null };
   return Response.json({
-    ...counts[0], photos,
+    ...counts[0], photos, speed: { region: process.env.VERCEL_REGION ?? null, db_ms: dbMs },
     aavtikal: {
       held: held[0]?.n ?? null, tried_again: String(redone[0]?.value ?? "").split("\n").filter(Boolean),
       articles: arts,

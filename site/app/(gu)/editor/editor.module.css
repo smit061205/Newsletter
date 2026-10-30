@@ -57,7 +57,7 @@ a.title:hover { text-decoration: underline }
 .ck .brandHead h2 { color: var(--brand) !important }
 .ck .brandHead p { color: var(--soft) }
 .av .brandHead { background: #0B0B0F; color: #E6E5EA }
-.av .brandHead h2 { color: #E6E5EA !important; font-stretch: 75% }
+.av .brandHead h2 { color: #E6E5EA !important; font-family: var(--cond) }
 .av .brandHead p { color: rgba(230, 229, 234, .78) }
 
 /* search, and the on-the-site / taken-down switch */
