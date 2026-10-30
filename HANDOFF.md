@@ -288,9 +288,11 @@ older notes below disagree, this block is right.*
 - **Aavtikal's desk** (`site/engine/desk.ts`, `site-desk.yml`, 45-minute rounds that queue the
   next): writes **15 explainers a day** on AI, Tech and Science (never Politics on its own;
   never touches the editor's own articles). Gemini Flash writes on Google's free tier; Gemini
-  Flash Lite looks at every picture before it is used (`site/engine/cover.ts`): the top
-  picture must show the subject itself, or the article gets a **drawn cover**
-  (`site/engine/drawn.ts`; the user chose this on 30 Oct). On 30 Oct the re-check of every old
+  Flash Lite looks at every picture before it is used (`site/engine/cover.ts`). **Covers are
+  real pictures only (the user, 30 Oct, replacing the drawn covers of that morning):** nothing
+  drawn, nothing AI-looking. If the first pictures have none, Commons and NASA are searched
+  wider; a new subject with no real picture is set aside; a published article with none shows
+  no picture and is tried again daily. On 30 Oct the re-check of every old
   article used up Flash's free allowance by 6:27 AM IST; it resets about 1:30 PM IST.
 - **The editor's page** (`/editor`, Google sign-in for the addresses in Vercel's
   `CK_EDITORS`): approve or reject held stories, change or take down any story or article,
@@ -307,8 +309,7 @@ older notes below disagree, this block is right.*
    `site/pipeline/features.ts`, the user agent in `site/engine/wikiphoto.ts` and
    `site/lib/leaders.ts`, `site/README.md` and this file; set `SITE_URL`; send
    `capital-kranti.vercel.app` there.
-3. Small: one drawn cover from before 30 Oct (Google's AURA glasses) has its line cut inside
-   a word ("artificial intelli"). New covers are fine. The editor may fix the typo "૧૯૬ ૮" in
+3. Small: the editor may fix the typo "૧૯૬ ૮" in
    one article. The Hindi backfill of old stories continues on its own.
 4. The editor fills in the leaders list (it starts empty).
 5. **Only when the user says:** Phase C, the social media desk.
