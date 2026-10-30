@@ -23,6 +23,7 @@ import { collect } from "./collect.ts";
 import { gate, gather, importance, levelOf, needsTranslation, translate, writeChecked, type ClusterItem, type Debunk } from "./newsroom.ts";
 import { indiaDate, photoOf, saveLive } from "./publish.ts";
 import { alertBreaking } from "../lib/push.ts";
+import { birthdays, leaders } from "../lib/leaders.ts";
 import { freePhoto } from "./wikiphoto.ts";
 import { cluster, placeTier, sameEvent, triage, type Triage } from "./triage.ts";
 
@@ -257,6 +258,18 @@ async function translations() {
   return done;
 }
 
+/** The day's birthdays on the leaders list (lib/leaders.ts), told to the editor once, from 6 AM India time: the greeting
+ *  picture and the email draft wait on the editor page. Nothing is sent to the leaders. */
+async function birthdayNote() {
+  if (Number(new Date().toLocaleString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", hour12: false })) < 6) return;
+  const first = await sql.query(`insert into state (key, value) values ($1, now()::text) on conflict (key) do nothing returning key`, [`birthdays:${indiaDate()}`]);
+  if (!first.length) return;
+  const { today } = birthdays(await leaders(sql));
+  if (!today.length) return;
+  log(`birthdays today: ${today.map((l) => l.nameEn || l.nameGu).join(", ")}`);
+  await tell(`🎂 <b>આજે જન્મદિવસ:</b> ${today.map((l) => `${l.title} ${l.nameGu}`).join(", ")}\nશુભેચ્છા ફોટો અને ઈમેલનો મુસદ્દો સંપાદકના પાના પર તૈયાર છે: ${WEBSITE.url}/editor#leaders`);
+}
+
 /** Step 9: a published story's sources watched for 24 hours. */
 async function watch() {
   const live = await sql.query(
@@ -340,6 +353,8 @@ try {
   details.translated = await translations();
   await step("watch");
   await watch();
+  await step("birthdays");
+  await birthdayNote();
 } catch (e) {
   ok = false;
   details.error = e instanceof Error ? `${e.message}\n${e.stack?.split("\n").slice(1, 4).join("\n")}` : String(e);

@@ -304,7 +304,10 @@ const figureText = (figs: Figure[]) => figs.map((g) => [
 async function drawn(sql: Sql, beat: string, name: string, what: string, topic: string, id: string): Promise<(Photo & { credit?: string }) | null> {
   const latin = (t: string) => /^[\x20-\x7E\u2018\u2019\u2013\u2014]+$/.test(t);
   const n = latin(name) && name.length <= 40 ? name : topic.split(/\s+/).slice(0, 3).join(" ");
-  const w = latin(what) ? what.replace(/[0-9]+/g, "").replace(/\s{2,}/g, " ").trim().slice(0, 60) : "";
+  // the plain words under the name: up to 80 letters (about 90 fit), cut between words, never inside one (30 Oct:
+  // "integrated with artificial intelli")
+  const plainWords = latin(what) ? what.replace(/[0-9]+/g, "").replace(/\s{2,}/g, " ").trim() : "";
+  const w = plainWords.length <= 80 ? plainWords : plainWords.slice(0, 81).replace(/\s+\S*$/, "").replace(/\s+(with|and|of|for|to|in|on|the|a|an)$/i, "");
   try {
     return await storeImage(sql, await drawCover(beat, n, w), `${id}-cover`, 1920);
   } catch {

@@ -72,6 +72,16 @@ sets a busy one aside for 10 minutes rather than retrying it):
    the outlets' photos are never copied. Each run renews the pages.
 6. **Watch after**: for 24 hours, a source correcting or withdrawing takes the story down
    (held) and tells the editor; new sources are added to its source box.
+7. **Breaking news** (`lib/push.ts`): a story scored 9.5 or more is breaking for three
+   hours: a bar across every page (the reader can close it), and an alert to the phones and
+   computers that asked for one (the bell in the join box; at most four a day, in the
+   reader's language). Free: the browsers' own push services; the site's key pair is made
+   once and kept in the database.
+8. **Birthdays** (`lib/leaders.ts`): the editor keeps a leaders list on the editor page (a
+   name found on Wikidata fills in the Gujarati name, the birthday and a free portrait). On
+   a leader's birthday the page has a greeting picture in the paper's design, drawn in the
+   editor's browser, and a Gujarati email draft to open in Gmail; the run tells the editor
+   on Telegram from 6 AM. **The site never sends the email.**
 
 `try.ts` does all of it on real news and prints the stories, storing nothing;
 `selftest.ts` checks the pure parts (feeds, the gate, grouping, copy detection).

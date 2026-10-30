@@ -7,10 +7,13 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import s from "./editor.module.css";
 import { W } from "./words.ts";
-import { approveStory, pauseEngine, publishFeature, putBackStory, rejectStory, removeFeature, removeStory } from "./actions.ts";
+import Birthday from "./Birthday.tsx";
+import LeaderForm from "./LeaderForm.tsx";
+import { approveStory, dropLeaderAction, pauseEngine, publishFeature, putBackStory, rejectStory, removeFeature, removeStory } from "./actions.ts";
 import { db } from "@/lib/db.ts";
 import { COOKIE, desk, editorOf, findFeatures, findStories, PAGE, signInReady, type DeskStory, type Found, type Show } from "@/lib/editor.ts";
 import { beatName, isBeat } from "@/lib/flagship.ts";
+import { birthdays, draftEmail, leaders } from "@/lib/leaders.ts";
 import { num, timeText, shortDate } from "@/lib/format.ts";
 import { paragraphs } from "@/lib/format.ts";
 
@@ -46,7 +49,8 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
   const count = (v?: string) => Math.min(500, Math.max(PAGE, Math.round(Number(v) / PAGE) * PAGE || PAGE));
   const n = count(q.n), fn = count(q.fn);
   const sql = db();
-  const [d, news, arts] = await Promise.all([desk(sql), findStories(sql, words, show, n), findFeatures(sql, fwords, fshow, fn)]);
+  const [d, news, arts, people] = await Promise.all([desk(sql), findStories(sql, words, show, n), findFeatures(sql, fwords, fshow, fn), leaders(sql)]);
+  const bday = birthdays(people);
 
   // a link to this page with some of its asks changed (the rest kept)
   const keep: Record<string, string | undefined> = { lang: lang === "en" ? "en" : undefined, q: words || undefined, show: show === "removed" ? show : undefined,
@@ -138,6 +142,7 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
       </header>
       <nav className={s.jump} aria-label={w.jump}>
         <a href="#waiting">{w.waiting}{d.held.length > 0 && ` (${nn(d.held.length)})`}</a>
+        <a href="#leaders">{w.leadersShort}{bday.today.length > 0 && ` (${nn(bday.today.length)})`}</a>
         <a href="#news" className={s.jCK}>{w.ck}</a>
         <a href="#aavtikal" className={s.jAV}>{w.av}</a>
         <a href="#engine">{w.engine}</a>
@@ -149,6 +154,40 @@ export default async function Editor({ searchParams }: { searchParams: Promise<Q
       <section className={s.block} aria-labelledby="waiting">
         <h2 id="waiting">{w.waiting} {d.held.length > 0 && <span className={s.count}>{nn(d.held.length)}</span>}</h2>
         {d.held.length ? d.held.map((x) => <Held key={x.id} x={x} />) : <p className={s.empty}>{w.waitingNone}</p>}
+      </section>
+
+      <section className={s.block} aria-labelledby="leaders">
+        <h2 id="leaders">{w.leaders} {bday.today.length > 0 && <span className={s.count}>{nn(bday.today.length)}</span>}</h2>
+        <p className={s.help}>{w.leadersNote}</p>
+        {bday.today.length ? bday.today.map((l) => {
+          const m = draftEmail(l);
+          return <Birthday key={l.id} lang={lang} leader={l} subject={m.subject} body={m.body} />;
+        }) : <p className={s.empty}>{w.bdayNone}</p>}
+        {bday.soon.length > 0 && <>
+          <h3 className={s.sub}>{w.bdaySoon}</h3>
+          <ul className={s.runs}>{bday.soon.map(({ leader: l, inDays }) => (
+            <li key={l.id}><span>{l.title} {l.nameGu}</span><span className={s.when}>{inDays === 1 ? w.tomorrow : `${nn(inDays)} ${w.daysLater}`}</span></li>
+          ))}</ul>
+        </>}
+        <h3 className={s.sub}>{w.allLeaders}</h3>
+        {people.length ? (
+          <ul className={s.list}>
+            {people.map((l) => (
+              <li key={l.id}>
+                <div className={s.what}>
+                  <span className={s.title}>{l.title} {l.nameGu}</span>
+                  <span className={s.when}>{nn(Number(l.born.slice(3)))} {w.months[Number(l.born.slice(0, 2)) - 1]}{l.post && ` · ${l.post}`}{!l.email && ` · ${w.noEmailShort}`}</span>
+                </div>
+                <div className={s.acts}>
+                  <details className={s.confirm}><summary>{w.edit}</summary><LeaderForm lang={lang} leader={l} /></details>
+                  <details className={s.confirm}><summary>{w.removeLeader}</summary>
+                    <form action={dropLeaderAction.bind(null, l.id)}><button className={s.no}>{w.sure}</button></form></details>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : <p className={s.empty}>{w.leadersNone}</p>}
+        <details className={s.addLeader}><summary className={s.writeBtn}>{w.addLeader}</summary><LeaderForm lang={lang} /></details>
       </section>
 
       <section className={`${s.block} ${s.ck}`} aria-labelledby="news">

@@ -51,6 +51,11 @@ export const SCHEMA = [
   `create table if not exists state (key text primary key, value text not null)`,
   // the phones and computers that asked for breaking-news alerts (lib/push.ts; ROADMAP §4, 30 Oct)
   `create table if not exists push_subs (endpoint text primary key, keys jsonb not null, lang text not null default 'gu', created_at timestamptz not null default now())`,
+  // the leaders list the editor keeps, for their birthdays (lib/leaders.ts; ROADMAP §3.3, 30 Oct); born is "MM-DD"
+  `create table if not exists leaders (
+     id text primary key, name_gu text not null, name_en text not null default '', title text not null default 'શ્રી',
+     post text not null default '', born text not null, email text not null default '', portrait text not null default '',
+     credit text not null default '', added_at timestamptz not null default now())`,
   `create table if not exists usage (
      day date not null,
      kind text not null,                            -- 'upload', 'ai_free', ...

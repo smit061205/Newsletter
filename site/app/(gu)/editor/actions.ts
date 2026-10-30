@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { addFeature, addStory, COOKIE, decideFeature, decideStory, editorOf, restoreStory, saveFeature, saveStory, setPaused, withdrawStory, type NewFeature, type NewStory, type Words } from "@/lib/editor.ts";
 import { help, type Draft, type Help } from "@/lib/aihelp.ts";
 import { GENRES, TIERS } from "@/lib/sections.ts";
+import { dropLeader, findLeader, saveLeader, type FoundLeader, type Leader } from "@/lib/leaders.ts";
 
 async function signedIn() {
   const who = editorOf((await cookies()).get(COOKIE)?.value);
@@ -103,3 +104,17 @@ export async function aiHelp(d: Draft, kind: "news" | "article" = "news"): Promi
   if (!String(d?.body ?? "").trim()) return { ok: false, why: "failed" };
   return help(sql, { headline: String(d.headline ?? ""), deck: String(d.deck ?? ""), body: String(d.body).slice(0, 30_000) }, kind === "article" ? "article" : "news");
 }
+
+/** the leaders list (lib/leaders.ts): a leader looked up on Wikidata, added or changed, taken off */
+export async function findLeaderAction(name: string): Promise<FoundLeader | null> {
+  await signedIn();
+  return findLeader(String(name ?? "")).catch(() => null);
+}
+export async function saveLeaderAction(x: Leader): Promise<boolean> {
+  const { sql } = await signedIn();
+  const s = (v: unknown) => String(v ?? "");
+  const ok = await saveLeader(sql, { id: s(x.id), nameGu: s(x.nameGu), nameEn: s(x.nameEn), title: s(x.title), post: s(x.post), born: s(x.born), email: s(x.email), portrait: s(x.portrait), credit: s(x.credit) });
+  if (ok) refresh();
+  return ok;
+}
+export async function dropLeaderAction(id: string) { const { sql } = await signedIn(); await dropLeader(sql, id); refresh(); }

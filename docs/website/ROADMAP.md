@@ -490,8 +490,14 @@ and entered by the user; never in chat or the repository.
 engine"): sources, triage and clustering, the verification loop (§3.1), Gujarati
 writing by importance, English and Hindi (§3.2), publish or hold, Telegram approvals,
 24-hour watch. Tested by dry runs on GitHub (`site-engine-try.yml`); it runs every 15
-minutes (`site-engine.yml`) once merged. Still to do in this phase: Hindi on the site
-(`/hi`), the editor's page on the site, the leaders list and birthday drafts (§3.3).
+minutes (`site-engine.yml`) once merged.
+
+**Status (30 Oct): every item is built.** Hindi (`/hi`) and the editor's page came first;
+on 30 Oct the last ones: pages for a tier and a genre together (`/section/gujarat/farm`),
+the "from other outlets" row on the home page, breaking news (a bar on every page for
+three hours, and opt-in alerts on phones and computers, at most four a day: `lib/push.ts`),
+and the leaders list with birthday greetings and email drafts on the editor page
+(`lib/leaders.ts`; never sent by the site). What's left is the review below.
 
 1. **One pipeline with sources that plug in:** watchers → cluster → verify → decide → write → publish (section 3).
 2. **Sources:** PIB's lists every few minutes (PIB answers GitHub's servers: tested 25 Oct), the Gujarat CM's office, All India Radio Gujarati, ministries; then other outlets' RSS.
