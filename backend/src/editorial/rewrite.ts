@@ -37,6 +37,11 @@ export const LEAD_MODEL = profile.editorial.leadModel;
  * limit), "ok", or null if it wasn't asked (pipeline.ts keeps it for the newsroom). */
 let money: "out" | "ok" | null = null;
 export const aiMoney = () => money;
+/** Has the AI just stopped answering? Laying out goes on without what it would
+ * have written (31 Oct: 16 minutes of a 44-minute paper waiting on one page). */
+const STALL_MINUTES = 5;
+let stalledAt = 0;
+export const aiStalled = () => Date.now() - stalledAt < STALL_MINUTES * 60_000;
 
 export async function openRouter(init: RequestInit, seconds = 90): Promise<Response> {
   // every AI call of a step goes out at once (no cap of our own: OpenRouter
@@ -54,6 +59,7 @@ export async function openRouter(init: RequestInit, seconds = 90): Promise<Respo
       const asked = Number(res.headers.get("retry-after"));
       await new Promise((r) => setTimeout(r, (Number.isFinite(asked) && asked > 0 ? asked * 1000 : 1000 * 2 ** attempt) + Math.random() * 500));
     } catch (e) {
+      stalledAt = Date.now();
       return new Response(`no answer in ${seconds}s (${e instanceof Error ? e.message : e})`, { status: 504 });
     }
   }

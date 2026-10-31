@@ -12,7 +12,7 @@
 //     important first).
 // Every rung passes editorial/quality.ts (never says a thing twice, every
 // letter printable) and is in the paper's language.
-import { fitLength, paragraphs } from "./rewrite.ts";
+import { aiStalled, fitLength, paragraphs } from "./rewrite.ts";
 import { repeats, settable, withoutRepeats, wordCount } from "./quality.ts";
 import { inPaperLanguage } from "../layout/stories.ts";
 import { profile } from "../profile.ts";
@@ -120,7 +120,7 @@ export async function ladderOf(store: Store, story: Story, release: Release | un
  * null if the release has no more to say, or the new text can't be printed. */
 export async function grown(store: Store, story: Story, release: Release, ladder: Rung[], more: number,
                             log?: (s: string) => void): Promise<{ rungs: Rung[]; cost: number } | null> {
-  if (wordForWord(story)) return null;
+  if (wordForWord(story) || aiStalled()) return null;
   const top = ladder[0]?.words ?? 0;
   const target = Math.round(Math.min(wordCount(paragraphs(release.body).join(" ")), top + more));
   if (target < top + 10) return null;

@@ -366,17 +366,15 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // the editor's column, once in the paper: a story of the day, no photo, on an
     // inside page's edge in two columns (the editor, 30 Oct; layout/designs.ts): Gujarat's
     // own news first, one with no photo of its own, the longest (the lead and what the editor sent stay as they are)
+    // (in order: layout takes the first whose headline can be set in two columns)
+    let columnPicks: string[] = [];
     const columnTitle = profile.editorial.columnTitle;
     if (columnTitle && !opts.copy) {
       const fit = pool.slice(1).filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && wordCount(s.bodies.long) >= COLUMN_WORDS);
       const prefers = profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null;
       const local = (s: Story) => Number(!!prefers?.test(`${s.headline} ${s.bodies.long.slice(0, 300)}`));
-      const pick = fit.sort((a, b) => local(b) - local(a) || Number(!!a.translatedFrom) - Number(!!b.translatedFrom) || Number(!!a.photo) - Number(!!b.photo)
-                                      || b.bodies.long.length - a.bodies.long.length || a.id.localeCompare(b.id))[0];
-      if (pick) {
-        log(`  the editor's column: ${pick.id}`);
-        pool = pool.map((s) => (s === pick ? { ...s, editorsColumn: true, photo: null, photos: [], priority: 3 } : s));
-      }
+      columnPicks = fit.sort((a, b) => local(b) - local(a) || Number(!!a.translatedFrom) - Number(!!b.translatedFrom) || Number(!!a.photo) - Number(!!b.photo)
+                                     || b.bodies.long.length - a.bodies.long.length || a.id.localeCompare(b.id)).map((s) => s.id);
     }
     // feature articles print like the news: no kicker, no special title (24 Oct, the editor's wish)
     pool = pool.map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s));
@@ -431,7 +429,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
     const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy,
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, columnPicks,
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
       ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
       date, fillers, log, ...(opts.mend && !opts.copy ? { mend: opts.mend } : {}),
