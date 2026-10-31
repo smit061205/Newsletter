@@ -161,6 +161,8 @@ export async function layOut(args: {
   /** a paper that failed its checks laid out again another way (pipeline.ts): the
    * front page's lead in its usual width */
   mend?: { narrowLead?: boolean };
+  /** the stories that may be the editor's column, best first */
+  columnPicks?: string[];
   log: (s: string) => void; progress?: (done: number, total: number, what: string) => void;
 }): Promise<EngineResult> {
   const { m, log } = args;
@@ -196,6 +198,18 @@ export async function layOut(args: {
   const t1 = Date.now();
 
   // 2. the stories over the pages, by their sizes at their usual width
+  // the editor's column: the first of the day's picks that can be set (31 Oct's
+  // headline had a long English word that fills no two columns: the box went
+  // missing and every repair of the paper failed for it)
+  for (const id of args.columnPicks ?? []) {
+    const s = args.pool.find((x) => x.id === id);
+    if (!s) continue;
+    const column: Story = { ...s, editorsColumn: true, photo: null, photos: [], priority: 3 };
+    if (!(await blocks.range(column, await blocks.settable(column, rankOf(column, false)))).length) continue;
+    log(`  the editor's column: ${id}`);
+    args = { ...args, pool: args.pool.map((x) => (x === s ? column : x)) };
+    break;
+  }
   const sizeOf = async (s: Story, lead: boolean): Promise<Sized | null> => {
     const range = await blocks.range(s, await blocks.settable(s, rankOf(s, lead)));
     if (!range.length) return null;
@@ -576,6 +590,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     // the front page: at most one article beside the lead (a stack of them
     // down its side looks bad, the editor, 27 Oct 2026)
     if (n === 1) penalty += 200 * Math.max(0, besideLead(placed, got.fills, stories[0]) - 1);
+    // a tall gap one column wide: hardly a story fits it (31 Oct's page 4 left 16cm white)
+    for (const f of got.fills) if (f.cols === 1 && f.height > 12 * BODY.pitch) penalty += 500;
     // the editor's column at the page's edge, as high as it can be
     for (const p of placed) {
       if (!p.module.story.editorsColumn) continue;

@@ -40,7 +40,7 @@ export function designs(stories: DesignStory[], ads: DesignAd[], cols: number, h
   storiesOnly = !gaps;
   for (let n = 0; n < attempts && out.size < count; n++) {
     const edge = stories.some((s) => s.edge);
-    const t = ((edge ? n % 4 !== 3 : !gaps && n % 2 === 0) ? footRow(stories, ads, cols, height, rng) : null) ?? grow({ c0: 0, c1: cols, top: 0, height, ads, items }, stories, rng);
+    const t = ((edge ? n % 4 !== 3 : !gaps && n % 2 === 0) ? footRow(stories, ads, cols, height, rng) ?? well(stories, ads, cols, height, rng) : null) ?? grow({ c0: 0, c1: cols, top: 0, height, ads, items }, stories, rng);
     if (t && fills(t) <= (gaps ? 2 : 0)) out.set(key(t), t);
   }
   return [...out.values()];
@@ -97,6 +97,49 @@ function footRow(stories: DesignStory[], ads: DesignAd[], cols: number, height: 
     return part.ad ? join("stack", k, [leaf, { kind: "ad", ad: part.ad.index, cols: k }]) : leaf;
   });
   return join("stack", cols, [top, join("row", cols, blocks)]);
+}
+
+/** A narrow ad stacked on a wide one at the page's side, the staircase a film poster
+ * on a yatra ad makes (31 Oct's page 4: no design of stories alone, so a one-column
+ * hole went white). As a desk lays it out: stories down the free columns, and over
+ * the wide ad a story standing on the narrow ad, one beside it down to the wide ad,
+ * and at times one across both. The editor's column stands on a two-column ad. */
+function well(stories: DesignStory[], ads: DesignAd[], cols: number, height: number, rng: () => number): Tree | null {
+  if (ads.length !== 2) return null;
+  const [wide, narrow] = [...ads].sort((a, b) => b.c1 - b.c0 - (a.c1 - a.c0));
+  const right = wide.c1 === cols && narrow.c1 === cols;
+  if ((!right && !(wide.c0 === 0 && narrow.c0 === 0)) || wide.y + wide.height < height - 1 || narrow.y + narrow.height > wide.y + 1) return null;
+  const k = wide.c1 - wide.c0, n = narrow.c1 - narrow.c0, side = cols - k, mid = k - n;
+  if (side < 1 || mid < 1) return null;
+  const items = stories.map((_, i) => i).filter((i) => !stories[i].fill);
+  const column = items.find((i) => stories[i].edge);
+  if (column !== undefined && n !== 2) return null;
+  const free = items.filter((i) => i !== column);
+  for (let i = free.length - 1; i > 1; i--) { // (the page's first story stays first)
+    const j = 1 + Math.floor(rng() * i);
+    [free[i], free[j]] = [free[j], free[i]];
+  }
+  const take = (w: number): number | null => {
+    const at = free.findIndex((i) => stories[i].widths.includes(w));
+    return at < 0 ? null : free.splice(at, 1)[0];
+  };
+  const on = column ?? take(n);
+  const down = take(side);
+  const beside = take(mid);
+  if (on == null || down == null || beside == null) return null;
+  const across = free.length && rng() < 0.5 ? take(k) : null;
+  const left: number[] = [down];
+  while (free.length) {
+    const i = take(side);
+    if (i == null) return null;
+    left.push(i);
+  }
+  const leaf = (story: number, w: number): Tree => ({ kind: "story", story, cols: w });
+  const standing = join("stack", n, [leaf(on, n), { kind: "ad", ad: narrow.index, cols: n }]);
+  const over = join("row", k, right ? [leaf(beside, mid), standing] : [standing, leaf(beside, mid)]);
+  const tower = join("stack", k, [...(across != null ? [leaf(across, k)] : []), over, { kind: "ad", ad: wide.index, cols: k }]);
+  const running = left.length > 1 ? join("stack", side, left.map((i) => leaf(i, side))) : leaf(down, side);
+  return join("row", cols, right ? [running, tower] : [tower, running]);
 }
 
 /** The top of a page with the editor's column: the column at the left or right

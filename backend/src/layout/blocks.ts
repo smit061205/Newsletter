@@ -47,7 +47,7 @@ export function stretchOf(mod: Module): number {
 const WEIGHT = [3, 2, 1.5, 1, 0.7];
 
 /** The most lines a headline down one column runs to. */
-const ONE_COLUMN_HEAD_LINES = 6;
+export const ONE_COLUMN_HEAD_LINES = 6;
 
 export class Blocks {
   private tables = new Map<string, Promise<Option[]>>();
@@ -118,7 +118,7 @@ export class Blocks {
           // a brief's headline too: at most four lines, under half the brief
           // (22 Oct: a one-column brief under a nine-line headline)
           const headLines = mod.elements.filter((e) => new RegExp(`^${story.id}-h\\d+$`).test(e.id)).length;
-          if (rank >= 5 && (headLines > 4 || mod.headlineHeight > 0.45 * mod.height)) continue;
+          if (rank >= 5 && (headLines > (cols === 1 ? ONE_COLUMN_HEAD_LINES : 4) || mod.headlineHeight > 0.45 * mod.height)) continue;
           // (a headline down one column that runs on and on, eight lines on 30 Oct: a wider setting for that story)
           if (cols === 1 && headLines > ONE_COLUMN_HEAD_LINES) continue;
           const loose = storyLooseness(mod.elements);

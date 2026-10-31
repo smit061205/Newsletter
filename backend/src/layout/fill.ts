@@ -7,9 +7,9 @@
 //   3. the paper's message panel or house ad (once each in a paper: profile fillers).
 import type { Element } from "@ck/shared/contract";
 import { writeBrief } from "../editorial/features.ts";
-import { newsBrief } from "../editorial/rewrite.ts";
+import { aiStalled, newsBrief } from "../editorial/rewrite.ts";
 import { wordForWord, type Release, type Store, type Story } from "../store.ts";
-import type { Blocks } from "./blocks.ts";
+import { ONE_COLUMN_HEAD_LINES, type Blocks } from "./blocks.ts";
 import { houseAd, messageFiller, type FillerCount } from "./fit.ts";
 import { stretchTo } from "./guillotine.ts";
 import type { Measurer } from "./measure.ts";
@@ -97,7 +97,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
         const mod = await buildModule({ ...s, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0, BODY.pitch, HEADLINE.filler);
         if (!Number.isFinite(mod.height) || mod.height > h + 0.5) continue;
         const heads = mod.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length;
-        if ((mod.displayFill >= 0.97 || cols === 1) && heads <= 4 && mod.headlineHeight <= 0.45 * mod.height && close(mod)
+        if ((mod.displayFill >= 0.97 || cols === 1) && heads <= (cols === 1 ? ONE_COLUMN_HEAD_LINES : 4) && mod.headlineHeight <= 0.45 * mod.height && close(mod)
             && (!best || mod.height > best.mod.height)) best = { s, mod };
         break; // (the longest cut that fits: shorter ones fill less)
       }
@@ -114,7 +114,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   // sub-heading and body, from its release's facts only (26 Oct's copies left
   // six-line gaps white with 35 stories held: every one's headline and
   // sub-heading alone were taller than the gap, and a tip is no news)
-  if ((h / pitch - 4) * cols * 5 >= ITEM_WORDS * 0.8) {
+  if (!aiStalled() && (h / pitch - 4) * cols * 5 >= ITEM_WORDS * 0.8) {
     const size = { head: cols === 1 ? 3 : cols === 2 ? 5 : 7, deck: cols === 1 ? 4 : cols === 2 ? 7 : 10 };
     for (const s of ctx.held.filter((x) => !wordForWord(x)).slice(0, 8)) {
       const release = (s.releaseId ? ctx.store.release(s.releaseId) : null)
@@ -139,7 +139,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
           if (Number.isFinite(tried.height) && tried.height <= h + 0.5) break;
         }
         const heads = tried ? tried.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length : 0;
-        if (tried && tried.height <= h + 0.5 && (tried.displayFill >= 0.97 || cols === 1) && heads <= 4
+        if (tried && tried.height <= h + 0.5 && (tried.displayFill >= 0.97 || cols === 1) && heads <= (cols === 1 ? ONE_COLUMN_HEAD_LINES : 4)
             && tried.headlineHeight <= 0.45 * tried.height && close(tried) && (!mod || tried.height > mod.height)) mod = tried;
         filled = !!mod && h - mod.height < 1.5 * pitch;
         if (filled || !tried || !Number.isFinite(tried.height)) break;
