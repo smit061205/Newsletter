@@ -20,7 +20,7 @@ export interface IssueInfo { date: string; version: number; status: string; repo
 export interface Status {
   today: string; now: string; runAt: string; autoRun: boolean; nextRun: string | null;
   running: Job | null; lastJob: Job | null; openrouterKey: boolean; aiOutOfMoney?: boolean;
-  lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number; inrAuto: boolean; inrUpdated: string; notify: boolean; siteUrl: string;
+  lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number; inrAuto: boolean; inrUpdated: string; notify: boolean; newEngine: boolean; siteUrl: string;
   /** what a story costs in each kind of copy (US$), learned from real batches, and a copy's minutes */
   costRates: Record<string, number>; copyMinutes: number; samplesOn: boolean;
   issue: { version: number; status: string; ready?: boolean; issueNumber?: number } | null; version: string;
@@ -49,7 +49,7 @@ export interface AdRow { id: string; date: string; page: number; width: number; 
   /** every day the booking runs */
   days: string[] }
 export interface Settings { runAt: string; autoRun: boolean; openrouterKey: boolean; lang: "gu" | "en"; onboarded: boolean; inrPerUsd: number;
-  inrAuto: boolean; inrUpdated: string; notify: boolean; siteUrl: string; editions: Edition[]; editionsAuto: boolean;
+  inrAuto: boolean; inrUpdated: string; notify: boolean; newEngine: boolean; siteUrl: string; editions: Edition[]; editionsAuto: boolean;
   /** the paper's Telegram bot (news the editor sends it): none set up, or its name, the code a new person sends it, who's let in */
   telegram?: { token: false } | { token: true; bot: string | null; busy?: boolean; code: string; chats: { id: number; name: string }[]; waiting: number } }
 /** A language the paper's copies and sister papers come in. */

@@ -14,7 +14,7 @@
 import type { Element, IssueRender, TextElement } from "@ck/shared/contract";
 import type { PagePlan } from "./pack.ts";
 import { normalizeText } from "./text.ts";
-import { BODY, GRID, PT } from "./typography.ts";
+import { BODY, FRONT_MOST, GRID, PT } from "./typography.ts";
 import { profile } from "../profile.ts";
 import { repeats } from "../editorial/quality.ts";
 import { alwaysPrinted, wordForWord } from "../store.ts";
@@ -133,6 +133,7 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
              && mod.headSize >= mod.deckSize * 1.25 - 0.01 && mod.deckSize >= BODY.size * 1.15 - 0.01);
   }).map((x) => `p${p.page} ${x.module.story.id}${x.module.deckSize ? "" : " (no sub-heading)"}`));
 
+  const frontStories = plans[0]?.placed.length ?? 0;
   const gates = [
     { gate: "S1 body text evenly spaced (no holes between words)", pass: q(0.95) <= P95_EM && looseShare <= LOOSE_SHARE,
       detail: `extra word space p50 ${q(0.5).toFixed(2)}em, p95 ${q(0.95).toFixed(2)}em; ${loose.length} loose line(s) ` +
@@ -146,6 +147,7 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
     { gate: `S10 no story under ${profile.editorial.minWords} words`, pass: under.length === 0, detail: under.join(", ") || "ok" },
     { gate: "S11 the editor's column once, at an inside page's edge", pass: !profile.editorial.columnTitle || column === 1,
       detail: column === 1 ? "ok" : `${column} printed at an edge of pages 2 and after` },
+    { gate: `S12 the front page has at most ${FRONT_MOST} stories`, pass: frontStories <= FRONT_MOST, detail: `${frontStories}` },
     { gate: "S9 no story set loosely", pass: looseStories.length === 0, detail: looseStories.join(", ") || "ok" },
     { gate: "S6 numbers in the paper's digits", pass: latinDigits.length === 0, detail: latinDigits.slice(0, 8).join(", ") || "ok" },
   ];

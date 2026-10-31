@@ -213,6 +213,7 @@ const PROBE = `
     // width: where its last letter ends (less the spacing CSS adds after
     // it), against the box's right edge, after any squeeze -- within 1.5 CSS px
     // (0.4mm in print; a line 4px short of 2,000 sent 31 Oct's paper round its repairs).
+    var FIT_GIVE = 6;
     document.querySelectorAll("div.t[data-fit]").forEach(function (el) {
       // from the first letter to the last (not the line's block box, which is always the full width)
       var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), first = walker.nextNode(), last = first;
@@ -222,8 +223,16 @@ const PROBE = `
       range.setStart(first, 0);
       range.setEnd(last, last.data.length);
       var box = el.getBoundingClientRect(), squeeze = box.width / el.offsetWidth;
-      var trailing = (parseFloat(getComputedStyle(el).letterSpacing) || 0) * squeeze;
-      var off = range.getBoundingClientRect().right - trailing - box.right;
+      var measure = function () { return range.getBoundingClientRect().right - (parseFloat(getComputedStyle(el).letterSpacing) || 0) * squeeze - box.right; };
+      var off = measure();
+      // a hair off: the line's own letter spacing takes it up here, in the page that's
+      // printed (what's measured ahead can't see the browser's last word on a line's width)
+      var letters = el.textContent.length;
+      if (Math.abs(off) > 0.2 && Math.abs(off) <= FIT_GIVE && letters > 1) {
+        var was = parseFloat(getComputedStyle(el).letterSpacing) || 0;
+        el.style.letterSpacing = (was - off / (letters - 1) / squeeze) + "px";
+        off = measure();
+      }
       if (Math.abs(off) > 1.5) {
         var units = Math.round(Math.abs(off) * meta.__dpi / 96);
         add("line-fit", el.dataset.el, "line ends " + units + " px " + (off > 0 ? "past" : "short of") + " its box", units);

@@ -219,6 +219,12 @@ export class Store {
     this.db.prepare("insert or replace into fitted (key, json) values (?, ?)").run(key, JSON.stringify(value));
   }
 
+  /** A story's fitted versions with these words dropped (they failed a check): the next fit writes them anew. */
+  forgetFitted(story: string, body: string) {
+    const rows = this.db.prepare("select key, json from fitted where substr(key, 1, ?) = ?").all(story.length + 1, `${story}|`) as { key: string; json: string }[];
+    for (const r of rows) if ((JSON.parse(r.json) as { body: string }).body === body) this.db.prepare("delete from fitted where key = ?").run(r.key);
+  }
+
   /** A pipeline run (pipeline.ts): its steps, their logs and outcome. */
   newJob(date: string, job: Omit<Job, "id">): Job {
     const r = this.db.prepare("insert into jobs (date, json) values (?, ?)").run(date, JSON.stringify(job));

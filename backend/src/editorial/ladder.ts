@@ -135,6 +135,27 @@ export async function grown(store: Store, story: Story, release: Release, ladder
   return fine.length ? { rungs: [...fine, ...ladder], cost: got.cost } : null;
 }
 
+/** A story written to a slot the page's plan measured (layout/planner.ts): `lines` of the
+ * paper's body, `perLine` words each. Its ladder with that length and its cuts added,
+ * in order. Facts from its release only: null if the release can't reach it, or the
+ * new text can't be printed. */
+export async function writtenTo(store: Store, story: Story, release: Release, ladder: Rung[], lines: number, perLine: number,
+                                log?: (s: string) => void): Promise<{ rungs: Rung[]; cost: number } | null> {
+  if (wordForWord(story) || aiStalled()) return null;
+  // (a line or two long: whole sentences come off it to fit, and a miss is written again)
+  const target = Math.round(Math.min(wordCount(paragraphs(release.body).join(" ")), (lines + 1.5) * perLine));
+  const got = await fitLength(store, story, release, target, { log, lines: Math.round(lines), perLine });
+  if (!got || got.factCheck) return null;
+  const rungs: Rung[] = [{ body: got.body, words: wordCount(got.body), from: "longer" }];
+  for (let body = dropLastSentence(got.body); body && wordCount(body) >= MIN_WORDS; body = dropLastSentence(body)) {
+    rungs.push({ body, words: wordCount(body), from: "cut" });
+  }
+  const fine = rungs.filter((r) => !repeats(r.body) && settable(r.body) && inPaperLanguage({ ...story, bodies: { long: r.body, medium: r.body, short: r.body } }));
+  if (!fine.length) return null;
+  const all = [...fine, ...ladder].sort((a, b) => b.words - a.words);
+  return { rungs: all.filter((r, i) => !i || all[i - 1].words !== r.words), cost: got.cost };
+}
+
 /** A story set at one rung. */
 export const atRung = (story: Story, r: Rung): Story => ({
   ...story, bodies: { long: r.body, medium: r.body, short: r.body },
