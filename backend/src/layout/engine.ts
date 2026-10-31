@@ -608,7 +608,16 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     const more = boxes.some((b) => b.y + b.height < height - 1) ? 8 : 1;
     // (a strip left over by the ads takes only a story: 30 Oct's strips held 16-word
     // items; a gap is allowed a page truly short of copy, or once stories alone haven't filled it)
-    const planned = planning ? plan(ds, options, boxes, GRID.columns, height, rng, 600) : null;
+    let planned = planning ? plan(ds, options, boxes, GRID.columns, height, rng, 600) : null;
+    // (a lead across the page can leave no way to set the rest under it, known for certain:
+    // its usual width, before anything is written longer or held back. 31 Oct: page 1 blank)
+    if (planned && !planned.fits && !planned.gaveUp && n === 1 && ds[0].widths.length === 1 && ds[0].widths[0] === GRID.columns) {
+      const usual = blocks.widths(stories[0], ranks[0], oneColumn).filter((c) => c >= LEAD_MIN_COLS && c < GRID.columns && options(0, c).length);
+      if (usual.length) {
+        ds[0] = { ...ds[0], widths: usual };
+        planned = plan(ds, options, boxes, GRID.columns, height, rng, 600);
+      }
+    }
     if (planned && !planned.fits) plannedShort = planned.short;
     const gaps = shortBy > 0 || last || round >= GAPS_FROM;
     const trees = planned?.fits ? planned.trees : planned && !planned.gaveUp && !gaps ? []
