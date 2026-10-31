@@ -7,11 +7,15 @@
 import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, rewriteOne } from "./rewrite.ts";
 import { translateOne } from "./translate.ts";
+import { checkFacts, toRefit } from "./facts.ts";
 
 /** Writes the day's number-flagged stories again. Returns how many came out clean. */
 export async function repairFacts(store: Store, date: string, log: (s: string) => void): Promise<number> {
   const key = env("OPENROUTER_API_KEY");
   if (!key) return 0;
+  // (fitted versions dropped by the check of names and dates: the next layout writes them)
+  const refits = toRefit.size;
+  toRefit.clear();
   // (a round-up of several releases is written from all of them: left to the editor)
   const flagged = store.stories(date).filter((s) => s.factCheck && s.releaseId && (s.mergedFrom?.length ?? 1) <= 1);
   let mended = 0;
@@ -19,22 +23,26 @@ export async function repairFacts(store: Store, date: string, log: (s: string) =
     const r = store.release(s.releaseId!);
     if (!r) return;
     const nums = s.factCheck!.replace(/^[^:]*:\s*/, "");
-    const note = `\nIMPORTANT: a first version of this story put in numbers that are not in the release (${nums}). ` +
-      "Use only numbers that appear in the release; where it says something like \"equal shares\" or \"half\", say it in words as it does.";
+    const note = s.factCheck!.startsWith("numbers")
+      ? `\nIMPORTANT: a first version of this story put in numbers that are not in the release (${nums}). ` +
+        "Use only numbers that appear in the release; where it says something like \"equal shares\" or \"half\", say it in words as it does."
+      : `\nIMPORTANT: a first version of this story said things that are not in the release (${nums}). Use only the names, places, dates and quotations the release gives.`;
     try {
       const got = s.translatedFrom ? await translateOne(r, key, undefined, note)
         : await rewriteOne(r, s.model && s.model !== "as-is" ? s.model : env("OPENROUTER_MODEL") ?? DEFAULT_MODEL, key, 1, note);
       const left = numbersNotIn(`${got.story.headline} ${got.story.deck} ${got.story.bodies.long}`, `${r.headline} ${r.subhead} ${r.body}`, r.date);
       if (left.length) { log(`  ${s.id}: written again, still with ${left.join(", ")}: left for the editor`); return; }
+      const wrong = (await checkFacts(store, { ...s, headline: got.story.headline, deck: got.story.deck, bodies: got.story.bodies }, log)).problems;
+      if (wrong.length) { log(`  ${s.id}: written again, still with ${wrong.join("; ")}: left for the editor`); return; }
       // the new wording, the story's place in the paper kept
       const fixed: Story = { ...s, kicker: got.story.kicker, headline: got.story.headline, deck: got.story.deck, bodies: got.story.bodies,
                              caption: got.story.caption || s.caption, factCheck: undefined };
       store.putStory(fixed);
       mended++;
-      log(`  ${s.id}: written again without the numbers its source doesn't have (${nums})`);
+      log(`  ${s.id}: written again without what its source doesn't have (${nums})`);
     } catch (e) {
       log(`  ${s.id}: couldn't be written again (${e instanceof Error ? e.message : e})`);
     }
   }));
-  return mended;
+  return mended + refits;
 }

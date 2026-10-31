@@ -417,6 +417,8 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
   const model = env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
   const current = story.bodies.long;
   const now = current.split(/\s+/).filter(Boolean).length;
+  // (a version of this story that failed the check of names and dates, facts.ts)
+  const avoid = store.fitted(`avoid|${story.id}`)?.body;
   const res = await openRouter({
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
@@ -429,6 +431,7 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
           (opts.lines && opts.perLine ? `The space holds exactly ${opts.lines} lines of about ${opts.perLine.toFixed(1)} words each: aim for ${words} words, ` +
             `never more than ${Math.round(opts.lines * opts.perLine)}; every paragraph's last line is shorter. ` : "") +
           (words > now ? "Add detail ONLY from the release below -- never invent anything." : "Shorten it, keeping the most important facts first.") +
+          (avoid ? ` An earlier version wrongly said: ${avoid}. Say only what the release says.` : "") +
           " Keep the dateline. Return JSON {body}." },
         { role: "user", content: `RELEASE:\n${paragraphs(release.body).join("\n\n")}\n\nCURRENT STORY BODY:\n${current}` },
       ],

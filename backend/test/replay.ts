@@ -104,7 +104,8 @@ const count = (f: (r: Row) => boolean, of = rows) => of.filter(f).length;
 const saved = rows.filter((r) => !r.day.startsWith("hard"));
 const hard = rows.filter((r) => r.day.startsWith("hard"));
 // (the layout's own failures: gate 6 is what old days' stories said, not how they were set)
-const layoutClean = (r: Row) => r.failing.every((g) => g === "6");
+// (and a hard day's ads are one small picture enlarged: gate P is about that, not the layout)
+const layoutClean = (r: Row) => r.failing.every((g) => g === "6" || (g === "P" && r.day.startsWith("hard")));
 console.log(`\nscore: saved days ${count(layoutClean, saved)}/${saved.length} clean layouts first time (${count((r) => r.ready, saved)} READY); hard days ${count(layoutClean, hard)}/${hard.length}; ` +
             `${rows.reduce((a, r) => a + r.blank, 0)} blank pages; ${rows.reduce((a, r) => a + r.oneCol, 0)} one-column stories; ` +
             `longest ${Math.max(...rows.map((r) => r.seconds))}s, ${rows.reduce((a, r) => a + r.seconds, 0)}s in all`);

@@ -17,6 +17,7 @@ import { newsOverlap } from "./editorial/translate.ts";
 import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
+import { checkPlaced } from "./editorial/facts.ts";
 import { fitCalls, isSpeechText, numbersNotIn, speechTwin, writeDeck } from "./editorial/rewrite.ts";
 import type { FillerCount } from "./layout/fit.ts";
 import { layOut, type EngineResult } from "./layout/engine.ts";
@@ -140,6 +141,8 @@ export function issueNumberFor(date: string): number {
 
 export interface BuildReport {
   date: string; version: number; issueNumber: number; pages: number;
+  /** the planned pages made this paper, not the older design search (Settings, on trial from 1 Nov) */
+  modular?: boolean;
   placed: { page: number; story: string; headline: string; variant: string; cols: number; rank: number; source: string }[];
   /** column stretches left empty (taller than 1.5 body lines), pt */
   whiteSpace: { page: number; col: number; height: number; y: number }[];
@@ -206,6 +209,7 @@ export async function fillContext(store: Store, date: string): Promise<{
 }
 
 export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport }> {
+  const modular = process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
   const { log } = opts;
   // how long each part takes (report.timing)
   const began = Date.now();
@@ -429,7 +433,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
     const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, columnPicks,
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, columnPicks, modular,
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
       ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
       date, fillers, log, ...(opts.mend && !opts.copy ? { mend: opts.mend } : {}),
@@ -534,20 +538,23 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const dayReleases = new Map(store.releases(date).map((r) => [storyIdOf(r), r]));
   const recheck = (s: Story) => {
     const r = dayReleases.get(s.id);
-    if (!s.factCheck || s.translatedFrom || !r) return s.factCheck;
+    if (!s.factCheck?.startsWith("numbers") || s.translatedFrom || !r) return s.factCheck;
     const n = numbersNotIn(`${s.headline} ${s.deck} ${s.bodies.long}`, `${r.headline} ${r.subhead} ${r.body}`, r.date);
     return n.length ? `numbers not in the release: ${n.join(", ")}` : undefined;
   };
   // (the layout passes on each story's saved flag: those are the ones checked again)
   const byId = new Map(result.placed.map((p) => [p.story.id, p.story]));
   const seenFact = new Set<string>();
-  const allFacts = [...result.factChecks, ...result.placed.flatMap((p) => (p.story.factCheck ? [{ story: p.story.id, detail: p.story.factCheck }] : []))]
+  // (the new engine lengthens stories unattended: their names, dates and quotes are read too)
+  const read = modular && !opts.copy ? await checkPlaced(store, result.placed.map((p) => p.story), log) : { found: [], cost: 0 };
+  result.spent += read.cost;
+  const allFacts = [...result.factChecks, ...result.placed.flatMap((p) => (p.story.factCheck ? [{ story: p.story.id, detail: p.story.factCheck }] : [])), ...read.found]
     .map((f) => { const s = byId.get(f.story); return s && f.detail === s.factCheck ? { ...f, detail: recheck(s) } : f; })
     .filter((f): f is { story: string; detail: string } => !!f.detail && !seenFact.has(`${f.story}|${f.detail}`) && !!seenFact.add(`${f.story}|${f.detail}`));
   // gate 7 compares only builds made from the same inputs by the same engine:
   // after a change to either, the paper is meant to differ
   // (another arrangement on purpose, a repair: compared only with its like)
-  const fingerprint = buildFingerprint(store, date) + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
+  const fingerprint = buildFingerprint(store, date) + (modular ? "|planned" : "") + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
     + (opts.mend?.narrowLead ? "|narrow lead" : "");
   // (a copy is meant to differ from the day's paper)
   const previous = opts.copy ? null : store.latestIssue(date);
@@ -591,7 +598,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     { gate: "W no story across the whole page unless the editor allowed it",
       pass: !result.placed.some((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth),
       detail: result.placed.filter((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth).map((p) => `p${p.page} ${p.story.id} (${p.cols} columns)`).join(", ") || "ok" },
-    { gate: "6 fact checks: every number in the release", pass: allFacts.length === 0, detail: allFacts.map((f) => `${f.story}: ${f.detail}`).join("; ") || "ok" },
+    { gate: modular ? "6 fact checks: every number, name, place, date and quote in the release" : "6 fact checks: every number in the release", pass: allFacts.length === 0, detail: allFacts.map((f) => `${f.story}: ${f.detail}`).join("; ") || "ok" },
     ...style.gates,
     { gate: "7 same inputs, same issue", pass: same !== false,
       detail: !previous ? "first build"
@@ -618,7 +625,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       `page review ${min(took.review)}m, checks ${min(took.checks)}m -- ${min(took.total)}m; memory: engine ${took.engineMb} MB, computer free ${took.freeMb} MB`);
 
   const report: Omit<BuildReport, "version"> = {
-    date, issueNumber, pages: total,
+    date, issueNumber, pages: total, ...(modular ? { modular } : {}),
     placed: result.placed.map((p) => ({ page: p.page, story: p.story.id, headline: p.story.headline, variant: p.variant,
                                         cols: p.cols, rank: p.rank, source: p.story.source })),
     whiteSpace,

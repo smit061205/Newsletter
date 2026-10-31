@@ -189,6 +189,8 @@ export function settingsOf(store: Store) {
     /** when it was last brought up to date (ISO), "" never */
     inrUpdated: store.setting("inrUpdated", ""),
     notify: store.setting("notify", true),
+    /** the paper's pages planned the new way (layout/planner.ts): on trial, off until it has proved itself */
+    newEngine: store.setting("newEngine", false),
     /** the public website, for "Open the website" */
     siteUrl: store.setting("siteUrl", ""),
     /** the sister papers (editorial/copies.ts): their names and languages */
@@ -628,7 +630,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         if (req.method === "GET") return send(res, 200, { ...settingsOf(store), openrouterKey: envHas("OPENROUTER_API_KEY"), telegram: await telegramOf(store) });
         if (req.method === "POST") {
           const body = (await readJson(req)) as { runAt?: string; autoRun?: boolean; openrouterKey?: string; lang?: string;
-                                                   onboarded?: boolean; inrPerUsd?: number; inrAuto?: boolean; notify?: boolean; siteUrl?: string;
+                                                   onboarded?: boolean; inrPerUsd?: number; inrAuto?: boolean; notify?: boolean; newEngine?: boolean; siteUrl?: string;
                                                    editions?: Edition[]; editionsAuto?: boolean;
                                                    telegramToken?: string; telegramRemove?: number };
           if (body.editions !== undefined) {
@@ -648,6 +650,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             store.putSetting("siteUrl", body.siteUrl.trim());
           }
           if (body.notify !== undefined) store.putSetting("notify", !!body.notify);
+          if (body.newEngine !== undefined) store.putSetting("newEngine", !!body.newEngine);
           if (body.inrPerUsd !== undefined) {
             if (!(body.inrPerUsd > 10 && body.inrPerUsd < 1000)) return send(res, 400, { error: "the rupee rate should be about 80-100" });
             store.putSetting("inrPerUsd", Math.round(body.inrPerUsd * 100) / 100);

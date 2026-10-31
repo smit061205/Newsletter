@@ -74,6 +74,9 @@ export const CAPTION = { font: t.caption.font, size: t.caption.size * PT, pitch:
 /** What a print desk accepts for a photo (see the profile's `photo`). */
 export const PHOTO = { ...profile.photo, minHeight: profile.photo.minHeight * PT };
 
+/** The most stories on the front page: fewer, longer stories (the editor, 28 Oct). */
+export const FRONT_MOST = 6;
+
 /** Space between the parts of a story, px. */
 export const GAP = Object.fromEntries(Object.entries(profile.spacing).map(([k, v]) => [k, v * PT])) as
   Record<keyof typeof profile.spacing, number>;

@@ -50,6 +50,7 @@ export default function SettingsPage() {
             <input className={s.input} type="time" value={x.runAt} disabled={!x.autoRun} onChange={(e) => setX({ ...x, runAt: e.target.value })}
                    onBlur={(e) => e.target.value && save({ runAt: e.target.value })} style={{ maxWidth: 160 }} /></label>
           <label className={s.switch}><input type="checkbox" checked={x.notify} onChange={(e) => save({ notify: e.target.checked })} /><span>{t("settings.notify")}</span></label>
+          <label className={s.switch}><input type="checkbox" checked={x.newEngine} onChange={(e) => save({ newEngine: e.target.checked })} /><span>{t("settings.newEngine")}</span></label>
         </section>
 
         <WakeCard runAt={status?.runAt ?? x.runAt} />

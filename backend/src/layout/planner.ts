@@ -199,7 +199,8 @@ export function plan(stories: DesignStory[], options: (story: number, cols: numb
           ways.push(() => {
             const x = read(a, c, top, foot, h), y = read(b, w - c, top, foot, h);
             if (!x || !y) return null;
-            return row(w, rng() < 0.5 ? [x, y] : [y, x]);
+            // (the part with the lead stays on the left: the lead opens the page at its top left)
+            return row(w, m & 1 || rng() < 0.5 ? [x, y] : [y, x]);
           });
         }
       }
@@ -235,7 +236,7 @@ export function plan(stories: DesignStory[], options: (story: number, cols: numb
     }
     const main = read(x.rest, cols - 2, true, true, H);
     if (!side || !main) return null;
-    return row(cols, rng() < 0.5 ? [side, main] : [main, side]);
+    return row(cols, x.rest & 1 || rng() < 0.5 ? [main, side] : [side, main]);
   }
   const out = new Map<string, Tree>();
   for (let n2 = 0; n2 < want * 8 && out.size < want; n2++) {
