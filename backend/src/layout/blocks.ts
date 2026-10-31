@@ -67,23 +67,25 @@ export class Blocks {
     return this.ladders.get(story.id) ?? [{ body: story.bodies.long, words: story.bodies.long.split(/\s+/).length, from: "long" }];
   }
 
-  /** The widths a story of this rank may take on a page: a brief one to
-   * three columns, a story two or more (a lead three or more; a lesser one one), up to the
-   * widest a story may be. Its usual widths (pack.ts spansFor) cost least. */
-  widths(story: Story, rank: number): number[] {
+  /** The widths a story of this rank may take on a page: a brief two to
+   * three columns, a story two or more (a lead three or more), up to the widest a
+   * story may be; one column only where an ad leaves a strip that wide (`oneColumn`:
+   * a word or two to a line looks off, the developer, 31 Oct). Its usual widths
+   * (pack.ts spansFor) cost least. */
+  widths(story: Story, rank: number, oneColumn = false): number[] {
     if (story.editorsColumn) return [2]; // (two columns, always: the editor, 30 Oct)
     const most = story.fullWidth ? GRID.columns : MAX_STORY_COLS;
-    // (a less important story may run down one column too, beside a narrow ad: at a cost)
-    const [from, to] = rank >= 5 ? [1, 3] : rank === 1 ? [3, most] : rank === 2 ? [2, most] : [1, most];
+    const least = oneColumn ? 1 : 2;
+    const [from, to] = rank >= 5 ? [least, 3] : rank === 1 ? [3, most] : rank === 2 ? [2, most] : [least, most];
     return Array.from({ length: Math.max(0, to - from + 1) }, (_, i) => from + i).filter((k) => k <= most);
   }
 
   /** The rank a story is set at: its own, else lower until some width has a
    * setting (a short story at the top of a page can't carry a lead's
    * headline over 30% of it: 26 Oct's page 3 had no design at all). */
-  async settable(story: Story, rank: number): Promise<number> {
+  async settable(story: Story, rank: number, oneColumn = false): Promise<number> {
     for (let r = rank; r < 5; r++) {
-      for (const cols of this.widths(story, r)) if ((await this.options(story, r, cols)).length) return r;
+      for (const cols of this.widths(story, r, oneColumn)) if ((await this.options(story, r, cols)).length) return r;
     }
     return 5;
   }
