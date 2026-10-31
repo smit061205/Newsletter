@@ -87,7 +87,7 @@ async function play(day: string, date: string) {
 
 const days = args.length ? args : (store.db.prepare("select distinct date from issues order by date").all() as { date: string }[]).map((d) => d.date).filter((d) => d >= "2026-10-22");
 for (const date of days) {
-  const printed = store.ads(date).length ? store.ads(date) : printedAds(date);
+  const printed = printedAds(date);
   setAds(date, printed);
   await play(date, date);
 }

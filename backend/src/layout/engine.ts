@@ -21,6 +21,7 @@ import { spanWidth } from "./module.ts";
 import { designs, type DesignAd, type DesignStory } from "./designs.ts";
 import { FILL_MAX, FILL_MIN, realise, Solver, spanOf, type Block, type Tree } from "./guillotine.ts";
 import { fillInTurn, type FillContext } from "./fill.ts";
+import { plan } from "./planner.ts";
 import type { FillerCount } from "./fit.ts";
 import type { Measurer } from "./measure.ts";
 import { outranks, rankOf, renderPlaced, tombstoned, type Band, type PlacedModule } from "./pack.ts";
@@ -451,6 +452,8 @@ const LAST = 8;
 const GAPS_FROM = 5;
 /** Rounds in which a page laid out badly is designed again by itself. */
 const PAGE_RETRIES = 3;
+/** Pages planned (layout/planner.ts), not drawn at random: the new engine, on trial. */
+const PLANNER = process.env.CK_PLANNER === "1";
 /** The fewest stories a page is brought down to by holding them back. */
 const PAGE_FEWEST = 3;
 /** The most stories on the front page: fewer, longer stories (the editor, 28 Oct). */
@@ -565,7 +568,11 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   const candidates: { t: Tree; cost: number; solver: Solver; ads: Ad[]; short?: number }[] = [];
   let tried = 0;
   const near: { below: number; above: number; t: Tree; solver: Solver; ads: Ad[] }[] = [];
-  for (const arranged of adLayouts(ads, band)) {
+  // the page planned (layout/planner.ts) -- not with an ad the editor placed, which the
+  // designs work round. It places free ads itself, so one arrangement is all it needs
+  const planning = PLANNER && !ads.some((a) => a.pinned !== false || a.place);
+  let plannedShort = 0;
+  for (const arranged of planning ? [ads] : adLayouts(ads, band)) {
     const boxes: DesignAd[] = arranged.map((a, index) => {
       const c0 = Math.round((a.x - GRID.left) / GRID.pitch);
       return { index, c0, c1: c0 + colsOf(a), y: a.y - band.top, height: a.height };
@@ -576,7 +583,11 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     const more = boxes.some((b) => b.y + b.height < height - 1) ? 8 : 1;
     // (a strip left over by the ads takes only a story: 30 Oct's strips held 16-word
     // items; a gap is allowed a page truly short of copy, or once stories alone haven't filled it)
-    const trees = designs(ds, boxes, GRID.columns, height, rng, 300 * (round + 1), 6000 * (round + 1) * more, shortBy > 0 || last || round >= GAPS_FROM);
+    const planned = planning ? plan(ds, options, boxes, GRID.columns, height, rng, 300) : null;
+    if (planned && !planned.fits) plannedShort = planned.short;
+    const gaps = shortBy > 0 || last || round >= GAPS_FROM;
+    const trees = planned?.fits ? planned.trees : planned && !planned.gaveUp && !gaps ? []
+      : designs(ds, boxes, GRID.columns, height, rng, 300 * (round + 1), 6000 * (round + 1) * more, gaps);
     tried += trees.length;
     for (const t of trees) {
       const cost = solver.cost(t);
@@ -587,6 +598,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   if (!candidates.length) {
     // (a design that can't be made any height at all says neither)
     const diagnosis = { short: near.filter((x) => x.above < 0 && x.below >= 0).length, long: near.filter((x) => x.below < 0 && x.above >= 0).length };
+    // (the planner knows for certain: nothing fits under the foot, or the page falls short of it)
+    if (planning && !near.length && plannedShort > 0) { if (plannedShort < Math.floor(height / PT)) diagnosis.short = 1; else diagnosis.long = 1; }
     log(`  page ${n}: none of ${tried} designs fills it exactly (${diagnosis.short} too short, ${diagnosis.long} too tall; ${secs(t0)}s)`);
     if (!last) return { page: null, diagnosis };
     // the last round: the design that comes nearest, set out from the top --
@@ -602,7 +615,7 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   let best: { page: EnginePage; cost: number; penalty: number; fills: Extract<Block, { kind: "fill" }>[] } | null = null;
   let looked = 0;
   for (const { t, cost, solver, ads: arranged, short } of candidates) {
-    if (looked >= (n === 1 ? 120 : 40)) break;
+    if (looked >= (planning ? 300 : n === 1 ? 120 : 40)) break;
     const sig = sigOf(t, stories);
     if (avoid?.has(sig)) continue;
     looked++;
@@ -632,7 +645,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
       if (p.col > 0 && p.col + p.module.cols < GRID.columns) penalty += 300;
       if (p.y > band.top + 1) penalty += 30;
     }
-    const total = cost + penalty;
+    // (a page with a strip by a one-column ad: no more stories down one column than it takes)
+    const total = cost + penalty + 100 * placed.filter((p) => p.module.cols === 1).length;
     if (!best || total < best.cost) {
       const elements = renderPlaced(placed);
       const boxes: Element[] = [
@@ -641,7 +655,7 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
       ];
       best = { page: { page: n, placed, ads: got.ads, elements, blocks: boxes, design: sig }, cost: total, penalty, fills: got.fills };
     }
-    if (penalty === 0) break;
+    if (penalty === 0 && !placed.some((p) => p.module.cols === 1)) break;
   }
   // a page that came out with a lesser headline over a bigger one, or the like:
   // this page alone designed again (the whole paper laid out again took ten minutes, 30 Oct)
