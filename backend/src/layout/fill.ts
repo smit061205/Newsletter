@@ -49,12 +49,14 @@ export function fillInTurn(...args: Parameters<typeof fillHole>): ReturnType<typ
 }
 
 export async function fillHole(page: number, col: number, cols: number, y: number, h: number, ctx: FillContext, avoid: string[],
-                               smallestHead = Infinity):
+                               smallestHead = Infinity,
+                               /** the most stories the page may still take (the front page's limit) */
+                               most = Infinity):
   Promise<{ placed: PlacedModule[]; elements: Element[]; left: number } | null> {
   const placed: PlacedModule[] = [];
   const elements: Element[] = [];
   let top = y, left = h;
-  for (let n = 0; n < 3 && left >= 4 * BODY.pitch; n++) {
+  for (let n = 0; n < 3 && n < most && left >= 4 * BODY.pitch; n++) {
     const got = await fillOne(page, col, cols, top, left, ctx, [...avoid, ...placed.map((p) => p.module.story.headline)], n, smallestHead);
     if (!got) break;
     if (got.placed) placed.push(got.placed);

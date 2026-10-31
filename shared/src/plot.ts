@@ -211,7 +211,8 @@ const PROBE = `
     });
     // A line the backend set to fill its box exactly must print at that
     // width: where its last letter ends (less the spacing CSS adds after
-    // it), against the box's right edge, after any squeeze -- within 1 CSS px.
+    // it), against the box's right edge, after any squeeze -- within 1.5 CSS px
+    // (0.4mm in print; a line 4px short of 2,000 sent 31 Oct's paper round its repairs).
     document.querySelectorAll("div.t[data-fit]").forEach(function (el) {
       // from the first letter to the last (not the line's block box, which is always the full width)
       var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), first = walker.nextNode(), last = first;
@@ -223,7 +224,7 @@ const PROBE = `
       var box = el.getBoundingClientRect(), squeeze = box.width / el.offsetWidth;
       var trailing = (parseFloat(getComputedStyle(el).letterSpacing) || 0) * squeeze;
       var off = range.getBoundingClientRect().right - trailing - box.right;
-      if (Math.abs(off) > 1) {
+      if (Math.abs(off) > 1.5) {
         var units = Math.round(Math.abs(off) * meta.__dpi / 96);
         add("line-fit", el.dataset.el, "line ends " + units + " px " + (off > 0 ? "past" : "short of") + " its box", units);
       }

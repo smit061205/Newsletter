@@ -348,7 +348,7 @@ export async function layOut(args: {
       // the page can take): a reserve story that runs in one or two columns
       // (a page with room for what it has isn't helped by less: only other designs, next round)
       if (d.short === 0 && d.long === 0 && narrowed.has(i) && shares[i].length > 1 && sum(i, "mid") <= rooms[i] && round < LAST) continue;
-      if (d.short === 0 && d.long === 0 && narrowed.has(i) && shares[i].length > 1) {
+      if (d.short === 0 && d.long === 0 && narrowed.has(i) && shares[i].length > PAGE_FEWEST) {
         // a narrow story didn't help (26 Oct): the least important one held back
         const s = shares[i].slice(1).sort((a, b) => toHold(a, b) || b.mid - a.mid)[0];
         shares[i] = shares[i].filter((x) => x !== s);
@@ -412,6 +412,28 @@ export async function layOut(args: {
     const order = new Map(sized.map((s, k) => [s.story.id, k]));
     for (const i of failed) shares[i].sort((a, b) => (order.get(a.story.id) ?? 0) - (order.get(b.story.id) ?? 0));
   }
+  // a page still not laid out (31 Oct's front page came out blank, its stories held
+  // back one by one): the day's stories back on it, the lead in its usual width, the
+  // nearest design taken. Any gap is reported (gate 2): a page is never left empty
+  for (const i of pages.map((_, k) => k).filter((k) => !pages[k])) {
+    const n = i + 1;
+    log(`  page ${n}: no design yet: laid out again with more of the day's stories`);
+    for (const s of [...held].sort(toBring)) {
+      if (shares[i].length >= (i === 0 ? FRONT_MOST : 6) || shares[i].reduce((a, x) => a + x.mid, 0) >= rooms[i]) break;
+      if (i === 0 && s.story.editorsColumn) continue;
+      held.splice(held.indexOf(s), 1);
+      shares[i].push(s);
+    }
+    const order = new Map(sized.map((s, k) => [s.story.id, k]));
+    shares[i].sort((a, b) => (order.get(a.story.id) ?? 0) - (order.get(b.story.id) ?? 0));
+    for (let attempt = 0; attempt < 3 && !pages[i]; attempt++) {
+      fill.held = held.map((s) => s.story);
+      const got = await solvePage(n, shares[i].map((s) => s.story), args.bands[i], pageAds(n), blocks, m, seeded(args.seed * 37 + n + attempt * 7919),
+                                  args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), true, false);
+      pages[i] = got.page;
+      for (const s of [...held]) if (!fill.held.includes(s.story)) held.splice(held.indexOf(s), 1);
+    }
+  }
   for (const p of pages) {
     for (const x of p?.placed ?? []) if (x.module.story.factCheck) factChecks.push({ story: x.module.story.id, detail: x.module.story.factCheck });
   }
@@ -429,6 +451,8 @@ const LAST = 8;
 const GAPS_FROM = 5;
 /** Rounds in which a page laid out badly is designed again by itself. */
 const PAGE_RETRIES = 3;
+/** The fewest stories a page is brought down to by holding them back. */
+const PAGE_FEWEST = 3;
 /** The most stories on the front page: fewer, longer stories (the editor, 28 Oct). */
 const FRONT_MOST = 6;
 
@@ -590,6 +614,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     // the front page: at most one article beside the lead (a stack of them
     // down its side looks bad, the editor, 27 Oct 2026)
     if (n === 1) penalty += 200 * Math.max(0, besideLead(placed, got.fills, stories[0]) - 1);
+    // the front page's limit counts what its gaps will take (31 Oct: 5 stories and 2 briefs made 7)
+    if (n === 1) penalty += 300 * Math.max(0, placed.length + got.fills.length - FRONT_MOST);
     // a tall gap one column wide: hardly a story fits it (31 Oct's page 4 left 16cm white)
     for (const f of got.fills) if (f.cols === 1 && f.height > 12 * BODY.pitch) penalty += 500;
     // the editor's column at the page's edge, as high as it can be
@@ -628,7 +654,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     const avoid = page.placed.map((p) => p.module.story.headline);
     for (const f of best.fills) {
       const smallest = Math.min(...page.placed.filter((p) => p.module.headSize > 0).map((p) => p.module.headSize));
-      const got = await fillInTurn(n, f.col, f.cols, f.y, f.height, fill, avoid, smallest);
+      const room = n === 1 ? FRONT_MOST - page.placed.length : Infinity;
+      const got = room > 0 ? await fillInTurn(n, f.col, f.cols, f.y, f.height, fill, avoid, smallest, room) : null;
       if (!got) { log(`  page ${n}: nothing found for a ${f.cols}-column gap (${(f.height / PT).toFixed(0)}pt)`); continue; }
       page.placed.push(...got.placed);
       extra.push(...got.elements);
