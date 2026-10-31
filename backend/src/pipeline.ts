@@ -101,7 +101,9 @@ const MENDS: { seedShift: number; mend?: { narrowLead?: boolean }; why: string }
   { seedShift: 7, why: "another arrangement" },
 ];
 /** Mending stops after this long (minutes): the paper is wanted the same evening. */
-const MEND_MINUTES = 15;
+const MEND_MINUTES = 10;
+/** ... or after this many tries in a row that came out no better than the best so far. */
+const MEND_FRUITLESS = 4;
 
 type Scored = { gates: { gate: string; pass: boolean }[]; whiteSpace: { height: number }[]; placed: { story: string }[] };
 
@@ -269,7 +271,18 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       type Way = (typeof MENDS)[number] | null;
       let way: Way = null;
       let best: { way: Way; bad: number } = { way, bad: badness(r.report) };
-      for (let round = 1; best.bad > 0 && Date.now() - began < MEND_MINUTES * 60_000; round++) {
+      // (31 Oct: the lead already narrow, "the lead in its usual width" built the same paper over again)
+      const leadCols = (x: typeof r) => (x.report as unknown as { placed: { page: number; cols: number }[] }).placed.filter((p) => p.page === 1).reduce((a, p) => Math.max(a, p.cols), 0);
+      const tried = new Set([`0:${leadCols(r) < 8}`]);
+      const unseen = (from: number): Way | undefined => {
+        for (let k = from; k < MENDS.length; k++) {
+          const w = MENDS[k];
+          if (!tried.has(`${w.seedShift}:${!!w.mend?.narrowLead || leadCols(r) < 8}`)) return w;
+        }
+        return undefined;
+      };
+      let fruitless = 0;
+      for (let round = 1; best.bad > 0 && fruitless < MEND_FRUITLESS && Date.now() - began < MEND_MINUTES * 60_000; round++) {
         const failing = r.report.gates.filter((g) => !g.pass);
         const layout = failing.filter((g) => REPAIR_BY_LAYOUT.test(g.gate));
         // (a gap in the paper filled by an item written for it passes the checks, but another way may need none)
@@ -280,15 +293,17 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           mended = await timed(`mending numbers ${round}`, () => repairFacts(store, date, say));
         }
         // (a story written again is laid out the best way so far; a layout failing, the next way)
-        const next: Way | undefined = layout.length || padded ? MENDS[MENDS.indexOf(way!) + 1] : mended ? best.way : undefined;
+        const next: Way | undefined = layout.length || padded ? unseen(MENDS.indexOf(way!) + 1) : mended ? best.way : undefined;
         if (next === undefined) break;
         way = next;
+        if (way) tried.add(`${way.seedShift}:${!!way.mend?.narrowLead || leadCols(r) < 8}`);
         const w = way;
         say(`mending ${round}: ${[...layout.map((g) => g.gate.replace(/^\S+ /, "")), ...(padded ? ["an item written for a gap"] : []), ...(mended ? [`${mended} story(ies) written again`] : [])].join("; ")}` +
             ` -- laying out again${w ? `: ${w.why}` : ""}`);
         r = await timed(`laying out again ${round}`, () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: w?.seedShift ?? 0, ...(w?.mend ? { mend: w.mend } : {}) }));
         const bad = badness(r.report);
         // (a story written again: every way before it was laid out from the old words)
+        fruitless = bad < best.bad || mended ? 0 : fruitless + 1;
         if (bad < best.bad || mended) best = { way, bad };
       }
       // the best way the paper came out, made again if a later one was worse

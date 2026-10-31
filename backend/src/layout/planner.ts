@@ -22,8 +22,9 @@ const GAP_STRETCH = 3;
 const flag = (top: boolean, foot: boolean) => (top ? 2 : 0) + (foot ? 1 : 0);
 const bitsOf = (b: bigint): number[] => {
   const out: number[] = [];
-  for (let h = 0; b > 0n; h++, b >>= 1n) if (b & 1n) out.push(h);
-  return out;
+  const text = b.toString(2);
+  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 49 && b) out.push(text.length - 1 - i);
+  return out.reverse();
 };
 
 export interface Plan {
@@ -177,8 +178,16 @@ export function plan(stories: DesignStory[], options: (story: number, cols: numb
   };
   const gapFor = (under: bigint, h: number, a: number) => { for (let s = 0; s <= GAP_STRETCH; s++) if (has(under, h - a - gap - s)) return h - a - gap - s; return -1; };
 
+  // (the ways of cutting a group at a height, worked out once: designs share most of them)
+  const cuts = new Map<string, (() => Tree | null)[]>();
   function read(m: number, w: number, top: boolean, foot: boolean, h: number): Tree | null {
     if (!(m & (m - 1))) return leaf(Math.log2(m), w);
+    const key = `${m}:${w}:${flag(top, foot)}:${h}`;
+    let ways = cuts.get(key);
+    if (!ways) { ways = waysOf(m, w, top, foot, h); cuts.set(key, ways); }
+    return ways.length ? pick(ways)() : null;
+  }
+  function waysOf(m: number, w: number, top: boolean, foot: boolean, h: number): (() => Tree | null)[] {
     const ways: (() => Tree | null)[] = [];
     const first = lowest(m);
     for (let a = (m - 1) & m; a > 0; a = (a - 1) & m) {
@@ -208,7 +217,7 @@ export function plan(stories: DesignStory[], options: (story: number, cols: numb
         return x && y ? stack(w, [x, y]) : null;
       });
     }
-    return ways.length ? pick(ways)() : null;
+    return ways;
   }
   function readAll(): Tree | null {
     if (!columnBit) return read(all, cols, true, true, H);

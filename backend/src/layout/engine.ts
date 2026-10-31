@@ -583,7 +583,7 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     const more = boxes.some((b) => b.y + b.height < height - 1) ? 8 : 1;
     // (a strip left over by the ads takes only a story: 30 Oct's strips held 16-word
     // items; a gap is allowed a page truly short of copy, or once stories alone haven't filled it)
-    const planned = planning ? plan(ds, options, boxes, GRID.columns, height, rng, 300) : null;
+    const planned = planning ? plan(ds, options, boxes, GRID.columns, height, rng, 600) : null;
     if (planned && !planned.fits) plannedShort = planned.short;
     const gaps = shortBy > 0 || last || round >= GAPS_FROM;
     const trees = planned?.fits ? planned.trees : planned && !planned.gaveUp && !gaps ? []
@@ -614,13 +614,20 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   // follow importance, no two level headlines side by side the same size
   let best: { page: EnginePage; cost: number; penalty: number; fills: Extract<Block, { kind: "fill" }>[] } | null = null;
   let looked = 0;
-  for (const { t, cost, solver, ads: arranged, short } of candidates) {
+  const queue = [...candidates];
+  for (let q = 0; q < queue.length; q++) {
+    const { t, cost, solver, ads: arranged, short } = queue[q];
     if (looked >= (planning ? 300 : n === 1 ? 120 : 40)) break;
     const sig = sigOf(t, stories);
     if (avoid?.has(sig)) continue;
     looked++;
     const laid = solver.layout(t, band.top, short ?? 0);
     if (!laid) continue;
+    // (planned designs are many: one with a lesser headline over a bigger one is passed over unset)
+    if (planning && q < candidates.length && candidates.length > 1) {
+      const set = laid.flatMap((b) => (b.kind === "story" ? [options(b.story, b.cols)[b.option].module] : []));
+      if (set.some((a) => set.some((b) => outranks(a, b)))) { queue.push(queue[q]); looked--; continue; }
+    }
     const got = await realise(laid, options, arranged, m);
     const placed = got.placed.map((p) => ({ ...p, module: { ...p.module } }));
     let penalty = 0;

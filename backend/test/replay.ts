@@ -93,7 +93,7 @@ for (const date of days) {
 }
 const hardDay = days[days.length - 1];
 const own = store.ads(hardDay);
-for (const h of HARD) {
+for (const h of process.env.REPLAY_SAVED ? [] : HARD) {
   setAds(hardDay, h.ads(hardDay));
   store.putSetting("samplesOn", h.name !== "no ads"); // (no ads at all: else the sample ads are placed)
   await play(`hard: ${h.name}`, hardDay);
