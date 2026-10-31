@@ -6,6 +6,8 @@ none of the earlier conversations); brought up to date on 24 October 2026.
 rules), then this file (the story and the open work), then `README.md` (the
 technical manual) as needed.
 
+**The new engine (1 Nov 2026, v1.1.50):** built and released behind Settings' switch, off by default; the older design search still makes the paper. Replay of the saved days (first build, no AI): 5 of 10 clean layouts, 4 READY (2 of 10 before); hard days 1 of 6. A real paper on 31 Oct's news came out READY after one repair in about 3 minutes, about ₹1 of AI. Open: the first build left a page blank in 2 of 3 real runs (repairs mended it each time); a page with a kept ad falls back to the older designs; `sample-english` has one gap and `sample-urdu` isn't READY with the new engine on. `sample-urdu` also fails on this Mac with it off, on `main` too. Who turns it on and when starts the 14 evenings' count; `report.modular` marks those papers.
+
 ---
 
 ## 1. What this is
