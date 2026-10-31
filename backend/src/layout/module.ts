@@ -235,7 +235,8 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     // (28 Oct: a one-line sub-heading ending short left a gap the editor
     // asked to fill), still clearly under the headline; else as a short
     // paragraph, its last line free
-    const full = await setDisplay(m, deck, { font: DECK.font, max: Math.max(DECK.min, Math.min((headSize || hd) / 1.25, ds * 1.3)), min: DECK.min,
+    // (never much over the profile's share of the headline: 31 Oct's at 78% couldn't be told from their headlines)
+    const full = await setDisplay(m, deck, { font: DECK.font, max: Math.max(DECK.min, Math.min((headSize || hd) / 1.25, ds * 1.05)), min: DECK.min,
                                              maxLines: cols <= 2 ? 3 : 2, leading: DECK.leading, align: "fit" }, `${aid}-d`, aid, 0, cursor, w);
     if (full) displayFill = Math.min(displayFill, full.fill);
     const got = full ?? await display(deck, "d", { font: DECK.font, max: Math.max(ds, DECK.min), min: DECK.min, maxLines: 2, leading: DECK.leading,
