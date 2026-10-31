@@ -429,7 +429,7 @@ export async function layOut(args: {
     for (let attempt = 0; attempt < 3 && !pages[i]; attempt++) {
       fill.held = held.map((s) => s.story);
       const got = await solvePage(n, shares[i].map((s) => s.story), args.bands[i], pageAds(n), blocks, m, seeded(args.seed * 37 + n + attempt * 7919),
-                                  args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), true, false);
+                                  args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), true, false, undefined, Infinity, !!args.mend);
       pages[i] = got.page;
       for (const s of [...held]) if (!fill.held.includes(s.story)) held.splice(held.indexOf(s), 1);
     }
@@ -483,7 +483,9 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
                          /** the page's stories written longer for its gaps, then the page designed again */
                          grow?: Grow,
                          /** designed again: only a design with less gap than this will do */
-                         beat = Infinity):
+                         beat = Infinity,
+                         /** the last way out of a blank page: a story may run down one column */
+                         anyWidth = false):
   Promise<{ page: EnginePage | null; diagnosis: Diagnosis }> {
   const t0 = Date.now();
   const none = { page: null, diagnosis: { short: 0, long: 0 } };
@@ -502,23 +504,25 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     log(`  page ${n}: ad ${a.id} set on the columns nearest it`);
     return { ...a, x, width };
   });
+  // (one column only where an ad leaves a strip that wide: blocks.widths)
+  const oneColumn = anyWidth || ads.some((a) => colsOf(a) === 1 || colsOf(a) === GRID.columns - 1);
   // (a story that can't be set at its rank, a rank lower: blocks.settable)
-  const ranks = await Promise.all(stories.map((s, i) => blocks.settable(s, rankOf(s, i === 0))));
+  const ranks = await Promise.all(stories.map((s, i) => blocks.settable(s, rankOf(s, i === 0), oneColumn)));
   // every story's settings at every width it may take (measured once, shared by all designs)
   const table = new Map<string, Option[]>();
   for (const [i, s] of stories.entries()) {
-    for (const cols of blocks.widths(s, ranks[i])) table.set(`${i}|${cols}`, await blocks.options(s, ranks[i], cols));
+    for (const cols of blocks.widths(s, ranks[i], oneColumn)) table.set(`${i}|${cols}`, await blocks.options(s, ranks[i], cols));
   }
   // the front page's lead keeps its photo (the editor, 30 Oct: a setting
   // without it was shorter, so it won), at any width that can show it
   if (n === 1 && stories[0].photo) {
-    const widths = blocks.widths(stories[0], ranks[0]);
+    const widths = blocks.widths(stories[0], ranks[0], oneColumn);
     const shown = widths.map((c) => (table.get(`0|${c}`) ?? []).filter((o) => !o.module.photoDropped));
     if (shown.some((o) => o.length)) widths.forEach((c, k) => table.set(`0|${c}`, shown[k]));
   }
   // ... and its full length: a cut lead came out at 236 words (30 Oct)
   if (n === 1) {
-    const widths = blocks.widths(stories[0], ranks[0]);
+    const widths = blocks.widths(stories[0], ranks[0], oneColumn);
     const long = widths.map((c) => (table.get(`0|${c}`) ?? []).filter((o) => wordCount(o.module.story.bodies.long) >= LEAD_WORDS));
     if (long.some((o) => o.length)) widths.forEach((c, k) => table.set(`0|${c}`, long[k]));
   }
@@ -530,10 +534,13 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     const all = table.get(`0|${GRID.columns}`) ?? [];
     const low = all.filter((o) => o.height <= (band.bottom - band.top) * LEAD_MAX_SHARE);
     if (low.length && low.length < all.length) table.set(`0|${GRID.columns}`, low);
+    // (none that low: its usual width. 31 Oct's shortest was 41%, so every height was
+    // let in and the lead came out at 61%)
+    if (all.length && !low.length) stories = [{ ...stories[0], fullWidth: false }, ...stories.slice(1)];
   }
   const options = (i: number, cols: number) => table.get(`${i}|${cols}`) ?? [];
   const ds: DesignStory[] = stories.map((s, i) => {
-    let widths = blocks.widths(s, ranks[i]).filter((c) => options(i, c).length);
+    let widths = blocks.widths(s, ranks[i], oneColumn).filter((c) => options(i, c).length);
     // the front page's lead across the whole page when it can be (its usual widths only if not)
     if (s.fullWidth && n === 1 && i === 0 && LEAD_FULL_WIDTH && widths.includes(GRID.columns)) widths = [GRID.columns];
     // (else wide enough to lead the page: at three columns a lesser story's headline
@@ -550,7 +557,7 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     };
   });
   // (up to four columns: the strip over one of several ads side by side, 24 Oct's page 3)
-  if (shortBy > 0) ds.push({ fill: true, widths: [1, 2, 3, 4], area: () => shortBy });
+  if (shortBy > 0) ds.push({ fill: true, widths: oneColumn ? [1, 2, 3, 4] : [2, 3, 4], area: () => shortBy });
   const height = band.bottom - band.top;
   const t1 = Date.now();
   // the page's ads in each tidy arrangement (all at their sizes, at the foot):
@@ -616,8 +623,9 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     if (n === 1) penalty += 200 * Math.max(0, besideLead(placed, got.fills, stories[0]) - 1);
     // the front page's limit counts what its gaps will take (31 Oct: 5 stories and 2 briefs made 7)
     if (n === 1) penalty += 300 * Math.max(0, placed.length + got.fills.length - FRONT_MOST);
-    // a tall gap one column wide: hardly a story fits it (31 Oct's page 4 left 16cm white)
-    for (const f of got.fills) if (f.cols === 1 && f.height > 12 * BODY.pitch) penalty += 500;
+    // a gap one column wide with no ad to force it, or a tall one: hardly a story
+    // fits it (31 Oct's page 4 left 16cm white)
+    for (const f of got.fills) if (f.cols === 1 && (!oneColumn || f.height > 12 * BODY.pitch)) penalty += 500;
     // the editor's column at the page's edge, as high as it can be
     for (const p of placed) {
       if (!p.module.story.editorsColumn) continue;
@@ -641,10 +649,15 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     log(`  page ${n}: its best design isn't good enough: trying more`);
     return { page: null, diagnosis: { short: 0, long: 0, again: true } };
   }
+  // the best design still has a gap one column wide: a real story for it, not a scrap
+  if (!oneColumn && best?.fills.some((f) => f.cols === 1)) {
+    const again = await solvePage(n, stories, band, ads, blocks, m, rng, avoid, log, round, fill, shortBy, last, leadWide, grow, beat, true);
+    if (again.page) return again;
+  }
   const gapOf = (fills: Extract<Block, { kind: "fill" }>[]) => fills.reduce((a, f) => a + f.height * f.cols, 0);
   if (beat < Infinity && (!best || gapOf(best.fills) >= beat)) return none;
   if (best?.fills.length && grow && await grow(best.page.placed, best.fills)) {
-    const again = await solvePage(n, stories, band, ads, blocks, m, rng, avoid, log, round, fill, shortBy, last, leadWide, undefined, gapOf(best.fills));
+    const again = await solvePage(n, stories, band, ads, blocks, m, rng, avoid, log, round, fill, shortBy, last, leadWide, undefined, gapOf(best.fills), anyWidth);
     if (again.page) return again;
   }
   // the design's filler blocks, filled with copy (layout/fill.ts)
