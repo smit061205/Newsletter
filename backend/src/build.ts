@@ -379,7 +379,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (in order: layout takes the first whose headline can be set in two columns)
     let columnPicks: string[] = [];
     const columnTitle = profile.editorial.columnTitle;
-    if (columnTitle && (!opts.copy || modular)) {
+    if (columnTitle && !opts.copy) {
       const fit = pool.slice(1).filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && wordCount(s.bodies.long) >= COLUMN_WORDS);
       const prefers = profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null;
       const local = (s: Story) => Number(!!prefers?.test(`${s.headline} ${s.bodies.long.slice(0, 300)}`));
