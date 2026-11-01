@@ -28,7 +28,7 @@ const SCHEMA = {
             id: { type: "string" },
             rank: { type: "integer", minimum: 1, maximum: 5, description: "1 = the day's lead (one or two), 2 front-page stories, 3 main inside stories, 4 standard, 5 brief" },
             reason: { type: "string", description: "Why, in a few words (English)" },
-            event: { type: "string", description: "The one happening it reports, in a few English words; stories on the same happening carry exactly the same words" },
+            event: { type: "string", description: "The one happening it reports, in a few English words; stories on the same happening, or on one visit by one person, carry exactly the same words" },
           },
         },
       },
@@ -42,7 +42,7 @@ export async function planDay(store: Store, date: string, stories: Story[], opts
   Promise<{ plan: PlanEntry[]; cost: number } | null> {
   if (!stories.length || process.env.CK_FAKE_AI === "1") return null;
   const ids = stories.map((s) => s.id).sort();
-  const key = `plan2|${date}|${createHash("sha1").update(ids.join(",")).digest("hex").slice(0, 12)}`;
+  const key = `plan3|${date}|${createHash("sha1").update(ids.join(",")).digest("hex").slice(0, 12)}`;
   const cached = store.fitted(key);
   if (cached) return { plan: JSON.parse(cached.body), cost: 0 };
   const apiKey = env("OPENROUTER_API_KEY");
@@ -61,7 +61,9 @@ export async function planDay(store: Store, date: string, stories: Story[], opts
           "that affect people; then the rest. One or two leads (rank 1), four or five front-page stories (rank 2). Round-ups of " +
           "greetings or congratulations are briefs (5). A story with a photo makes a better front-page story, all else equal. " +
           "Say which stories report the same happening: the same speech, visit, ceremony, announcement or decision, whoever wrote it up, " +
-          "even from different angles, carry exactly the same event words. Another day, another place or another decision is another event. " +
+          "even from different angles, carry exactly the same event words. One person's visit to one place on one day is one event, however many " +
+          "functions, speeches or inaugurations it took in (1 Nov: the President at two functions in Kurukshetra printed twice). " +
+          "Another day, another place or another decision is another event. " +
           "Return every story id given, once." },
         { role: "user", content: stories.map((s) => `${s.id} | ${words(s.bodies.long)} words${s.photo ? " | photo" : ""}${s.translatedFrom ? ` | translated from ${s.translatedFrom === "en" ? "English" : "Hindi"}` : ""}\n` +
           `  ${s.headline}\n  ${s.deck}\n  ${s.bodies.long.slice(0, 220).replace(/\s+/g, " ")}`).join("\n") },
