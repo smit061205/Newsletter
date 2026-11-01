@@ -14,6 +14,7 @@
 //      if none is exact (its gap reported). No other engine lays out a page.
 import type { Element } from "@ck/shared/contract";
 import { grown, ladderOf, MIN_WORDS, writtenTo, type Rung } from "../editorial/ladder.ts";
+import { checkFacts } from "../editorial/facts.ts";
 import { wordCount } from "../editorial/quality.ts";
 import { paragraphs } from "../editorial/rewrite.ts";
 import { alwaysPrinted, wordForWord, type Ad, type Release, type Store, type Story } from "../store.ts";
@@ -88,7 +89,8 @@ const toHold = (a: Sized, b: Sized) => Number(sent(a)) - Number(sent(b)) || b.st
 const toBring = (a: Sized, b: Sized) => Number(sent(b)) - Number(sent(a)) || a.story.priority - b.story.priority || Number(!!b.story.photo) - Number(!!a.story.photo);
 
 /** The stories shared out over the pages: each page's list, most important first. */
-export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<string, number>; rng?: () => number }): { pages: Sized[][]; held: Sized[] } {
+export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<string, number>; rng?: () => number; front?: boolean }): { pages: Sized[][]; held: Sized[] } {
+  const roomFront = (k: number, pages: Sized[][]) => k > 0 || opts.front === false || pages[0].length < FRONT_MOST || rooms.length === 1;
   const pages: Sized[][] = rooms.map(() => []);
   const used = rooms.map(() => 0);
   const held: Sized[] = [];
@@ -114,7 +116,7 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
       const score = (k: number) => (k === 0 && s.story.editorsColumn ? -10 : 0) + want[k] / rooms[k] + (k === 0 && s.story.priority <= 2 ? 0.15 : 0)
         + (feature ? (k === 0 ? -0.5 : 0.05 * k) : 0.08 * (rooms.length - 1 - k))
         - (pages[k].some((o) => related(o.story, s.story)) ? 0.3 : 0) + (opts.rng ? (opts.rng() - 0.5) * 0.12 : 0);
-      p = rooms.map((_, k) => k).filter((k) => k > 0 || pages[0].length < FRONT_MOST || rooms.length === 1).reduce((a, b) => (score(b) > score(a) ? b : a));
+      p = rooms.map((_, k) => k).filter((k) => roomFront(k, pages)).reduce((a, b) => (score(b) > score(a) ? b : a));
       if (rooms[p] - used[p] < s.min * 0.6 && !sent(s)) { held.push(s); continue; }
     }
     pages[p].push(s);
@@ -123,7 +125,7 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
   // a page short of copy takes a held story, or one from a page with copy to spare
   for (let round = 0; round < 8; round++) {
     const sum = (k: number, f: "min" | "max") => pages[k].reduce((a, s) => a + s[f], 0);
-    const short = rooms.findIndex((r, k) => sum(k, "max") < r && (k > 0 || pages[0].length < FRONT_MOST || rooms.length === 1));
+    const short = rooms.findIndex((r, k) => sum(k, "max") < r && roomFront(k, pages));
     const long = rooms.findIndex((r, k) => sum(k, "min") > r);
     if (short < 0 && long < 0) break;
     if (long >= 0) {
@@ -158,6 +160,8 @@ export async function layOut(args: {
   fixedPage?: Map<string, number>; avoid?: Set<string>;
   /** ask the AI for longer versions (the day's paper; a copy uses what's cached) */
   longer: boolean;
+  /** a copy's stories written to the spaces its pages need (the new engine; not a translation) */
+  toFit?: boolean;
   /** the day (a written brief's cache key) and the fillers the paper has used (one message, one house ad) */
   date: string; fillers: FillerCount;
   /** a paper that failed its checks laid out again another way (pipeline.ts): the
@@ -167,10 +171,18 @@ export async function layOut(args: {
   columnPicks?: string[];
   /** the page planned (layout/planner.ts), and written to what the plan measures */
   modular?: boolean;
+  /** a repair (pipeline.ts): pages of the last try that passed, by number, kept as they are */
+  keep?: Map<number, EnginePage>;
   log: (s: string) => void; progress?: (done: number, total: number, what: string) => void;
 }): Promise<EngineResult> {
   const { m, log } = args;
   const total = args.bands.length;
+  // the kept pages' stories aren't the day's to place again, nor their one house ad
+  const kept = [...(args.keep?.values() ?? [])];
+  const keptStories = new Set(kept.flatMap((p) => p.placed.map((x) => x.module.story.id)));
+  args = { ...args, pool: args.pool.filter((s) => !keptStories.has(s.id)) };
+  args.fillers.houseAds += new Set(kept.flatMap((p) => p.elements.flatMap((e) => (e.articleId?.startsWith("filler-") ? [e.articleId] : [])))).size;
+  if (kept.some((p) => p.placed.some((x) => x.module.story.editorsColumn))) args = { ...args, columnPicks: [] };
   let cost = 0;
   const t0 = Date.now();
   const secs = (t: number) => ((Date.now() - t) / 1000).toFixed(1);
@@ -191,7 +203,33 @@ export async function layOut(args: {
   await lengths(args.pool, args.longer ? false : "cached");
   // the front page's lead written longer where its release has more: it carries
   // the page, and at its bare 250 words its photo left a stray line under it (30 Oct)
-  if (args.longer && args.pool[0]) await lengths([args.pool[0]], true);
+  if (args.longer && args.pool[0] && !args.keep?.has(1)) {
+    await lengths([args.pool[0]], true);
+    // (every length of its words read before it goes on the page, as a story written to a slot's
+    // are: 31 Oct's printed length had a wrong title the longest didn't. Written once more if
+    // one is wrong; what's still wrong isn't used, the words it had to start with if nothing's left)
+    const lead = args.pool[0];
+    const read = async () => {
+      const rungs = ladders.get(lead.id) ?? [];
+      const got = await Promise.all(rungs.map((r) => checkFacts(args.store, { ...lead, bodies: { ...lead.bodies, long: r.body } }, log)));
+      for (const g of got) cost += g.cost;
+      return { good: rungs.filter((_, i) => !got[i].problems.length), wrong: got.flatMap((g) => g.problems) };
+    };
+    if (args.modular && ladders.get(lead.id)?.length) {
+      let found = await read();
+      if (found.wrong.length) {
+        args.store.forgetFitted(lead.id);
+        args.store.putFitted(`avoid|${lead.id}`, { body: [...new Set(found.wrong)].join("; "), model: "facts" });
+        await lengths([lead], true);
+        found = await read();
+      }
+      if (found.wrong.length) {
+        args.store.forgetFitted(lead.id);
+        if (found.good.length) ladders.set(lead.id, found.good); else await lengths([lead], false);
+        log(`  ${lead.id}: wrong again when written longer: only the lengths that passed kept`);
+      }
+    }
+  }
   // a story shorter than the paper's shortest (profile minWords) isn't printed,
   // unless the editor sent it: no items of a few lines under a big headline
   const tooShort = args.pool.filter((s) => !alwaysPrinted(s) && Math.max(...(ladders.get(s.id) ?? []).map((r) => r.words)) < MIN_WORDS);
@@ -236,15 +274,26 @@ export async function layOut(args: {
     sized = (await Promise.all(sized.map((s, i) => sizeOf(s.story, i === 0)))).filter((x): x is Sized => !!x);
     log(`  short of copy: longer versions written (${secs(t2)}s)`);
   }
+  // (a translation writes nothing: its stories run to the lengths there are)
+  const factsOf = (s: Story) => { const r = args.releases.get(s.id); return (args.longer || args.toFit) && r && !wordForWord(s) ? wordCount(paragraphs(r.body).join(" ")) : 0; };
   const pageAds = (n: number) => args.ads.filter((a) => a.page === n);
   const rooms = args.bands.map((b, i) => roomOf(b, pageAds(i + 1)));
   const rng = seeded(args.seed);
-  const { pages: shares, held } = assign(sized, rooms, { fixedPage: args.fixedPage, rng: args.seed ? rng : undefined });
+  // (only the open pages share out the stories: a repair keeps the pages that passed)
+  const open = rooms.map((_, i) => i).filter((i) => !args.keep?.has(i + 1));
+  // (the planned pages: the stories chosen by what each page's spaces can take. A copy
+  // that keeps its stories on their pages shares nothing out)
+  const chosen = args.modular && !args.fixedPage
+    ? await share(sized, rooms, open, (i) => pageAds(i + 1), (i, list) => pageFits(i + 1, list.map((s) => s.story), args.bands[i], pageAds(i + 1), blocks, factsOf, log), rng, log)
+    : null;
+  const byRoom = chosen ? null : assign(sized, open.map((i) => rooms[i]), { fixedPage: args.fixedPage, rng: args.seed ? rng : undefined, front: !args.keep?.has(1) });
+  const held = chosen?.held ?? byRoom!.held;
+  const shares: Sized[][] = chosen?.pages ?? rooms.map((_, i) => byRoom!.pages[open.indexOf(i)] ?? []);
   // the editor's column on an inside page, however the pages were evened out
   const astray = shares[0]?.find((s) => s.story.editorsColumn);
-  if (astray && shares.length > 1) {
+  if (astray && shares.length > 1 && open.some((i) => i > 0)) {
     shares[0] = shares[0].filter((s) => s !== astray);
-    const to = shares.map((_, k) => k).slice(1).sort((a, b) => shares[a].reduce((t, s) => t + s.mid, 0) / rooms[a] - shares[b].reduce((t, s) => t + s.mid, 0) / rooms[b])[0];
+    const to = open.filter((k) => k > 0).sort((a, b) => shares[a].reduce((t, s) => t + s.mid, 0) / rooms[a] - shares[b].reduce((t, s) => t + s.mid, 0) / rooms[b])[0];
     shares[to].push(astray);
   }
   log(`  pages: ${shares.map((p, i) => `${i + 1}: ${p.length} stories (${Math.round(p.reduce((a, s) => a + s.mid, 0) / rooms[i] * 100)}%)`).join(", ")}` +
@@ -268,13 +317,26 @@ export async function layOut(args: {
   };
   // a page the planner can't fill from the lengths there are: each story written to the
   // slot it needs, from its release's facts, all at once (layout/planner.ts)
-  const writeTo: WriteTo | undefined = !args.longer ? undefined : async (needs) => {
+  const writeTo: WriteTo | undefined = !args.longer && !args.toFit ? undefined : async (needs) => {
     const got = await Promise.all(needs.map(async ({ story, lines, perLine }) => {
       const release = args.releases.get(story.id);
       const ladder = ladders.get(story.id);
       if (!release || !ladder) return false;
-      const more = await writtenTo(args.store, story, release, ladder, lines, perLine, log);
+      let more = await writtenTo(args.store, story, release, ladder, lines, perLine, log);
       if (!more) return false;
+      // what it now says read before it goes on the page; written once more if it's wrong
+      const read = async (body: string) => {
+        const got = await checkFacts(args.store, { ...story, bodies: { ...story.bodies, long: body } }, log);
+        cost += got.cost;
+        return got.problems;
+      };
+      const wrong = await read(more.rungs[0].body);
+      if (wrong.length) {
+        args.store.forgetFitted(story.id);
+        args.store.putFitted(`avoid|${story.id}`, { body: wrong.join("; "), model: "facts" });
+        more = await writtenTo(args.store, story, release, ladder, lines, perLine, log);
+        if (!more || (await read(more.rungs[0].body)).length) return false;
+      }
       ladders.set(story.id, more.rungs);
       blocks.forget(story.id);
       cost += more.cost;
@@ -283,7 +345,6 @@ export async function layOut(args: {
     }));
     return got.some(Boolean);
   };
-  const factsOf = (s: Story) => { const r = args.releases.get(s.id); return r && !wordForWord(s) ? wordCount(paragraphs(r.body).join(" ")) : 0; };
   // a gap on a page: the stories nearest it written longer by the AI, from their
   // releases' facts, to fill it, before any short item goes in (the developer,
   // 30 Oct: an 11-word item was set with stories on the page that had more to say)
@@ -315,7 +376,7 @@ export async function layOut(args: {
   // 3. each page designed and solved; a page no design fills: other designs,
   // then a story more (one held back, or the smallest from a page with copy
   // to spare) or one fewer (the least important, held back), and again
-  const pages: (EnginePage | null)[] = new Array(total).fill(null);
+  const pages: (EnginePage | null)[] = rooms.map((_, i) => args.keep?.get(i + 1) ?? null);
   // a page short of copy with no story left to give it: room for a filler
   const shortBy = new Map<number, number>();
   const fill: FillContext = { store: args.store, date: args.date, m, blocks, held: [], fillers: args.fillers, written: [], turn: Promise.resolve(), cost: 0, log };
@@ -449,7 +510,12 @@ export async function layOut(args: {
     }
     const order = new Map(sized.map((s, k) => [s.story.id, k]));
     shares[i].sort((a, b) => (order.get(a.story.id) ?? 0) - (order.get(b.story.id) ?? 0));
-    for (let attempt = 0; attempt < 3 && !pages[i]; attempt++) {
+    for (let attempt = 0; attempt < 6 && !pages[i]; attempt++) {
+      // (three tries with the page's stories, then another story in the place of its last)
+      if (attempt >= 3 && held.length && shares[i].length > 1) {
+        const other = [...held].sort(toBring).find((s) => i > 0 || !s.story.editorsColumn), out = shares[i].findLast((s) => !s.story.editorsColumn);
+        if (other && out) { held.splice(held.indexOf(other), 1, out); shares[i] = shares[i].map((s) => (s === out ? other : s)); }
+      }
       fill.held = held.map((s) => s.story);
       const got = await solvePage(n, shares[i].map((s) => s.story), args.bands[i], pageAds(n), blocks, m, !!args.modular, seeded(args.seed * 37 + n + attempt * 7919),
                                   args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), true, false, undefined, Infinity, !!args.mend);
@@ -497,27 +563,9 @@ type Grow = (placed: PlacedModule[], gaps: Extract<Block, { kind: "fill" }>[]) =
 /** Why a page found no design: how many designs came out too short for it, and too tall. */
 interface Diagnosis { short: number; long: number; /** a page laid out, but badly: only other designs are wanted */ again?: boolean }
 
-/** One page: its designs, solved, the best one set out. Null if none fills it. */
-async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blocks: Blocks, m: Measurer, modular: boolean, rng: () => number,
-                         avoid: Set<string> | undefined, log: (s: string) => void, round: number, fill: FillContext,
-                         /** room (px²) no story is left for: a filler block may take it */
-                         shortBy = 0,
-                         /** the last try: no exact design, the nearest one */
-                         last = false,
-                         /** the front page's lead across the page (the profile's leadFullWidth) */
-                         leadWide = true,
-                         /** the page's stories written longer for its gaps, then the page designed again */
-                         grow?: Grow,
-                         /** designed again: only a design with less gap than this will do */
-                         beat = Infinity,
-                         /** the last way out of a blank page: a story may run down one column */
-                         anyWidth = false,
-                         /** stories written to the slots a page needs, and what a release can reach */
-                         slots?: { writeTo: WriteTo; factsOf: (s: Story) => number; pass?: number }):
-  Promise<{ page: EnginePage | null; diagnosis: Diagnosis }> {
-  const t0 = Date.now();
-  const none = { page: null, diagnosis: { short: 0, long: 0 } };
-  if (!stories.length) return none;
+/** A page as it can be set: its stories' settings at each width, and what the designs and
+ * the planner are given. The same for choosing a page's stories (share below) and laying it out. */
+async function pageModel(n: number, stories: Story[], band: Band, ads: Ad[], blocks: Blocks, log: (s: string) => void, leadWide = true, anyWidth = false) {
   // the front page's lead may run the full width (the profile's leadFullWidth)
   if (n === 1 && LEAD_FULL_WIDTH && leadWide) stories = [{ ...stories[0], fullWidth: true }, ...stories.slice(1)];
   // an ad the editor put at a place of their own: laid round it. One booked off
@@ -584,6 +632,138 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
       },
     };
   });
+  return { stories, ads, ranks, oneColumn, options, ds };
+}
+
+/** Each setting's stretch, as far as a story's release could run: the page as if every
+ * story could be written to any length its facts reach. */
+function elastic(stories: Story[], options: (i: number, c: number) => Option[], factsOf: (s: Story) => number) {
+  const room = (i: number, o: Option) => {
+    const lines = Math.max(1, o.module.bodyLines);
+    const perLine = wordCount(o.module.story.bodies.long) / lines;
+    const most = Math.min(LONGEST_WRITTEN, factsOf(stories[i]));
+    return Math.max(o.stretch, ((most / perLine - lines) / o.module.cols) * BODY.pitch);
+  };
+  return (i: number, c: number) => options(i, c).map((o) => ({ ...o, stretch: room(i, o) }));
+}
+
+/** An ad as the designs see it. */
+const boxOf = (a: Ad, index: number, band: Band): DesignAd => {
+  const c0 = Math.round((a.x - GRID.left) / GRID.pitch);
+  return { index, c0, c1: c0 + colsOf(a), y: a.y - band.top, height: a.height };
+};
+
+/** Can these stories fill this page, written to what their releases reach? Known for certain, before any AI. */
+async function pageFits(n: number, stories: Story[], band: Band, ads: Ad[], blocks: Blocks, factsOf: (s: Story) => number, log: (s: string) => void): Promise<boolean> {
+  const { stories: set, ads: placed, options, ds: model, ranks, oneColumn } = await pageModel(n, stories, band, ads, blocks, () => {});
+  let ds = model;
+  if (ds.some((d) => !d.widths.length)) return false;
+  const stretched = elastic(set, options, factsOf);
+  const boxes = placed.map((a, i) => boxOf(a, i, band));
+  const height = band.bottom - band.top;
+  const rng = seeded(n);
+  let got = plan(ds, stretched, boxes, GRID.columns, height, rng, 0);
+  // (a lead across the page can leave no way to set the rest: its usual width)
+  if (!got.fits && !got.gaveUp && n === 1 && ds[0].widths.length === 1 && ds[0].widths[0] === GRID.columns) {
+    const usual = blocks.widths(set[0], ranks[0], oneColumn).filter((c) => c >= LEAD_MIN_COLS && c < GRID.columns && options(0, c).length);
+    if (usual.length) { ds = [{ ...ds[0], widths: usual }, ...ds.slice(1)]; got = plan(ds, stretched, boxes, GRID.columns, height, rng, 0); }
+  }
+  if (got.gaveUp) log(`  page ${n}: too many stories to work out`);
+  if (!got.fits) return false;
+  // (headlines following importance, known here: 25 Oct's page 4 had designs, none of them in order)
+  const solver = new Solver({ options: stretched, ads: placed, height });
+  const trees = plan(ds, stretched, boxes, GRID.columns, height, rng, 120).trees;
+  return !trees.length || trees.some((t) => !disordered(solver.layout(t, band.top), stretched));
+}
+
+/** A lesser headline bigger than a more important one's, in a page laid out (or none laid out). */
+function disordered(laid: Block[] | null | undefined, options: (story: number, cols: number) => Option[]): boolean {
+  if (!laid) return true;
+  const set = laid.flatMap((b) => (b.kind === "story" ? [options(b.story, b.cols)[b.option].module] : []));
+  return set.some((a) => set.some((b) => outranks(a, b)));
+}
+
+/** The most stories tried on an inside page. */
+const PAGE_MOST = 8;
+
+/** The stories chosen for the pages by what each page's spaces can take, not by how much
+ * room it has (31 Oct's page 3: three ads across its foot, three spaces, and the room left
+ * said it was fine). Most important first; a page that can't work is known here, before
+ * any AI, and takes other stories. Null for a page nothing was found for: left to the rounds. */
+async function share(sized: Sized[], rooms: number[], open: number[], perPage: (i: number) => Ad[], fits: (i: number, list: Sized[]) => Promise<boolean>,
+                     rng: () => number, log: (s: string) => void): Promise<{ pages: Sized[][]; held: Sized[]; unsure: number[] }> {
+  // (a little chance among stories of about the same weight: a repair is another arrangement)
+  const lead = sized[0];
+  let left = sized.slice(1).map((s, i) => ({ s, at: i + rng() * 3 })).sort((a, b) => a.at - b.at).map((x) => x.s).sort((a, b) => Number(sent(b)) - Number(sent(a)));
+  let column = left.find((s) => s.story.editorsColumn);
+  left = left.filter((s) => s !== column);
+  if (lead) left.unshift(lead);
+  const pages: Sized[][] = rooms.map(() => []);
+  const unsure: number[] = [];
+  // the front page, then the page with the most ads, which has the fewest ways of working
+  const order = [...open.filter((i) => i === 0), ...open.filter((i) => i > 0).sort((a, b) => perPage(b).length - perPage(a).length || rooms[a] - rooms[b])];
+  for (const i of order) {
+    const mean = left.slice(0, 12).reduce((a, s) => a + s.mid, 0) / Math.max(1, Math.min(12, left.length));
+    const most = i === 0 ? FRONT_MOST : PAGE_MOST, least = Math.min(most, Math.max(i === 0 ? 3 : 2, perPage(i).length));
+    const want = Math.min(most, Math.max(least, Math.round(rooms[i] / Math.max(1, mean))));
+    const counts = [0, -1, 1, -2, 2, 3].map((d) => want + d).filter((k, x, all) => k >= least && k <= most && all.indexOf(k) === x);
+    let chosen: Sized[] | null = null;
+    for (const k of counts) {
+      // the most important k; then, a story at a time from the end, the next ones in their place
+      for (let skip = 0; skip <= 5 && !chosen; skip++) {
+        const head = left.slice(0, Math.max(1, k - 1 - (column && i > 0 ? 1 : 0) - Math.min(skip, 2)));
+        const list = [...head, ...left.slice(head.length + skip, k + skip - (column && i > 0 ? 1 : 0)), ...(column && i > 0 ? [column] : [])];
+        if (list.length && await fits(i, list)) chosen = list;
+      }
+      if (chosen) break;
+    }
+    if (!chosen) {
+      // (the column may do better on another page)
+      unsure.push(i);
+      log(`  page ${i + 1}: no choice of stories worked out here`);
+      continue;
+    }
+    if (column && chosen.includes(column)) column = undefined;
+    pages[i] = chosen;
+    left = left.filter((s) => !chosen!.includes(s));
+  }
+  // (what wasn't chosen waits for the rounds: the room that's left, by weight)
+  for (const i of unsure) {
+    let used = 0;
+    if (column && i > 0) { pages[i].push(column); used += column.mid; column = undefined; }
+    while (left.length && used < rooms[i] && pages[i].length < (i === 0 ? FRONT_MOST : PAGE_MOST)) { const s = left.shift()!; pages[i].push(s); used += s.mid; }
+  }
+  if (column) left.push(column);
+  const place = new Map(sized.map((s, k) => [s, k]));
+  for (const p of pages) p.sort((a, b) => place.get(a)! - place.get(b)!);
+  return { pages, held: left, unsure };
+}
+
+/** One page: its designs, solved, the best one set out. Null if none fills it. */
+async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blocks: Blocks, m: Measurer, modular: boolean, rng: () => number,
+                         avoid: Set<string> | undefined, log: (s: string) => void, round: number, fill: FillContext,
+                         /** room (px²) no story is left for: a filler block may take it */
+                         shortBy = 0,
+                         /** the last try: no exact design, the nearest one */
+                         last = false,
+                         /** the front page's lead across the page (the profile's leadFullWidth) */
+                         leadWide = true,
+                         /** the page's stories written longer for its gaps, then the page designed again */
+                         grow?: Grow,
+                         /** designed again: only a design with less gap than this will do */
+                         beat = Infinity,
+                         /** the last way out of a blank page: a story may run down one column */
+                         anyWidth = false,
+                         /** stories written to the slots a page needs, and what a release can reach */
+                         slots?: { writeTo: WriteTo; factsOf: (s: Story) => number; pass?: number }):
+  Promise<{ page: EnginePage | null; diagnosis: Diagnosis }> {
+  const t0 = Date.now();
+  const none = { page: null, diagnosis: { short: 0, long: 0 } };
+  if (!stories.length) return none;
+  const model = await pageModel(n, stories, band, ads, blocks, log, leadWide, anyWidth);
+  const { options, ds, oneColumn, ranks } = model;
+  stories = model.stories;
+  ads = model.ads;
   // (up to four columns: the strip over one of several ads side by side, 24 Oct's page 3)
   if (shortBy > 0) ds.push({ fill: true, widths: oneColumn ? [1, 2, 3, 4] : [2, 3, 4], area: () => shortBy });
   const height = band.bottom - band.top;
@@ -593,9 +773,11 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   const candidates: { t: Tree; cost: number; solver: Solver; ads: Ad[]; short?: number }[] = [];
   let tried = 0;
   const near: { below: number; above: number; t: Tree; solver: Solver; ads: Ad[] }[] = [];
-  // the page planned (layout/planner.ts) -- not with an ad the editor placed, which the
-  // designs work round. It places free ads itself, so one arrangement is all it needs
-  const planning = modular && !ads.some((a) => a.pinned !== false || a.place);
+  // the page planned (layout/planner.ts) -- not with an ad given a part of the page, which
+  // the designs work round. It places free ads itself, so one arrangement is all it needs;
+  // an ad kept where the editor put it: only the designs with it there
+  const planning = modular && !ads.some((a) => a.place);
+  const kept = ads.flatMap((a, i) => (a.pinned !== false ? [i] : []));
   let plannedShort = 0;
   for (const arranged of planning ? [ads] : adLayouts(ads, band)) {
     const boxes: DesignAd[] = arranged.map((a, index) => {
@@ -608,7 +790,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     const more = boxes.some((b) => b.y + b.height < height - 1) ? 8 : 1;
     // (a strip left over by the ads takes only a story: 30 Oct's strips held 16-word
     // items; a gap is allowed a page truly short of copy, or once stories alone haven't filled it)
-    let planned = planning ? plan(ds, options, boxes, GRID.columns, height, rng, 600) : null;
+    const inPlace = (t: Tree) => !kept.length || !!solver.layout(t, band.top)?.every((b) => b.kind !== "ad" || !kept.includes(b.ad) || (b.col === boxes[b.ad].c0 && Math.abs(b.y - boxes[b.ad].y) < 1));
+    let planned = planning ? plan(ds, options, boxes, GRID.columns, height, rng, kept.length ? 1500 : 600) : null;
     // (a lead across the page can leave no way to set the rest under it, known for certain:
     // its usual width, before anything is written longer or held back. 31 Oct: page 1 blank)
     if (planned && !planned.fits && !planned.gaveUp && n === 1 && ds[0].widths.length === 1 && ds[0].widths[0] === GRID.columns) {
@@ -620,7 +803,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     }
     if (planned && !planned.fits) plannedShort = planned.short;
     const gaps = shortBy > 0 || last || round >= GAPS_FROM;
-    const trees = planned?.fits ? planned.trees : planned && !planned.gaveUp && !gaps ? []
+    const placedRight = planned?.fits ? planned.trees.filter(inPlace) : [];
+    const trees = placedRight.length ? placedRight : planned?.fits && !kept.length ? planned.trees : planned && !planned.gaveUp && !gaps && !kept.length ? []
       : designs(ds, boxes, GRID.columns, height, rng, 300 * (round + 1), 6000 * (round + 1) * more, gaps);
     tried += trees.length;
     for (const t of trees) {
@@ -631,21 +815,14 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   }
   // nothing fits the lengths there are: the page planned again as if each story could run to
   // what its release holds, and the stories written to the slots that gives (at most twice)
-  if (planning && !candidates.length && slots && (slots.pass ?? 0) < 2 && !last) {
-    const room = (i: number, o: Option) => {
-      const lines = Math.max(1, o.module.bodyLines);
-      const perLine = wordCount(o.module.story.bodies.long) / lines;
-      const most = Math.min(LONGEST_WRITTEN, slots.factsOf(stories[i]));
-      return Math.max(o.stretch, ((most / perLine - lines) / o.module.cols) * BODY.pitch);
-    };
-    const elastic = (i: number, c: number) => options(i, c).map((o) => ({ ...o, stretch: room(i, o) }));
-    const boxes: DesignAd[] = ads.map((a, index) => {
-      const c0 = Math.round((a.x - GRID.left) / GRID.pitch);
-      return { index, c0, c1: c0 + colsOf(a), y: a.y - band.top, height: a.height };
-    });
-    const planned = plan(ds, elastic, boxes, GRID.columns, height, rng, 60);
-    const solver = new Solver({ options: elastic, ads, height });
-    const t = planned.trees.map((x) => ({ x, cost: solver.cost(x) })).sort((a, b) => a.cost - b.cost)[0]?.x;
+  // (the same when every design has a lesser headline over a bigger one)
+  const inOrder = candidates.some((c) => !disordered(c.solver.layout(c.t, band.top), options));
+  if (planning && !kept.length && !inOrder && slots && (slots.pass ?? 0) < 2 && !last) {
+    const stretched = elastic(stories, options, slots.factsOf);
+    const boxes = ads.map((a, index) => boxOf(a, index, band));
+    const planned = plan(ds, stretched, boxes, GRID.columns, height, rng, 60);
+    const solver = new Solver({ options: stretched, ads, height });
+    const t = planned.trees.map((x) => ({ x, cost: solver.cost(x) + (disordered(solver.layout(x, band.top), stretched) ? 1e6 : 0) })).sort((a, b) => a.cost - b.cost)[0]?.x;
     const laid = t && solver.layout(t, band.top);
     const needs: SlotNeed[] = [];
     for (const b of laid || []) {
@@ -689,8 +866,7 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     if (!laid) continue;
     // (planned designs are many: one with a lesser headline over a bigger one is passed over unset)
     if (planning && q < candidates.length && candidates.length > 1) {
-      const set = laid.flatMap((b) => (b.kind === "story" ? [options(b.story, b.cols)[b.option].module] : []));
-      if (set.some((a) => set.some((b) => outranks(a, b)))) { queue.push(queue[q]); looked--; continue; }
+      if (disordered(laid, options)) { queue.push(queue[q]); looked--; continue; }
     }
     const got = await realise(laid, options, arranged, m);
     const placed = got.placed.map((p) => ({ ...p, module: { ...p.module } }));

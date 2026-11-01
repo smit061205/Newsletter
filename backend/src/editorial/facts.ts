@@ -12,7 +12,7 @@ const SYSTEM = `You compare a newspaper story with the press release(s) it was w
 List only clear errors of these kinds:
 - a person, organisation or place the story names that the release does not, or names differently (a different person, not a different spelling or translation);
 - a date, day or year that differs from the release, or that the release does not give;
-- words in quotation marks given to someone who did not say them in the release, or changed in meaning.
+- words printed inside quotation marks and given to someone who did not say them in the release, or changed in meaning. A headline such as "words: a person's name" with no quotation marks is the paper's summary, not a quotation.
 Do not list: numbers, general wording, translation choices, spelling or transliteration, the dateline, background every reader knows (the Prime Minister's title, the name of the state or country), or anything you are not sure of.
 Return JSON {"problems": [{"kind": "name"|"place"|"date"|"quote", "says": "<the story's words>", "why": "<a few plain words>"}]}: an empty list when there is nothing wrong.`;
 
@@ -31,7 +31,7 @@ export async function checkFacts(store: Store, story: Story, log: (s: string) =>
   if (!sources.length || !apiKey || wordForWord(story) || process.env.CK_FAKE_AI === "1") return { problems: [], cost: 0 };
   const text = `STORY:\n${story.headline}\n${story.deck}\n${story.bodies.long}`;
   const source = sources.map((r) => `RELEASE (${r.date}):\n${r.headline}\n${r.subhead}\n${r.body}`).join("\n\n");
-  const key = `facts|${story.id}|${createHash("sha256").update(text + source).digest("hex").slice(0, 24)}`;
+  const key = `facts2|${story.id}|${createHash("sha256").update(text + source).digest("hex").slice(0, 24)}`;
   const saved = store.fitted(key);
   if (saved) return { problems: JSON.parse(saved.body) as string[], cost: 0 };
   try {
@@ -47,7 +47,10 @@ export async function checkFacts(store: Store, story: Story, log: (s: string) =>
     if (!res.ok) { log(`  ${story.id}: names and dates not checked (OpenRouter ${res.status})`); return { problems: [], cost: 0 }; }
     const data = (await res.json()) as { choices: { message: { content: string } }[]; usage?: { cost?: number } };
     const got = JSON.parse(data.choices[0].message.content) as { problems: { kind: string; says: string; why: string }[] };
-    const problems = got.problems.map((p) => `${p.kind} "${p.says}": ${p.why}`);
+    // (a quotation is only what the story prints in quotation marks)
+    const quoted = [...text.matchAll(/["“‘'«]([^"”’'»]{4,})["”’'»]/g)].map((m) => m[1]);
+    const said = (p: { kind: string; says: string }) => p.kind !== "quote" || quoted.some((q) => q.includes(p.says.slice(0, 20)) || p.says.includes(q.slice(0, 20)));
+    const problems = got.problems.filter(said).map((p) => `${p.kind} "${p.says}": ${p.why}`);
     store.putFitted(key, { body: JSON.stringify(problems), model: DEFAULT_MODEL });
     return { problems, cost: data.usage?.cost ?? 0 };
   } catch (e) {
@@ -73,7 +76,7 @@ export async function checkPlaced(store: Store, placed: Story[], log: (s: string
     const own = store.story(s.id);
     if (own?.bodies.long === s.bodies.long) { if (!own.factCheck) store.putStory({ ...own, factCheck: detail }); continue; }
     const first = !store.fitted(`avoid|${s.id}`);
-    store.forgetFitted(s.id, s.bodies.long);
+    store.forgetFitted(s.id);
     store.putFitted(`avoid|${s.id}`, { body: problems.join("; "), model: DEFAULT_MODEL });
     if (first) toRefit.add(s.id); // (once: a second failure stays for the editor)
   }

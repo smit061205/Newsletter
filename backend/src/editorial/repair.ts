@@ -10,14 +10,14 @@ import { translateOne } from "./translate.ts";
 import { checkFacts, toRefit } from "./facts.ts";
 
 /** Writes the day's number-flagged stories again. Returns how many came out clean. */
-export async function repairFacts(store: Store, date: string, log: (s: string) => void): Promise<number> {
+export async function repairFacts(store: Store, date: string, log: (s: string) => void, only?: Set<string>): Promise<number> {
   const key = env("OPENROUTER_API_KEY");
   if (!key) return 0;
   // (fitted versions dropped by the check of names and dates: the next layout writes them)
   const refits = toRefit.size;
   toRefit.clear();
   // (a round-up of several releases is written from all of them: left to the editor)
-  const flagged = store.stories(date).filter((s) => s.factCheck && s.releaseId && (s.mergedFrom?.length ?? 1) <= 1);
+  const flagged = store.stories(date).filter((s) => s.factCheck && s.releaseId && (s.mergedFrom?.length ?? 1) <= 1 && (!only || only.has(s.id)));
   let mended = 0;
   await Promise.all(flagged.map(async (s) => {
     const r = store.release(s.releaseId!);

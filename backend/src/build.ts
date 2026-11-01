@@ -18,9 +18,10 @@ import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
 import { checkPlaced } from "./editorial/facts.ts";
+import { repairFacts } from "./editorial/repair.ts";
 import { fitCalls, isSpeechText, numbersNotIn, speechTwin, writeDeck } from "./editorial/rewrite.ts";
 import type { FillerCount } from "./layout/fit.ts";
-import { layOut, type EngineResult } from "./layout/engine.ts";
+import { layOut, type EnginePage, type EngineResult } from "./layout/engine.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
 import { removed } from "./layout/text.ts";
 import { applyTextEdits, dedupe, droppedBy, inPaperLanguage, oneReportOfEach, referenceAds, standInsMovable } from "./layout/stories.ts";
@@ -43,6 +44,8 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
   seedShift?: number;
   /** a paper that failed its checks laid out again another way (pipeline.ts; layout/engine.ts mend) */
   mend?: { narrowLead?: boolean };
+  /** a repair: the last try's pages that passed, kept as they are; only the others are laid out */
+  keep?: Map<number, EnginePage>;
               /** how far the build has got: planning the pages, finishing each, checking (pipeline.ts) */
               progress?: (p: Progress) => void;
               /** page images even when the fonts may be served (tests read them) */
@@ -54,6 +57,8 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
  * masthead, page headers and footer left empty for the paper's own. */
 /** The fewest words a front-page lead has (a lead's headline over less is top-heavy). */
 const LEAD_WORDS = 250;
+/** How many of the day's stories, most important first, are checked before the layout (a paper prints 20 to 30). */
+const FACTS_AHEAD = 30;
 /** Under this a story is a short item, ranked below the day's ordinary stories (set as a brief). */
 const SHORT_WORDS = 200;
 /** Two reports sharing this much of their opening words and figures are the same
@@ -208,7 +213,7 @@ export async function fillContext(store: Store, date: string): Promise<{
   }
 }
 
-export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport }> {
+export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport; pages: (EnginePage | null)[] }> {
   const modular = process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
   const { log } = opts;
   // how long each part takes (report.timing)
@@ -240,6 +245,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   let planEntries: BuildReport["plan"] = [];
   // (stories taken out as the same news as one kept: reported with those left out)
   const sameNews: Story[] = [];
+  let enginePages: (EnginePage | null)[] = [];
   let result!: { pages: Map<number, Element[]>; placed: { page: number; story: Story; variant: string; cols: number; rank: number }[];
                  gaps: { page: number; col: number; y0: number; y1: number }[]; leftOut: Story[];
                  plans: PagePlan[]; spent: number; factChecks: { story: string; detail: string }[] };
@@ -373,7 +379,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (in order: layout takes the first whose headline can be set in two columns)
     let columnPicks: string[] = [];
     const columnTitle = profile.editorial.columnTitle;
-    if (columnTitle && !opts.copy) {
+    if (columnTitle && (!opts.copy || modular)) {
       const fit = pool.slice(1).filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && wordCount(s.bodies.long) >= COLUMN_WORDS);
       const prefers = profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null;
       const local = (s: Story) => Number(!!prefers?.test(`${s.headline} ${s.bodies.long.slice(0, 300)}`));
@@ -387,6 +393,21 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       const own = paperArticleStories(date);
       if (own.length) log(`  the editor's own article(s), word for word: ${own.map((s) => s.id).join(", ")}`);
       pool = [...pool, ...own.map((s) => ({ ...s, photos: s.photos ?? [] }))];
+    }
+    let checkedAhead = 0;
+    // what the likely stories say checked before the layout, not after: a wrong one written
+    // again now costs a story, found on the page it cost the whole paper another try
+    if (modular && !opts.copy) {
+      const ahead = await checkPlaced(store, pool.slice(0, FACTS_AHEAD), log);
+      checkedAhead = ahead.cost;
+      const wrong = new Set(store.stories(date).filter((s) => s.factCheck && pool.slice(0, FACTS_AHEAD).some((x) => x.id === s.id)).map((s) => s.id));
+      if (wrong.size) {
+        await repairFacts(store, date, log, wrong);
+        pool = pool.map((s) => { const now = wrong.has(s.id) ? store.story(s.id) : null; return now ? { ...s, headline: now.headline, deck: now.deck, bodies: now.bodies, caption: now.caption, factCheck: now.factCheck } : s; });
+        // (one still wrong waits behind the rest, unless it's the lead or the editor's own)
+        const stuck = (s: Story, i: number) => i > 0 && !!s.factCheck && wrong.has(s.id) && !alwaysPrinted(s);
+        pool = [...pool.filter((s, i) => !stuck(s, i)), ...pool.filter((s, i) => stuck(s, i))];
+      }
     }
     let rewordCost = 0;
     if (opts.copy) {
@@ -433,7 +454,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
     const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, columnPicks, modular,
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, toFit: modular && !!opts.copy && !opts.copy.translate, columnPicks,
+      // (a page repaired alone is planned exactly: it has already failed by trial)
+      modular, ...(opts.keep ? { keep: opts.keep } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
       ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
       date, fillers, log, ...(opts.mend && !opts.copy ? { mend: opts.mend } : {}),
@@ -442,9 +465,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         ? { done: total + done, total: total * 2 + 1, label: "planning", item: String(Math.min(total, done + 1)) }
         : { done, total: of, label: "lengths" }),
     });
-    spent += v2.cost;
+    spent += v2.cost + checkedAhead;
     factChecks.push(...v2.factChecks);
     pool = v2.leftOut as typeof pool;
+    enginePages = v2.pages;
     timing.planning = Date.now() - timing.start;
     const t1 = Date.now();
     for (let n = 1; n <= total; n++) {
@@ -554,7 +578,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // gate 7 compares only builds made from the same inputs by the same engine:
   // after a change to either, the paper is meant to differ
   // (another arrangement on purpose, a repair: compared only with its like)
-  const fingerprint = buildFingerprint(store, date) + (modular ? "|planned" : "") + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
+  const fingerprint = buildFingerprint(store, date) + (modular ? `|planned ${read.found.length}` : "") + (opts.keep ? `|kept ${[...opts.keep.keys()].sort().join("")}` : "") + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
     + (opts.mend?.narrowLead ? "|narrow lead" : "");
   // (a copy is meant to differ from the day's paper)
   const previous = opts.copy ? null : store.latestIssue(date);
@@ -648,7 +672,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const g = whiteSpace.filter((x) => x.page === n);
     if (g.length) log(`  page ${n}: ${g.length} column gap(s) over 1.5 lines, the tallest ${Math.max(...g.map((x) => x.height))}pt`);
   }
-  return { issue, report: { ...report, version } };
+  return { issue, report: { ...report, version }, pages: enginePages };
 }
 
 /** A right-to-left paper's page (Urdu): laid out as usual, then every story
