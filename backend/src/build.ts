@@ -214,7 +214,8 @@ export async function fillContext(store: Store, date: string): Promise<{
 }
 
 export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport; pages: (EnginePage | null)[] }> {
-  const modular = process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
+  // (copies and sister papers always: the editor, 2 Nov; the day's paper by Settings' switch)
+  const modular = !!opts.copy || process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
   const { log } = opts;
   // how long each part takes (report.timing)
   const began = Date.now();

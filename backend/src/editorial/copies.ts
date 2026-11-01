@@ -137,7 +137,7 @@ export const editionFile = (date: string, id: string) => path.join(editionsDir(d
  * came back in every arrangement on 23 Oct: retrying them only tripled the time.) */
 const LAYOUT_GATES = ["1", "2", "W"];
 /** Tries per copy when a layout check fails (a copy placed like another is always tried again). */
-const TRIES = 2;
+const TRIES = 4;
 /** How far a try is from clean: each failed layout check, then what it is that failed --
  * a line over another or past its column worst, then an empty stretch, then a line a
  * hair short (26 Oct: two tries that each failed once kept the first, a line over the
@@ -274,9 +274,9 @@ async function rewordStory(store: Store, s: Story, n: number, reword: Reword, ke
     };
     out.bodies = { long: body, medium: upTo(0.66), short: upTo(0.4) };
   }
-  // (the new engine: names, places, dates and quotes read against the release as well; a
-  // wording that changes one isn't used, and a translation that does is left out)
-  if ((process.env.CK_PLANNER === "1" || store.setting("newEngine", false)) && out.headline + out.bodies.long !== s.headline + s.bodies.long) {
+  // (names, places, dates and quotes read against the release as well; a wording that
+  // changes one isn't used, and a translation that does is left out)
+  if (out.headline + out.bodies.long !== s.headline + s.bodies.long) {
     const read = await checkFacts(store, out, () => {});
     if (read.problems.length) return { story: s, cost: cost + read.cost };
     cost += read.cost;
@@ -346,7 +346,6 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
     own.fitted = (k: string) => store.fitted(`copy${n}|${k}`) ?? (spec.reword === "all" ? null : store.fitted(k));
     own.putFitted = (k: string, v: Parameters<Store["putFitted"]>[1]) => store.putFitted(`copy${n}|${k}`, v);
     own.forgetFitted = (id: string) => store.forgetFitted(`copy${n}|${id}`);
-    const planned = process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
     let made: { built: Awaited<ReturnType<typeof buildIssue>>; sig: string; layout: string; fails: number } | null = null;
     let spent = 0;
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -356,7 +355,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
         progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0),
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
         copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, reword, pdfPath: item.pdf,
-                translate: spec.translate, ...((spec.reword === "all" || planned) && !spec.translate ? { store: own } : {}),
+                translate: spec.translate, ...(!spec.translate ? { store: own } : {}),
                 ...(spec.articles?.length ? { extras: spec.articles.map((a, i) => articleStory(a, i, n, spec.date)) } : {}) },
       });
       spent += built.report.cost;
@@ -525,7 +524,7 @@ export async function copiesIn(store: Store, specFile: string) {
       store.db.exec("insert or ignore into fitted select * from src.fitted");
       // the editor's choice of sample ads (none at all, or not these): 26 Oct's
       // copies printed seven sample ads with them switched off
-      store.db.exec("insert or replace into settings select * from src.settings where key in ('samplesOn', 'samplesOff', 'newEngine')");
+      store.db.exec("insert or replace into settings select * from src.settings where key in ('samplesOn', 'samplesOff')");
     } finally { store.db.exec("detach database src"); }
     let last = 0;
     await layOutHere(store, spec, (l) => console.log(`[copies] ${l}`), (f) => console.log(`@@file ${JSON.stringify(f)}`),
