@@ -12,6 +12,7 @@
 // what the earlier steps stored stays stored.
 import { spawn } from "node:child_process";
 import { buildIssue } from "./build.ts";
+import type { EnginePage } from "./layout/engine.ts";
 import type { Job, JobStep, Progress, StepName, Store } from "./store.ts";
 
 export const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build"];
@@ -105,7 +106,8 @@ const MEND_MINUTES = 10;
 /** ... or after this many tries in a row that came out no better than the best so far. */
 const MEND_FRUITLESS = 4;
 
-type Scored = { gates: { gate: string; pass: boolean }[]; whiteSpace: { height: number }[]; placed: { story: string }[] };
+type Scored = { gates: { gate: string; pass: boolean; detail?: string }[]; whiteSpace: { height: number; page: number }[]; placed: { story: string; page: number }[];
+                pages: number; warnings: { page: number }[] };
 
 /** How far a build is from clean: each check failing (not the page review,
  * which comes after, nor gate 7, which only compares builds), and every point
@@ -115,6 +117,31 @@ function badness(r: Scored): number {
 }
 /** Items in the paper written for a gap, not the day's news (layout/fill.ts: id b-...). */
 const writtenItems = (r: Scored) => r.placed.filter((p) => p.story.startsWith("b-")).length;
+
+/** Tries in a row with no gain before a repair goes back to laying out the whole paper. */
+const PAGE_TRIES = 2;
+
+/** The pages a build's faults are on, the rest being good to keep (31 Oct: one blank
+ * page laid out all four again, four times, and each time new faults came on pages
+ * that had passed). Null when a fault isn't on any one page: the whole paper goes again. */
+function faultyPages(r: Scored): Set<number> | null {
+  const out = new Set(r.whiteSpace.map((w) => w.page));
+  for (const p of r.placed) if (p.story.startsWith("b-")) out.add(p.page);
+  const pageOf = new Map(r.placed.map((p) => [p.story, p.page]));
+  let nowhere = false;
+  for (const g of r.gates) {
+    if (g.pass || /^[257] /.test(g.gate)) continue;
+    const pages = /^1 /.test(g.gate) ? r.warnings.map((w) => w.page)
+      : [...(g.detail ?? "").matchAll(/\bp([1-9])\b/g)].map((m) => +m[1]);
+    for (const [id, page] of pageOf) if (g.detail?.includes(id)) pages.push(page);
+    if (!pages.length) nowhere = true;
+    for (const p of pages) out.add(p);
+  }
+  // (a blank page: the lead or the editor's column missing went with it)
+  const blank = Array.from({ length: r.pages }, (_, i) => i + 1).filter((n) => !r.placed.some((p) => p.page === n));
+  for (const n of blank) out.add(n);
+  return (nowhere && !blank.length) || !out.size ? null : out;
+}
 
 /** Runs `job`, noting how long it took as one of the step's parts (the time meter). */
 type Timed = <T>(name: string, job: () => Promise<T>) => Promise<T>;
@@ -270,7 +297,8 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       const began = Date.now();
       type Way = (typeof MENDS)[number] | null;
       let way: Way = null;
-      let best: { way: Way; bad: number } = { way, bad: badness(r.report) };
+      let best: { way: Way; bad: number; r: typeof r } = { way, bad: badness(r.report), r };
+      let keep: Map<number, EnginePage> | undefined;
       // (31 Oct: the lead already narrow, "the lead in its usual width" built the same paper over again)
       const leadCols = (x: typeof r) => (x.report as unknown as { placed: { page: number; cols: number }[] }).placed.filter((p) => p.page === 1).reduce((a, p) => Math.max(a, p.cols), 0);
       const tried = new Set([`0:${leadCols(r) < 8}`]);
@@ -283,10 +311,12 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       };
       let fruitless = 0;
       for (let round = 1; best.bad > 0 && fruitless < MEND_FRUITLESS && Date.now() - began < MEND_MINUTES * 60_000; round++) {
-        const failing = r.report.gates.filter((g) => !g.pass);
+        // (a try that came out worse is left: the next starts from the best so far)
+        const base = badness(r.report) > best.bad ? best.r : r;
+        const failing = base.report.gates.filter((g) => !g.pass);
         const layout = failing.filter((g) => REPAIR_BY_LAYOUT.test(g.gate));
         // (a gap in the paper filled by an item written for it passes the checks, but another way may need none)
-        const padded = writtenItems(r.report) > 0;
+        const padded = writtenItems(base.report) > 0;
         let mended = 0;
         if (failing.some((g) => g.gate.startsWith("6 "))) {
           const { repairFacts } = await import("./editorial/repair.ts");
@@ -298,20 +328,26 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         way = next;
         if (way) tried.add(`${way.seedShift}:${!!way.mend?.narrowLead || leadCols(r) < 8}`);
         const w = way;
+        // the pages that passed stay as they are; after two tries with no gain, the whole paper
+        const faulty = fruitless < PAGE_TRIES ? faultyPages(base.report) : null;
+        keep = faulty ? new Map(base.pages.flatMap((p, i) => (p && !faulty.has(i + 1) ? [[i + 1, p] as const] : []))) : undefined;
+        if (!keep?.size) keep = undefined;
+        if (keep) say(`keeping page(s) ${[...keep.keys()].join(", ")}: only the others are laid out again`);
         say(`mending ${round}: ${[...layout.map((g) => g.gate.replace(/^\S+ /, "")), ...(padded ? ["an item written for a gap"] : []), ...(mended ? [`${mended} story(ies) written again`] : [])].join("; ")}` +
             ` -- laying out again${w ? `: ${w.why}` : ""}`);
-        r = await timed(`laying out again ${round}`, () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: w?.seedShift ?? 0, ...(w?.mend ? { mend: w.mend } : {}) }));
+        r = await timed(`laying out again ${round}`, () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: w?.seedShift ?? 0, ...(w?.mend ? { mend: w.mend } : {}), ...(keep ? { keep } : {}) }));
         const bad = badness(r.report);
         // (a story written again: every way before it was laid out from the old words)
         fruitless = bad < best.bad || mended ? 0 : fruitless + 1;
-        if (bad < best.bad || mended) best = { way, bad };
+        if (bad < best.bad || mended) best = { way, bad, r };
       }
       // the best way the paper came out, made again if a later one was worse
       // (the same inputs, the same paper: gate 7)
       if (badness(r.report) > best.bad) {
         say(`the best of the tries was ${best.way ? best.way.why : "the first"}: laid out that way again`);
-        const b = best.way;
-        r = await timed("the best try again", () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: b?.seedShift ?? 0, ...(b?.mend ? { mend: b.mend } : {}) }));
+        // (every page of the best try kept: nothing to lay out)
+        const b = best.way, all = new Map(best.r.pages.flatMap((p, i) => (p ? [[i + 1, p] as const] : [])));
+        r = await timed("the best try again", () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: b?.seedShift ?? 0, keep: all }));
       }
       const version = (r.report as { version?: number }).version;
       say(`issue ${r.report.issueNumber} v${version ?? "?"}: ${r.report.ready ? "READY" : "NOT READY"} (the page review follows)`);
