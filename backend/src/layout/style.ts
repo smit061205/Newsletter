@@ -94,6 +94,9 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
     && x.module.story.bodies[x.module.variant].split(/\s+/).filter(Boolean).length < profile.editorial.minWords)
     .map((x) => `p${p.page} ${x.module.story.id}`));
 
+  const leadNoPhoto = plans.filter((p) => p.page === 1).flatMap((p) => p.placed).filter((x) => x.module.rank === 1 && x.module.photoDropped).length;
+  // (the editor's column isn't a must, the editor, 2 Nov: at most one, in its place)
+  const columnsPrinted = plans.flatMap((p) => p.placed).filter((x) => x.module.story.editorsColumn).length;
   const column = plans.filter((p) => p.page > 1).flatMap((p) => p.placed)
     .filter((x) => x.module.story.editorsColumn && (x.col === 0 || x.col + x.module.cols === GRID.columns)).length;
 
@@ -145,8 +148,9 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
     { gate: "S7 every story: headline, smaller sub-heading, smaller body", pass: structure.length === 0, detail: structure.join(", ") || "ok" },
     { gate: "S8 no story says the same thing twice", pass: repeating.length === 0, detail: repeating.join(", ") || "ok" },
     { gate: `S10 no story under ${profile.editorial.minWords} words`, pass: under.length === 0, detail: under.join(", ") || "ok" },
-    { gate: "S11 the editor's column once, at an inside page's edge", pass: !profile.editorial.columnTitle || column === 1,
-      detail: column === 1 ? "ok" : `${column} printed at an edge of pages 2 and after` },
+    { gate: "S11 the editor's column at most once, at an inside page's edge", pass: columnsPrinted <= 1 && column === columnsPrinted,
+      detail: column === columnsPrinted && columnsPrinted <= 1 ? "ok" : `${columnsPrinted} printed, ${column} at an edge of pages 2 and after` },
+    { gate: "S13 the front page's lead prints with its photo", pass: leadNoPhoto === 0, detail: leadNoPhoto ? "its photo left out" : "ok" },
     { gate: `S12 the front page has at most ${FRONT_MOST} stories`, pass: frontStories <= FRONT_MOST, detail: `${frontStories}` },
     { gate: "S9 no story set loosely", pass: looseStories.length === 0, detail: looseStories.join(", ") || "ok" },
     { gate: "S6 numbers in the paper's digits", pass: latinDigits.length === 0, detail: latinDigits.slice(0, 8).join(", ") || "ok" },

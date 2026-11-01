@@ -886,6 +886,8 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
     // a gap one column wide with no ad to force it, or a tall one: hardly a story
     // fits it (31 Oct's page 4 left 16cm white)
     for (const f of got.fills) if (f.cols === 1 && (!oneColumn || f.height > 12 * BODY.pitch)) penalty += 500;
+    // the lead with its photo (copy 8 of 1 Nov came out without): gate S13
+    if (n === 1 && placed.some((p) => p.module.story.id === stories[0].id && p.module.photoDropped)) penalty += 1000;
     // the editor's column at the page's edge, as high as it can be
     for (const p of placed) {
       if (!p.module.story.editorsColumn) continue;

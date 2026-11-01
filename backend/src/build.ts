@@ -214,7 +214,8 @@ export async function fillContext(store: Store, date: string): Promise<{
 }
 
 export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport; pages: (EnginePage | null)[] }> {
-  const modular = process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
+  // (copies and sister papers always: the editor, 2 Nov; the day's paper by Settings' switch)
+  const modular = !!opts.copy || process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
   const { log } = opts;
   // how long each part takes (report.timing)
   const began = Date.now();
@@ -379,7 +380,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (in order: layout takes the first whose headline can be set in two columns)
     let columnPicks: string[] = [];
     const columnTitle = profile.editorial.columnTitle;
-    if (columnTitle && (!opts.copy || modular)) {
+    if (columnTitle && !opts.copy) {
       const fit = pool.slice(1).filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && wordCount(s.bodies.long) >= COLUMN_WORDS);
       const prefers = profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null;
       const local = (s: Story) => Number(!!prefers?.test(`${s.headline} ${s.bodies.long.slice(0, 300)}`));

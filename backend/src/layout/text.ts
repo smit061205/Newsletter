@@ -49,10 +49,12 @@ export const removed = new Set<string>();
  * its Gujarati twin; the signs Gopika lacks (the candra vowels: "ૅ")
  * in their nearest form; anything else outside Gujarati, Latin and common
  * punctuation taken out and reported (24 Oct: a Punjabi "ਲ" in a PIB release
- * was printed in a system font). */
+ * was printed in a system font). The degree sign in words: Gopika has none (1 Nov's
+ * "૧૧૧.૭૫°" came from a system font), and taken out it would change the number's sense. */
 function printableGujarati(text: string): string {
   const CANDRA: Record<string, string> = { "ૅ": "ે", "ૉ": "ો", "ઍ": "એ", "ઑ": "ઓ" };
   const out = devanagariToGujarati(text)
+    .replace(/\s*°\s*C\b/g, " ડિગ્રી સેલ્સિયસ").replace(/\s*°\s*F\b/g, " ડિગ્રી ફેરનહીટ").replace(/\s*°/g, " ડિગ્રી")
     // Gurmukhi lines up with Gujarati letter for letter (U+0A00 -> U+0A80)
     .replace(/[\u0A00-\u0A7F]/g, (c) => { const g = String.fromCodePoint(c.codePointAt(0)! + 0x80); return /\p{Cn}/u.test(g) ? c : g; })
     .replace(/[ૅૉઍઑ]/g, (c) => CANDRA[c])
