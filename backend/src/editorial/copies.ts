@@ -525,7 +525,7 @@ export async function copiesIn(store: Store, specFile: string) {
       store.db.exec("insert or ignore into fitted select * from src.fitted");
       // the editor's choice of sample ads (none at all, or not these): 26 Oct's
       // copies printed seven sample ads with them switched off
-      store.db.exec("insert or replace into settings select * from src.settings where key in ('samplesOn', 'samplesOff')");
+      store.db.exec("insert or replace into settings select * from src.settings where key in ('samplesOn', 'samplesOff', 'newEngine')");
     } finally { store.db.exec("detach database src"); }
     let last = 0;
     await layOutHere(store, spec, (l) => console.log(`[copies] ${l}`), (f) => console.log(`@@file ${JSON.stringify(f)}`),
