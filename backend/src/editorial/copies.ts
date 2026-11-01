@@ -134,8 +134,8 @@ export const editionsDir = (date: string) => path.join(OUT_DIR, "editions", date
 export const editionFile = (date: string, id: string) => path.join(editionsDir(date), `${id}.pdf`);
 /** The checks a different arrangement can fix: an overflow, empty space, a
  * full-width story. (A headline that won't fill its width or a heavy one
- * came back in every arrangement on 23 Oct: retrying them only tripled the time.) */
-const LAYOUT_GATES = ["1", "2", "W"];
+ * came back in every arrangement on 23 Oct: retrying them only tripled the time; a lead without its photo gets another go.) */
+const LAYOUT_GATES = ["1", "2", "W", "S13"];
 /** Tries per copy when a layout check fails (a copy placed like another is always tried again). */
 const TRIES = 4;
 /** How far a try is from clean: each failed layout check, then what it is that failed --
