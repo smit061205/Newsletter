@@ -20,7 +20,7 @@ import { reviewPages } from "./editorial/review.ts";
 import { checkPlaced } from "./editorial/facts.ts";
 import { fitCalls, isSpeechText, numbersNotIn, speechTwin, writeDeck } from "./editorial/rewrite.ts";
 import type { FillerCount } from "./layout/fit.ts";
-import { layOut, type EngineResult } from "./layout/engine.ts";
+import { layOut, type EnginePage, type EngineResult } from "./layout/engine.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
 import { removed } from "./layout/text.ts";
 import { applyTextEdits, dedupe, droppedBy, inPaperLanguage, oneReportOfEach, referenceAds, standInsMovable } from "./layout/stories.ts";
@@ -43,6 +43,8 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
   seedShift?: number;
   /** a paper that failed its checks laid out again another way (pipeline.ts; layout/engine.ts mend) */
   mend?: { narrowLead?: boolean };
+  /** a repair: the last try's pages that passed, kept as they are; only the others are laid out */
+  keep?: Map<number, EnginePage>;
               /** how far the build has got: planning the pages, finishing each, checking (pipeline.ts) */
               progress?: (p: Progress) => void;
               /** page images even when the fonts may be served (tests read them) */
@@ -208,7 +210,7 @@ export async function fillContext(store: Store, date: string): Promise<{
   }
 }
 
-export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport }> {
+export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport; pages: (EnginePage | null)[] }> {
   const modular = process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
   const { log } = opts;
   // how long each part takes (report.timing)
@@ -240,6 +242,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   let planEntries: BuildReport["plan"] = [];
   // (stories taken out as the same news as one kept: reported with those left out)
   const sameNews: Story[] = [];
+  let enginePages: (EnginePage | null)[] = [];
   let result!: { pages: Map<number, Element[]>; placed: { page: number; story: Story; variant: string; cols: number; rank: number }[];
                  gaps: { page: number; col: number; y0: number; y1: number }[]; leftOut: Story[];
                  plans: PagePlan[]; spent: number; factChecks: { story: string; detail: string }[] };
@@ -433,7 +436,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
     const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, columnPicks, modular,
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, columnPicks,
+      // (a page repaired alone is planned exactly: it has already failed by trial)
+      modular: modular || !!opts.keep, ...(opts.keep ? { keep: opts.keep } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
       ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
       date, fillers, log, ...(opts.mend && !opts.copy ? { mend: opts.mend } : {}),
@@ -445,6 +450,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     spent += v2.cost;
     factChecks.push(...v2.factChecks);
     pool = v2.leftOut as typeof pool;
+    enginePages = v2.pages;
     timing.planning = Date.now() - timing.start;
     const t1 = Date.now();
     for (let n = 1; n <= total; n++) {
@@ -554,7 +560,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // gate 7 compares only builds made from the same inputs by the same engine:
   // after a change to either, the paper is meant to differ
   // (another arrangement on purpose, a repair: compared only with its like)
-  const fingerprint = buildFingerprint(store, date) + (modular ? "|planned" : "") + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
+  const fingerprint = buildFingerprint(store, date) + (modular ? "|planned" : "") + (opts.keep ? `|kept ${[...opts.keep.keys()].sort().join("")}` : "") + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
     + (opts.mend?.narrowLead ? "|narrow lead" : "");
   // (a copy is meant to differ from the day's paper)
   const previous = opts.copy ? null : store.latestIssue(date);
@@ -648,7 +654,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const g = whiteSpace.filter((x) => x.page === n);
     if (g.length) log(`  page ${n}: ${g.length} column gap(s) over 1.5 lines, the tallest ${Math.max(...g.map((x) => x.height))}pt`);
   }
-  return { issue, report: { ...report, version } };
+  return { issue, report: { ...report, version }, pages: enginePages };
 }
 
 /** A right-to-left paper's page (Urdu): laid out as usual, then every story

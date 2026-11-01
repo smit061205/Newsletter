@@ -88,7 +88,8 @@ const toHold = (a: Sized, b: Sized) => Number(sent(a)) - Number(sent(b)) || b.st
 const toBring = (a: Sized, b: Sized) => Number(sent(b)) - Number(sent(a)) || a.story.priority - b.story.priority || Number(!!b.story.photo) - Number(!!a.story.photo);
 
 /** The stories shared out over the pages: each page's list, most important first. */
-export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<string, number>; rng?: () => number }): { pages: Sized[][]; held: Sized[] } {
+export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<string, number>; rng?: () => number; front?: boolean }): { pages: Sized[][]; held: Sized[] } {
+  const roomFront = (k: number, pages: Sized[][]) => k > 0 || opts.front === false || pages[0].length < FRONT_MOST || rooms.length === 1;
   const pages: Sized[][] = rooms.map(() => []);
   const used = rooms.map(() => 0);
   const held: Sized[] = [];
@@ -114,7 +115,7 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
       const score = (k: number) => (k === 0 && s.story.editorsColumn ? -10 : 0) + want[k] / rooms[k] + (k === 0 && s.story.priority <= 2 ? 0.15 : 0)
         + (feature ? (k === 0 ? -0.5 : 0.05 * k) : 0.08 * (rooms.length - 1 - k))
         - (pages[k].some((o) => related(o.story, s.story)) ? 0.3 : 0) + (opts.rng ? (opts.rng() - 0.5) * 0.12 : 0);
-      p = rooms.map((_, k) => k).filter((k) => k > 0 || pages[0].length < FRONT_MOST || rooms.length === 1).reduce((a, b) => (score(b) > score(a) ? b : a));
+      p = rooms.map((_, k) => k).filter((k) => roomFront(k, pages)).reduce((a, b) => (score(b) > score(a) ? b : a));
       if (rooms[p] - used[p] < s.min * 0.6 && !sent(s)) { held.push(s); continue; }
     }
     pages[p].push(s);
@@ -123,7 +124,7 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
   // a page short of copy takes a held story, or one from a page with copy to spare
   for (let round = 0; round < 8; round++) {
     const sum = (k: number, f: "min" | "max") => pages[k].reduce((a, s) => a + s[f], 0);
-    const short = rooms.findIndex((r, k) => sum(k, "max") < r && (k > 0 || pages[0].length < FRONT_MOST || rooms.length === 1));
+    const short = rooms.findIndex((r, k) => sum(k, "max") < r && roomFront(k, pages));
     const long = rooms.findIndex((r, k) => sum(k, "min") > r);
     if (short < 0 && long < 0) break;
     if (long >= 0) {
@@ -167,10 +168,18 @@ export async function layOut(args: {
   columnPicks?: string[];
   /** the page planned (layout/planner.ts), and written to what the plan measures */
   modular?: boolean;
+  /** a repair (pipeline.ts): pages of the last try that passed, by number, kept as they are */
+  keep?: Map<number, EnginePage>;
   log: (s: string) => void; progress?: (done: number, total: number, what: string) => void;
 }): Promise<EngineResult> {
   const { m, log } = args;
   const total = args.bands.length;
+  // the kept pages' stories aren't the day's to place again, nor their one house ad
+  const kept = [...(args.keep?.values() ?? [])];
+  const keptStories = new Set(kept.flatMap((p) => p.placed.map((x) => x.module.story.id)));
+  args = { ...args, pool: args.pool.filter((s) => !keptStories.has(s.id)) };
+  args.fillers.houseAds += new Set(kept.flatMap((p) => p.elements.flatMap((e) => (e.articleId?.startsWith("filler-") ? [e.articleId] : [])))).size;
+  if (kept.some((p) => p.placed.some((x) => x.module.story.editorsColumn))) args = { ...args, columnPicks: [] };
   let cost = 0;
   const t0 = Date.now();
   const secs = (t: number) => ((Date.now() - t) / 1000).toFixed(1);
@@ -191,7 +200,7 @@ export async function layOut(args: {
   await lengths(args.pool, args.longer ? false : "cached");
   // the front page's lead written longer where its release has more: it carries
   // the page, and at its bare 250 words its photo left a stray line under it (30 Oct)
-  if (args.longer && args.pool[0]) await lengths([args.pool[0]], true);
+  if (args.longer && args.pool[0] && !args.keep?.has(1)) await lengths([args.pool[0]], true);
   // a story shorter than the paper's shortest (profile minWords) isn't printed,
   // unless the editor sent it: no items of a few lines under a big headline
   const tooShort = args.pool.filter((s) => !alwaysPrinted(s) && Math.max(...(ladders.get(s.id) ?? []).map((r) => r.words)) < MIN_WORDS);
@@ -239,12 +248,27 @@ export async function layOut(args: {
   const pageAds = (n: number) => args.ads.filter((a) => a.page === n);
   const rooms = args.bands.map((b, i) => roomOf(b, pageAds(i + 1)));
   const rng = seeded(args.seed);
-  const { pages: shares, held } = assign(sized, rooms, { fixedPage: args.fixedPage, rng: args.seed ? rng : undefined });
+  // (only the open pages share out the stories)
+  const open = rooms.map((_, i) => i).filter((i) => !args.keep?.has(i + 1));
+  const shared = assign(sized, open.map((i) => rooms[i]), { fixedPage: args.fixedPage, rng: args.seed ? rng : undefined, front: !args.keep?.has(1) });
+  const { held } = shared;
+  const shares: Sized[][] = rooms.map((_, i) => shared.pages[open.indexOf(i)] ?? []);
+  // a page repaired alone has at least one story for each space its ads leave
+  // (31 Oct's page 3: three ads across the foot, and stories written long left it two)
+  if (args.keep) for (const i of open) {
+    const least = Math.max(REPAIRED_FEWEST, pageAds(i + 1).length + 1);
+    for (const s of [...held].sort(toBring)) {
+      if (shares[i].length >= least) break;
+      if (i === 0 && s.story.editorsColumn) continue;
+      held.splice(held.indexOf(s), 1);
+      shares[i].push(s);
+    }
+  }
   // the editor's column on an inside page, however the pages were evened out
   const astray = shares[0]?.find((s) => s.story.editorsColumn);
-  if (astray && shares.length > 1) {
+  if (astray && shares.length > 1 && open.some((i) => i > 0)) {
     shares[0] = shares[0].filter((s) => s !== astray);
-    const to = shares.map((_, k) => k).slice(1).sort((a, b) => shares[a].reduce((t, s) => t + s.mid, 0) / rooms[a] - shares[b].reduce((t, s) => t + s.mid, 0) / rooms[b])[0];
+    const to = open.filter((k) => k > 0).sort((a, b) => shares[a].reduce((t, s) => t + s.mid, 0) / rooms[a] - shares[b].reduce((t, s) => t + s.mid, 0) / rooms[b])[0];
     shares[to].push(astray);
   }
   log(`  pages: ${shares.map((p, i) => `${i + 1}: ${p.length} stories (${Math.round(p.reduce((a, s) => a + s.mid, 0) / rooms[i] * 100)}%)`).join(", ")}` +
@@ -315,7 +339,7 @@ export async function layOut(args: {
   // 3. each page designed and solved; a page no design fills: other designs,
   // then a story more (one held back, or the smallest from a page with copy
   // to spare) or one fewer (the least important, held back), and again
-  const pages: (EnginePage | null)[] = new Array(total).fill(null);
+  const pages: (EnginePage | null)[] = rooms.map((_, i) => args.keep?.get(i + 1) ?? null);
   // a page short of copy with no story left to give it: room for a filler
   const shortBy = new Map<number, number>();
   const fill: FillContext = { store: args.store, date: args.date, m, blocks, held: [], fillers: args.fillers, written: [], turn: Promise.resolve(), cost: 0, log };
@@ -449,7 +473,12 @@ export async function layOut(args: {
     }
     const order = new Map(sized.map((s, k) => [s.story.id, k]));
     shares[i].sort((a, b) => (order.get(a.story.id) ?? 0) - (order.get(b.story.id) ?? 0));
-    for (let attempt = 0; attempt < 3 && !pages[i]; attempt++) {
+    for (let attempt = 0; attempt < 6 && !pages[i]; attempt++) {
+      // (three tries with the page's stories, then another story in the place of its last)
+      if (attempt >= 3 && held.length && shares[i].length > 1) {
+        const other = [...held].sort(toBring).find((s) => i > 0 || !s.story.editorsColumn), out = shares[i].findLast((s) => !s.story.editorsColumn);
+        if (other && out) { held.splice(held.indexOf(other), 1, out); shares[i] = shares[i].map((s) => (s === out ? other : s)); }
+      }
       fill.held = held.map((s) => s.story);
       const got = await solvePage(n, shares[i].map((s) => s.story), args.bands[i], pageAds(n), blocks, m, !!args.modular, seeded(args.seed * 37 + n + attempt * 7919),
                                   args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), true, false, undefined, Infinity, !!args.mend);
@@ -477,6 +506,8 @@ const PAGE_RETRIES = 3;
 /** Pages planned (layout/planner.ts), not drawn at random: the new engine, on trial. */
 /** The longest a story is written to fill a slot (words). */
 const LONGEST_WRITTEN = 700;
+/** The fewest stories a page repaired alone starts with. */
+const REPAIRED_FEWEST = 4;
 /** The fewest stories a page is brought down to by holding them back. */
 const PAGE_FEWEST = 3;
 /** The fewest words of the front page's lead. */
