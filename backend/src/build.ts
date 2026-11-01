@@ -456,7 +456,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const v2: EngineResult = await layOut({
       pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, columnPicks,
       // (a page repaired alone is planned exactly: it has already failed by trial)
-      modular: modular || !!opts.keep, ...(opts.keep ? { keep: opts.keep } : {}),
+      modular, ...(opts.keep ? { keep: opts.keep } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
       ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
       date, fillers, log, ...(opts.mend && !opts.copy ? { mend: opts.mend } : {}),

@@ -299,6 +299,8 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       let way: Way = null;
       let best: { way: Way; bad: number; r: typeof r } = { way, bad: badness(r.report), r };
       let keep: Map<number, EnginePage> | undefined;
+      // (keeping the pages that passed is the new engine's; the old one lays out the whole paper each time)
+      const planned = !!r.report.modular;
       // (31 Oct: the lead already narrow, "the lead in its usual width" built the same paper over again)
       const leadCols = (x: typeof r) => (x.report as unknown as { placed: { page: number; cols: number }[] }).placed.filter((p) => p.page === 1).reduce((a, p) => Math.max(a, p.cols), 0);
       const tried = new Set([`0:${leadCols(r) < 8}`]);
@@ -312,7 +314,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       let fruitless = 0;
       for (let round = 1; best.bad > 0 && fruitless < MEND_FRUITLESS && Date.now() - began < MEND_MINUTES * 60_000; round++) {
         // (a try that came out worse is left: the next starts from the best so far)
-        const base = badness(r.report) > best.bad ? best.r : r;
+        const base = planned && badness(r.report) > best.bad ? best.r : r;
         const failing = base.report.gates.filter((g) => !g.pass);
         const layout = failing.filter((g) => REPAIR_BY_LAYOUT.test(g.gate));
         // (a gap in the paper filled by an item written for it passes the checks, but another way may need none)
@@ -329,7 +331,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         if (way) tried.add(`${way.seedShift}:${!!way.mend?.narrowLead || leadCols(r) < 8}`);
         const w = way;
         // the pages that passed stay as they are; after two tries with no gain, the whole paper
-        const faulty = fruitless < PAGE_TRIES ? faultyPages(base.report) : null;
+        const faulty = planned && fruitless < PAGE_TRIES ? faultyPages(base.report) : null;
         keep = faulty ? new Map(base.pages.flatMap((p, i) => (p && !faulty.has(i + 1) ? [[i + 1, p] as const] : []))) : undefined;
         if (!keep?.size) keep = undefined;
         if (keep) say(`keeping page(s) ${[...keep.keys()].join(", ")}: only the others are laid out again`);
@@ -347,7 +349,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         say(`the best of the tries was ${best.way ? best.way.why : "the first"}: laid out that way again`);
         // (every page of the best try kept: nothing to lay out)
         const b = best.way, all = new Map(best.r.pages.flatMap((p, i) => (p ? [[i + 1, p] as const] : [])));
-        r = await timed("the best try again", () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: b?.seedShift ?? 0, keep: all }));
+        r = await timed("the best try again", () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: b?.seedShift ?? 0, ...(planned ? { keep: all } : b?.mend ? { mend: b.mend } : {}) }));
       }
       const version = (r.report as { version?: number }).version;
       say(`issue ${r.report.issueNumber} v${version ?? "?"}: ${r.report.ready ? "READY" : "NOT READY"} (the page review follows)`);

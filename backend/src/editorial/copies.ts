@@ -31,6 +31,7 @@ import os from "node:os";
 import path from "node:path";
 import { DB_FILE, ENV_FILE, MEDIA_DIR, OUT_DIR, PAPERS_HOME, ROOT } from "../config.ts";
 import { buildIssue, type CopyOpts } from "../build.ts";
+import { checkFacts } from "./facts.ts";
 import { browserServer, closeBrowser } from "../browser.ts";
 import { profile } from "../profile.ts";
 import type { Store, Story } from "../store.ts";
@@ -272,6 +273,13 @@ async function rewordStory(store: Store, s: Story, n: number, reword: Reword, ke
       return out.join("\n\n");
     };
     out.bodies = { long: body, medium: upTo(0.66), short: upTo(0.4) };
+  }
+  // (the new engine: names, places, dates and quotes read against the release as well; a
+  // wording that changes one isn't used, and a translation that does is left out)
+  if ((process.env.CK_PLANNER === "1" || store.setting("newEngine", false)) && out.headline + out.bodies.long !== s.headline + s.bodies.long) {
+    const read = await checkFacts(store, out, () => {});
+    if (read.problems.length) return { story: s, cost: cost + read.cost };
+    cost += read.cost;
   }
   return { story: out, cost };
 }
