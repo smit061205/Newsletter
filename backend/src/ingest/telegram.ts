@@ -237,7 +237,9 @@ async function ask(store: Store, photos: InboxItem[], _log: (s: string) => void)
 export async function placePhotos(store: Store, log: (s: string) => void, now = Date.now() / 1000) {
   const all = store.inbox();
   const arts = articles(all);
-  const waiting = all.filter((x) => x.kind === "photo" && x.pairedTo === undefined && !x.asked && !x.usedOn && now - x.at >= SETTLE);
+  // (a photo told it had no article to go with looks again once articles have come: 1 Nov)
+  const hasArticle = (x: InboxItem) => arts.some((a) => a.chat === x.chat && Math.abs(a.at - x.at) <= RECENT && !all.find((y) => y.id === a.ids[0])?.usedOn);
+  const waiting = all.filter((x) => x.kind === "photo" && x.pairedTo === undefined && (!x.asked || (x.asked === -1 && hasArticle(x))) && !x.usedOn && now - x.at >= SETTLE);
   const done = new Set<string>();
   const jobs: InboxItem[] = [];
   for (const p of waiting) {
@@ -325,6 +327,7 @@ async function byLooking(p: InboxItem, group: InboxItem[], recent: ReturnType<ty
 export async function ingestTelegram(store: Store, date: string, opts: { log?: (s: string) => void } = {}): Promise<number> {
   const log = opts.log ?? (() => {});
   if (!token()) return 0;
+  await caughtUp(log);
   // (photos that haven't settled yet: placed now if time or the AI can; any other waits for his answer)
   await placePhotos(store, log, Number.POSITIVE_INFINITY).catch((e: unknown) => log(`Telegram: photos not placed (${e instanceof Error ? e.message : e})`));
   const all = store.inbox(true);
@@ -377,6 +380,29 @@ export async function botName(): Promise<string | null | "busy"> {
 }
 
 let polling = false;
+/** When the ask now waiting on Telegram began (0: none is: messages are being taken in). */
+let askingSince = 0;
+/** Telegram didn't answer the last ask. */
+let unreachable = false;
+/** An ask with messages waiting returns at once: one still open after this long (ms) means none are. */
+const NONE_WAITING = 3000;
+/** The longest the paper waits for messages still coming in (ms). */
+const CATCH_UP = 5 * 60_000;
+
+/** Waits for what Telegram is holding to come in. Messages sent while the app was closed
+ * come when it opens, one by one, photos before the words sent after them: on 1 Nov the
+ * paper looked halfway through, saw only photos and took no news. */
+async function caughtUp(log: (s: string) => void) {
+  const began = Date.now();
+  let said = false;
+  while (polling && !unreachable && Date.now() - began < CATCH_UP) {
+    if (askingSince && Date.now() - askingSince >= NONE_WAITING) return;
+    if (!said && Date.now() - began > NONE_WAITING * 2) { said = true; log("Telegram: messages are still coming in: waiting for them"); }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  if (Date.now() - began >= CATCH_UP) log("Telegram: still more messages coming in: the paper goes on with those that have come");
+}
+
 /** Asks Telegram for messages for as long as the engine runs (a token set). */
 export function pollTelegram(store: Store, log: (s: string) => void) {
   if (polling) return;
@@ -387,16 +413,22 @@ export function pollTelegram(store: Store, log: (s: string) => void) {
       if (!token()) { await new Promise((r) => setTimeout(r, 60_000)); continue; }
       try {
         const offset = store.setting<number>("telegramOffset", 0);
+        askingSince = Date.now();
         const updates = await api<TgUpdate[]>("getUpdates", { offset, timeout: 50, allowed_updates: ["message", "callback_query"] }, 70);
+        askingSince = 0;
+        unreachable = false;
         for (const u of updates) {
           await take(store, u, log).catch((e: unknown) => log(`Telegram: a message couldn't be taken (${e instanceof Error ? e.message : e})`));
           store.putSetting("telegramOffset", u.update_id + 1);
         }
-        if (Date.now() - lastPlace > 60_000) {
+        // (not with messages still to come: a photo would be told it has no article)
+        if (!updates.length && Date.now() - lastPlace > 60_000) {
           lastPlace = Date.now();
           await placePhotos(store, log);
         }
       } catch (e) {
+        askingSince = 0;
+        unreachable = true;
         log(`Telegram: ${e instanceof Error ? e.message : e} (trying again in a minute)`);
         await new Promise((r) => setTimeout(r, 60_000));
       }
