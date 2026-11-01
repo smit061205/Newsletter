@@ -214,6 +214,15 @@ export async function layOut(args: {
         args.store.forgetFitted(lead.id);
         args.store.putFitted(`avoid|${lead.id}`, { body: read.problems.join("; "), model: "facts" });
         await lengths([lead], true);
+        // (wrong again: the words it has, which passed. 31 Oct: the same wrong title both times)
+        const again = ladders.get(lead.id)?.[0];
+        const twice = again && await checkFacts(args.store, { ...lead, bodies: { ...lead.bodies, long: again.body } }, log);
+        if (twice) cost += twice.cost;
+        if (twice?.problems.length) {
+          args.store.forgetFitted(lead.id);
+          await lengths([lead], false);
+          log(`  ${lead.id}: wrong again when written longer: its own words kept`);
+        }
       }
     }
   }
