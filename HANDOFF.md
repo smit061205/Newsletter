@@ -8,6 +8,8 @@ technical manual) as needed.
 
 **The new engine (1 Nov 2026, v1.1.50):** built and released behind Settings' switch, off by default; the older design search still makes the paper. Replay of the saved days (first build, no AI): 5 of 10 clean layouts, 4 READY (2 of 10 before); hard days 1 of 6. A real paper on 31 Oct's news came out READY after one repair in about 3 minutes, about ₹1 of AI. Open: the first build left a page blank in 2 of 3 real runs (repairs mended it each time); a page with a kept ad falls back to the older designs; `sample-english` has one gap and `sample-urdu` isn't READY with the new engine on. `sample-urdu` also fails on this Mac with it off, on `main` too. Who turns it on and when starts the 14 evenings' count; `report.modular` marks those papers.
 
+**The third engine (2 Nov 2026, behind the same switch):** the order changed so retries aren't needed: spaces of all pages, then stories chosen to fit them, facts read before the layout, stories written to their slots, page-only repair, whole paper last. Replay with real AI, first build: 8 of 10 saved days clean layouts (the second engine: 5 of 10), 5 READY; the stories that failed were fact flags, mended by the repair loop. Goals, not promises: no whole-paper rebuild on a normal day, under 2 minutes of layout. Still the switch's trial: 14 clean evenings (READY first try, no whole-paper rebuild) before it becomes the default.
+
 ---
 
 ## 1. What this is
