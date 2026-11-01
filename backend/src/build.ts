@@ -454,7 +454,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
     const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, columnPicks,
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, toFit: modular && !!opts.copy && !opts.copy.translate, columnPicks,
       // (a page repaired alone is planned exactly: it has already failed by trial)
       modular, ...(opts.keep ? { keep: opts.keep } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,

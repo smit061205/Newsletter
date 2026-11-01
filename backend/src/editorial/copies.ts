@@ -340,10 +340,13 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
       say(`@@cost ${JSON.stringify({ cost: got.cost, stories: got.pool.length })}`);
       continue;
     }
-    // a reworded body is fitted to its space on its own (not with the day's fits)
+    // a reworded body is fitted to its space on its own (not with the day's fits); one
+    // keeping the day's words starts from the day's fits, and what's written for it stays its own
     const own = Object.create(store) as Store;
-    own.fitted = (k: string) => store.fitted(`copy${n}|${k}`);
+    own.fitted = (k: string) => store.fitted(`copy${n}|${k}`) ?? (spec.reword === "all" ? null : store.fitted(k));
     own.putFitted = (k: string, v: Parameters<Store["putFitted"]>[1]) => store.putFitted(`copy${n}|${k}`, v);
+    own.forgetFitted = (id: string) => store.forgetFitted(`copy${n}|${id}`);
+    const planned = process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
     let made: { built: Awaited<ReturnType<typeof buildIssue>>; sig: string; layout: string; fails: number } | null = null;
     let spent = 0;
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -353,7 +356,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
         progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0),
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
         copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, reword, pdfPath: item.pdf,
-                translate: spec.translate, ...(spec.reword === "all" && !spec.translate ? { store: own } : {}),
+                translate: spec.translate, ...((spec.reword === "all" || planned) && !spec.translate ? { store: own } : {}),
                 ...(spec.articles?.length ? { extras: spec.articles.map((a, i) => articleStory(a, i, n, spec.date)) } : {}) },
       });
       spent += built.report.cost;

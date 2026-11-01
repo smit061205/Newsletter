@@ -160,6 +160,8 @@ export async function layOut(args: {
   fixedPage?: Map<string, number>; avoid?: Set<string>;
   /** ask the AI for longer versions (the day's paper; a copy uses what's cached) */
   longer: boolean;
+  /** a copy's stories written to the spaces its pages need (the new engine; not a translation) */
+  toFit?: boolean;
   /** the day (a written brief's cache key) and the fillers the paper has used (one message, one house ad) */
   date: string; fillers: FillerCount;
   /** a paper that failed its checks laid out again another way (pipeline.ts): the
@@ -259,8 +261,8 @@ export async function layOut(args: {
     sized = (await Promise.all(sized.map((s, i) => sizeOf(s.story, i === 0)))).filter((x): x is Sized => !!x);
     log(`  short of copy: longer versions written (${secs(t2)}s)`);
   }
-  // (a copy writes nothing: its stories run to the lengths there are)
-  const factsOf = (s: Story) => { const r = args.releases.get(s.id); return args.longer && r && !wordForWord(s) ? wordCount(paragraphs(r.body).join(" ")) : 0; };
+  // (a translation writes nothing: its stories run to the lengths there are)
+  const factsOf = (s: Story) => { const r = args.releases.get(s.id); return (args.longer || args.toFit) && r && !wordForWord(s) ? wordCount(paragraphs(r.body).join(" ")) : 0; };
   const pageAds = (n: number) => args.ads.filter((a) => a.page === n);
   const rooms = args.bands.map((b, i) => roomOf(b, pageAds(i + 1)));
   const rng = seeded(args.seed);
@@ -302,7 +304,7 @@ export async function layOut(args: {
   };
   // a page the planner can't fill from the lengths there are: each story written to the
   // slot it needs, from its release's facts, all at once (layout/planner.ts)
-  const writeTo: WriteTo | undefined = !args.longer ? undefined : async (needs) => {
+  const writeTo: WriteTo | undefined = !args.longer && !args.toFit ? undefined : async (needs) => {
     const got = await Promise.all(needs.map(async ({ story, lines, perLine }) => {
       const release = args.releases.get(story.id);
       const ladder = ladders.get(story.id);
@@ -691,7 +693,7 @@ async function share(sized: Sized[], rooms: number[], open: number[], perPage: (
     const mean = left.slice(0, 12).reduce((a, s) => a + s.mid, 0) / Math.max(1, Math.min(12, left.length));
     const most = i === 0 ? FRONT_MOST : PAGE_MOST, least = Math.min(most, Math.max(i === 0 ? 3 : 2, perPage(i).length));
     const want = Math.min(most, Math.max(least, Math.round(rooms[i] / Math.max(1, mean))));
-    const counts = [-1, 0, 1, -2, 2, 3].map((d) => want + d).filter((k, x, all) => k >= least && k <= most && all.indexOf(k) === x);
+    const counts = [0, -1, 1, -2, 2, 3].map((d) => want + d).filter((k, x, all) => k >= least && k <= most && all.indexOf(k) === x);
     let chosen: Sized[] | null = null;
     for (const k of counts) {
       // the most important k; then, a story at a time from the end, the next ones in their place
