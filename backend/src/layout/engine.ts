@@ -205,24 +205,28 @@ export async function layOut(args: {
   // the page, and at its bare 250 words its photo left a stray line under it (30 Oct)
   if (args.longer && args.pool[0] && !args.keep?.has(1)) {
     await lengths([args.pool[0]], true);
-    // (its new words read before it goes on the page, as a story written to a slot's are)
-    const lead = args.pool[0], top = ladders.get(lead.id)?.[0];
-    if (args.modular && top) {
-      const read = await checkFacts(args.store, { ...lead, bodies: { ...lead.bodies, long: top.body } }, log);
-      cost += read.cost;
-      if (read.problems.length) {
+    // (every length of its words read before it goes on the page, as a story written to a slot's
+    // are: 31 Oct's printed length had a wrong title the longest didn't. Written once more if
+    // one is wrong; what's still wrong isn't used, the words it had to start with if nothing's left)
+    const lead = args.pool[0];
+    const read = async () => {
+      const rungs = ladders.get(lead.id) ?? [];
+      const got = await Promise.all(rungs.map((r) => checkFacts(args.store, { ...lead, bodies: { ...lead.bodies, long: r.body } }, log)));
+      for (const g of got) cost += g.cost;
+      return { good: rungs.filter((_, i) => !got[i].problems.length), wrong: got.flatMap((g) => g.problems) };
+    };
+    if (args.modular && ladders.get(lead.id)?.length) {
+      let found = await read();
+      if (found.wrong.length) {
         args.store.forgetFitted(lead.id);
-        args.store.putFitted(`avoid|${lead.id}`, { body: read.problems.join("; "), model: "facts" });
+        args.store.putFitted(`avoid|${lead.id}`, { body: [...new Set(found.wrong)].join("; "), model: "facts" });
         await lengths([lead], true);
-        // (wrong again: the words it has, which passed. 31 Oct: the same wrong title both times)
-        const again = ladders.get(lead.id)?.[0];
-        const twice = again && await checkFacts(args.store, { ...lead, bodies: { ...lead.bodies, long: again.body } }, log);
-        if (twice) cost += twice.cost;
-        if (twice?.problems.length) {
-          args.store.forgetFitted(lead.id);
-          await lengths([lead], false);
-          log(`  ${lead.id}: wrong again when written longer: its own words kept`);
-        }
+        found = await read();
+      }
+      if (found.wrong.length) {
+        args.store.forgetFitted(lead.id);
+        if (found.good.length) ladders.set(lead.id, found.good); else await lengths([lead], false);
+        log(`  ${lead.id}: wrong again when written longer: only the lengths that passed kept`);
       }
     }
   }
