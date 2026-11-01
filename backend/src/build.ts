@@ -18,6 +18,7 @@ import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
 import { checkPlaced } from "./editorial/facts.ts";
+import { repairFacts } from "./editorial/repair.ts";
 import { fitCalls, isSpeechText, numbersNotIn, speechTwin, writeDeck } from "./editorial/rewrite.ts";
 import type { FillerCount } from "./layout/fit.ts";
 import { layOut, type EngineResult } from "./layout/engine.ts";
@@ -54,6 +55,8 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
  * masthead, page headers and footer left empty for the paper's own. */
 /** The fewest words a front-page lead has (a lead's headline over less is top-heavy). */
 const LEAD_WORDS = 250;
+/** How many of the day's stories, most important first, are checked before the layout (a paper prints 20 to 30). */
+const FACTS_AHEAD = 30;
 /** Under this a story is a short item, ranked below the day's ordinary stories (set as a brief). */
 const SHORT_WORDS = 200;
 /** Two reports sharing this much of their opening words and figures are the same
@@ -388,6 +391,21 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       if (own.length) log(`  the editor's own article(s), word for word: ${own.map((s) => s.id).join(", ")}`);
       pool = [...pool, ...own.map((s) => ({ ...s, photos: s.photos ?? [] }))];
     }
+    let checkedAhead = 0;
+    // what the likely stories say checked before the layout, not after: a wrong one written
+    // again now costs a story, found on the page it cost the whole paper another try
+    if (modular && !opts.copy) {
+      const ahead = await checkPlaced(store, pool.slice(0, FACTS_AHEAD), log);
+      checkedAhead = ahead.cost;
+      const wrong = new Set(store.stories(date).filter((s) => s.factCheck && pool.slice(0, FACTS_AHEAD).some((x) => x.id === s.id)).map((s) => s.id));
+      if (wrong.size) {
+        await repairFacts(store, date, log, wrong);
+        pool = pool.map((s) => { const now = wrong.has(s.id) ? store.story(s.id) : null; return now ? { ...s, headline: now.headline, deck: now.deck, bodies: now.bodies, caption: now.caption, factCheck: now.factCheck } : s; });
+        // (one still wrong waits behind the rest, unless it's the lead or the editor's own)
+        const stuck = (s: Story, i: number) => i > 0 && !!s.factCheck && wrong.has(s.id) && !alwaysPrinted(s);
+        pool = [...pool.filter((s, i) => !stuck(s, i)), ...pool.filter((s, i) => stuck(s, i))];
+      }
+    }
     let rewordCost = 0;
     if (opts.copy) {
       const c = opts.copy;
@@ -442,7 +460,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         ? { done: total + done, total: total * 2 + 1, label: "planning", item: String(Math.min(total, done + 1)) }
         : { done, total: of, label: "lengths" }),
     });
-    spent += v2.cost;
+    spent += v2.cost + checkedAhead;
     factChecks.push(...v2.factChecks);
     pool = v2.leftOut as typeof pool;
     timing.planning = Date.now() - timing.start;
@@ -554,7 +572,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // gate 7 compares only builds made from the same inputs by the same engine:
   // after a change to either, the paper is meant to differ
   // (another arrangement on purpose, a repair: compared only with its like)
-  const fingerprint = buildFingerprint(store, date) + (modular ? "|planned" : "") + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
+  const fingerprint = buildFingerprint(store, date) + (modular ? `|planned ${read.found.length}` : "") + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
     + (opts.mend?.narrowLead ? "|narrow lead" : "");
   // (a copy is meant to differ from the day's paper)
   const previous = opts.copy ? null : store.latestIssue(date);

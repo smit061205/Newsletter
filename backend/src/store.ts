@@ -219,10 +219,9 @@ export class Store {
     this.db.prepare("insert or replace into fitted (key, json) values (?, ?)").run(key, JSON.stringify(value));
   }
 
-  /** A story's fitted versions with these words dropped (they failed a check): the next fit writes them anew. */
-  forgetFitted(story: string, body: string) {
-    const rows = this.db.prepare("select key, json from fitted where substr(key, 1, ?) = ?").all(story.length + 1, `${story}|`) as { key: string; json: string }[];
-    for (const r of rows) if ((JSON.parse(r.json) as { body: string }).body === body) this.db.prepare("delete from fitted where key = ?").run(r.key);
+  /** A story's fitted versions dropped (one failed a check, and the page may print a cut of any): the next fit writes them anew. */
+  forgetFitted(story: string) {
+    this.db.prepare("delete from fitted where substr(key, 1, ?) = ?").run(story.length + 1, `${story}|`);
   }
 
   /** A pipeline run (pipeline.ts): its steps, their logs and outcome. */
