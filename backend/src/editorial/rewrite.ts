@@ -222,9 +222,17 @@ export function numbersNotIn(out: string, source: string, date?: string): string
     if (k > 0) known.add(String(k * 1000 + Number(m[3])));
   }
   const words = new Set(source.toLowerCase().split(/[\s,.;:()'"‘’“”!?।-]+/));
+  // ... and the other way: "૪૦ હજાર" in the story is the release's "40,000" (1 Nov)
+  const scaled = new Map<string, string[]>();
+  const outLatin = out.replace(/[૦-૯]/g, (d) => String("૦૧૨૩૪૫૬૭૮૯".indexOf(d))).replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d)));
+  for (const m of outLatin.matchAll(/(\d+(?:\.\d+)?)\s*(हज़ार|हजार|હજાર|लाख|લાખ|करोड़|करोड|કરોડ)/g)) {
+    const v = Number(m[1]) * (/लाख|લાખ/.test(m[2]) ? 100_000 : /करोड|કરોડ/.test(m[2]) ? 10_000_000 : 1000);
+    scaled.set(plain(m[1]), [...(scaled.get(plain(m[1])) ?? []), String(Math.round(v)), asNumber(v / 1e5), asNumber(v / 1e6), asNumber(v / 1e7)]);
+  }
   return [...digits(out)].filter((n) => {
     const v = plain(n);
     if (known.has(v)) return false;
+    if (scaled.get(v)?.some((x) => known.has(x))) return false;
     const k = Number(v);
     return !(Number.isInteger(k) && k >= 1 && k <= 20 && NUMBER_WORDS[k].some((w) => words.has(w) || [...words].some((x) => x.startsWith(w) && x.length <= w.length + 3)));
   });

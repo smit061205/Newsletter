@@ -522,6 +522,9 @@ export async function copiesIn(store: Store, specFile: string) {
       // the editorial plan (the stories rank as in the day's paper), the length
       // fits, briefs, rewordings and translations: none paid for twice
       store.db.exec("insert or ignore into fitted select * from src.fitted");
+      // (the day's editorial plan as the day's paper has it, over any this worker made for itself:
+      // 1 Nov's second worker kept its own, which left a story out, and the same news printed twice)
+      store.db.exec("insert or replace into fitted select * from src.fitted where key like 'plan%'");
       // the editor's choice of sample ads (none at all, or not these): 26 Oct's
       // copies printed seven sample ads with them switched off
       store.db.exec("insert or replace into settings select * from src.settings where key in ('samplesOn', 'samplesOff')");
