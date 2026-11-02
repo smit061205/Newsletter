@@ -129,7 +129,8 @@ function articleStory(a: Article, i: number, n: number, date: string): Story {
 /** The day's stories that are the same news as one of the customer's articles (2 Nov): each copy
  * prints his article in their place, never the news twice. The AI reads them side by side (once a
  * day and set of articles, cached); two sharing most of their words are the same news anyway. */
-async function sameAsArticles(store: Store, date: string, articles: Article[], say: Say): Promise<{ ids: string[]; cost: number }> {
+export async function sameAsArticles(store: Store, date: string, articles: Pick<Article, "titles" | "bodies">[], say: Say):
+  Promise<{ ids: string[]; headlines: string[]; cost: number }> {
   const edits = store.edits(date);
   const dropped = droppedBy(edits);
   const stories = applyTextEdits(store.stories(date), edits).filter((s) => !dropped.has(s.id));
@@ -167,8 +168,9 @@ async function sameAsArticles(store: Store, date: string, articles: Article[], s
     } else say(`couldn't ask which stories are the customer's news (OpenRouter ${res.status}): only those sharing most of their words left out`);
   }
   const out = [...ids];
-  if (out.length) say(`the same news as the fixed article(s), left out of every copy: ${out.map((id) => stories.find((s) => s.id === id)?.headline.slice(0, 50) ?? id).join("; ")}`);
-  return { ids: out, cost };
+  const headlines = out.map((id) => stories.find((s) => s.id === id)?.headline ?? id);
+  if (out.length) say(`the same news as the fixed article(s), left out of every copy: ${headlines.map((h) => h.slice(0, 50)).join("; ")}`);
+  return { ids: out, headlines, cost };
 }
 
 /** Kept for the newsroom (api.ts CopiesRun). */
@@ -181,7 +183,7 @@ export const editionFile = (date: string, id: string) => path.join(editionsDir(d
 /** The checks a different arrangement can fix: an overflow, empty space, a
  * full-width story. (A headline that won't fill its width or a heavy one
  * came back in every arrangement on 23 Oct: retrying them only tripled the time; a lead without its photo gets another go.) */
-const LAYOUT_GATES = ["1", "2", "W", "S13", "S14"];
+const LAYOUT_GATES = ["1", "2", "W", "S13"];
 /** Tries per copy when a layout check fails (a copy placed like another is always tried again). */
 const TRIES = 4;
 /** How far a try is from clean: each failed layout check, then what it is that failed --
@@ -737,7 +739,7 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
     await mkdir(copiesDir(date), { recursive: true });
     const translate = lang !== profile.language.lang;
     say(`${opts.count} cop${opts.count === 1 ? "y" : "ies"} in ${LANG_NAME[lang]}`);
-    const same = opts.articles?.length ? await sameAsArticles(store, date, opts.articles, say) : { ids: [], cost: 0 };
+    const same = opts.articles?.length ? await sameAsArticles(store, date, opts.articles, say) : { ids: [], headlines: [], cost: 0 };
     batch.cost += same.cost;
     const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead,
                    ...(opts.articles?.length ? { articles: opts.articles } : {}), ...(same.ids.length ? { drop: same.ids } : {}) };

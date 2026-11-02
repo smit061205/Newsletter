@@ -413,9 +413,11 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       }
     }
     let rewordCost = 0;
+    let originals: Map<string, Story> | undefined;
     if (opts.copy) {
       const c = opts.copy;
       // (the day's report of a customer's news gives way to his own article: never printed twice, 2 Nov)
+      originals = new Map(pool.map((s) => [s.id, s]));
       const got = await c.reword(c.drop?.length ? pool.filter((s) => !c.drop!.includes(s.id)) : pool);
       rewordCost = got.cost;
       // a story that couldn't be put into the paper's language stays out
@@ -458,7 +460,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
     const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, longer: !opts.copy, toFit: modular && !!opts.copy && !opts.copy.translate, columnPicks,
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, toFit: modular && !!opts.copy && !opts.copy.translate, columnPicks,
       // (a page repaired alone is planned exactly: it has already failed by trial)
       modular, ...(opts.keep ? { keep: opts.keep } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,

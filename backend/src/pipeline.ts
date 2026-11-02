@@ -83,7 +83,7 @@ const RETRY_EVERY_MS = 10 * 60_000;
 const RETRIES = 12;
 
 // layout checks a new arrangement of the paper can mend (gate names, report.gates)
-const REPAIR_BY_LAYOUT = /^(1 plotter|2 no empty space|3 no tombstoned|3 headline sizes|3 no headline over|S2 |S4 |S9 |S10 |S11 |S12 |S13 |S14 |W )/;
+const REPAIR_BY_LAYOUT = /^(1 plotter|2 no empty space|3 no tombstoned|3 headline sizes|3 no headline over|S2 |S4 |S9 |S10 |S11 |S12 |S13 |W )/;
 
 /** The other ways the paper is laid out when its checks fail, in turn: other
  * arrangements; then, against empty space, the front page's lead in its usual

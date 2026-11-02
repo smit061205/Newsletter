@@ -169,6 +169,8 @@ export async function layOut(args: {
   mend?: { narrowLead?: boolean };
   /** the stories that may be the editor's column, best first */
   columnPicks?: string[];
+  /** a copy's stories as the day's paper words them (its own wording may not set) */
+  originals?: Map<string, Story>;
   /** the page planned (layout/planner.ts), and written to what the plan measures */
   modular?: boolean;
   /** a repair (pipeline.ts): pages of the last try that passed, by number, kept as they are */
@@ -262,7 +264,13 @@ export async function layOut(args: {
   };
   let sized: Sized[] = [];
   for (const [i, s] of args.pool.entries()) {
-    const got = await sizeOf(s, i === 0);
+    let got = await sizeOf(s, i === 0);
+    // (a copy's headline that no width takes: the day's paper's own, which did -- 2 Nov, his news left out of a copy)
+    const was = args.originals?.get(s.id);
+    if (!got && was && was.headline !== s.headline && (got = await sizeOf(was, i === 0))) {
+      log(`  ${s.id}: its new wording can't be set: the day's paper's own`);
+      args = { ...args, pool: args.pool.map((x) => (x === s ? was : x)) };
+    }
     if (got) sized.push(got); else log(`  ${s.id}: no setting keeps the desk's rules: left out`);
   }
   const roomAll = args.bands.reduce((t, b, i) => t + roomOf(b, args.ads.filter((a) => a.page === i + 1)), 0);
@@ -283,9 +291,15 @@ export async function layOut(args: {
   const open = rooms.map((_, i) => i).filter((i) => !args.keep?.has(i + 1));
   // (the planned pages: the stories chosen by what each page's spaces can take. A copy
   // that keeps its stories on their pages shares nothing out)
-  const chosen = args.modular && !args.fixedPage
-    ? await share(sized, rooms, open, (i) => pageAds(i + 1), (i, list) => pageFits(i + 1, list.map((s) => s.story), args.bands[i], pageAds(i + 1), blocks, factsOf, log), rng, log)
-    : null;
+  const sharing = (insideMost: number) =>
+    share(sized, rooms, open, (i) => pageAds(i + 1), (i, list) => pageFits(i + 1, list.map((s) => s.story), args.bands[i], pageAds(i + 1), blocks, factsOf, log), rng, log, insideMost);
+  let chosen = args.modular && !args.fixedPage ? await sharing(PAGE_MOST) : null;
+  // every news the editor sent prints, however much (2 Nov): with some of it left over, the
+  // inside pages take more stories, each written shorter (never under the paper's least words)
+  if (chosen?.held.some((s) => alwaysPrinted(s.story))) {
+    log(`  the editor's news doesn't all fit ${PAGE_MOST} to an inside page: up to ${PAGE_CROWDED}, written shorter`);
+    chosen = await sharing(PAGE_CROWDED);
+  }
   const byRoom = chosen ? null : assign(sized, open.map((i) => rooms[i]), { fixedPage: args.fixedPage, rng: args.seed ? rng : undefined, front: !args.keep?.has(1) });
   const held = chosen?.held ?? byRoom!.held;
   const shares: Sized[][] = chosen?.pages ?? rooms.map((_, i) => byRoom!.pages[open.indexOf(i)] ?? []);
@@ -685,18 +699,23 @@ function disordered(laid: Block[] | null | undefined, options: (story: number, c
 
 /** The most stories tried on an inside page. */
 const PAGE_MOST = 8;
+/** ... and on a day the editor's own news needs the room (2 Nov). */
+const PAGE_CROWDED = 10;
 
 /** The stories chosen for the pages by what each page's spaces can take, not by how much
  * room it has (31 Oct's page 3: three ads across its foot, three spaces, and the room left
  * said it was fine). Most important first; a page that can't work is known here, before
  * any AI, and takes other stories. Null for a page nothing was found for: left to the rounds. */
 async function share(sized: Sized[], rooms: number[], open: number[], perPage: (i: number) => Ad[], fits: (i: number, list: Sized[]) => Promise<boolean>,
-                     rng: () => number, log: (s: string) => void): Promise<{ pages: Sized[][]; held: Sized[]; unsure: number[] }> {
+                     rng: () => number, log: (s: string) => void, insideMost = PAGE_MOST): Promise<{ pages: Sized[][]; held: Sized[]; unsure: number[] }> {
   // (a little chance among stories of about the same weight: a repair is another arrangement)
   const lead = sized[0];
   let left = sized.slice(1).map((s, i) => ({ s, at: i + rng() * 3 })).sort((a, b) => a.at - b.at).map((x) => x.s).sort((a, b) => Number(sent(b)) - Number(sent(a)));
   let column = left.find((s) => s.story.editorsColumn);
   left = left.filter((s) => s !== column);
+  // (a crowded day: the editor's column, never a must, gives its room to his news)
+  const spare = insideMost > PAGE_MOST ? column : undefined;
+  if (spare) column = undefined;
   if (lead) left.unshift(lead);
   const pages: Sized[][] = rooms.map(() => []);
   const unsure: number[] = [];
@@ -704,7 +723,7 @@ async function share(sized: Sized[], rooms: number[], open: number[], perPage: (
   const order = [...open.filter((i) => i === 0), ...open.filter((i) => i > 0).sort((a, b) => perPage(b).length - perPage(a).length || rooms[a] - rooms[b])];
   for (const i of order) {
     const mean = left.slice(0, 12).reduce((a, s) => a + s.mid, 0) / Math.max(1, Math.min(12, left.length));
-    const most = i === 0 ? FRONT_MOST : PAGE_MOST, least = Math.min(most, Math.max(i === 0 ? 3 : 2, perPage(i).length));
+    const most = i === 0 ? FRONT_MOST : insideMost, least = Math.min(most, Math.max(i === 0 ? 3 : 2, perPage(i).length));
     const want = Math.min(most, Math.max(least, Math.round(rooms[i] / Math.max(1, mean))));
     const counts = [0, -1, 1, -2, 2, 3].map((d) => want + d).filter((k, x, all) => k >= least && k <= most && all.indexOf(k) === x);
     let chosen: Sized[] | null = null;
@@ -733,9 +752,10 @@ async function share(sized: Sized[], rooms: number[], open: number[], perPage: (
   for (const i of unsure) {
     let used = 0;
     if (column && i > 0) { pages[i].push(column); used += column.mid; column = undefined; }
-    while (left.length && used < rooms[i] && pages[i].length < (i === 0 ? FRONT_MOST : PAGE_MOST)) { const s = left.shift()!; pages[i].push(s); used += s.mid; }
+    while (left.length && used < rooms[i] && pages[i].length < (i === 0 ? FRONT_MOST : insideMost)) { const s = left.shift()!; pages[i].push(s); used += s.mid; }
   }
   if (column) left.push(column);
+  if (spare) left.push(spare);
   const place = new Map(sized.map((s, k) => [s, k]));
   for (const p of pages) p.sort((a, b) => place.get(a)! - place.get(b)!);
   return { pages, held: left, unsure };

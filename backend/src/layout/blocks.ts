@@ -92,7 +92,8 @@ export class Blocks {
 
   /** Every acceptable setting of `story` at `cols` columns, shortest first. */
   options(story: Story, rank: number, cols: number): Promise<Option[]> {
-    const key = `${story.id}|${rank}|${cols}`;
+    // (by its wording too: a copy's headline that won't set is tried again as the paper's own)
+    const key = `${story.id}|${rank}|${cols}|${story.headline}|${story.deck}`;
     if (!this.tables.has(key)) this.tables.set(key, this.build(story, rank, cols));
     return this.tables.get(key)!;
   }

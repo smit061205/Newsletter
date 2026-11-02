@@ -13,7 +13,7 @@ import { BatchTime } from "../ui/BatchTime";
 import { num, rupees } from "../ui/format";
 import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
-import { artOf, Articles, blankArt, type Art } from "./Articles";
+import { artOf, Articles, blankArt, Swaps, type Art } from "./Articles";
 import { designName, Designs } from "./Designs";
 
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
@@ -191,6 +191,7 @@ export default function Copies() {
           <label className={s.choice}><input type="checkbox" checked={useExtra} disabled={running} onChange={(e) => { setXTouched(true); setUseExtra(e.target.checked); }} />
             <span><strong>{t("copies.extra")}</strong></span></label>
           {useExtra && <Articles arts={arts} onChange={(x) => { setXTouched(true); setArts(x); }} disabled={running} count={count} />}
+          {useExtra && <Swaps date={date} arts={arts} disabled={running} />}
         </>}
         {error && <Note tone="bad">{error}</Note>}
         {paperBusy && <Note tone="warn">{t("copies.busyPaper")}</Note>}
