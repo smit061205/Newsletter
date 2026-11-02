@@ -19,6 +19,7 @@ before changing Next code (`web/AGENTS.md`).
 - **"વિશેષ લેખ" (special article) appears only once per paper.**
 - Every story is headline > sub-heading > body, in decreasing sizes; kickers (where a paper has them) are centred; columns end level; no empty space on a page (horizontal rules divide stories and fill odd gaps).
 - The printed size and geometry follow the original paper exactly: 390 × 525 mm, with a foot rule on every page but the last. It goes to a printer, so check positions in the PDF itself.
+- **The editor's Telegram news comes first (2 Nov):** taken before any website, up to the second the paper begins and again before the writing; always printed, and the report kept when a website has the same news (it takes that one's photo if it has none).
 - News comes from **PIB**: Gujarati first, then Hindi translated when short. **Don't get around any website's bot blocking.**
 
 ## Money and secrets

@@ -396,7 +396,8 @@ async function caughtUp(log: (s: string) => void) {
   const began = Date.now();
   let said = false;
   while (polling && !unreachable && Date.now() - began < CATCH_UP) {
-    if (askingSince && Date.now() - askingSince >= NONE_WAITING) return;
+    // (an ask open for 3 seconds since the paper began: a message sent a second before is in)
+    if (askingSince && Date.now() - Math.max(askingSince, began) >= NONE_WAITING) return;
     if (!said && Date.now() - began > NONE_WAITING * 2) { said = true; log("Telegram: messages are still coming in: waiting for them"); }
     await new Promise((r) => setTimeout(r, 250));
   }
