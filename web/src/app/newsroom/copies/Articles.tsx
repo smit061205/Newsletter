@@ -88,7 +88,10 @@ export function Articles({ arts, onChange, disabled, count, single }: { arts: Ar
                     <input type="file" accept="image/jpeg,image/png" multiple={!single} disabled={disabled} aria-label={t("copies.extra.pick")}
                            onChange={async (e) => {
                              const files = [...(e.target.files ?? [])]; e.target.value = "";
-                             const got: Pic[] = await Promise.all(files.map(async (f) => {
+                             const got: Pic[] = await Promise.all(files.map(async (picked) => {
+                               // (kept in memory now: a file moved or deleted after it was picked -- WhatsApp's
+                               // downloads go -- could no longer be read when the copies were made, 2 Nov)
+                               const f = new File([await picked.arrayBuffer()], picked.name, { type: picked.type });
                                const preview = URL.createObjectURL(f);
                                return { file: f, preview, small: (await widthOf(preview)) < SHARP_WIDTH };
                              }));
