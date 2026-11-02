@@ -17,6 +17,7 @@
 //   copies-in --spec FILE   lay out copies in this paper's language (started by
 //            editorial/copies.ts for a Hindi or Urdu copy; CK_SOURCE_DB is the day's paper)
 //   status   every day in the database: releases, stories, built issues
+import { readFile } from "node:fs/promises";
 import { ingestDay } from "./ingest/gujaratInfo.ts";
 import { Store } from "./store.ts";
 
@@ -110,7 +111,9 @@ async function main() {
       const { makeCopies } = await import("./editorial/copies.ts");
       const t = Date.now();
       const b = await makeCopies(store, date, { count: Number(flag("count") ?? 3), reword: (flag("reword") ?? "all") as never,
-                                                shuffle: (flag("shuffle") ?? "keepLead") as never, lang: flag("lang") as never, log });
+                                                shuffle: (flag("shuffle") ?? "keepLead") as never, lang: flag("lang") as never, log,
+                                                // (a customer's articles, as the newsroom sends them: a JSON file)
+                                                ...(flag("articles") ? { articles: JSON.parse(await readFile(flag("articles")!, "utf8")) } : {}) });
       log(`copies ${date}: ${((Date.now() - t) / 60_000).toFixed(1)} min, $${b.cost.toFixed(4)}`);
       break;
     }
