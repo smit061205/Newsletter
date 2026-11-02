@@ -22,6 +22,7 @@
 //   GET   /api/issues/:date/articles   the editor's own articles in the paper (editorial/articles.ts); POST {articles} saves them and lays it out again
 //   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang, articles?} makes them
 //   GET   /api/issues/:date/editions   the day's sister papers; POST {only?} makes them (all, or one); GET .../editions/<id>.pdf
+//   POST  /api/issues/:date/copies/swaps {articles}  the day's stories those articles take the place of in the copies
 //   GET   /api/issues/:date/copies/N.pdf  one copy (on its paper's design, if it has one)
 //   GET   /api/designs  POST /api/designs {name, base64}  DELETE /api/designs/:id|all   other papers' designs, one per copy
 //   POST  /api/designs/assign {copy | upTo, id|null}   POST /api/designs/save {date, names}   POST /api/designs/stamp {date, copy, name, base64}
@@ -382,6 +383,16 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             return send(res, 200, await onDesign(new Uint8Array(await readFile(file)), n), "application/pdf");
           }
           if (req.method === "GET") return send(res, 200, copiesOf(date));
+          // which of the day's stories a customer's articles take the place of in the copies (shown before they're made)
+          if (req.method === "POST" && parts[4] === "swaps") {
+            const { sameAsArticles } = await import("./editorial/copies.ts");
+            const body = (await readJson(req)) as { articles?: { titles?: string[]; bodies?: string[] }[] };
+            const arts = (body.articles ?? []).map((a) => ({ titles: (a.titles ?? []).filter((x) => x.trim()), bodies: (a.bodies ?? []).filter((x) => x.trim()) }))
+              .filter((a) => a.titles.length || a.bodies.length);
+            if (!arts.length) return send(res, 200, { headlines: [] });
+            const got = await sameAsArticles(store, date, arts, () => {});
+            return send(res, 200, { headlines: got.headlines });
+          }
           if (req.method === "POST") {
             type Pic = import("./editorial/articles.ts").GivenPhoto;
             type Given = import("./editorial/articles.ts").GivenArticle;

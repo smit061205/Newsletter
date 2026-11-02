@@ -85,8 +85,8 @@ export function styleChecks(issue: IssueRender, plans: PagePlan[], bands: { top:
     return { id, page, p90: sorted[Math.floor(0.9 * (sorted.length - 1))] };
   }).filter((x) => x.p90 > STORY_P90_EM).map((x) => `p${x.page} ${x.id} (${x.p90.toFixed(2)}em)`);
 
-  // a story that says the same thing twice
-  const repeating = plans.flatMap((p) => p.placed.filter((x) => repeats(x.module.story.bodies[x.module.variant]))
+  // a story that says the same thing twice (a customer's article prints as he gave it)
+  const repeating = plans.flatMap((p) => p.placed.filter((x) => !wordForWord(x.module.story) && repeats(x.module.story.bodies[x.module.variant]))
     .map((x) => `p${p.page} ${x.module.story.id}`));
 
   // a short story: the paper's shortest length is a floor (the editor, 30 Oct)

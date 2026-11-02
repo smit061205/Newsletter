@@ -4,8 +4,9 @@
 // through them in turn (backend/src/editorial/copies.ts articleFor). The day's
 // paper takes the same box, `single`: one of each, any article removable
 // (backend/src/editorial/articles.ts).
+import { useState } from "react";
 import type { CopyArticle } from "../api";
-import { media } from "../api";
+import { call, media } from "../api";
 import s from "../newsroom.module.css";
 import { num } from "../ui/format";
 import { Button, Icon, Note, useApp } from "../ui/kit";
@@ -107,6 +108,35 @@ export function Articles({ arts, onChange, disabled, count, single }: { arts: Ar
         );
       })}
       <span><Button icon={Icon.copies()} disabled={disabled} onClick={() => onChange([...arts, blankArt()])}>{t("copies.article.add")}</Button></span>
+    </div>
+  );
+}
+
+/** Which of the day's stories the articles take the place of in the copies (the same news: never
+ * printed twice), asked before the copies are made -- the editor sees what gives way (2 Nov). */
+export function Swaps({ date, arts, disabled }: { date: string; arts: Art[]; disabled: boolean }) {
+  const { t } = useApp();
+  const [got, setGot] = useState<{ key: string; headlines: string[] } | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState("");
+  const articles = arts.map((a) => ({ titles: filled(a.titles), bodies: filled(a.bodies) })).filter((a) => a.titles.length || a.bodies.length);
+  const key = JSON.stringify(articles);
+  if (!articles.length) return null;
+  const ask = async () => {
+    setAsking(true); setError("");
+    try { setGot({ key, ...(await call<{ headlines: string[] }>(`/api/issues/${date}/copies/swaps`, { json: { articles } })) }); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setAsking(false); }
+  };
+  // (an answer for articles since changed isn't shown)
+  const now = got?.key === key ? got.headlines : null;
+  return (
+    <div className={s.field}>
+      <span><Button disabled={disabled || asking} onClick={ask}>{t(asking ? "copies.swaps.asking" : "copies.swaps.ask")}</Button></span>
+      {error && <Note tone="bad">{error}</Note>}
+      {now && (now.length
+        ? <Note tone="warn">{t("copies.swaps.some")}<ul style={{ margin: "6px 0 0", paddingLeft: 20 }}>{now.map((h) => <li key={h}>{h}</li>)}</ul></Note>
+        : <Note>{t("copies.swaps.none")}</Note>)}
     </div>
   );
 }
