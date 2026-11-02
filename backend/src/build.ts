@@ -90,6 +90,8 @@ export interface CopyOpts {
   translate?: boolean;
   /** articles in this copy, printed word for word with its titles, texts and photos (editorial/copies.ts) */
   extras?: Story[];
+  /** the day's stories that are the same news as one of those articles: left out, the article in their place */
+  drop?: string[];
 }
 
 /** The sample ads (the paper's own stand-ins for a day with nothing booked) as
@@ -290,7 +292,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // written before the rewrite grouped them): the event's story is enough
     const speechDup = (s: Story) => {
       const r = releases.get(s.id);
-      return !!r && isSpeechText(r) && stories.some((o) => o.id !== s.id && !dropped.has(o.id) && !!releases.get(o.id) && speechTwin(r, releases.get(o.id)!));
+      return !!r && !alwaysPrinted(s) && isSpeechText(r) && stories.some((o) => o.id !== s.id && !dropped.has(o.id) && !!releases.get(o.id) && speechTwin(r, releases.get(o.id)!));
     };
     let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && !speechDup(s) && (opts.copy?.translate || inPaperLanguage(s))))
       .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
@@ -413,7 +415,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     let rewordCost = 0;
     if (opts.copy) {
       const c = opts.copy;
-      const got = await c.reword(pool);
+      // (the day's report of a customer's news gives way to his own article: never printed twice, 2 Nov)
+      const got = await c.reword(c.drop?.length ? pool.filter((s) => !c.drop!.includes(s.id)) : pool);
       rewordCost = got.cost;
       // a story that couldn't be put into the paper's language stays out
       if (c.translate) got.pool = got.pool.filter((s) => inPaperLanguage(s));
@@ -607,6 +610,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       }
     }
   }
+  // every news the editor sent on Telegram printed (2 Nov: his Nita Ambani news went
+  // missing), unless he left it out, or a copy prints a customer's article in its place
+  const leftOutByHim = droppedBy(store.edits(date));
+  const printedIds = new Set(result.placed.map((p) => p.story.id));
+  const unsent = store.releases(date).filter((r) => r.source === "telegram").map((r) => storyIdOf(r))
+    .filter((id) => !leftOutByHim.has(id) && !opts.copy?.drop?.includes(id) && !printedIds.has(id));
   const gates = [
     { gate: "1 plotter: no overflow, overlap, off-page, failed fonts or images", pass: plotterProblems.length === 0, detail: `${plotterProblems.length} warning(s)` },
     { gate: "F every letter in the paper's own fonts", pass: missingGlyphs.size === 0,
@@ -620,6 +629,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     { gate: "3 no headline over 30% of its story", pass: headShare.length === 0, detail: headShare.join(", ") || "ok" },
     { gate: "4 the lead on page 1; every story placed or left out with a reason", pass: !!lead,
       detail: `lead ${lead?.story.id ?? "missing"}; left out (no room): ${result.leftOut.map((s) => s.id).join(", ") || "none"}` },
+    { gate: "S14 every news sent on Telegram printed", pass: unsent.length === 0, detail: unsent.join(", ") || "ok" },
     { gate: "W no story across the whole page unless the editor allowed it",
       pass: !result.placed.some((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth),
       detail: result.placed.filter((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth).map((p) => `p${p.page} ${p.story.id} (${p.cols} columns)`).join(", ") || "ok" },

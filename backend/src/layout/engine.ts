@@ -712,6 +712,8 @@ async function share(sized: Sized[], rooms: number[], open: number[], perPage: (
       // the most important k; then, a story at a time from the end, the next ones in their place
       for (let skip = 0; skip <= 5 && !chosen; skip++) {
         const head = left.slice(0, Math.max(1, k - 1 - (column && i > 0 ? 1 : 0) - Math.min(skip, 2)));
+        // (the editor's own news is never passed over for another: it all prints)
+        if (left.slice(head.length, head.length + skip).some(sent)) continue;
         const list = [...head, ...left.slice(head.length + skip, k + skip - (column && i > 0 ? 1 : 0)), ...(column && i > 0 ? [column] : [])];
         if (list.length && await fits(i, list)) chosen = list;
       }

@@ -37,6 +37,8 @@ export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", 
 export interface InboxItem {
   /** Telegram's update number (one per message, in order) */
   id: number;
+  /** the message's own number in his chat (the bot's replies point at it) */
+  msg?: number;
   chat: number;
   from: string;
   /** when it was sent (seconds since 1970) */

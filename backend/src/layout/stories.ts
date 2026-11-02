@@ -44,7 +44,8 @@ export function dedupe(stories: Story[]): Story[] {
   const kept: Story[] = [];
   // (what the editor sent is the report kept: his news is the paper's own source, 2 Nov)
   for (const s of [...stories].sort((a, b) => Number(sentByEditor(b)) - Number(sentByEditor(a)) || Number(!!b.photo) - Number(!!a.photo) || b.bodies.long.length - a.bodies.long.length)) {
-    const k = kept.findIndex((o) => sameEvent(o, s));
+    // (two of his own never: each news he sends prints, 2 Nov)
+    const k = kept.findIndex((o) => sameEvent(o, s) && !(sentByEditor(o) && sentByEditor(s)));
     if (k < 0) { kept.push(s); continue; }
     // (the report kept takes the other's photo when it has none)
     if (!kept[k].photo && s.photo) kept[k] = { ...kept[k], photo: s.photo, photos: s.photos ?? [s.photo], caption: s.caption };

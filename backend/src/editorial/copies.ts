@@ -38,6 +38,7 @@ import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
 import { settable } from "./quality.ts";
 import { applyTextEdits, droppedBy } from "../layout/stories.ts";
+import { newsOverlap } from "./translate.ts";
 
 export type Reword = "headline" | "headlineDeck" | "all";
 export type Shuffle = CopyOpts["shuffle"];
@@ -125,6 +126,51 @@ function articleStory(a: Article, i: number, n: number, date: string): Story {
   return { id: `z-fixed-${i + 1}`, releaseId: null, date, kicker: "", headline: title.trim(), deck: deck.trim(), bodies: { long: body, medium: body, short: body },
            priority: 2, page: null, photo, photos: photo ? [photo] : [], caption: "", source: "fixed:copy", model: "as-is", needsReview: false };
 }
+/** The day's stories that are the same news as one of the customer's articles (2 Nov): each copy
+ * prints his article in their place, never the news twice. The AI reads them side by side (once a
+ * day and set of articles, cached); two sharing most of their words are the same news anyway. */
+async function sameAsArticles(store: Store, date: string, articles: Article[], say: Say): Promise<{ ids: string[]; cost: number }> {
+  const edits = store.edits(date);
+  const dropped = droppedBy(edits);
+  const stories = applyTextEdits(store.stories(date), edits).filter((s) => !dropped.has(s.id));
+  const texts = articles.map((a) => ({ headline: a.titles[0] ?? "", body: a.bodies[0] ?? "" }));
+  const ids = new Set(stories.filter((s) => texts.some((t) => newsOverlap(t, { headline: s.headline, body: s.bodies.long }) >= 0.4)).map((s) => s.id));
+  let cost = 0;
+  const apiKey = env("OPENROUTER_API_KEY");
+  const key = `fixedsame|${date}|${createHash("sha1").update(JSON.stringify([texts, stories.map((s) => s.id).sort()])).digest("hex").slice(0, 12)}`;
+  const cached = store.fitted(key);
+  if (cached) for (const id of JSON.parse(cached.body) as string[]) ids.add(id);
+  else if (apiKey && stories.length && process.env.CK_FAKE_AI !== "1") {
+    const res = await openRouter({
+      method: "POST",
+      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
+      body: JSON.stringify({
+        model: DEFAULT_MODEL, temperature: 0, usage: { include: true },
+        response_format: { type: "json_schema", json_schema: { name: "same", strict: true, schema: {
+          type: "object", additionalProperties: false, required: ["ids"],
+          properties: { ids: { type: "array", items: { type: "string" }, description: "ids of the stories that report the same news as one of the articles" } } } } },
+        messages: [{ role: "user", content: "A newspaper prints the ARTICLES below in its copies. Which of its STORIES report the same news as one of them " +
+          "(the same event, visit, launch, announcement or ceremony, however worded)? Only those; none if none.\n\nARTICLES:\n" +
+          texts.map((t, i) => `${i + 1}. ${t.headline}\n${t.body.slice(0, 700).replace(/\s+/g, " ")}`).join("\n\n") + "\n\nSTORIES:\n" +
+          stories.map((s) => `${s.id} | ${s.headline}\n  ${s.bodies.long.slice(0, 220).replace(/\s+/g, " ")}`).join("\n") }],
+      }),
+    }, 60);
+    if (res.ok) {
+      try {
+        const data = (await res.json()) as { choices: { message: { content: string } }[]; usage?: { cost?: number } };
+        const got = (JSON.parse(data.choices[0].message.content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")) as { ids: string[] }).ids
+          .filter((id) => stories.some((s) => s.id === id));
+        store.putFitted(key, { body: JSON.stringify(got), model: DEFAULT_MODEL });
+        cost = data.usage?.cost ?? 0;
+        for (const id of got) ids.add(id);
+      } catch { say("couldn't read which stories are the customer's news: only those sharing most of their words left out"); }
+    } else say(`couldn't ask which stories are the customer's news (OpenRouter ${res.status}): only those sharing most of their words left out`);
+  }
+  const out = [...ids];
+  if (out.length) say(`the same news as the fixed article(s), left out of every copy: ${out.map((id) => stories.find((s) => s.id === id)?.headline.slice(0, 50) ?? id).join("; ")}`);
+  return { ids: out, cost };
+}
+
 /** Kept for the newsroom (api.ts CopiesRun). */
 export type CopiesRun = Batch;
 
@@ -135,7 +181,7 @@ export const editionFile = (date: string, id: string) => path.join(editionsDir(d
 /** The checks a different arrangement can fix: an overflow, empty space, a
  * full-width story. (A headline that won't fill its width or a heavy one
  * came back in every arrangement on 23 Oct: retrying them only tripled the time; a lead without its photo gets another go.) */
-const LAYOUT_GATES = ["1", "2", "W", "S13"];
+const LAYOUT_GATES = ["1", "2", "W", "S13", "S14"];
 /** Tries per copy when a layout check fails (a copy placed like another is always tried again). */
 const TRIES = 4;
 /** How far a try is from clean: each failed layout check, then what it is that failed --
@@ -291,6 +337,8 @@ interface SetSpec {
   reword: Reword; shuffle: Shuffle; translate: boolean;
   /** the articles in every copy, word for word */
   articles?: Article[];
+  /** the day's stories that are the same news as one of them: left out */
+  drop?: string[];
   /** each story's page and the lead in the day's paper */
   pageOf: [string, number][]; lead?: string;
   /** placements already used (the day's paper, earlier copies): none may repeat */
@@ -356,7 +404,8 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
         copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, reword, pdfPath: item.pdf,
                 translate: spec.translate, ...(!spec.translate ? { store: own } : {}),
-                ...(spec.articles?.length ? { extras: spec.articles.map((a, i) => articleStory(a, i, n, spec.date)) } : {}) },
+                ...(spec.articles?.length ? { extras: spec.articles.map((a, i) => articleStory(a, i, n, spec.date)) } : {}),
+                ...(spec.drop?.length ? { drop: spec.drop } : {}) },
       });
       spent += built.report.cost;
       const sig = built.report.placed.map((p) => `${p.story}:${p.page}:${p.cols}`).sort().join(",");
@@ -688,7 +737,10 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
     await mkdir(copiesDir(date), { recursive: true });
     const translate = lang !== profile.language.lang;
     say(`${opts.count} cop${opts.count === 1 ? "y" : "ies"} in ${LANG_NAME[lang]}`);
-    const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead, ...(opts.articles?.length ? { articles: opts.articles } : {}) };
+    const same = opts.articles?.length ? await sameAsArticles(store, date, opts.articles, say) : { ids: [], cost: 0 };
+    batch.cost += same.cost;
+    const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead,
+                   ...(opts.articles?.length ? { articles: opts.articles } : {}), ...(same.ids.length ? { drop: same.ids } : {}) };
     for (const [i, a] of (opts.articles ?? []).entries()) {
       say(`fixed article ${i + 1} in every copy: ${a.titles.length} title(s), ${a.decks.length} sub-heading(s), ${a.bodies.length} text(s), ${a.photos.length} photo(s), in turn`);
     }

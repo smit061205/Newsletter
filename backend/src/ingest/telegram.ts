@@ -33,8 +33,9 @@ const NEAR = 30 * 60;
 /** Messages this near each other (seconds) from one person may be one article in parts: a long one
  * Telegram split (it cuts at 4,096 letters), or a headline sent on its own, then its text. */
 const PARTS = 3 * 60;
-/** A message this long was cut by Telegram: the next one is its rest. */
-const SPLIT = 3500;
+/** A message this long may have been cut by Telegram: the next one is its rest, unless it
+ * starts as news of its own (2 Nov: complete messages of 3,700 letters took the next news in) */
+const SPLIT = 4000;
 /** A photo is placed once it has waited this long (seconds): its article may come after it. */
 const SETTLE = NEAR;
 /** Articles a photo may go with: the last day's. */
@@ -101,14 +102,15 @@ export function articles(items: InboxItem[]): { ids: number[]; chat: number; at:
 /** Is `text` (just in) the rest of `before` (his message before it, a moment ago), or news of its own?
  * By their shape where that's plain; else the AI reads both (none: its own). */
 async function continuing(before: string, text: string, log: (s: string) => void): Promise<boolean> {
-  if (before.length >= SPLIT) return true; // Telegram cut it
   const lines = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean);
   const [first, ...rest] = lines(text);
   if (/^\*[^*]+\*$/.test(first ?? "")) return false; // starts with its own headline in bold (WhatsApp's *...*)
+  // Telegram cut it: the rest, unless a headline (short, no full stop) over its text
+  if (before.length >= SPLIT) return !(rest.length && first.length <= 160 && !/[.।!?]\s*$/.test(first));
   // a headline, then its text (not a one-line news item of its own, which ends
   // in a full stop: 26 Oct joined the next article to one)
   if (lines(before).length === 1 && before.length <= 150 && !/[.।!?]\s*$/.test(before.trim())) return true;
-  if (rest.length && first.length <= 120) return false; // a headline of its own over its text
+  if (rest.length && first.length <= 160) return false; // a headline of its own over its text
   const key = env("OPENROUTER_API_KEY");
   if (!key) return false;
   const res = await openRouter({
@@ -148,7 +150,7 @@ async function take(store: Store, u: TgUpdate, log: (s: string) => void) {
   }
   const text = (m.text ?? m.caption ?? "").trim();
   if (m.text?.startsWith("/start")) return void await api("sendMessage", { chat_id: m.chat.id, text: SAY.welcome });
-  const base = { id: u.update_id, chat: m.chat.id, from: name, at: m.date };
+  const base = { id: u.update_id, chat: m.chat.id, from: name, at: m.date, msg: m.message_id };
   if (m.photo?.length) {
     // the largest size Telegram has of it
     const file = await api<{ file_path: string }>("getFile", { file_id: m.photo[m.photo.length - 1].file_id });
@@ -207,6 +209,9 @@ export async function attach(store: Store, photo: number, to: number): Promise<b
   return true;
 }
 
+/** A message about a photo sent as a reply to it, so he sees which photo it means (2 Nov). */
+const onPhoto = (p: InboxItem) => (p.msg ? { reply_parameters: { message_id: p.msg, allow_sending_without_reply: true } } : {});
+
 /** A photo and the others of its album. */
 const albumOf = (store: Store, id: number) => {
   const all = store.inbox();
@@ -222,11 +227,11 @@ async function ask(store: Store, photos: InboxItem[], _log: (s: string) => void)
     .slice(-6).reverse();
   if (!recent.length) {
     for (const x of photos) store.putInbox({ ...x, asked: -1 });
-    await api("sendMessage", { chat_id: p.chat, text: SAY.noArticle });
+    await api("sendMessage", { chat_id: p.chat, text: SAY.noArticle, ...onPhoto(p) });
     return;
   }
   const sent = await api<{ message_id: number }>("sendMessage", {
-    chat_id: p.chat, text: SAY.which,
+    chat_id: p.chat, text: SAY.which, ...onPhoto(p),
     reply_markup: { inline_keyboard: [...recent.map((a) => [{ text: titleOf(a.text), callback_data: `p:${p.id}:${a.ids[0]}` }]),
                                       [{ text: SAY.none, callback_data: `p:${p.id}:0` }]] },
   });
@@ -282,7 +287,7 @@ async function placeOne(store: Store, p: InboxItem, group: InboxItem[], arts: Re
   pick = seen ?? pick;
   if (pick) {
     for (const x of group) store.putInbox({ ...x, pairedTo: pick.ids[0] });
-    await api("sendMessage", { chat_id: p.chat, text: SAY.joined(titleOf(pick.text)),
+    await api("sendMessage", { chat_id: p.chat, text: SAY.joined(titleOf(pick.text)), ...onPhoto(p),
                                reply_markup: { inline_keyboard: [[{ text: SAY.change, callback_data: `c:${p.id}` }]] } }).catch(() => {});
   } else await ask(store, group, log);
 }
