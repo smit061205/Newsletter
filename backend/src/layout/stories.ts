@@ -37,12 +37,20 @@ const sameEvent = (a: Story, b: Story) => similarity(a, b) > 0.6;
 /** Related stories (the same trip, the same visitor) go on different pages. */
 export const related = (a: Story, b: Story) => similarity(a, b) > 0.2;
 
+/** A story the editor sent (his Telegram news, a copy's fixed article: store.alwaysPrinted). */
+const sentByEditor = (s: Story) => !!s.source && (s.source.startsWith("telegram:") || s.source.startsWith("fixed:"));
+
 export function dedupe(stories: Story[]): Story[] {
   const kept: Story[] = [];
-  for (const s of [...stories].sort((a, b) => Number(!!b.photo) - Number(!!a.photo) || b.bodies.long.length - a.bodies.long.length)) {
-    if (!kept.some((k) => sameEvent(k, s))) kept.push(s);
+  // (what the editor sent is the report kept: his news is the paper's own source, 2 Nov)
+  for (const s of [...stories].sort((a, b) => Number(sentByEditor(b)) - Number(sentByEditor(a)) || Number(!!b.photo) - Number(!!a.photo) || b.bodies.long.length - a.bodies.long.length)) {
+    const k = kept.findIndex((o) => sameEvent(o, s));
+    if (k < 0) { kept.push(s); continue; }
+    // (the report kept takes the other's photo when it has none)
+    if (!kept[k].photo && s.photo) kept[k] = { ...kept[k], photo: s.photo, photos: s.photos ?? [s.photo], caption: s.caption };
   }
-  return stories.filter((s) => kept.includes(s));
+  const by = new Map(kept.map((s) => [s.id, s]));
+  return stories.flatMap((s) => by.get(s.id) ?? []);
 }
 
 /** The same news reported more than once (`same` says which): the best report

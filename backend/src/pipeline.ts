@@ -159,6 +159,16 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       // bring it: the day is made from the releases already saved
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(Date.now());
       const past = date < today;
+      // what the editor sent the paper's Telegram bot, first of all and up to the moment the
+      // paper begins: his news is the paper's own source (the editor, 2 Nov). Today's paper only:
+      // an earlier day's, made again, doesn't take what's new
+      const telegram = async () => {
+        if (past) return;
+        const { ingestTelegram } = await import("./ingest/telegram.ts");
+        await timed("Telegram", () => ingestTelegram(store, date, { log: say }))
+          .catch((e: unknown) => { if (stopping) throw e; say(`the Telegram news couldn't be taken (${e instanceof Error ? e.message : e})`); });
+      };
+      await telegram();
       // then the CM's office and All India Radio's Gujarati news (a Gujarati
       // paper): extra copy, so a site not answering never stops the paper
       // (read side by side with PIB: each site at its own polite pace)
@@ -181,13 +191,8 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       // both in: an item that is the same news as a PIB release that came in alongside it goes
       const official = async () => {
         await Promise.all([officialRun, foreignRun]);
-        // what the editor sent the paper's Telegram bot since the last paper (today's paper only:
-        // an earlier day's, made again, doesn't take what's new)
-        if (!past) {
-          const { ingestTelegram } = await import("./ingest/telegram.ts");
-          await timed("Telegram", () => ingestTelegram(store, date, { log: say }))
-            .catch((e: unknown) => { if (stopping) throw e; say(`the Telegram news couldn't be taken (${e instanceof Error ? e.message : e})`); });
-        }
+        // (and what he sent while the websites were read)
+        await telegram();
         if (profile.language.lang !== "gu") return;
         const { dropTwinsOfPib } = await import("./ingest/official.ts");
         dropTwinsOfPib(store, date, say);
@@ -222,6 +227,13 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       return;
     }
     case "rewrite": {
+      // (what the editor sent the bot while the news was fetched: in before the writing)
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(Date.now());
+      if (date >= today) {
+        const { ingestTelegram } = await import("./ingest/telegram.ts");
+        await timed("Telegram", () => ingestTelegram(store, date, { log: say }))
+          .catch((e: unknown) => { if (stopping) throw e; say(`the Telegram news couldn't be taken (${e instanceof Error ? e.message : e})`); });
+      }
       const { rewriteDay } = await import("./editorial/rewrite.ts");
       return rewriteDay(store, date, { log: say, progress });
     }
