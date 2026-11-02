@@ -614,8 +614,11 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   // missing), unless he left it out, or a copy prints a customer's article in its place
   const leftOutByHim = droppedBy(store.edits(date));
   const printedIds = new Set(result.placed.map((p) => p.story.id));
+  const written = new Set(store.stories(date).map((s) => s.id));
   const unsent = store.releases(date).filter((r) => r.source === "telegram").map((r) => storyIdOf(r))
     .filter((id) => !leftOutByHim.has(id) && !opts.copy?.drop?.includes(id) && !printedIds.has(id));
+  // (one not written as a story at all: named, not laid out again and again -- no arrangement prints it)
+  const unwritten = unsent.filter((id) => !written.has(id));
   const gates = [
     { gate: "1 plotter: no overflow, overlap, off-page, failed fonts or images", pass: plotterProblems.length === 0, detail: `${plotterProblems.length} warning(s)` },
     { gate: "F every letter in the paper's own fonts", pass: missingGlyphs.size === 0,
@@ -629,7 +632,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     { gate: "3 no headline over 30% of its story", pass: headShare.length === 0, detail: headShare.join(", ") || "ok" },
     { gate: "4 the lead on page 1; every story placed or left out with a reason", pass: !!lead,
       detail: `lead ${lead?.story.id ?? "missing"}; left out (no room): ${result.leftOut.map((s) => s.id).join(", ") || "none"}` },
-    { gate: "S14 every news sent on Telegram printed", pass: unsent.length === 0, detail: unsent.join(", ") || "ok" },
+    { gate: "S14 every news sent on Telegram printed", pass: unsent.length === unwritten.length, detail: unsent.filter((id) => !unwritten.includes(id)).join(", ") || "ok" },
+    { gate: "S15 every news sent on Telegram written", pass: unwritten.length === 0, detail: unwritten.join(", ") || "ok" },
     { gate: "W no story across the whole page unless the editor allowed it",
       pass: !result.placed.some((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth),
       detail: result.placed.filter((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth).map((p) => `p${p.page} ${p.story.id} (${p.cols} columns)`).join(", ") || "ok" },

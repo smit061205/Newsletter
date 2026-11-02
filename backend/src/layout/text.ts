@@ -51,6 +51,8 @@ export const removed = new Set<string>();
  * punctuation taken out and reported (24 Oct: a Punjabi "ਲ" in a PIB release
  * was printed in a system font). The degree sign in words: Gopika has none (1 Nov's
  * "૧૧૧.૭૫°" came from a system font), and taken out it would change the number's sense. */
+/** Gujarati's vowel signs and their vowels, written alone. */
+const FULL_VOWEL: Record<string, string> = { "ા": "આ", "િ": "ઇ", "ી": "ઈ", "ુ": "ઉ", "ૂ": "ઊ", "ૃ": "ઋ", "ે": "એ", "ૈ": "ઐ", "ો": "ઓ", "ૌ": "ઔ" };
 function printableGujarati(text: string): string {
   const CANDRA: Record<string, string> = { "ૅ": "ે", "ૉ": "ો", "ઍ": "એ", "ઑ": "ઓ" };
   const out = devanagariToGujarati(text)
@@ -58,6 +60,8 @@ function printableGujarati(text: string): string {
     // Gurmukhi lines up with Gujarati letter for letter (U+0A00 -> U+0A80)
     .replace(/[\u0A00-\u0A7F]/g, (c) => { const g = String.fromCodePoint(c.codePointAt(0)! + 0x80); return /\p{Cn}/u.test(g) ? c : g; })
     .replace(/[ૅૉઍઑ]/g, (c) => CANDRA[c])
+    // a vowel sign on an English letter ("Keshyepે", 2 Nov): no font joins them -- the vowel itself
+    .replace(/(?<=[A-Za-z0-9])[\u0ABE-\u0ACC]/g, (c) => FULL_VOWEL[c] ?? "")
     // a halant ending a word ("કાર્યરત્", 24 Oct): Gopika has no such form, and
     // Gujarati papers print the word without it
     .replace(/([\u0A95-\u0AB9])\u0ACD(?=[^\u0A80-\u0AFF\u200C\u200D]|$)/g, "$1");

@@ -169,7 +169,7 @@ export const SYSTEM = `${profile.language.lang === "gu" ? `તમે ગાં�
 Rules:
 - Use ONLY facts in the release. Never add names, numbers, dates, places or quotes that are not in it.
 - Keep every number, name and date exactly as in the release, written in ${paperLang.digits} -- except inside English names and codes (ATM 2026, COVID-19).
-- Start body_long with the dateline the release uses (e.g. "${paperLang.dateline}"), if it has one.
+${profile.language.lang !== "en" ? `- A release in English (the editor's own news): write it all in ${paperLang.name}, people's and places' names in ${paperLang.name} letters.\n` : ""}- Start body_long with the dateline the release uses (e.g. "${paperLang.dateline}"), if it has one.
 - Headline: active, specific, no exclamation marks. Always write a deck (the sub-heading: one line adding the next most important fact). The kicker may be empty.
 - body_medium and body_short are shorter versions of body_long, keeping the most important facts first.
 Return JSON matching the schema.`;
@@ -339,7 +339,8 @@ export async function rewriteDay(store: Store, date: string, opts: { log: (s: st
   const all = store.releases(date).filter((r) => !r.lang || r.lang === profile.language.lang);
   // releases in the paper's own script (a release issued in two languages is the same news)
   const own = SCRIPT[profile.language.lang] ?? /[A-Za-z]/g;
-  const releases = all.filter((r) => share(r.headline + r.body.slice(0, 400), own) > 0.5);
+  // (the editor's own news in any language: written in the paper's, 2 Nov -- his English ones were skipped)
+  const releases = all.filter((r) => r.source === "telegram" || share(r.headline + r.body.slice(0, 400), own) > 0.5);
   for (const r of all) if (!releases.includes(r)) store.deleteStory(storyIdOf(r));
   // a PIB release is only ever "p<PRID>" (never a state-style "r<id>" from older code)
   for (const r of all) if (r.source === "pib") store.deleteStory(`r${r.id}`);
