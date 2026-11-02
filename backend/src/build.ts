@@ -94,6 +94,14 @@ export interface CopyOpts {
   drop?: string[];
 }
 
+/** His Telegram news sent on an earlier day than the paper's own (IST): outdated, not printed
+ * (2 Nov, the editor: the day before's messages printed a day late). Their story ids. */
+function outdatedTelegram(store: Store, date: string): Set<string> {
+  const cutoff = new Date(`${date}T00:00:00+05:30`).getTime() / 1000;
+  const sentAt = new Map(store.inbox().map((x) => [x.id, x.at]));
+  return new Set(store.releases(date).filter((r) => r.source === "telegram" && (sentAt.get(r.id - 7_000_000_000) ?? Infinity) < cutoff).map((r) => storyIdOf(r)));
+}
+
 /** The sample ads (the paper's own stand-ins for a day with nothing booked) as
  * the editor keeps them: printed at all (setting samplesOn), and which of them
  * not (samplesOff) -- taken out of every paper laid out after, for good. */
@@ -290,11 +298,13 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     }));
     // a speech's full text written up beside the event's own story (stories
     // written before the rewrite grouped them): the event's story is enough
+    const outdated = outdatedTelegram(store, date);
     const speechDup = (s: Story) => {
       const r = releases.get(s.id);
       return !!r && !alwaysPrinted(s) && isSpeechText(r) && stories.some((o) => o.id !== s.id && !dropped.has(o.id) && !!releases.get(o.id) && speechTwin(r, releases.get(o.id)!));
     };
-    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && !speechDup(s) && (opts.copy?.translate || inPaperLanguage(s))))
+    if (outdated.size) log(`  Telegram news sent on an earlier day, outdated: left out: ${[...outdated].join(", ")}`);
+    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && !outdated.has(s.id) && !speechDup(s) && (opts.copy?.translate || inPaperLanguage(s))))
       .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
       .sort(byRank);
     // the editorial plan ranks the day's stories (an editor's own rank wins)
@@ -617,8 +627,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const leftOutByHim = droppedBy(store.edits(date));
   const printedIds = new Set(result.placed.map((p) => p.story.id));
   const written = new Set(store.stories(date).map((s) => s.id));
+  const old = outdatedTelegram(store, date);
   const unsent = store.releases(date).filter((r) => r.source === "telegram").map((r) => storyIdOf(r))
-    .filter((id) => !leftOutByHim.has(id) && !opts.copy?.drop?.includes(id) && !printedIds.has(id));
+    .filter((id) => !leftOutByHim.has(id) && !old.has(id) && !opts.copy?.drop?.includes(id) && !printedIds.has(id));
   // (one not written as a story at all: named, not laid out again and again -- no arrangement prints it)
   const unwritten = unsent.filter((id) => !written.has(id));
   const gates = [
