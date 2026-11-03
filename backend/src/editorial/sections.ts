@@ -17,7 +17,7 @@ import { profile } from "../profile.ts";
 import { sectionsDay, storyIdOf, type Release, type Store, type Story } from "../store.ts";
 import { DEFAULT_MODEL, env, openRouter, rewriteOne } from "./rewrite.ts";
 import type { Section } from "../ingest/sections.ts";
-import { filePhoto } from "../ingest/commons.ts";
+import { creditOf, filePhoto } from "../ingest/commons.ts";
 
 /** The caption under a file photo, before its credit. */
 export const FILE_PHOTO = "ફાઇલ ફોટો: ";
@@ -123,7 +123,7 @@ export async function writeSections(store: Store, date: string, printed: Set<str
     const got = await filePhoto(store, date, { name: p.photo, is: p.photoIs }, s.headline, log);
     if (!got || used.has(got.url)) continue;
     used.add(got.url);
-    c.stories[k] = { ...s, photo: got.url, photos: [got.url], caption: `${FILE_PHOTO}${got.credit}` };
+    c.stories[k] = { ...s, photo: got.url, photos: [got.url], caption: `${FILE_PHOTO}${await creditOf(store, got)}` };
   }
   for (const c of chosen) {
     const list = c.stories.filter((s): s is Story => !!s);
