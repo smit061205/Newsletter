@@ -47,7 +47,9 @@ export interface Subject {
   /** what they are, as Wikipedia would say ("Indian cricketer", "cricket stadium in Ahmedabad") */
   is: string;
 }
-export interface FilePhoto { url: string; credit: string }
+export interface FilePhoto { url: string;
+  /** who took it and its licence, as Commons gives them (in English) */
+  author: string; licence: string }
 
 let queue = Promise.resolve();
 /** One request at a time to Wikimedia; told to slow down (429), it waits and asks again. */
@@ -85,7 +87,7 @@ const kindsOf = (s: string) => KINDS.flatMap((k, i) => (k.test(s.toLowerCase()) 
 export async function filePhoto(store: Store, date: string, subject: Subject, headline: string, log: (s: string) => void): Promise<FilePhoto | null> {
   if (!subject.name.trim()) return null;
   // (the same person looked for again: the same answer, nothing fetched or paid for twice)
-  const key = `commons2|${bare(subject.name)}|${bare(subject.is)}`;
+  const key = `commons3|${bare(subject.name)}|${bare(subject.is)}`;
   const had = store.fitted(key);
   if (had) return had.body ? (JSON.parse(had.body) as FilePhoto) : null;
   const got = await find(subject, headline, date).catch((e: unknown) => ({ photo: null, why: `couldn't be looked for (${e instanceof Error ? e.message : e})` }));
@@ -147,7 +149,7 @@ async function find(subject: Subject, headline: string, date: string): Promise<{
   const name = `commons-${hash(title)}.${bytes[0] === 0x89 ? "png" : "jpg"}`;
   await writeFile(path.join(dir, name), bytes);
   // (the credit the licence asks for: who took it, and the licence)
-  return { photo: { url: `/media/${date}/${name}`, credit: `${artist ? `${artist}, ` : ""}${licence} / Wikimedia Commons` }, why: "" };
+  return { photo: { url: `/media/${date}/${name}`, author: artist, licence }, why: "" };
 }
 
 /** The AI's look at a photo before it prints: a real, sharp photograph of the subject's kind, fit for the news? */
@@ -181,6 +183,50 @@ async function look(img: Uint8Array, subject: Subject, headline: string): Promis
   const data = (await res.json()) as { choices: { message: { content: string } }[] };
   const out = JSON.parse(data.choices[0].message.content.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")) as { ok: boolean; reason: string };
   return { ok: !!out.ok, reason: out.reason || "not fit to print" };
+}
+
+/** The credit under a file photo, in the paper's language: Gujarati letters for a Gujarati paper (4 Nov: the
+ * credit printed in English under a Gujarati story), the licence in its own words and the paper's digits. */
+export async function creditOf(store: Store, photo: FilePhoto): Promise<string> {
+  if (profile.language.lang !== "gu") return `${photo.author ? `${photo.author}, ` : ""}${photo.licence} / Wikimedia Commons`;
+  const { localDigits } = await import("../chrome/chrome.ts");
+  const ver = photo.licence.match(/\d+(\.\d+)?/)?.[0] ?? "";
+  const licence = /^(public domain|pd\b|cc0)/i.test(photo.licence) ? "મુક્ત ઉપયોગ"
+    : /^godl/i.test(photo.licence) ? "ભારત સરકારનું ઓપન ડેટા લાઇસન્સ"
+    : `ક્રિએટિવ કૉમન્સ ${/-sa/i.test(photo.licence) ? "બીવાય-એસએ" : "બીવાય"} ${localDigits(ver)}`.trim();
+  const author = photo.author ? await inGujarati(store, photo.author) : "";
+  return `${author ? `${author}, ` : ""}${licence} / વિકિમીડિયા કૉમન્સ`;
+}
+
+/** A photographer's or an office's name in Gujarati letters (an office's translated: "Prime Minister's Office" is
+ * "વડાપ્રધાન કાર્યાલય"), kept so it's asked once; as it is if the AI can't be reached. */
+async function inGujarati(store: Store, name: string): Promise<string> {
+  const key = `credit-gu|${name}`;
+  const had = store.fitted(key);
+  if (had) return had.body;
+  const k = env("OPENROUTER_API_KEY");
+  if (!k) return name;
+  try {
+    const res = await openRouter({
+      method: "POST",
+      headers: { authorization: `Bearer ${k}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
+      body: JSON.stringify({
+        model: profile.editorial.translateModel, temperature: 0,
+        messages: [{ role: "user", content: `Write this photo credit in Gujarati script for a Gujarati newspaper: a person's name or a user name ` +
+          `spelled out in Gujarati letters as it sounds, an organisation's name translated as Gujarati papers write it (e.g. "Prime Minister's Office" = "વડાપ્રધાન કાર્યાલય"). ` +
+          `Answer with the Gujarati text alone, no Latin letters.\n\n${name}` }],
+      }),
+    });
+    if (!res.ok) return name;
+    const data = (await res.json()) as { choices: { message: { content: string } }[] };
+    const out = data.choices[0].message.content.trim().replace(/^["'“]|["'”]$/g, "").split("\n")[0].trim();
+    // (only Gujarati letters, punctuation and spaces: anything else, kept as it was)
+    if (!out || /[A-Za-z]/.test(out) || !/[\u0A80-\u0AFF]/.test(out)) return name;
+    store.putFitted(key, { body: out, model: profile.editorial.translateModel });
+    return out;
+  } catch {
+    return name;
+  }
 }
 
 function hash(s: string): string {
