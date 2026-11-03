@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import type { Element, TextElement } from "@ck/shared/contract";
 import { profile, profilePath } from "../profile.ts";
 import { elementText, topFor, type Measurer } from "../layout/measure.ts";
-import { GAP } from "../layout/typography.ts";
+import { GAP, GRID, HEADLINE, INK, PT } from "../layout/typography.ts";
 
 interface Field {
   x: number; y: number; width: number; height: number;
@@ -110,7 +110,7 @@ export function bandOf(n: number, total: number): { top: number; bottom: number;
  * `blank`: the same room kept, left empty -- a copy whose masthead, page
  * headers and footer are put in by hand afterwards (editorial/copies.ts). */
 export async function chromeFor(n: number, total: number, issueDate: string, issueNumber: number, m?: Measurer,
-                                opts: { blank?: boolean } = {}): Promise<ChromeResult> {
+                                opts: { blank?: boolean; title?: string } = {}): Promise<ChromeResult> {
   const roleName = n === 1 ? "first" : n === total ? "last" : "inner";
   const role = template.roles[roleName];
   const els: Element[] = opts.blank ? [] : [{ id: `p${n}-chrome`, kind: "image", ...role.art, fit: "fill" }];
@@ -126,5 +126,21 @@ export async function chromeFor(n: number, total: number, issueDate: string, iss
     els.push({ id: `p${n}-foot-rule`, kind: "line", x1: r.x1, y1: r.y, x2: r.x2, y2: r.y, color: r.color, width: r.width });
   }
   const band = bandOf(n, total);
+  // the 8-page paper's own pages: the section's title in white on a black bar across the page's top (3 Nov)
+  if (opts.title) {
+    // (its room the same whether it's drawn or only measured: the Ads screen)
+    if (!m) return { elements: els, bodyTop: band.top + SECTION_BAR + GAP.underHeader, bodyBottom: band.bottom };
+    const { fitLines } = await import("../layout/module.ts");
+    const { stackLines } = await import("../layout/compose.ts");
+    const x = GRID.left, w = template.page.width - 2 * GRID.left, h = SECTION_BAR;
+    const { lines, size } = await fitLines(m, opts.title, w * 0.8, HEADLINE.font, h * 0.72, h * 0.5, 1);
+    const st = await stackLines(m, lines, `p${n}-section-title`, `p${n}-section`, x + w * 0.1, band.top + (h - size * 1.2) / 2, w * 0.8, HEADLINE.font, size, size * 1.2);
+    els.push({ id: `p${n}-section-bar`, kind: "rect", x, y: band.top, width: w, height: h, fill: INK, radius: h * 0.2 },
+             ...st.elements.map((e) => (e.kind === "text" ? { ...e, color: "#ffffff", align: "center" as const } : e)));
+    return { elements: els, bodyTop: band.top + SECTION_BAR + GAP.underHeader, bodyBottom: band.bottom };
+  }
   return { elements: els, bodyTop: band.top, bodyBottom: band.bottom };
 }
+
+/** The height of a section page's title bar (template px). */
+const SECTION_BAR = 30 * PT;

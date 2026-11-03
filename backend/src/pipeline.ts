@@ -11,11 +11,18 @@
 // newsroom shows it live, and a failed step can be run again from there --
 // what the earlier steps stored stays stored.
 import { spawn } from "node:child_process";
+import path from "node:path";
 import { buildIssue } from "./build.ts";
+import { OUT_DIR } from "./config.ts";
 import type { EnginePage } from "./layout/engine.ts";
-import type { Job, JobStep, Progress, StepName, Store } from "./store.ts";
+import { sectionsDay, type Job, type JobStep, type Progress, type StepName, type Store } from "./store.ts";
 
-export const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build"];
+export const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build", "sections"];
+
+/** The day's paper as last laid out here: the 8-page paper's first pages (step "sections"). */
+let built: { date: string; version: number; pages: (EnginePage | null)[] } | null = null;
+/** The 8-page paper's own news, read beside the day's (begun in "fetch"). */
+let sectionsRead: { date: string; run: Promise<unknown> } | null = null;
 
 type Listener = (job: Job, line?: string) => void;
 const listeners = new Set<Listener>();
@@ -169,6 +176,12 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           .catch((e: unknown) => { if (stopping) throw e; say(`the Telegram news couldn't be taken (${e instanceof Error ? e.message : e})`); });
       };
       await telegram();
+      // (the 8-page paper's own pages' news, read beside it all: its own sites, at their own pace)
+      const { profile: paper } = await import("./profile.ts");
+      if (paper.sections?.length) {
+        const { ingestSections } = await import("./ingest/sections.ts");
+        sectionsRead = { date, run: ingestSections(store, date, () => {}).catch(() => {}) };
+      }
       // then the CM's office and All India Radio's Gujarati news (a Gujarati
       // paper): extra copy, so a site not answering never stops the paper
       // (read side by side with PIB: each site at its own polite pace)
@@ -364,12 +377,59 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         r = await timed("the best try again", () => buildIssue(store, date, { log: say, progress, reviewLater: true, seedShift: b?.seedShift ?? 0, ...(planned ? { keep: all } : b?.mend ? { mend: b.mend } : {}) }));
       }
       const version = (r.report as { version?: number }).version;
+      if (version) built = { date, version, pages: r.pages };
       say(`issue ${r.report.issueNumber} v${version ?? "?"}: ${r.report.ready ? "READY" : "NOT READY"} (the page review follows)`);
       // the page review, after the paper is saved: it only reports, so the paper is ready meanwhile
       if (version) {
         const { reviewSaved } = await import("./build.ts");
         // (the newsroom looks again while gate 5 says it's running)
         void reviewSaved(store, date, version).catch(() => {});
+      }
+      return;
+    }
+    case "sections": {
+      // the 8-page paper (the editor, 3 Nov): the day's pages, then one for each section. Made
+      // beside the day's paper, never instead of it: anything going wrong here leaves that as it is
+      const { profile } = await import("./profile.ts");
+      if (!profile.sections?.length) return say("this paper has no 8-page edition");
+      const latest = store.latestIssue(date);
+      if (!built || built.date !== date || built.version !== latest?.version) {
+        return say("the 8-page paper is made with the day's paper: press Make it again for both");
+      }
+      const base = built;
+      try {
+        const { ingestSections } = await import("./ingest/sections.ts");
+        await timed("the 8-page paper's news", () => sectionsRead?.date === date ? sectionsRead.run : ingestSections(store, date, say));
+        sectionsRead = null;
+        // (and anything new since: a feed read again only takes what it hasn't)
+        await ingestSections(store, date, say);
+        const printed = new Set(base.pages.flatMap((p) => p?.placed.map((x) => x.module.story.id) ?? []));
+        const { writeSections } = await import("./editorial/sections.ts");
+        let w = await timed("the 8-page paper's stories", () => writeSections(store, date, printed, say));
+        const pdfPath = path.join(OUT_DIR, `${profile.id}-${date}-8.pdf`);
+        const lay = (round: number) => timed(`laying out the 8 pages${round ? ` again ${round}` : ""}`,
+          () => buildIssue(store, date, { log: say, progress, reviewLater: true, sections: { base: base.pages, stories: w.stories, pdfPath } }));
+        let r = await lay(0);
+        let cost = w.cost + (r.report.cost ?? 0);
+        // what the fact check found on its own pages (4 to 8), written again and laid out again, as the day's
+        // paper does (its pages 1 to 3 are the day's paper's, mended there)
+        for (let round = 1; round <= 2 && r.report.gates.some((g) => g.gate.startsWith("6 ") && !g.pass); round++) {
+          const { repairFacts } = await import("./editorial/repair.ts");
+          const { OWN_WORDS } = await import("./editorial/sections.ts");
+          const own = new Set((r.report as unknown as { placed: { page: number; story: string }[] }).placed.filter((p) => p.page >= base.pages.length).map((p) => p.story));
+          const mended = await timed(`mending the 8 pages' facts ${round}`, async () =>
+            (await repairFacts(store, sectionsDay(date), say, own, { note: OWN_WORDS("business, technology, entertainment or sports", 1) })) +
+            (await repairFacts(store, date, say, own)));
+          if (!mended) break;
+          w = await writeSections(store, date, printed, say);
+          r = await lay(round);
+          cost += w.cost + (r.report.cost ?? 0);
+        }
+        store.putSetting(`eightPages|${date}`, { version: base.version, pdf: pdfPath, ready: r.report.ready, pages: r.report.pages, cost });
+        say(`the 8-page paper: ${r.report.ready ? "READY" : "NOT READY"}${r.report.ready ? "" : ` (${r.report.gates.filter((g) => !g.pass).map((g) => g.gate).join("; ")})`}`);
+      } catch (e) {
+        if (stopping) throw e;
+        say(`the 8-page paper couldn't be made (${e instanceof Error ? e.message : e}): the day's paper is ready all the same`);
       }
       return;
     }

@@ -8,9 +8,10 @@ import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, rewriteOne } from "./rewrite.ts";
 import { translateOne } from "./translate.ts";
 import { checkFacts, toRefit } from "./facts.ts";
+import { FILE_PHOTO } from "./sections.ts";
 
 /** Writes the day's number-flagged stories again. Returns how many came out clean. */
-export async function repairFacts(store: Store, date: string, log: (s: string) => void, only?: Set<string>): Promise<number> {
+export async function repairFacts(store: Store, date: string, log: (s: string) => void, only?: Set<string>, opts: { note?: string } = {}): Promise<number> {
   const key = env("OPENROUTER_API_KEY");
   if (!key) return 0;
   // (fitted versions dropped by the check of names and dates: the next layout writes them)
@@ -29,14 +30,15 @@ export async function repairFacts(store: Store, date: string, log: (s: string) =
       : `\nIMPORTANT: a first version of this story said things that are not in the release (${nums}). Use only the names, places, dates and quotations the release gives.`;
     try {
       const got = s.translatedFrom ? await translateOne(r, key, undefined, note)
-        : await rewriteOne(r, s.model && s.model !== "as-is" ? s.model : env("OPENROUTER_MODEL") ?? DEFAULT_MODEL, key, 1, note);
+        : await rewriteOne(r, s.model && s.model !== "as-is" ? s.model : env("OPENROUTER_MODEL") ?? DEFAULT_MODEL, key, 1, `${opts.note ?? ""}${note}`);
       const left = numbersNotIn(`${got.story.headline} ${got.story.deck} ${got.story.bodies.long}`, `${r.headline} ${r.subhead} ${r.body}`, r.date);
       if (left.length) { log(`  ${s.id}: written again, still with ${left.join(", ")}: left for the editor`); return; }
       const wrong = (await checkFacts(store, { ...s, headline: got.story.headline, deck: got.story.deck, bodies: got.story.bodies }, log)).problems;
       if (wrong.length) { log(`  ${s.id}: written again, still with ${wrong.join("; ")}: left for the editor`); return; }
       // the new wording, the story's place in the paper kept
       const fixed: Story = { ...s, kicker: got.story.kicker, headline: got.story.headline, deck: got.story.deck, bodies: got.story.bodies,
-                             caption: got.story.caption || s.caption, factCheck: undefined };
+                             // (a file photo's credit stays under it: ingest/commons.ts)
+                             caption: s.caption.startsWith(FILE_PHOTO) ? s.caption : got.story.caption || s.caption, factCheck: undefined };
       store.putStory(fixed);
       mended++;
       log(`  ${s.id}: written again without what its source doesn't have (${nums})`);

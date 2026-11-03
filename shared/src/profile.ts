@@ -60,6 +60,27 @@ export const ProfileSchema = z.object({
     datedNextDay: z.boolean().optional(),
     pages: z.number().int().positive(),
   }),
+  /** The 8-page paper (the editor, 3 Nov): the day's pages, then a page for each of these, made every
+   * evening beside the day's paper. Each takes its own news: its sources' feeds, and the day's PIB
+   * releases from its ministries that the day's pages didn't print. */
+  sections: z.array(z.object({
+    id: z.string().min(1),
+    /** the page's title, printed across its top */
+    title: z.string().min(1),
+    /** what the page is about, for the AI that chooses its news */
+    about: z.string().min(1),
+    /** PIB ministries whose releases are this page's news (a regular expression on the ministry's name) */
+    ministries: z.string().optional(),
+    feeds: z.array(z.object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      /** an RSS or Atom feed */
+      url: z.string().url(),
+      lang: z.enum(["gu", "hi", "en"]),
+      /** the source's photos may be printed (a government's own, NASA's): a news outlet's are its own, never */
+      photos: z.boolean().optional(),
+    })),
+  })).optional(),
   page: z.object({ width: pt.positive(), height: pt.positive() }),
   grid: z.object({
     left: pt, // first column's left edge

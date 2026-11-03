@@ -20,18 +20,24 @@ export interface Release {
   fetchedAt: string;
   /** where it came from: the state's Information Department (the default, for older rows), PIB,
    * the Gujarat CM's office or All India Radio's Gujarati news (ingest/official.ts) */
-  source?: "gujinfo" | "pib" | "cmo" | "air" | "un" | "telegram";
+  source?: "gujinfo" | "pib" | "cmo" | "air" | "un" | "telegram" | "section";
   /** its language: Gujarati (the default), or Hindi or English, which are translated */
   lang?: "gu" | "hi" | "en";
   /** PIB: the ministry that issued it */
   ministry?: string;
   /** PIB: the same release in other languages (their PRIDs) */
   langVersions?: number[];
+  /** the 8-page paper's own pages: the section it's news for (profile sections: finance, tech, ...) */
+  section?: string;
 }
 
 /** The story made from a release: "p<PRID>" for PIB's, "c…" the CM's office's, "a…" All India Radio's, "u…" UN News's,
  * "t…" one sent to the paper's Telegram bot, "r<id>" the state's. */
-export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u", telegram: "t" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
+export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u", telegram: "t", section: "s" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
+
+/** Where the 8-page paper's own news (its pages after the day's) is kept: a day of its own beside
+ * the paper's, so nothing that makes the day's paper, its copies or its checks ever sees it (3 Nov). */
+export const sectionsDay = (date: string) => `${date}+sections`;
 
 /** A message sent to the paper's Telegram bot (ingest/telegram.ts): news text, or a photo for it. */
 export interface InboxItem {
@@ -88,6 +94,8 @@ export interface Story {
   editorsColumn?: boolean;
   /** Translated from another language (its code, e.g. "hi"): the editor checks it against the original. */
   translatedFrom?: string;
+  /** the 8-page paper's section page it's for (profile sections), the day's paper's stories have none */
+  section?: string;
 }
 
 /** Always printed: news the editor sent the paper's Telegram bot, and a copy's
@@ -96,7 +104,7 @@ export const alwaysPrinted = (s: Pick<Story, "source">) => !!s.source && (s.sour
 /** Printed word for word: a copy's fixed article is never reworded, cut or left without its photo. */
 export const wordForWord = (s: Pick<Story, "source">) => !!s.source?.startsWith("fixed:");
 
-export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build";
+export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build" | "sections";
 /** How far a step has got: `done` of `total`, in words, with the item in hand (a headline, a page). */
 export interface Progress { done: number; total: number; label: string; item?: string }
 export interface JobStep {

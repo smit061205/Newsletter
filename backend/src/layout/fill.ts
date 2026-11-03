@@ -29,7 +29,14 @@ export interface FillContext {
   turn: Promise<unknown>;
   cost: number;
   log: (s: string) => void;
+  /** stories that belong to one page (the 8-page paper's section pages): a held one fills only its own page's gaps */
+  pageOf?: Map<string, number>;
+  /** pages no item is written for (a section page prints its subject's news only) */
+  noItems?: Set<number>;
 }
+
+/** The held stories page `page` may take. */
+const heldFor = (ctx: FillContext, page: number) => ctx.held.filter((s) => !ctx.pageOf?.has(s.id) || ctx.pageOf.get(s.id) === page);
 
 const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
 /** The fewest words anything filling a gap has: the paper's shortest story (the
@@ -77,7 +84,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   // fills the hole to its foot, or leaves room for another item under it
   const close = (mod: Module) => mod.height <= h + 0.5 && (h - mod.height < 1.5 * pitch || h - mod.height >= 4 * pitch + GAP.betweenStories);
   // 1. a held story as a brief
-  for (const s of [...ctx.held]) {
+  for (const s of heldFor(ctx, page)) {
     const opts = await ctx.blocks.options(s, 5, cols);
     const fit = opts.filter((o) => o.height <= h + 0.5 && o.height + o.stretch >= h - 1.5 * pitch).sort((a, b) => b.height - a.height)[0];
     if (!fit || !ctx.held.includes(s)) continue;
@@ -90,7 +97,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   // before anything written: 25 Oct wrote a cooking tip with eight stories held)
   {
     let best: { s: Story; mod: Module } | null = null;
-    for (const s of ctx.held.slice(0, 30)) {
+    for (const s of heldFor(ctx, page).slice(0, 30)) {
       const sentences = s.bodies.long.split(/(?<=[.।!?])\s+/);
       for (let k = sentences.length; k >= 1; k--) {
         const body = sentences.slice(0, k).join(" ");
@@ -118,7 +125,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   // sub-heading alone were taller than the gap, and a tip is no news)
   if (!aiStalled() && (h / pitch - 4) * cols * 5 >= ITEM_WORDS * 0.8) {
     const size = { head: cols === 1 ? 3 : cols === 2 ? 5 : 7, deck: cols === 1 ? 4 : cols === 2 ? 7 : 10 };
-    for (const s of ctx.held.filter((x) => !wordForWord(x)).slice(0, 8)) {
+    for (const s of heldFor(ctx, page).filter((x) => !wordForWord(x)).slice(0, 8)) {
       const release = (s.releaseId ? ctx.store.release(s.releaseId) : null)
         ?? ({ id: 0, date: s.date, headline: s.headline, subhead: s.deck, body: s.bodies.long } as unknown as Release);
       let target = Math.max(ITEM_WORDS + 10, Math.round((h / pitch - 4) * cols * 5));
@@ -157,7 +164,7 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   }
   // 2. an item written to its size, its length from what a first try measured
   // (never with real news waiting: 30 Oct's was a tip on storing grain, 28 stories held)
-  if (!ctx.held.length && (h / pitch - 5) * cols * 5 >= ITEM_WORDS * 0.8) {
+  if (!heldFor(ctx, page).length && !ctx.noItems?.has(page) && (h / pitch - 5) * cols * 5 >= ITEM_WORDS * 0.8) {
     const slot = `${page}-${col}-${cols}-${n}`;
     let target = Math.max(ITEM_WORDS + 10, Math.round((h / pitch - 5) * cols * 5));
     let best: Module | null = null;

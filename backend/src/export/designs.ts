@@ -94,9 +94,13 @@ export async function designFor(n: number): Promise<Design | null> {
 export async function withDesign(pdf: Uint8Array, design: Design): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdf, { ignoreEncryption: true });
   const src = await PDFDocument.load(await readFile(fileOf(design.id)), { ignoreEncryption: true });
+  const have = src.getPageCount(), count = doc.getPageCount();
   for (const [i, page] of doc.getPages().entries()) {
-    if (i >= src.getPageCount()) break;
-    const from = src.getPage(i);
+    // page for page; a 4-page design on the 8-page paper (4 Nov): its last page (the footer) on the last,
+    // its first three on the first three, and the pages between left with the copy's own (no wrong page numbers)
+    const at = have >= count ? i : i === count - 1 ? have - 1 : i < have - 1 ? i : -1;
+    if (at < 0) continue;
+    const from = src.getPage(at);
     const crop = from.getCropBox();
     const art = await doc.embedPage(from, { left: crop.x, bottom: crop.y, right: crop.x + crop.width, top: crop.y + crop.height });
     const { width: W, height: H } = page.getSize();

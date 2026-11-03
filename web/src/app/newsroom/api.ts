@@ -1,7 +1,7 @@
 // The newsroom's link to the backend on this computer (backend/src/server.ts).
 // The browser calls it directly: both run here, on 127.0.0.1.
 
-export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build";
+export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build" | "sections";
 export interface Progress { done: number; total: number; label: string; item?: string }
 export interface JobStep { name: StepName; status: "waiting" | "running" | "done" | "failed" | "skipped"; startedAt?: string; endedAt?: string; log: string[]; error?: string; progress?: Progress;
   /** how long its parts took (seconds), as they finish */
@@ -16,7 +16,9 @@ export interface Report {
   plan?: { id: string; rank: number; reason: string }[];
   whiteSpace?: { page: number; col: number; height: number; y: number }[];
 }
-export interface IssueInfo { date: string; version: number; status: string; report: Report }
+export interface IssueInfo { date: string; version: number; status: string; report: Report;
+  /** the 8-page paper was made from this version too (its PDF: /api/issues/<date>/pdf8) */
+  eight?: boolean }
 export interface Status {
   today: string; now: string; runAt: string; autoRun: boolean; nextRun: string | null;
   running: Job | null; lastJob: Job | null; openrouterKey: boolean; aiOutOfMoney?: boolean;
@@ -65,6 +67,8 @@ export type Shuffle = "keepLead" | "anywhere" | "samePage";
 export interface PaperDesign { id: string; /** the file it came from */ name: string; pages: number }
 export interface PaperDesigns { designs: PaperDesign[]; /** copy number -> design id */ copies: Record<string, string> }
 export interface CopiesRun { kind: "copies" | "editions"; date: string; count: number; reword: Reword; shuffle: Shuffle; lang: PaperLang;
+  /** copies of the 8-page paper */
+  pages?: number;
   status: "running" | "done" | "failed" | "stopped"; startedAt: string; endedAt?: string; done: number;
   files: { n: number; id?: string; name?: string; lang: PaperLang; ready: boolean; pages: number }[]; cost: number; log: string[]; error?: string;
   /** how far it has got, 0-1, page by page; and each copy's own progress and what it's doing */

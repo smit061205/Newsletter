@@ -23,6 +23,161 @@
     "datedNextDay": true,
     "pages": 4
   },
+  "sections": [
+    {
+      "id": "finance",
+      "title": "વેપાર-ઉદ્યોગ",
+      "about": "business, the economy, markets, banking, prices, trade and industry, Gujarat's industry and GIFT City first",
+      "ministries": "Finance|Commerce|Corporate|MSME|Micro, Small|Textile|Petroleum|Coal|Steel|Heavy Industr|Consumer Affairs|Cooperation|નાણા|વાણિજ્ય|ઉદ્યોગ",
+      "feeds": [
+        {
+          "id": "tv9-business",
+          "name": "ટીવી9 ગુજરાતી: બિઝનેસ",
+          "url": "https://tv9gujarati.com/business/feed",
+          "lang": "gu"
+        },
+        {
+          "id": "sandesh-business",
+          "name": "સંદેશ: બિઝનેસ",
+          "url": "https://sandesh.com/rss/business.xml",
+          "lang": "gu"
+        },
+        {
+          "id": "ie-business",
+          "name": "The Indian Express: business",
+          "url": "https://indianexpress.com/section/business/feed/",
+          "lang": "en"
+        },
+        {
+          "id": "businessline",
+          "name": "The Hindu BusinessLine",
+          "url": "https://www.thehindubusinessline.com/feeder/default.rss",
+          "lang": "en"
+        },
+        {
+          "id": "mint-markets",
+          "name": "Mint: markets",
+          "url": "https://www.livemint.com/rss/markets",
+          "lang": "en"
+        },
+        {
+          "id": "rbi",
+          "name": "Reserve Bank of India",
+          "url": "https://www.rbi.org.in/pressreleases_rss.xml",
+          "lang": "en"
+        },
+        {
+          "id": "sebi",
+          "name": "SEBI",
+          "url": "https://www.sebi.gov.in/sebirss.xml",
+          "lang": "en"
+        }
+      ]
+    },
+    {
+      "id": "tech",
+      "title": "ટેક્નોલોજી અને AI",
+      "about": "artificial intelligence, technology, phones, the internet, science and space, India's and Gujarat's first",
+      "ministries": "Electronics|Information Technology|Science|Space|Telecom|Communications|Earth Sciences|Atomic|ઇલેક્ટ્રોનિક્સ|વિજ્ઞાન|અવકાશ",
+      "feeds": [
+        {
+          "id": "tv9-tech",
+          "name": "ટીવી9 ગુજરાતી: ટેક્નોલોજી",
+          "url": "https://tv9gujarati.com/technology/feed",
+          "lang": "gu"
+        },
+        {
+          "id": "ie-tech",
+          "name": "The Indian Express: technology",
+          "url": "https://indianexpress.com/section/technology/feed/",
+          "lang": "en"
+        },
+        {
+          "id": "mint-tech",
+          "name": "Mint: technology",
+          "url": "https://www.livemint.com/rss/technology",
+          "lang": "en"
+        },
+        {
+          "id": "nasa",
+          "name": "NASA",
+          "url": "https://www.nasa.gov/news-release/feed/",
+          "lang": "en",
+          "photos": true
+        }
+      ]
+    },
+    {
+      "id": "entertainment",
+      "title": "મનોરંજન",
+      "about": "films, Gujarati cinema (Dhollywood) first, Bollywood, television, OTT, music, theatre and festivals",
+      "ministries": "Information and Broadcasting|Culture|માહિતી અને પ્રસારણ|સંસ્કૃતિ",
+      "feeds": [
+        {
+          "id": "tv9-entertainment",
+          "name": "ટીવી9 ગુજરાતી: મનોરંજન",
+          "url": "https://tv9gujarati.com/entertainment/feed",
+          "lang": "gu"
+        },
+        {
+          "id": "sandesh-entertainment",
+          "name": "સંદેશ: મનોરંજન",
+          "url": "https://sandesh.com/rss/entertainment.xml",
+          "lang": "gu"
+        },
+        {
+          "id": "ie-entertainment",
+          "name": "The Indian Express: entertainment",
+          "url": "https://indianexpress.com/section/entertainment/feed/",
+          "lang": "en"
+        }
+      ]
+    },
+    {
+      "id": "sports",
+      "title": "રમત-ગમત",
+      "about": "cricket first (India, Gujarat's players and teams, Gujarat Titans, matches in Ahmedabad), then other sports, Gujarat's sportspeople and Khel Mahakumbh",
+      "ministries": "Youth Affairs|Sports|રમત",
+      "feeds": [
+        {
+          "id": "tv9-cricket",
+          "name": "ટીવી9 ગુજરાતી: ક્રિકેટ",
+          "url": "https://tv9gujarati.com/sports/cricket-news/feed",
+          "lang": "gu"
+        },
+        {
+          "id": "tv9-sports",
+          "name": "ટીવી9 ગુજરાતી: રમતગમત",
+          "url": "https://tv9gujarati.com/sports/feed",
+          "lang": "gu"
+        },
+        {
+          "id": "sandesh-cricket",
+          "name": "સંદેશ: ક્રિકેટ",
+          "url": "https://sandesh.com/rss/cricket.xml",
+          "lang": "gu"
+        },
+        {
+          "id": "sandesh-sports",
+          "name": "સંદેશ: રમતગમત",
+          "url": "https://sandesh.com/rss/sports.xml",
+          "lang": "gu"
+        },
+        {
+          "id": "ie-cricket",
+          "name": "The Indian Express: cricket",
+          "url": "https://indianexpress.com/section/sports/cricket/feed/",
+          "lang": "en"
+        },
+        {
+          "id": "ie-sports",
+          "name": "The Indian Express: sports",
+          "url": "https://indianexpress.com/section/sports/feed/",
+          "lang": "en"
+        }
+      ]
+    }
+  ],
   "page": {
     "width": 1105.5,
     "height": 1488.2

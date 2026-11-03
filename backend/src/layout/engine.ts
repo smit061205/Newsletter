@@ -133,13 +133,13 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
       const s = [...pages[long]].slice(1).sort((a, b) => toHold(a, b) || a.mid - b.mid)[0];
       if (!s) break;
       pages[long] = pages[long].filter((x) => x !== s);
-      const to = rooms.findIndex((r, k) => k !== long && sum(k, "max") + s.mid < r * 1.05);
+      const to = opts.fixedPage?.has(s.story.id) ? -1 : rooms.findIndex((r, k) => k !== long && sum(k, "max") + s.mid < r * 1.05);
       if (to >= 0) pages[to].push(s); else held.push(s);
       continue;
     }
-    const spare = held.sort(toBring)[0];
+    const spare = held.sort(toBring).find((s) => !opts.fixedPage?.has(s.story.id) || opts.fixedPage.get(s.story.id) === short + 1);
     if (spare) { held.splice(held.indexOf(spare), 1); pages[short].push(spare); continue; }
-    const from = rooms.findIndex((r, k) => k !== short && pages[k].length > 1 && sum(k, "min") < r * 0.9);
+    const from = opts.fixedPage ? -1 : rooms.findIndex((r, k) => k !== short && pages[k].length > 1 && sum(k, "min") < r * 0.9);
     if (from < 0) break;
     const s = [...pages[from]].slice(1).sort((a, b) => a.mid - b.mid)[0];
     pages[from] = pages[from].filter((x) => x !== s);
@@ -158,6 +158,8 @@ export async function layOut(args: {
   seed: number;
   /** a copy: its stories' pages fixed ("samePage"), and the designs used before it, to avoid */
   fixedPage?: Map<string, number>; avoid?: Set<string>;
+  /** pages no gap item is written for (the 8-page paper's section pages) */
+  noItems?: Set<number>;
   /** ask the AI for longer versions (the day's paper; a copy uses what's cached) */
   longer: boolean;
   /** a copy's stories written to the spaces its pages need (the new engine; not a translation) */
@@ -300,8 +302,12 @@ export async function layOut(args: {
     log(`  the editor's news doesn't all fit ${PAGE_MOST} to an inside page: up to ${PAGE_CROWDED}, written shorter`);
     chosen = await sharing(PAGE_CROWDED);
   }
-  const byRoom = chosen ? null : assign(sized, open.map((i) => rooms[i]), { fixedPage: args.fixedPage, rng: args.seed ? rng : undefined, front: !args.keep?.has(1) });
+  // (assign() counts only the pages laid out here: a fixed page, counted among them)
+  const openFixed = args.fixedPage && new Map([...args.fixedPage].flatMap(([id, n]) => (open.includes(n - 1) ? [[id, open.indexOf(n - 1) + 1] as const] : [])));
+  const byRoom = chosen ? null : assign(sized, open.map((i) => rooms[i]), { fixedPage: openFixed, rng: args.seed ? rng : undefined, front: !args.keep?.has(1) });
   const held = chosen?.held ?? byRoom!.held;
+  // (a story whose page is fixed goes on no other: the 8-page paper's section pages, 3 Nov)
+  const mayGo = (s: Sized, i: number) => !args.fixedPage?.has(s.story.id) || args.fixedPage.get(s.story.id) === i + 1;
   const shares: Sized[][] = chosen?.pages ?? rooms.map((_, i) => byRoom!.pages[open.indexOf(i)] ?? []);
   // the editor's column on an inside page, however the pages were evened out
   const astray = shares[0]?.find((s) => s.story.editorsColumn);
@@ -393,7 +399,8 @@ export async function layOut(args: {
   const pages: (EnginePage | null)[] = rooms.map((_, i) => args.keep?.get(i + 1) ?? null);
   // a page short of copy with no story left to give it: room for a filler
   const shortBy = new Map<number, number>();
-  const fill: FillContext = { store: args.store, date: args.date, m, blocks, held: [], fillers: args.fillers, written: [], turn: Promise.resolve(), cost: 0, log };
+  const fill: FillContext = { store: args.store, date: args.date, m, blocks, held: [], fillers: args.fillers, written: [], turn: Promise.resolve(), cost: 0, log,
+                              ...(args.fixedPage ? { pageOf: args.fixedPage } : {}), ...(args.noItems ? { noItems: args.noItems } : {}) };
   const tried = new Map<number, string>(); // page -> its stories when last tried
   let pagesDone = 0;
   // (a page no design was made for at all: a narrow story added once, then stories held back)
@@ -433,7 +440,7 @@ export async function layOut(args: {
       // a page's one story won't fit it: another in its place, the page never
       // left blank (30 Oct: page 4's one story, a speech, fitted no design)
       if (shares[i].length === 1 && d.long >= d.short && (d.long > 0 || narrowed.has(i))) {
-        const other = held.filter((s) => s.min < rooms[i] && (i > 0 || !s.story.editorsColumn)).sort((a, b) => toBring(a, b) || b.mid - a.mid)[0];
+        const other = held.filter((s) => s.min < rooms[i] && (i > 0 || !s.story.editorsColumn) && mayGo(s, i)).sort((a, b) => toBring(a, b) || b.mid - a.mid)[0];
         if (other) {
           const [s] = shares[i];
           held.splice(held.indexOf(other), 1, s);
@@ -457,7 +464,7 @@ export async function layOut(args: {
       if (d.short === 0 && d.long === 0) {
         narrowed.add(i);
         let narrow: Sized | undefined;
-        for (const s of [...held].sort((a, b) => a.mid - b.mid)) {
+        for (const s of [...held].filter((s) => mayGo(s, i)).sort((a, b) => a.mid - b.mid)) {
           const rank = rankOf(s.story, false);
           for (const cols of blocks.widths(s.story, rank).filter((c) => c <= 2)) {
             if ((await blocks.options(s.story, rank, cols)).length) { narrow = s; break; }
@@ -478,7 +485,7 @@ export async function layOut(args: {
           if (args.longer && !args.modular) await lengthen(i, shares[0].map((s) => s.story).slice(1), 80);
           continue;
         }
-        const spare = held.filter((s) => i > 0 || !s.story.editorsColumn).sort((a, b) => toBring(a, b) || b.mid - a.mid)[0];
+        const spare = held.filter((s) => (i > 0 || !s.story.editorsColumn) && mayGo(s, i)).sort((a, b) => toBring(a, b) || b.mid - a.mid)[0];
         if (spare) {
           held.splice(held.indexOf(spare), 1);
           shares[i].push(spare);
@@ -516,7 +523,7 @@ export async function layOut(args: {
   for (const i of pages.map((_, k) => k).filter((k) => !pages[k])) {
     const n = i + 1;
     log(`  page ${n}: no design yet: laid out again with more of the day's stories`);
-    for (const s of [...held].sort(toBring)) {
+    for (const s of [...held].filter((s) => mayGo(s, i)).sort(toBring)) {
       if (shares[i].length >= (i === 0 ? FRONT_MOST : 6) || shares[i].reduce((a, x) => a + x.mid, 0) >= rooms[i]) break;
       if (i === 0 && s.story.editorsColumn) continue;
       held.splice(held.indexOf(s), 1);
@@ -527,7 +534,7 @@ export async function layOut(args: {
     for (let attempt = 0; attempt < 6 && !pages[i]; attempt++) {
       // (three tries with the page's stories, then another story in the place of its last)
       if (attempt >= 3 && held.length && shares[i].length > 1) {
-        const other = [...held].sort(toBring).find((s) => i > 0 || !s.story.editorsColumn), out = shares[i].findLast((s) => !s.story.editorsColumn);
+        const other = [...held].sort(toBring).find((s) => (i > 0 || !s.story.editorsColumn) && mayGo(s, i)), out = shares[i].findLast((s) => !s.story.editorsColumn);
         if (other && out) { held.splice(held.indexOf(other), 1, out); shares[i] = shares[i].map((s) => (s === out ? other : s)); }
       }
       fill.held = held.map((s) => s.story);

@@ -12,6 +12,7 @@ import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
 import type { IssueRender } from "@ck/shared/contract";
 import { assetFile } from "../config.ts";
 import { imageSize } from "../ingest/pib.ts";
+import { leastPpi, spanWidth } from "../layout/module.ts";
 import { profile } from "../profile.ts";
 
 export interface Check { name: string; pass: boolean; detail: string }
@@ -51,7 +52,9 @@ export async function preflight(pdf: Uint8Array, issue: IssueRender): Promise<Ch
             // contract px per source pixel, as fitted ("cover" crops: the larger scale)
             const scale = e.fit === "contain" ? Math.min(e.width / size.width, e.height / size.height) : Math.max(e.width / size.width, e.height / size.height);
             const ppi = dpi / scale;
-            if (ppi < MIN_PPI) soft.push(`p${page.number} ${e.id} ${Math.round(ppi)} ppi`);
+            // (a photo at the narrowest width may print a little under: layout/module.ts leastPpi)
+            const least = e.width <= spanWidth(profile.photo.minCols) + 2 ? leastPpi(profile.photo.minCols) : MIN_PPI;
+            if (ppi < least) soft.push(`p${page.number} ${e.id} ${Math.round(ppi)} ppi`);
           }
         } catch { /* a missing image is the plotter's warning */ }
       }
@@ -63,7 +66,7 @@ export async function preflight(pdf: Uint8Array, issue: IssueRender): Promise<Ch
   return [
     { name: "trim", pass: !off.length, detail: off.length ? off.map((p) => `p${p.i} ${p.width.toFixed(1)}x${p.height.toFixed(1)}pt`).join(", ") : `${width}x${height}pt` },
     { name: "fonts", pass: !unembedded.size, detail: unembedded.size ? `not embedded: ${[...unembedded].join(", ")}` : "all embedded" },
-    { name: "photos", pass: !soft.length, detail: soft.length ? `under ${MIN_PPI} ppi: ${soft.slice(0, 6).join(", ")}` : `all ${MIN_PPI} ppi or more` },
+    { name: "photos", pass: !soft.length, detail: soft.length ? `too soft: ${soft.slice(0, 6).join(", ")}` : `all ${MIN_PPI} ppi or more` },
     { name: "bounds", pass: !outside.length, detail: outside.length ? `outside the page: ${outside.slice(0, 6).join(", ")}` : "all on the page" },
   ];
 }
