@@ -418,7 +418,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           const { OWN_WORDS } = await import("./editorial/sections.ts");
           const own = new Set((r.report as unknown as { placed: { page: number; story: string }[] }).placed.filter((p) => p.page >= base.pages.length).map((p) => p.story));
           const mended = await timed(`mending the 8 pages' facts ${round}`, async () =>
-            (await repairFacts(store, sectionsDay(date), say, own, { note: OWN_WORDS("business, technology, entertainment or sports", 1) })) +
+            (await repairFacts(store, sectionsDay(date), say, own, { note: OWN_WORDS("business, technology, entertainment or sports", 0), merged: true })) +
             (await repairFacts(store, date, say, own)));
           if (!mended) break;
           w = await writeSections(store, date, printed, say);
