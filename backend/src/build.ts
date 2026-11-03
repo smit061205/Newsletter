@@ -619,7 +619,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const recheck = (s: Story) => {
     const r = dayReleases.get(s.id);
     if (!s.factCheck?.startsWith("numbers") || s.translatedFrom || !r) return s.factCheck;
-    const n = numbersNotIn(`${s.headline} ${s.deck} ${s.bodies.long}`, `${r.headline} ${r.subhead} ${r.body}`, r.date);
+    // (a story written from several reports is checked against them all: 4 Nov, "14.2" in its second report was flagged)
+    const all = s.mergedFrom?.length ? s.mergedFrom.map((id) => store.release(id)).filter((x): x is NonNullable<typeof x> => !!x) : [r];
+    const n = numbersNotIn(`${s.headline} ${s.deck} ${s.bodies.long}`, all.map((x) => `${x.headline} ${x.subhead} ${x.body}`).join("\n"), r.date);
     return n.length ? `numbers not in the release: ${n.join(", ")}` : undefined;
   };
   // (the layout passes on each story's saved flag: those are the ones checked again)
