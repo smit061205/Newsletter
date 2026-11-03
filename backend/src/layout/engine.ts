@@ -754,6 +754,23 @@ async function share(sized: Sized[], rooms: number[], open: number[], perPage: (
     if (column && i > 0) { pages[i].push(column); used += column.mid; column = undefined; }
     while (left.length && used < rooms[i] && pages[i].length < (i === 0 ? FRONT_MOST : insideMost)) { const s = left.shift()!; pages[i].push(s); used += s.mid; }
   }
+  // his news held while a lesser story has a place: it takes that place, or one more on a
+  // page (2 Nov's copies 14 and 29 each left one of his out for the day's lead and the rest)
+  for (const s of left.filter(sent)) {
+    for (const i of order) {
+      const p = pages[i];
+      const lesser = p.filter((x) => !sent(x) && x !== lead && !x.story.editorsColumn).reverse();
+      const tries = [...(p.length < (i === 0 ? FRONT_MOST : insideMost) ? [[...p, s]] : []), ...lesser.map((x) => p.map((y) => (y === x ? s : y)))];
+      let to: Sized[] | undefined;
+      for (const list of tries) if (await fits(i, list)) { to = list; break; }
+      if (!to) continue;
+      const out = p.find((x) => !to!.includes(x));
+      pages[i] = to;
+      left = [...left.filter((x) => x !== s), ...(out ? [out] : [])];
+      log(`  ${s.story.id}: the editor's news, on page ${i + 1}${out ? ` in place of ${out.story.id}` : ""}`);
+      break;
+    }
+  }
   if (column) left.push(column);
   if (spare) left.push(spare);
   const place = new Map(sized.map((s, k) => [s, k]));

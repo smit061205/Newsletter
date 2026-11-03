@@ -118,20 +118,35 @@ async function sizeOf(url: string, m: Measurer) {
   return imageSizes.get(url) ?? null;
 }
 
-/** Two photos side by side across the story, cut to one common height
- * (each loses at most PHOTO.maxCrop), each half the story wide. */
+/** Two photos side by side across the story (a customer's article: up to three, 3 Nov), cut to
+ * one common height (each loses at most PHOTO.maxCrop), sharing the story's width. */
 async function photoPair(story: Story, cols: number, y: number, m: Measurer): Promise<{ elements: Element[]; bottom: number } | null> {
-  const urls = (story.photos ?? []).slice(0, 2);
+  const theirs = wordForWord(story);
+  // (each photo at least PHOTO.minCols wide: as many as the width takes; three that won't go together, two)
+  for (let n = Math.min(theirs ? 3 : 2, Math.floor(cols / PHOTO.minCols)); n >= 2; n--) {
+    const row = await photoRow(story, (story.photos ?? []).slice(0, n), cols, y, m, theirs);
+    if (row) return row;
+  }
+  return null;
+}
+
+async function photoRow(story: Story, urls: string[], cols: number, y: number, m: Measurer, theirs: boolean): Promise<{ elements: Element[]; bottom: number } | null> {
   if (urls.length < 2 || cols < 4) return null;
-  // both landscape: two tall pictures side by side would take the story over
-  const kl = Math.ceil(cols / 2);
-  const parts = [{ k: kl, x: 0 }, { k: cols - kl, x: kl * (GRID.column + GRID.gutter) }];
+  const parts: { k: number; x: number }[] = [];
+  for (let i = 0, at = 0; i < urls.length; i++) {
+    const k = Math.floor(cols / urls.length) + (i < cols % urls.length ? 1 : 0);
+    parts.push({ k, x: at * (GRID.column + GRID.gutter) });
+    at += k;
+  }
+  // landscape: tall pictures side by side would take the story over (a customer's own photos,
+  // often a phone's, may be squarer: the story's share of picture still limits them)
   const sizes = await Promise.all(urls.map((u) => sizeOf(u, m)));
-  if (sizes.some((sz) => !sz || sz.width / sz.height < 1.25)) return null;
+  if (sizes.some((sz) => !sz || sz.width / sz.height < (theirs ? 0.75 : 1.25))) return null;
   const naturals = parts.map((p, i) => spanWidth(p.k) * sizes[i]!.height / sizes[i]!.width);
   const h = Math.min(...naturals);
-  if (naturals.some((n) => h < n * (1 - PHOTO.maxCrop)) || h < PHOTO.minHeight) return null;
-  if (parts.some((p, i) => sizes[i]!.width / (spanWidth(p.k) / 300) < PHOTO.minPpi)) return null;
+  // (a customer's photos, of all shapes, may lose a little more to share one height: 3 Nov)
+  if (naturals.some((n) => h < n * (1 - (theirs ? 0.25 : PHOTO.maxCrop))) || h < PHOTO.minHeight) return null;
+  if (parts.some((p, i) => sizes[i]!.width / (spanWidth(p.k) / 300) < (theirs ? PHOTO.minPpi * 0.6 : PHOTO.minPpi))) return null;
   return {
     elements: parts.map((p, i) => ({ id: `${story.id}-photo${i}`, kind: "image" as const, articleId: story.id,
                                      x: r1(p.x), y: r1(y), width: r1(spanWidth(p.k)), height: r1(h), url: urls[i], fit: "cover" as const })),
@@ -305,7 +320,8 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   const maxShare = photoMode ? Math.min(0.65, PHOTO.maxShare + 0.2) : PHOTO.maxShare;
   const none = (): Module => ({ story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [],
                                 photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill, deckSize });
-  if (photoMode && (!photo || photo.width / photo.height < 1.25)) return none();
+  // (the photos side by side check their own shapes)
+  if (photoMode === 1 && (!photo || photo.width / photo.height < 1.25)) return none();
 
   if (photoMode === 2) {
     const pair = await photoPair(story, cols, cursor, m);
@@ -322,7 +338,8 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
                                  BODY.size, pitch, m.isLegacy(BODY.font)));
     });
     const height = Math.max(bottom, pair.bottom);
-    if (pair.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0) > maxShare * w * height) {
+    // (a customer's photos are what he paid for: they may take more of his article, 3 Nov)
+    if (pair.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0) > (wordForWord(story) ? 0.8 : maxShare) * w * height) {
       return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize };
     }
     return { story, rank, cols, variant, photoMode, width: w, height, elements: [...els, ...out], photoDropped: false,

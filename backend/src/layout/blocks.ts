@@ -127,10 +127,12 @@ export class Blocks {
           const loose = storyLooseness(mod.elements);
           if (loose > STORY_P90_EM) break;
           // a wide photo that comes out like the usual one adds nothing
-          if (mode && out.some((o) => o.rung === i && Math.abs(o.height - mod.height) < PT)) break;
+          if (mode && !(mode === 2 && wordForWord(story)) && out.some((o) => o.rung === i && Math.abs(o.height - mod.height) < PT)) break;
           const cost = WEIGHT[Math.min(rank, 5) - 1] * (top - r.words) / Math.max(1, top)
             + (mod.photoDropped ? 1 + WEIGHT[Math.min(rank, 5) - 1] : 0) + (mode ? 0.1 : 0) + (r.from === "longer" ? 0.15 : 0) + loose * 2
-            + (spansFor(rank).includes(cols) ? 0 : cols === 1 ? 1 : 0.3) + k * 0.4;
+            + (spansFor(rank).includes(cols) ? 0 : cols === 1 ? 1 : 0.3) + k * 0.4
+            // (a customer's article prints the photos its copy was given: a width that shows fewer costs)
+            + (wordForWord(story) ? 0.5 * Math.max(0, (story.photos?.length ?? 0) - mod.elements.filter((e) => e.kind === "image").length) : 0);
           out.push({ module: mod, rung: i, height: mod.height, stretch: stretchOf(mod), cost });
           break;
         }
@@ -139,7 +141,9 @@ export class Blocks {
     // a customer's article always shows its photo: a width where it can't is no option for it
     // (and any story keeps its photo at a width with lengths that show it: the editor's pages have one with every story)
     const shown = out.filter((o) => !o.module.photoDropped);
-    return (story.photo && (wordForWord(story) || shown.length >= 2) ? shown : out).sort((a, b) => a.height - b.height);
+    // (a customer's article given its copy's few photos prints them side by side where the width takes them, 3 Nov)
+    const row = wordForWord(story) ? shown.filter((o) => o.module.photoMode === 2) : [];
+    return (row.length ? row : story.photo && (wordForWord(story) || shown.length >= 2) ? shown : out).sort((a, b) => a.height - b.height);
   }
 
   /** The heights a story can take at its widths (px), for planning a page: [shortest, longest]. */
