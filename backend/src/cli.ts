@@ -112,6 +112,7 @@ async function main() {
       const t = Date.now();
       const b = await makeCopies(store, date, { count: Number(flag("count") ?? 3), reword: (flag("reword") ?? "all") as never,
                                                 shuffle: (flag("shuffle") ?? "keepLead") as never, lang: flag("lang") as never, log,
+                                                ...(flag("pages") ? { pages: Number(flag("pages")) } : {}),
                                                 // (a customer's articles, as the newsroom sends them: a JSON file)
                                                 ...(flag("articles") ? { articles: JSON.parse(await readFile(flag("articles")!, "utf8")) } : {}) });
       log(`copies ${date}: ${((Date.now() - t) / 60_000).toFixed(1)} min, $${b.cost.toFixed(4)}`);

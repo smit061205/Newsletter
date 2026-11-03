@@ -12,9 +12,9 @@ import { Badge, Button, Dialog, Icon, Note, Ring, Skeleton, useApp } from "./ui/
 import { StoryPanel } from "./ui/StoryPanel";
 import type { StringKey } from "./ui/strings";
 
-const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build"];
+const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build", "sections"];
 // each step's usual share of a run's time (for the overall percentage)
-const WEIGHT: Record<StepName, number> = { fetch: 0.12, rewrite: 0.2, topup: 0.16, fill: 0.04, build: 0.48 };
+const WEIGHT: Record<StepName, number> = { fetch: 0.1, rewrite: 0.18, topup: 0.14, fill: 0.04, build: 0.42, sections: 0.12 };
 
 /** How far a run has got, 0-100. */
 function percent(job: Job): number {
@@ -145,6 +145,9 @@ export default function Today() {
   };
   const openPdf = () => issue && pdf({ url: media(`/api/issues/${date}/pdf`), title: t("pdf.title", { issue: num(lang, issue.report.issueNumber) }),
                                        fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")}.pdf` });
+  // (the 8-page paper, made beside it)
+  const openPdf8 = () => issue && pdf({ url: media(`/api/issues/${date}/pdf8`), title: t("pdf.title8", { issue: num(lang, issue.report.issueNumber) }),
+                                        fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")} - 8.pdf` });
   const nextRun = status?.autoRun && status.nextRun
     ? t("today.next", { when: t(status.nextRun.startsWith("today") ? "today.next.today" : "today.next.tomorrow", { time: num(lang, status.runAt) }) })
     : t("today.auto.off");
@@ -189,6 +192,7 @@ export default function Today() {
           ) : issue!.status === "approved" ? (
             <Hero tone="good" icon={Icon.checkCircle()} title={t("today.published.title")} body={t("today.published.body", { issue: num(lang, report.issueNumber) })}>
               <Button kind="primary" big icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>
+              {issue?.eight && <Button big icon={Icon.print()} onClick={openPdf8}>{t("today.print8")}</Button>}
               {status?.siteUrl && <a className={`${s.btn} ${s.big}`} href={status.siteUrl} target="_blank" rel="noreferrer">{Icon.globe()}{t("today.website")}</a>}
             </Hero>
           ) : badlyEmpty ? (
@@ -232,6 +236,7 @@ export default function Today() {
           <span className={s.row}>
             {report && <span className={s.faint}>{t("today.cost", { cost: rupees(lang, report.cost, status?.inrPerUsd ?? 88) })}</span>}
             {report && !running && issue!.status !== "approved" && <Button kind="quiet" icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>}
+            {report && !running && issue!.status !== "approved" && issue!.eight && <Button kind="quiet" icon={Icon.print()} onClick={openPdf8}>{t("today.print8")}</Button>}
             {report && !running && <Button kind="quiet" icon={Icon.refresh()} onClick={() => run()} disabled={!!otherRunning}>{t("today.again")}</Button>}
           </span>
         </div>

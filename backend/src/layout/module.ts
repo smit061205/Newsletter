@@ -61,6 +61,12 @@ export interface HeadBand { max?: number; min?: number }
 
 export const spanWidth = (cols: number) => cols * GRID.column + (cols - 1) * GRID.gutter;
 
+/** The least a photo `k` columns wide must give, pixels to the printed inch: the paper's (150) for
+ * a wider photo -- a small one blown up across 4 columns printed blurred (the editor, 3 Nov) --
+ * and two thirds of it at the narrowest (PIB's photos, 466 pixels wide, print 2 columns at 129:
+ * held to 150 they were left out, the front lead's with them, 3 Nov). */
+export const leastPpi = (k: number) => (k <= PHOTO.minCols ? PHOTO.minPpi * 2 / 3 : PHOTO.minPpi);
+
 /** Move a module's elements to (dx, dy). */
 export function place(elements: Element[], dx: number, dy: number): Element[] {
   return elements.map((e) => (e.kind === "line"
@@ -69,7 +75,7 @@ export function place(elements: Element[], dx: number, dy: number): Element[] {
     : { ...e, x: r1(e.x + dx), y: r1(e.y + dy) }));
 }
 
-async function fitLines(m: Measurer, text: string, width: number, font: string, start: number, min: number,
+export async function fitLines(m: Measurer, text: string, width: number, font: string, start: number, min: number,
                         maxLines: number): Promise<{ size: number; lines: Line[] }> {
   const sizes: number[] = [];
   for (let s = start; s >= min - 0.01; s -= PT) sizes.push(s);
@@ -307,7 +313,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   const photo = story.photo ? await sizeOf(story.photo, m) : null;
   // (the widest a small photo still prints sharp: PIB's often come 400-odd pixels
   // wide, the wider spans all passed them over, and 30 Oct's lead printed without one)
-  const sharp = photo ? Array.from({ length: cols }, (_, i) => cols - i).find((k) => photo.width / (spanWidth(k) / 300) >= PHOTO.minPpi) ?? 0 : 0;
+  const sharp = photo ? Array.from({ length: cols }, (_, i) => cols - i).find((k) => photo.width / (spanWidth(k) / 300) >= leastPpi(k)) ?? 0 : 0;
   const spans = !photo ? [0]
     : photoMode === 1 ? [cols]
     // (no photo in a one-column story: the editor, 30 Oct)
@@ -357,7 +363,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
       // (a customer's photo prints even small or a little soft: it's what he paid for -- the newsroom warns of a small one)
       const theirs = wordForWord(story);
       if (ph < PHOTO.minHeight && !theirs) continue; // a postage stamp
-      if (photo.width / (pw / 300) < (theirs ? PHOTO.minPpi * 0.6 : PHOTO.minPpi)) continue; // would print soft
+      if (photo.width / (pw / 300) < (theirs ? PHOTO.minPpi * 0.6 : leastPpi(k))) continue; // would print soft
       const px = w - pw;
       const img: ImageElement = { id: `${aid}-photo`, kind: "image", articleId: aid, x: r1(px), y: r1(cursor),
                                   width: r1(pw), height: r1(ph), url: story.photo!, fit: "cover" };

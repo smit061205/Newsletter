@@ -35,7 +35,7 @@ import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typograp
 import { profile } from "./profile.ts";
 import { wordCount } from "./editorial/quality.ts";
 import { paperArticleStories } from "./editorial/articles.ts";
-import { alwaysPrinted, storyIdOf, type Progress, type Store, type Story } from "./store.ts";
+import { alwaysPrinted, sectionsDay, storyIdOf, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
   /** the page review left to run after the paper is saved (reviewLater): the paper is ready a minute sooner */
@@ -51,7 +51,21 @@ type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; no
               /** page images even when the fonts may be served (tests read them) */
               images?: boolean;
               /** one of the day's copies (editorial/copies.ts): laid out afresh, never saved as the day's issue */
-              copy?: CopyOpts };
+              copy?: CopyOpts;
+              /** the 8-page paper (the editor, 3 Nov): the day's pages as laid out, then its section pages; never saved as the day's issue */
+              sections?: SectionsOpts };
+
+/** The 8-page paper: the day's paper's pages, its last laid out again as an inside page, then a page for each section. */
+export interface SectionsOpts {
+  /** the day's paper's pages, as laid out: all but the last kept as they are */
+  base: (EnginePage | null)[];
+  /** the section pages' stories (editorial/sections.ts), each with its section */
+  stories: Story[];
+  /** where its PDF goes */
+  pdfPath: string;
+  /** one of the day's copies (editorial/copies.ts): its pages' tops and feet left for its paper's design */
+  blank?: boolean;
+}
 
 /** A copy of the day's paper: its stories in other places, reworded, its
  * masthead, page headers and footer left empty for the paper's own. */
@@ -225,7 +239,7 @@ export async function fillContext(store: Store, date: string): Promise<{
 
 export async function buildIssue(store: Store, date: string, opts: Opts): Promise<{ issue: IssueRender; report: BuildReport; pages: (EnginePage | null)[] }> {
   // (copies and sister papers always: the editor, 2 Nov; the day's paper by Settings' switch)
-  const modular = !!opts.copy || process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
+  const modular = !!opts.copy || !!opts.sections || process.env.CK_PLANNER === "1" || store.setting("newEngine", false);
   const { log } = opts;
   // how long each part takes (report.timing)
   const began = Date.now();
@@ -248,7 +262,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     ads = all.filter((a) => samples.use(a.id));
     if (ads.length) log(`no ads booked for ${date}: placed the sample ads`);
   }
-  const total = opts.pages ?? profile.issue.pages;
+  const sectionList = opts.sections ? profile.sections ?? [] : [];
+  const total = opts.pages ?? (opts.sections ? opts.sections.base.length + sectionList.length : profile.issue.pages);
+  // (the 8-page paper's own pages: their section's title across the top)
+  const titleOf = (n: number) => (opts.sections && n > opts.sections.base.length ? sectionList[n - opts.sections.base.length - 1]?.title : undefined);
   const issueNumber = opts.issueNumber ?? issueNumberFor(date);
 
   const m = await Measurer.open(FONTS, FACES);
@@ -262,7 +279,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
                  plans: PagePlan[]; spent: number; factChecks: { story: string; detail: string }[] };
   const chrome: Awaited<ReturnType<typeof chromeFor>>[] = [];
   try {
-    for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m, { blank: !!opts.copy }));
+    for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m, { blank: !!opts.copy || !!opts.sections?.blank, ...(titleOf(i + 1) ? { title: titleOf(i + 1) } : {}) }));
     // the ads the layout may place go to the foot of their page (layout/ads.ts)
     {
       const booked = ads;
@@ -274,7 +291,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // stories not placed yet, most important first
     const edits = store.edits(date);
     const dropped = droppedBy(edits);
-    const releases = new Map(store.releases(date).map((r) => [storyIdOf(r), r]));
+    const releases = new Map([...store.releases(date), ...(opts.sections ? store.releases(sectionsDay(date)) : [])].map((r) => [storyIdOf(r), r]));
     // a feature article (editorial/features.ts) is its own source: the gap
     // closer can lengthen it or brief it from its text, and the number check
     // against a text with no numbers keeps it free of them
@@ -441,6 +458,29 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       const keyed = list.map((s) => ({ s, k: c.shuffle === "keepLead" && s.id === lead ? -Infinity : s.priority + c.rng() * spread }));
       pool = keyed.sort((a, b) => a.k - b.k).map((x) => x.s) as typeof pool;
     }
+    // the 8-page paper: the day's last page laid out again as an inside page, with its own stories, and each
+    // section page with its section's; the day's other pages kept as they are
+    let fixedPage: Map<string, number> | undefined;
+    let keep = opts.keep;
+    let noItems: Set<number> | undefined;
+    if (opts.sections) {
+      const sx = opts.sections, n = sx.base.length;
+      // (its stories as the day's paper printed them, the lengths they were set at)
+      // (one written again since for what the fact check found: its new words, pipeline.ts "sections")
+      const last = (sx.base[n - 1]?.placed ?? []).map((p) => p.module.story).map((x) => {
+        const now = x.factCheck ? store.story(x.id) : null;
+        return now && !now.factCheck ? { ...x, headline: now.headline, deck: now.deck, bodies: now.bodies, factCheck: undefined } : x;
+      });
+      const pageOf = new Map(sectionList.map((x, k) => [x.id, n + 1 + k]));
+      const own = sx.stories.filter((x) => pageOf.has(x.section ?? "")).map((x) => ({ ...x, photos: x.photos ?? (x.photo ? [x.photo] : []) }));
+      pool = [...last.map((x) => ({ ...x, photos: x.photos ?? [] })), ...own] as typeof pool;
+      fixedPage = new Map([...last.map((x) => [x.id, n] as const), ...own.map((x) => [x.id, pageOf.get(x.section!)!] as const)]);
+      keep = new Map(sx.base.slice(0, n - 1).flatMap((p, i) => (p ? [[i + 1, p] as const] : [])));
+      noItems = new Set(sectionList.map((_, k) => n + 1 + k));
+      columnPicks = last.filter((x) => x.editorsColumn).map((x) => x.id);
+      log(`the ${total}-page paper: pages 1-${n - 1} as the day's, page ${n} laid out again as an inside page; ` +
+          sectionList.map((x, k) => `page ${n + 1 + k} ${x.id}: ${own.filter((o) => o.section === x.id).length} stories`).join(", "));
+    }
     log(`planning ${date} (issue ${issueNumber}): ${pool.length} stories, ${ads.length} ads, ${total} pages`);
     const packer = new Packer(m);
     let spent = 0;
@@ -472,9 +512,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const v2: EngineResult = await layOut({
       pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, toFit: modular && !!opts.copy && !opts.copy.translate, columnPicks,
       // (a page repaired alone is planned exactly: it has already failed by trial)
-      modular, ...(opts.keep ? { keep: opts.keep } : {}),
+      modular, ...(keep ? { keep } : {}), ...(noItems ? { noItems } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,
-      ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : {}),
+      ...(opts.copy?.shuffle === "samePage" ? { fixedPage: opts.copy.pageOf } : fixedPage ? { fixedPage } : {}),
       date, fillers, log, ...(opts.mend && !opts.copy ? { mend: opts.mend } : {}),
       // (the stories' lengths, then each page as it's laid out -- in the newsroom's words)
       progress: (done, of, what) => opts.progress?.(what === "pages"
@@ -524,11 +564,11 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   let printed: Awaited<ReturnType<typeof printIssue>>;
   try {
     printed = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, browser,
-                                        ...((restricted || opts.images) && !opts.copy ? { images: 150 } : {}) });
+                                        ...((restricted || opts.images) && !opts.copy && !opts.sections ? { images: 150 } : {}) });
   } finally { releaseBrowser(); }
   const { pdf, warnings, images } = printed;
   timing.print = Date.now() - t2;
-  const pdfPath = opts.copy?.pdfPath ?? path.join(OUT_DIR, `${profile.id}-${date}.pdf`);
+  const pdfPath = opts.copy?.pdfPath ?? opts.sections?.pdfPath ?? path.join(OUT_DIR, `${profile.id}-${date}.pdf`);
   await mkdir(path.dirname(pdfPath), { recursive: true });
   await writeFile(pdfPath, pdf);
   if (images) {
@@ -575,7 +615,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const plotterProblems = warnings;
   // a story's numbers checked again against its release by today's rules (a
   // flag saved when it was written can be stale: "આઠ હજાર 224" read as wrong, 24 Oct)
-  const dayReleases = new Map(store.releases(date).map((r) => [storyIdOf(r), r]));
+  const dayReleases = new Map([...store.releases(date), ...(opts.sections ? store.releases(sectionsDay(date)) : [])].map((r) => [storyIdOf(r), r]));
   const recheck = (s: Story) => {
     const r = dayReleases.get(s.id);
     if (!s.factCheck?.startsWith("numbers") || s.translatedFrom || !r) return s.factCheck;
@@ -597,7 +637,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const fingerprint = buildFingerprint(store, date) + (modular ? `|planned ${read.found.length}` : "") + (opts.keep ? `|kept ${[...opts.keep.keys()].sort().join("")}` : "") + (opts.seedShift ? `|arrangement ${opts.seedShift}` : "")
     + (opts.mend?.narrowLead ? "|narrow lead" : "");
   // (a copy is meant to differ from the day's paper)
-  const previous = opts.copy ? null : store.latestIssue(date);
+  const previous = opts.copy || opts.sections ? null : store.latestIssue(date);
   const comparable = previous && (previous.report as { fingerprint?: string }).fingerprint === fingerprint;
   const same = comparable ? JSON.stringify(previous.issue) === JSON.stringify(issue) : null;
   const print = await preflight(pdf, issue);
@@ -690,7 +730,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     timing: took,
   };
   // a copy is the day's paper laid out again: not a new version of it
-  const version = opts.copy ? 0 : store.saveIssue(date, issue, report);
+  const version = opts.copy || opts.sections ? 0 : store.saveIssue(date, issue, report);
   log(`built ${date} v${version}: ${report.placed.length} stories placed, ${report.leftOut.length} left out, ` +
       `${warnings.length} plotter warning(s), ${checks.length} white-space gap(s) -> ${pdfPath}`);
   for (const w of report.warnings.filter((w) => w.kind !== "white-space")) log(`  warning p${w.page} ${w.elementId ?? ""}: ${w.kind} ${w.detail}`);

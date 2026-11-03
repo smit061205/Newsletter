@@ -20,9 +20,10 @@
 //   GET   /api/papers  POST /api/papers   the papers; save a new one from its reviewed draft
 //   GET   /api/papers/:id  POST /api/papers/:id/test  GET /api/papers/:id/pdf   a paper's test issue
 //   GET   /api/issues/:date/articles   the editor's own articles in the paper (editorial/articles.ts); POST {articles} saves them and lays it out again
-//   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang, articles?} makes them
+//   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang, articles?, pages?: 4|8} makes them
 //   GET   /api/issues/:date/editions   the day's sister papers; POST {only?} makes them (all, or one); GET .../editions/<id>.pdf
 //   POST  /api/issues/:date/copies/swaps {articles}  the day's stories those articles take the place of in the copies
+//   GET   /api/issues/:date/pdf8       the 8-page paper's PDF (when it was made from the latest version)
 //   GET   /api/issues/:date/copies/N.pdf  one copy (on its paper's design, if it has one)
 //   GET   /api/designs  POST /api/designs {name, base64}  DELETE /api/designs/:id|all   other papers' designs, one per copy
 //   POST  /api/designs/assign {copy | upTo, id|null}   POST /api/designs/save {date, names}   POST /api/designs/stamp {date, copy, name, base64}
@@ -313,7 +314,10 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         const date = parts[2];
         if (req.method === "GET" && parts.length === 3) {
           const got = store.latestIssue(date);
-          return got ? send(res, 200, { date, version: got.version, status: got.status, report: got.report })
+          // (the 8-page paper, when it was made from this version of the day's)
+          const eight = store.setting<{ version: number; pdf: string; ready: boolean } | null>(`eightPages|${date}`, null);
+          return got ? send(res, 200, { date, version: got.version, status: got.status, report: got.report,
+                                        eight: !!eight && eight.version === got.version && existsSync(eight.pdf) })
                      : send(res, 404, { error: `no issue built for ${date}` });
         }
         if (req.method === "GET" && parts[3] === "editable.pdf") {
@@ -321,6 +325,12 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           const got = store.latestIssue(date);
           if (!got) return send(res, 404, { error: `no issue built for ${date}` });
           return sendEditable(res, got.issue);
+        }
+        if (req.method === "GET" && parts[3] === "pdf8") {
+          // the 8-page paper (pipeline.ts "sections")
+          const eight = store.setting<{ pdf: string } | null>(`eightPages|${date}`, null);
+          if (!eight || !existsSync(eight.pdf)) return send(res, 404, { error: `no 8-page paper made for ${date}` });
+          return send(res, 200, new Uint8Array(await readFile(eight.pdf)), "application/pdf");
         }
         if (req.method === "GET" && parts[3] === "pdf") {
           const got = store.latestIssue(date);
@@ -396,7 +406,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           if (req.method === "POST") {
             type Pic = import("./editorial/articles.ts").GivenPhoto;
             type Given = import("./editorial/articles.ts").GivenArticle;
-            const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string; lang?: string; articles?: Given[];
+            const body = (await readJson(req)) as { count?: number; reword?: string; shuffle?: string; lang?: string; articles?: Given[]; pages?: number;
                                                     extra?: { body?: string; deck?: string; titles?: string[]; photos?: Pic[] } };
             if (body.lang !== undefined && !["gu", "hi", "ur"].includes(body.lang)) return send(res, 400, { error: "the language is gu, hi or ur" });
             const count = Math.round(Number(body.count));
@@ -406,6 +416,13 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             if (currentCopies()) return send(res, 409, { error: "copies or the other papers are being made: wait for them to finish" });
             if (currentJob()?.date === date) return send(res, 409, { error: "the day's paper is being made: make copies when it's done" });
             if (!store.latestIssue(date)) return send(res, 404, { error: `no paper made for ${date} yet` });
+            // copies of the 8-page paper: in the paper's language, once the evening has made it
+            if (body.pages !== undefined && body.pages !== 4 && body.pages !== 8) return send(res, 400, { error: "copies have 4 or 8 pages" });
+            if (body.pages === 8) {
+              if ((body.lang ?? profile.language.lang) !== profile.language.lang) return send(res, 400, { error: "the 8-page copies are in Gujarati only" });
+              const eight = store.setting<{ version: number } | null>(`eightPages|${date}`, null);
+              if (!eight || eight.version !== store.latestIssue(date)!.version) return send(res, 409, { error: "make the day's paper again first: its 8 pages weren't made with it" });
+            }
             // articles in every copy, word for word: their titles, sub-headings, texts and photos, the photos saved with the day's
             const given: Given[] = body.articles ?? (body.extra ? [{ titles: body.extra.titles, decks: body.extra.deck ? [body.extra.deck] : [],
                                                                       bodies: [body.extra.body ?? ""], photos: body.extra.photos }] : []);
@@ -413,7 +430,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             const { takeArticles } = await import("./editorial/articles.ts");
             const articles = await takeArticles(date, given, "fixed");
             if (typeof articles === "string") return send(res, 400, { error: articles });
-            makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", lang: body.lang as "gu" | undefined, articles, log })
+            makeCopies(store, date, { count, reword: body.reword as "headline", shuffle: body.shuffle as "keepLead", lang: body.lang as "gu" | undefined, articles, pages: body.pages, log })
               .catch((e) => log(`copies stopped: ${e instanceof Error ? e.message : e}`));
             return send(res, 202, copiesOf(date));
           }
@@ -583,7 +600,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         if (req.method === "PATCH" && parts[2]) {
           const id = decodeURIComponent(parts[2]);
           const body = (await readJson(req)) as { page?: number; place?: Ad["place"]; at?: Ad["at"] | null };
-          if (body.page !== undefined && !(body.page >= 1 && body.page <= profile.issue.pages)) return send(res, 400, { error: `the paper has pages 1 to ${profile.issue.pages}` });
+          if (body.page !== undefined && !(body.page >= 1 && body.page <= allPages())) return send(res, 400, { error: `the paper has pages 1 to ${allPages()}` });
           if (body.place !== undefined && !["left", "middle", "right"].includes(body.place)) return send(res, 400, { error: "the place is left, middle or right" });
           const rows = store.db.prepare("select id, json from ads where id = ? or id like ?").all(id, `${id}@%`) as { id: string; json: string }[];
           if (!rows.length) return send(res, 404, { error: "no such ad" });
@@ -616,6 +633,13 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         const pages = [];
         for (let n = 1; n <= total; n++) {
           const c = await chromeFor(n, total, indiaNow().day, 1);
+          pages.push({ page: n, topCm: cm(c.bodyTop), bottomCm: cm(c.bodyBottom) });
+        }
+        // (and the 8-page paper's own pages: an ad booked on one prints in that paper alone)
+        const sections = profile.sections ?? [];
+        for (let k = 0; k < sections.length; k++) {
+          const n = total + 1 + k;
+          const c = await chromeFor(n, total + sections.length, indiaNow().day, 1, undefined, { title: sections[k].title });
           pages.push({ page: n, topCm: cm(c.bodyTop), bottomCm: cm(c.bodyBottom) });
         }
         return send(res, 200, { widthCm: cm(PAGE.width), heightCm: cm(PAGE.height), columns: GRID.columns,
@@ -847,12 +871,23 @@ interface AdBooking {
   dates?: string[]; weekdays?: number[]; from?: string; to?: string;
 }
 
+/** The paper's pages, the 8-page paper's own included (an ad may be booked on one of those). */
+const allPages = () => profile.issue.pages + (profile.sections?.length ?? 0);
+
+/** An ad's page's room for stories: one of the day's pages, or one of the 8-page paper's own (under its title bar). */
+async function adBand(page: number, date: string) {
+  const { chromeFor } = await import("./chrome/chrome.ts");
+  const sections = profile.sections ?? [];
+  return page <= profile.issue.pages ? chromeFor(page, profile.issue.pages, date, 1)
+    : chromeFor(page, allPages(), date, 1, undefined, { title: sections[page - profile.issue.pages - 1]?.title });
+}
+
 /** Store an ad's image and book it on each of its days (it's placed by layout/ads.ts). */
 async function bookAd(store: Store, b: AdBooking): Promise<{ booked: string[] }> {
   const { GRID, PT } = await import("./layout/typography.ts");
   const { spanWidth } = await import("./layout/module.ts");
   if (!b.base64 || !b.cols || !b.heightCm || !b.page) throw new Error("an ad needs an image, its width in columns, its height in cm and a page");
-  if (!(b.page >= 1 && b.page <= profile.issue.pages)) throw new Error(`the paper has pages 1 to ${profile.issue.pages}`);
+  if (!(b.page >= 1 && b.page <= allPages())) throw new Error(`the paper has pages 1 to ${allPages()}`);
   if (b.from && b.to && b.to < b.from) throw new Error("the last day is before the first day");
   const id = `ad-${b.name.replace(/\.[a-z]+$/i, "").replace(/[^A-Za-z0-9-]+/g, "-").toLowerCase()}-${Date.now().toString(36)}`;
   const dir = path.join(MEDIA_DIR, "ads");
@@ -869,8 +904,7 @@ async function bookAd(store: Store, b: AdBooking): Promise<{ booked: string[] }>
   const width = spanWidth(Math.min(GRID.columns, Math.max(1, Math.round(b.cols))));
   const height = (b.heightCm / 2.54) * 72 * PT;
   // taller than the page's room for stories, it would never be placed
-  const { chromeFor } = await import("./chrome/chrome.ts");
-  const band = await chromeFor(b.page, profile.issue.pages, b.from ?? b.dates?.[0] ?? indiaNow().day, 1);
+  const band = await adBand(b.page, b.from ?? b.dates?.[0] ?? indiaNow().day);
   if (height > band.bodyBottom - band.bodyTop) {
     const max = Math.floor(((band.bodyBottom - band.bodyTop) / PT / 72) * 2.54 * 10) / 10;
     throw new Error(`that's taller than page ${b.page} has room for: at most ${max} cm`);
@@ -896,8 +930,7 @@ async function placeAd(ad: Ad, at: Ad["at"] | undefined): Promise<Ad> {
   const free: Ad = { ...ad, x: 0, y: 0, pinned: false };
   if (!at) return free;
   const { GRID, PT } = await import("./layout/typography.ts");
-  const { chromeFor } = await import("./chrome/chrome.ts");
-  const band = await chromeFor(ad.page, profile.issue.pages, ad.date, 1);
+  const band = await adBand(ad.page, ad.date);
   const cols = Math.max(1, Math.min(GRID.columns, Math.round((ad.width + GRID.gutter) / GRID.pitch)));
   const col = Math.max(0, Math.min(GRID.columns - cols, Math.round(at.col)));
   const cm = (72 * PT) / 2.54;

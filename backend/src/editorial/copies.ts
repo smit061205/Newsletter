@@ -34,7 +34,7 @@ import { buildIssue, type CopyOpts } from "../build.ts";
 import { checkFacts } from "./facts.ts";
 import { browserServer, closeBrowser } from "../browser.ts";
 import { profile } from "../profile.ts";
-import type { Store, Story } from "../store.ts";
+import { sectionsDay, type Store, type Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
 import { settable } from "./quality.ts";
 import { applyTextEdits, droppedBy } from "../layout/stories.ts";
@@ -79,6 +79,8 @@ export interface Batch {
   times?: { name: string; seconds: number }[];
   /** copies: articles in every copy (a customer's), word for word */
   articles?: Article[];
+  /** copies: 8, copies of the 8-page paper (4 Nov); 4 or none, of the day's */
+  pages?: number;
   /** (copies made before 27 Oct: one article) */
   extra?: { body: string; titles: string[]; photos: string[]; deck?: string };
 }
@@ -355,6 +357,9 @@ interface SetSpec {
   pageOf: [string, number][]; lead?: string;
   /** placements already used (the day's paper, earlier copies): none may repeat */
   seen: string[];
+  /** copies of the 8-page paper (4 Nov): each copy's pages, then the section pages, the day's
+   * paper's printed stories being the ones the section pages' choice was made beside */
+  eight?: { printed: string[] };
   /** only reword (or translate) the day's stories for each item, caching them, and lay nothing out:
    * every copy's AI work done at once before the layouts, which run a couple at a time (memory) */
   prepare?: boolean;
@@ -437,6 +442,21 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
     }
     if (!made) throw new Error(`${item.name ?? `copy ${n}`} couldn't be laid out unlike the others`);
     await rename(`${item.pdf}.best`, item.pdf);
+    // the 8-page paper: this copy's pages, its last laid out again as an inside page, then the
+    // section pages as the evening chose and wrote them (none paid for twice), each copy laid out its own way
+    if (spec.eight) {
+      const { writeSections } = await import("./sections.ts");
+      const w = await writeSections(store, spec.date, new Set(spec.eight.printed), () => {});
+      const mine = new Set(made.built.report.placed.map((p) => p.story));
+      progress(0.95, "the 8 pages");
+      const eight = await buildIssue(store, spec.date, {
+        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:)/.test(l)) say(`  ${l.trim()}`); },
+        noReview: true, seedShift: item.seed,
+        sections: { base: made.built.pages, stories: w.stories.filter((s) => !mine.has(s.id)), pdfPath: item.pdf, blank: true },
+      });
+      spent += w.cost + eight.report.cost;
+      made = { ...made, built: eight };
+    }
     // its pages as laid out, for the editable PDF (export/pdf-editable.ts)
     await writeFile(item.pdf.replace(/\.pdf$/, ".json"), JSON.stringify(made.built.issue));
     seen.add(made.sig); seen.add(made.layout);
@@ -574,9 +594,10 @@ export async function copiesIn(store: Store, specFile: string) {
     const d = spec.date;
     store.db.exec(`attach database '${src.replace(/'/g, "''")}' as src`);
     try {
-      for (const t of ["releases", "stories", "ads"]) {
-        store.db.prepare(`delete from ${t} where date = ?`).run(d);
-        store.db.prepare(`insert or replace into ${t} select * from src.${t} where date = ?`).run(d);
+      // (and the 8-page paper's own news, kept under a day of its own: store.ts sectionsDay)
+      for (const t of ["releases", "stories", "ads"]) for (const day of t === "ads" ? [d] : [d, sectionsDay(d)]) {
+        store.db.prepare(`delete from ${t} where date = ?`).run(day);
+        store.db.prepare(`insert or replace into ${t} select * from src.${t} where date = ?`).run(day);
       }
       store.db.prepare("delete from edits where issue_date = ?").run(d);
       store.db.prepare("insert into edits (issue_date, json) select issue_date, json from src.edits where issue_date = ? order by n").run(d);
@@ -739,20 +760,22 @@ async function layOutUnique(store: Store, tasks: Task[], seen: string[], say: Sa
 }
 
 /** Make `count` copies of the day's paper, in `lang` (in the background). */
-export async function makeCopies(store: Store, date: string, opts: { count: number; reword: Reword; shuffle: Shuffle; lang?: Lang; articles?: Article[]; log: Say }): Promise<Batch> {
+export async function makeCopies(store: Store, date: string, opts: { count: number; reword: Reword; shuffle: Shuffle; lang?: Lang; articles?: Article[]; pages?: number; log: Say }): Promise<Batch> {
   const lang = opts.lang ?? (profile.language.lang as Lang);
   const day = dayOf(store, date);
   const batch: Batch = { kind: "copies", date, count: opts.count, reword: opts.reword, shuffle: opts.shuffle, lang, status: "running",
-                         startedAt: new Date().toISOString(), done: 0, files: [], cost: 0, log: [], ...(opts.articles?.length ? { articles: opts.articles } : {}) };
+                         startedAt: new Date().toISOString(), done: 0, files: [], cost: 0, log: [], ...(opts.articles?.length ? { articles: opts.articles } : {}),
+                         ...(opts.pages === 8 ? { pages: 8 } : {}) };
   return runBatch(batch, copiesDir(date), async (say) => {
     await rm(copiesDir(date), { recursive: true, force: true });
     await mkdir(copiesDir(date), { recursive: true });
     const translate = lang !== profile.language.lang;
-    say(`${opts.count} cop${opts.count === 1 ? "y" : "ies"} in ${LANG_NAME[lang]}`);
+    say(`${opts.count} cop${opts.count === 1 ? "y" : "ies"} in ${LANG_NAME[lang]}${opts.pages === 8 ? ", 8 pages" : ""}`);
     const same = opts.articles?.length ? await sameAsArticles(store, date, opts.articles, say) : { ids: [], headlines: [], cost: 0 };
     batch.cost += same.cost;
     const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead,
-                   ...(opts.articles?.length ? { articles: opts.articles } : {}), ...(same.ids.length ? { drop: same.ids } : {}) };
+                   ...(opts.articles?.length ? { articles: opts.articles } : {}), ...(same.ids.length ? { drop: same.ids } : {}),
+                   ...(opts.pages === 8 ? { eight: { printed: day.pageOf.map(([id]) => id) } } : {}) };
     for (const [i, a] of (opts.articles ?? []).entries()) {
       say(`fixed article ${i + 1} in every copy: ${a.titles.length} title(s), ${a.decks.length} sub-heading(s), ${a.bodies.length} text(s), ${a.photos.length} photo(s)${a.photos.length > 1 ? `, 1 to ${Math.min(3, a.photos.length)} to a copy` : ""}, in turn`);
     }

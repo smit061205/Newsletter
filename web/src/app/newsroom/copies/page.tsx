@@ -41,6 +41,9 @@ export default function Copies() {
   const [shuffle, setShuffle] = useState<Shuffle>("keepLead");
   const [paperLang, setPaperLang] = useState<PaperLang>("gu");
   const translated = paperLang !== "gu";
+  // 4 pages (the day's paper) or 8 (the 8-page paper, Gujarati only, once the evening has made it)
+  const [pageChoice, setPageChoice] = useState<4 | 8>(4);
+  const pages = translated || !info?.eight ? 4 : pageChoice;
   // articles in every copy (a customer's), word for word, their titles, sub-headings, texts and photos in turn
   const [useExtra, setUseExtra] = useState(false);
   const [arts, setArts] = useState<Art[]>([blankArt()]);
@@ -102,7 +105,7 @@ export default function Copies() {
         photos: await Promise.all(a.pics.map(async (p) => ("url" in p ? { url: p.url } : { name: p.file.name, base64: await toBase64(p.file) }))),
       }))) : [];
       setXTouched(true);
-      setRun(await call<CopiesRun>(`/api/issues/${date}/copies`, { json: { count, reword, shuffle, lang: paperLang, articles } }));
+      setRun(await call<CopiesRun>(`/api/issues/${date}/copies`, { json: { count, reword, shuffle, lang: paperLang, articles, pages } }));
       toast(t("copies.making", { done: num(lang, 1), total: num(lang, count) }));
     } catch (e) { setError((e as Error).message); }
   };
@@ -112,7 +115,8 @@ export default function Copies() {
   const stories = (info?.report.placed.length ?? 25) + (info?.report.leftOut.length ?? 0);
   const rate = (k: string) => status?.costRates?.[k] ?? 0;
   const estimate = translated ? stories * rate(`translate-${paperLang}`) : count * stories * rate(reword);
-  const minutes = Math.max(1, Math.round(count * (status?.copyMinutes ?? minutesPerCopy) + (translated ? 1 : 0)));
+  // (an 8-page copy lays out its last page and four more: about half as long again)
+  const minutes = Math.max(1, Math.round(count * (status?.copyMinutes ?? minutesPerCopy) * (pages === 8 ? 1.5 : 1) + (translated ? 1 : 0)));
   const paperBusy = !!status?.running && status.running.date === date;
   const issueNo = info?.report.issueNumber ?? status?.issue?.issueNumber ?? 0;
   const paperName = status?.paper.name.split(" (")[0] ?? "Capital Kranti";
@@ -175,6 +179,12 @@ export default function Copies() {
             <div className={s.segmented} role="radiogroup" aria-label={t("copies.lang")}>
               {LANGS.map((k) => <button key={k} type="button" aria-pressed={paperLang === k} disabled={running} onClick={() => setPaperLang(k)}>{t(`lang.${k}` as StringKey)}</button>)}
             </div>
+            <span className={s.label} style={{ marginTop: 12 }}>{t("copies.pages")}</span>
+            <div className={s.segmented} role="radiogroup" aria-label={t("copies.pages")}>
+              {([4, 8] as const).map((k) => <button key={k} type="button" aria-pressed={pages === k} disabled={running || (k === 8 && (translated || !info?.eight))}
+                                                   onClick={() => setPageChoice(k)}>{t("copies.pages.n", { n: num(lang, k) })}</button>)}
+            </div>
+            {!translated && !info?.eight && <span className={s.hint}>{t("copies.pages.none")}</span>}
             {translated ? <Note tone="good">{t("copies.translated")}</Note> : <>
               <span className={s.label} style={{ marginTop: 12 }}>{t("copies.reword")}</span>
               <div className={s.choices} role="radiogroup" aria-label={t("copies.reword")}>
@@ -208,7 +218,7 @@ export default function Copies() {
           <div className={s.cardHead}>
             <h2 className={s.cardTitle}>{running ? t("copies.making", { done: num(lang, Math.min(run.count, run.done + 1)), total: num(lang, run.count) })
               : t("copies.done", { n: num(lang, run.files.length) })}</h2>
-            <span className={s.faint}>{t(`lang.${run.lang ?? "gu"}` as StringKey)} · {run.lang && run.lang !== "gu" ? t("copies.translatedShort") : t(`copies.reword.${run.reword}` as StringKey)} · {t(`copies.shuffle.${run.shuffle}` as StringKey)}</span>
+            <span className={s.faint}>{t(`lang.${run.lang ?? "gu"}` as StringKey)} · {run.lang && run.lang !== "gu" ? t("copies.translatedShort") : t(`copies.reword.${run.reword}` as StringKey)} · {t(`copies.shuffle.${run.shuffle}` as StringKey)}{run.pages === 8 ? ` · ${t("copies.pages.n", { n: num(lang, 8) })}` : ""}</span>
           </div>
           {running && (
             <div className={s.ringWrap}>
