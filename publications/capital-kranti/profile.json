@@ -158,7 +158,7 @@
     "maxCrop": 0.15,
     "minHeight": 80,
     "minCols": 2,
-    "minPpi": 100,
+    "minPpi": 150,
     "maxShare": 0.45
   },
   "chrome": "chrome.json",

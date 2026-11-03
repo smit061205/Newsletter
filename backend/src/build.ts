@@ -503,7 +503,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       gaps.push(...findGaps(done.blocks, bands[n - 1]).map((g) => ({ page: n, ...g })));
       finalPlans.push({ page: n, placed: done.placed, elements: done.elements, waste: 0, gaps: [] });
       log(`  page ${n}: ${done.placed.map((p) => `${p.module.story.id}(${p.module.cols}col, ${p.module.story.bodies.long.split(/\s+/).length}w` +
-          `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? ", 2 photos" : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" ")}`);
+          `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? `, ${p.module.elements.filter((e) => e.kind === "image").length} photos` : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" ")}`);
     }
     timing.fitting = Date.now() - t1;
     result = { pages: pagesOut, placed, gaps, leftOut: [...pool, ...sameNews], plans: finalPlans, spent: spent + rewordCost, factChecks };

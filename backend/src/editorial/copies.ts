@@ -119,12 +119,21 @@ export function articleFor(a: Article, n: number): { title: string; deck: string
   return { title: a.titles[t] ?? "", deck: a.decks[d] ?? "", body: a.bodies[b] ?? "", photo: a.photos[p] ?? null };
 }
 
-/** The fixed article `i` as copy n prints it: a story of its own, kept whole (store.ts wordForWord). */
+/** How many of an article's photos copy n prints: a mix of 2, 3 and 1, as many as there are (the editor, 3 Nov). */
+export function photoCount(photos: number, n: number): number {
+  const mix = [2, 3, 1].filter((k) => k <= photos);
+  return mix.length ? mix[(n - 1) % mix.length] : 0;
+}
+
+/** The fixed article `i` as copy n prints it: a story of its own, kept whole (store.ts wordForWord).
+ * Its photos: the copy's own first, then the ones after it, as many as photoCount says. */
 function articleStory(a: Article, i: number, n: number, date: string): Story {
   const { title, deck, body: text, photo } = articleFor(a, n);
   const body = text.split(/\n+/).map((p) => p.trim()).filter(Boolean).join("\n\n");
+  const from = photo ? a.photos.indexOf(photo) : 0;
+  const photos = Array.from({ length: photoCount(a.photos.length, n) }, (_, k) => a.photos[(from + k) % a.photos.length]);
   return { id: `z-fixed-${i + 1}`, releaseId: null, date, kicker: "", headline: title.trim(), deck: deck.trim(), bodies: { long: body, medium: body, short: body },
-           priority: 2, page: null, photo, photos: photo ? [photo] : [], caption: "", source: "fixed:copy", model: "as-is", needsReview: false };
+           priority: 2, page: null, photo, photos, caption: "", source: "fixed:copy", model: "as-is", needsReview: false };
 }
 /** The day's stories that are the same news as one of the customer's articles (2 Nov): each copy
  * prints his article in their place, never the news twice. The AI reads them side by side (once a
@@ -182,8 +191,9 @@ export const editionsDir = (date: string) => path.join(OUT_DIR, "editions", date
 export const editionFile = (date: string, id: string) => path.join(editionsDir(date), `${id}.pdf`);
 /** The checks a different arrangement can fix: an overflow, empty space, a
  * full-width story. (A headline that won't fill its width or a heavy one
- * came back in every arrangement on 23 Oct: retrying them only tripled the time; a lead without its photo gets another go.) */
-const LAYOUT_GATES = ["1", "2", "W", "S13"];
+ * came back in every arrangement on 23 Oct: retrying them only tripled the time; a lead without its photo gets another go,
+ * and so does a copy missing a news the editor sent, 3 Nov.) */
+const LAYOUT_GATES = ["1", "2", "W", "S13", "S14"];
 /** Tries per copy when a layout check fails (a copy placed like another is always tried again). */
 const TRIES = 4;
 /** How far a try is from clean: each failed layout check, then what it is that failed --
@@ -744,7 +754,7 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
     const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead,
                    ...(opts.articles?.length ? { articles: opts.articles } : {}), ...(same.ids.length ? { drop: same.ids } : {}) };
     for (const [i, a] of (opts.articles ?? []).entries()) {
-      say(`fixed article ${i + 1} in every copy: ${a.titles.length} title(s), ${a.decks.length} sub-heading(s), ${a.bodies.length} text(s), ${a.photos.length} photo(s), in turn`);
+      say(`fixed article ${i + 1} in every copy: ${a.titles.length} title(s), ${a.decks.length} sub-heading(s), ${a.bodies.length} text(s), ${a.photos.length} photo(s)${a.photos.length > 1 ? `, 1 to ${Math.min(3, a.photos.length)} to a copy` : ""}, in turn`);
     }
     const tasks: Task[] = Array.from({ length: opts.count }, (_, i) => ({
       lang, label: `copy ${i + 1}`, spec: base, seen: day.seen,
