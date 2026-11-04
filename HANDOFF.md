@@ -10,6 +10,59 @@ technical manual) as needed.
 
 **The third engine (2 Nov 2026, behind the same switch):** the order changed so retries aren't needed: spaces of all pages, then stories chosen to fit them, facts read before the layout, stories written to their slots, page-only repair, whole paper last. Replay with real AI, first build: 8 of 10 saved days clean layouts (the second engine: 5 of 10), 5 READY; the stories that failed were fact flags, mended by the repair loop. Goals, not promises: no whole-paper rebuild on a normal day, under 2 minutes of layout. Still the switch's trial: 14 clean evenings (READY first try, no whole-paper rebuild) before it becomes the default.
 
+## State on 4 November 2026 (read this first)
+
+Written for the next Claude Code session, on another Claude account, which has none of the earlier
+conversations. **Latest release: v1.1.67** (passed on Windows and Mac). Work happens on branch
+`feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
+
+**The developer (the user) wants:** answers first in plain English, short; little testing time on
+his side; every finished improvement merged, tagged and released without asking (tell him the version
+and what's in it); **one** test paper per change, built on a scratch copy of the database (never
+several days, never the real issues); a plan agreed before any big engine change (root-cause fixes,
+no shortcuts); costs in rupees. His father (the editor) uses the app on Windows every evening.
+
+**Done 3-4 Nov 2026 (v1.1.63-v1.1.67):**
+- Every Telegram news of the editor's in every copy; photos never blown up (150 ppi, but the narrowest,
+  2 columns, may go to 100: `leastPpi` in `layout/module.ts`, else PIB's 466-pixel photos went missing);
+  a customer's article with several photos prints 1, 2 or 3 of them, varying across copies.
+- **The 8-page paper** (the father's request, 3 Nov), made every evening after the 4-page one (pipeline
+  step `sections`): pages 1-3 the day's, page 4 laid out again as an inside page, then business, tech &
+  AI, entertainment, sports (profile `sections`, `ingest/sections.ts`, `editorial/sections.ts`; stored
+  under the day `<date>+sections`, `store.ts sectionsDay`). Fact problems on pages 4-8 are written again
+  and laid out again. Newsroom: Today and Paper screens have its PDF and its CorelDRAW PDF
+  (`/api/issues/<date>/pdf8`, `editable8.pdf`); ads may be booked on pages 5-8; Copies can be 4 or 8 pages.
+- **File photos on pages 5-8** (`ingest/commons.ts`): only the one named person a story is about, their
+  own Wikipedia lead photo (exact name + what they are), free on Commons, credited in Gujarati under it,
+  looked at by a vision AI before it prints, once per paper. A wrong photo is worse than none: the first
+  try (matching photos by words) printed a wrong person, a map and a painting. Wikimedia's robots rules
+  keep programs off `commons.wikimedia.org/w/`: use `api.wikimedia.org` and `/wiki/File:` pages only.
+
+**Open, in order:**
+1. Business and tech pages usually have no photos (their news is about companies). Option offered, not
+   agreed: PIB's own photos of ministers and government events.
+2. Sister papers (editions) in 8 pages; 8-page copies' pages 5-8 are the same in every copy (only
+   1-4 differ): reword their headlines per copy if customers mind.
+3. A customer's 4-page design on an 8-page copy: its pages 1-3 on 1-3, its footer on 8, pages 4-7 bare.
+4. Promised, not started: Gandhinagar local news sources for pages 1-4 (TV9 Gandhinagar, Indian Express
+   Ahmedabad, TOI Ahmedabad: check each one's robots rules first).
+5. The third engine is still on trial behind Settings' switch (14 clean evenings before it's the default).
+
+**How the last sessions tested (on the Mac):**
+- Scratch copy: `sqlite3 "file:$HOME/Library/Application Support/Capital Kranti/capital-kranti.sqlite?mode=ro" ".backup <scratch>/capital-kranti.sqlite"`,
+  and copy that day's `media/<date>` folder beside it. Run the CLI with `DATA_DIR=<scratch> CK_PAPERS_HOME=<scratch>
+  CK_ENV_FILE="$HOME/Library/Application Support/Capital Kranti/settings.env"` (the app's AI key, never printed)
+  and `CK_PLANNER=1`: `cli.ts all --date D --from build` makes the 4-page and the 8-page papers;
+  `cli.ts copies --date D --count 1 --pages 8` one 8-page copy. Look at the PDFs (`pdftoppm`) before saying it works.
+- Before a release: `npx tsc --noEmit -p backend`; the four CI layout runs (`backend/test/pack-0808.ts` with
+  `CK_PUBLICATION=dev-test`, `sample-english.ts` with `CK_PUBLICATION=sample-english`, each once plain and
+  once with `CK_PLANNER=1`, each in a fresh temp `DATA_DIR` with `CK_ENV_FILE=/dev/null`): all READY;
+  `cd web && NEWSROOM=1 npm run build`.
+- Release: merge to `main`, push, `git tag vX.Y.Z && git push origin vX.Y.Z`, then read the release
+  workflow's result through the GitHub API (`gh` isn't installed): both builds (windows-latest,
+  macos-15) and 7 files attached, before telling the user it works.
+- The website is in its own repository (§8): don't work on it here.
+
 ---
 
 ## 1. What this is
@@ -221,7 +274,7 @@ Then run the engine from *inside the packed app*, as the workflow's "packed app"
 
 ## 7. What's next
 
-Releases: **v1.1.4** is the latest (check the release workflow's result
+Releases: **v1.1.67** is the latest (4 Nov; the list below is from October, see the top of this file for what's open now) (check the release workflow's result
 through the GitHub API before saying a release works; `gh` isn't installed).
 
 The desktop app's open items:
