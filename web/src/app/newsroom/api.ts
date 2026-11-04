@@ -18,7 +18,9 @@ export interface Report {
 }
 export interface IssueInfo { date: string; version: number; status: string; report: Report;
   /** the 8-page paper was made from this version too (its PDF: /api/issues/<date>/pdf8) */
-  eight?: boolean }
+  eight?: boolean;
+  /** and its pages kept for the CorelDRAW PDF (/api/issues/<date>/editable8.pdf) */
+  eightEditable?: boolean }
 export interface Status {
   today: string; now: string; runAt: string; autoRun: boolean; nextRun: string | null;
   running: Job | null; lastJob: Job | null; openrouterKey: boolean; aiOutOfMoney?: boolean;

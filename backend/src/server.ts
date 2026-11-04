@@ -23,7 +23,7 @@
 //   GET   /api/issues/:date/copies     the day's copies (editorial/copies.ts); POST {count, reword, shuffle, lang, articles?, pages?: 4|8} makes them
 //   GET   /api/issues/:date/editions   the day's sister papers; POST {only?} makes them (all, or one); GET .../editions/<id>.pdf
 //   POST  /api/issues/:date/copies/swaps {articles}  the day's stories those articles take the place of in the copies
-//   GET   /api/issues/:date/pdf8       the 8-page paper's PDF (when it was made from the latest version)
+//   GET   /api/issues/:date/pdf8       the 8-page paper's PDF (when it was made from the latest version); .../editable8.pdf for CorelDRAW
 //   GET   /api/issues/:date/copies/N.pdf  one copy (on its paper's design, if it has one)
 //   GET   /api/designs  POST /api/designs {name, base64}  DELETE /api/designs/:id|all   other papers' designs, one per copy
 //   POST  /api/designs/assign {copy | upTo, id|null}   POST /api/designs/save {date, names}   POST /api/designs/stamp {date, copy, name, base64}
@@ -315,9 +315,10 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         if (req.method === "GET" && parts.length === 3) {
           const got = store.latestIssue(date);
           // (the 8-page paper, when it was made from this version of the day's)
-          const eight = store.setting<{ version: number; pdf: string; ready: boolean } | null>(`eightPages|${date}`, null);
+          const eight = store.setting<{ version: number; pdf: string; json?: string; ready: boolean } | null>(`eightPages|${date}`, null);
+          const made = !!eight && eight.version === got?.version && existsSync(eight.pdf);
           return got ? send(res, 200, { date, version: got.version, status: got.status, report: got.report,
-                                        eight: !!eight && eight.version === got.version && existsSync(eight.pdf) })
+                                        eight: made, eightEditable: made && !!eight!.json && existsSync(eight!.json) })
                      : send(res, 404, { error: `no issue built for ${date}` });
         }
         if (req.method === "GET" && parts[3] === "editable.pdf") {
@@ -325,6 +326,12 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           const got = store.latestIssue(date);
           if (!got) return send(res, 404, { error: `no issue built for ${date}` });
           return sendEditable(res, got.issue);
+        }
+        if (req.method === "GET" && parts[3] === "editable8.pdf") {
+          // the 8-page paper as a PDF whose text stays text in CorelDRAW
+          const eight = store.setting<{ json?: string } | null>(`eightPages|${date}`, null);
+          if (!eight?.json || !existsSync(eight.json)) return send(res, 404, { error: `no 8-page paper for CorelDRAW for ${date}: make the paper again` });
+          return sendEditable(res, JSON.parse(await readFile(eight.json, "utf8")));
         }
         if (req.method === "GET" && parts[3] === "pdf8") {
           // the 8-page paper (pipeline.ts "sections")
