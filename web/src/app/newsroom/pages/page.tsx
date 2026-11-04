@@ -83,6 +83,17 @@ export default function Paper() {
           fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${info.report.issueNumber} - ${date.split("-").reverse().join("-")} - CorelDRAW.pdf` })}>{t("corel.pdf")}</Button>
         <Link className={`${s.btn} ${s.primary}`} href="/newsroom">{Icon.publish()}{t("today.publish")}</Link>
       </TopBar>
+      {info?.eight && (
+        // the 8-page paper, made with this paper: its print PDF and its CorelDRAW PDF
+        <div className={s.row} style={{ justifyContent: "flex-end" }}>
+          <span className={s.faint}>{t("paper.eight")}</span>
+          <Button icon={Icon.print()} onClick={() => pdf({ url: media(`/api/issues/${date}/pdf8`), title: t("pdf.title8", { issue: num(lang, info.report.issueNumber) }),
+            fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${info.report.issueNumber} - ${date.split("-").reverse().join("-")} - 8.pdf` })}>{t("today.print8")}</Button>
+          <Button icon={Icon.download()} disabled={!info.eightEditable} onClick={() => pdf({ url: media(`/api/issues/${date}/editable8.pdf`),
+            title: t("corel.title", { what: t("pdf.title8", { issue: num(lang, info.report.issueNumber) }) }),
+            fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${info.report.issueNumber} - ${date.split("-").reverse().join("-")} - 8 - CorelDRAW.pdf` })}>{t("corel.pdf8")}</Button>
+        </div>
+      )}
       {error && <Note tone="bad">{error}</Note>}
       <div className={s.paperLayout}>
         <div className={s.thumbs}>

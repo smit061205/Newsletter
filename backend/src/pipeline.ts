@@ -425,7 +425,11 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           r = await lay(round);
           cost += w.cost + (r.report.cost ?? 0);
         }
-        store.putSetting(`eightPages|${date}`, { version: base.version, pdf: pdfPath, ready: r.report.ready, pages: r.report.pages, cost });
+        // (its pages as laid out, for the CorelDRAW PDF: export/pdf-editable.ts)
+        const { writeFile } = await import("node:fs/promises");
+        const json = pdfPath.replace(/\.pdf$/, ".json");
+        await writeFile(json, JSON.stringify(r.issue));
+        store.putSetting(`eightPages|${date}`, { version: base.version, pdf: pdfPath, json, ready: r.report.ready, pages: r.report.pages, cost });
         say(`the 8-page paper: ${r.report.ready ? "READY" : "NOT READY"}${r.report.ready ? "" : ` (${r.report.gates.filter((g) => !g.pass).map((g) => g.gate).join("; ")})`}`);
       } catch (e) {
         if (stopping) throw e;
