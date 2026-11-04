@@ -10,7 +10,7 @@ const GU = (
       <li>કમ્પ્યુટર ચાલુ રાખો: નક્કી કરેલા સમયે (સાંજે ૮ વાગ્યે) છાપું આપમેળે બને છે.</li>
       <li><b>આજે</b> માં જુઓ: “તૈયાર છે” દેખાય એટલે પાનાં જુઓ.</li>
       <li><b>છાપું</b> માં કોઈ પણ સમાચાર પર ક્લિક કરો — શીર્ષક, લખાણ, ફોટો કે મહત્વ બદલો, અથવા છાપામાંથી કાઢો.</li>
-      <li><b>પ્રકાશિત કરો</b> દબાવો: છાપું વેબસાઇટ પર આવે છે. <b>PDF છાપવા માટે</b> પ્રિન્ટરને મોકલો.</li>
+      <li><b>CorelDRAW માટે સાચવો</b> દબાવો અને CorelDRAW માં ખોલો. <b>છાપો</b> થી સીધું પ્રિન્ટર પર પણ મોકલી શકાય.</li>
     </ol>
     <h3>“હિન્દીમાંથી” લખેલા સમાચાર</h3>
     <p>ગુજરાતી સમાચાર ઓછા પડે ત્યારે PIB ના હિન્દી સમાચારનો અનુવાદ થાય છે. સુધારતી વખતે બાજુમાં મૂળ હિન્દી દેખાય છે.</p>
@@ -31,7 +31,7 @@ const EN = (
       <li>Leave the computer on: the paper makes itself at the set time (8 PM).</li>
       <li>Look at <b>Today</b>: when it says “ready”, look at the pages.</li>
       <li>In <b>Paper</b>, click any story to change its headline, text, photo or importance, or leave it out.</li>
-      <li>Press <b>Publish</b>: the paper goes on the website. Send <b>Print PDF</b> to the printer.</li>
+      <li>Press <b>Save for CorelDRAW</b> and open it in CorelDRAW. <b>Print</b> sends it straight to the printer.</li>
     </ol>
     <h3>Stories marked “From Hindi”</h3>
     <p>When the Gujarati news is short, PIB’s Hindi news is translated. While editing, the Hindi original shows alongside.</p>

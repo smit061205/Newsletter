@@ -1,7 +1,7 @@
 "use client";
 // What only the desktop app can do (desktop/preload.js puts window.ck there):
-// connect the website through GitHub's device sign-in, wake the computer
-// before the evening run, and switch the paper the newsroom works on. In a
+// wake the computer before the evening run, switch the paper the newsroom
+// works on, update the app, and choose a folder. In a
 // plain browser these cards say where they work.
 import { useEffect, useRef, useState } from "react";
 import s from "../newsroom.module.css";
@@ -30,38 +30,6 @@ export function useDesktop() {
   const [info, setInfo] = useState<Awaited<ReturnType<Ck["info"]>> | null>(null);
   useEffect(() => { ck()?.info().then(setInfo).catch(() => {}); }, []);
   return { info, refresh: () => ck()?.info().then(setInfo) };
-}
-
-export function ConnectCard() {
-  const { t } = useApp();
-  const { info, refresh } = useDesktop();
-  const [code, setCode] = useState("");
-  const [error, setError] = useState("");
-  useEffect(() => { ck()?.onGitHubConnected(() => { setCode(""); refresh(); }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!info) {
-    return (
-      <section className={s.card}>
-        <h2 className={s.cardTitle}>{t("settings.connect")}</h2>
-        <p className={s.muted}>{t("settings.connect.body")}</p>
-        <p className={s.faint}>{t("settings.connect.browser")}</p>
-      </section>
-    );
-  }
-  return (
-    <section className={s.card}>
-      <h2 className={s.cardTitle}>{t("settings.connect")}</h2>
-      {info.github ? <Note tone="good">{t("settings.connect.done")}</Note> : <>
-        <p className={s.muted}>{t("settings.connect.body")}</p>
-        {!info.canConnect && <Note tone="warn">{t("settings.connect.none")}</Note>}
-        {code ? <>
-          <p className={s.muted}>{t("settings.connect.code")}</p>
-          <p className={s.headlineInput} style={{ fontVariantNumeric: "tabular-nums", letterSpacing: ".12em", userSelect: "all" }}>{code}</p>
-        </> : <div><Button kind="primary" disabled={!info.canConnect}
-            onClick={() => { setError(""); ck()!.connectGitHub().then((r) => setCode(r.code)).catch((e) => setError(e.message)); }}>{t("settings.connect.go")}</Button></div>}
-        {error && <Note tone="bad">{error}</Note>}
-      </>}
-    </section>
-  );
 }
 
 /** The time five minutes before `runAt` ("HH:MM"), when the computer wakes. */

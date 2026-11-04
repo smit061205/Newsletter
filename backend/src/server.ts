@@ -692,7 +692,8 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           issue: latest ? { version: latest.version, status: latest.status, ready: (latest.report as { ready?: boolean }).ready,
                             issueNumber: (latest.report as { issueNumber?: number }).issueNumber } : null,
           version: gitVersion(),
-          paper: { id: profile.id, name: profile.name },
+          // (kickers: whether this paper prints them; the story editor hides the field when not)
+          paper: { id: profile.id, name: profile.name, kickers: !(await import("./layout/typography.ts")).KICKER.none },
         });
       }
       if (parts[0] === "api" && parts[1] === "settings") {

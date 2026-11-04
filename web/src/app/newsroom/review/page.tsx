@@ -45,7 +45,7 @@ export default function Review() {
           : !item ? (
             <Empty icon={Icon.checkCircle()} title={t("review.done")}>
               <p>{t("review.doneBody")}</p>
-              <div className={s.row}><Link className={s.btn} href="/newsroom/pages">{t("today.pages")}</Link><Link className={`${s.btn} ${s.primary}`} href="/newsroom">{t("today.publish")}</Link></div>
+              <div className={s.row}><Link className={s.btn} href="/newsroom/pages">{t("today.pages")}</Link><Link className={`${s.btn} ${s.primary}`} href="/newsroom">{t("nav.today")}</Link></div>
             </Empty>
           ) : (
             <>
