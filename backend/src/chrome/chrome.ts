@@ -6,7 +6,8 @@
 // scripts/mock_backend/chrome_assets.py from the 8 August issue).
 import { readFileSync } from "node:fs";
 import type { Element, TextElement } from "@ck/shared/contract";
-import { profile, profilePath } from "../profile.ts";
+import { printedDate, profile, profilePath } from "../profile.ts";
+export { printedDate };
 import { elementText, topFor, type Measurer } from "../layout/measure.ts";
 import { GAP, GRID, HEADLINE, INK, PT } from "../layout/typography.ts";
 
@@ -40,13 +41,6 @@ const DIGITS: Record<string, string> = { gujarati: "૦૧૨૩૪૫૬૭૮�
 export const localDigits = (v: string | number) =>
   String(v).replace(/[0-9]/g, (d) => DIGITS[profile.language.digits][Number(d)]);
 
-/** The date a day's paper carries: the next day's, for a paper made the evening before (profile issue.datedNextDay). */
-export function printedDate(iso: string): string {
-  if (!profile.issue.datedNextDay) return iso;
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
 
 /** The paper's date line for an ISO date, from the profile's pattern. */
 export function dateLine(iso: string): string {

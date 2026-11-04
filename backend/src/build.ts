@@ -273,6 +273,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   let planEntries: BuildReport["plan"] = [];
   // (stories taken out as the same news as one kept: reported with those left out)
   const sameNews: Story[] = [];
+  // (and those the plan finds out of date by the time the paper is read)
+  const staleNews: Story[] = [];
   let enginePages: (EnginePage | null)[] = [];
   let result!: { pages: Map<number, Element[]>; placed: { page: number; story: Story; variant: string; cols: number; rank: number }[];
                  gaps: { page: number; col: number; y0: number; y1: number }[]; leftOut: Story[];
@@ -336,6 +338,16 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       pool = pool.map((s) => (!rankedByEditor.has(s.id) && by.has(s.id) ? { ...s, priority: by.get(s.id)!.rank } : s))
         .sort(byRank);
       log(`  editorial plan: leads ${planned.plan.filter((p) => p.rank === 1).map((p) => p.id).join(", ") || "none"}`);
+    }
+    // nothing that reads old the morning the paper is read (5 Nov: All India Radio's "the
+    // cabinet meets today" and a US election's early leads, its result in another story
+    // left out): the plan says which; an editor's own rank and his Telegram news stand
+    {
+      const stale = new Set((planned?.plan ?? []).filter((p) => p.outdated).map((p) => p.id));
+      const old = pool.filter((s) => stale.has(s.id) && !rankedByEditor.has(s.id) && !alwaysPrinted(s));
+      if (old.length) log(`  out of date by the time the paper is read, left out: ${old.map((s) => s.id).join(", ")}`);
+      pool = pool.filter((s) => !old.includes(s));
+      staleNews.push(...old);
     }
     // the same news once in the paper (30 Oct: the PM's Banaskantha visit printed
     // three times, the news, the works and the speech): the plan says which stories
@@ -546,7 +558,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
           `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? `, ${p.module.elements.filter((e) => e.kind === "image").length} photos` : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" ")}`);
     }
     timing.fitting = Date.now() - t1;
-    result = { pages: pagesOut, placed, gaps, leftOut: [...pool, ...sameNews], plans: finalPlans, spent: spent + rewordCost, factChecks };
+    result = { pages: pagesOut, placed, gaps, leftOut: [...pool, ...sameNews, ...staleNews], plans: finalPlans, spent: spent + rewordCost, factChecks };
   } finally {
     await m.close();
   }
