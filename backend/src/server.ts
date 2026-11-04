@@ -29,6 +29,7 @@
 //   POST  /api/designs/assign {copy | upTo, id|null}   POST /api/designs/save {date, names}   POST /api/designs/stamp {date, copy, name, base64}
 //   POST  /api/designs/reveal {date}   the copies on their designs, saved in a folder in Downloads (and that folder opened)
 //   GET   /api/layout                  the page, its columns and each page's room for stories (the Ads screen's preview)
+//   GET   /api/space  POST /api/space   what the data folder holds; POST clears old files now (tidy.ts)
 //   GET   /api/backups  POST /api/backups {folder} | {now} | {restore: "YYYY-MM-DD"}   backups outside the app (backup.ts); a restore restarts the engine
 //   GET   /healthz                     "ok" (for the host's health check)
 //   GET   /reader                      the release reader: a bookmark that sends the release page you're reading here
@@ -47,7 +48,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR } from "./config.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { DATA_DIR, ENV_FILE, PAPERS_HOME, publicationDir, ROOT } from "./config.ts";
+import { DATA_DIR, ENV_FILE, outFile, PAPERS_HOME, publicationDir, ROOT } from "./config.ts";
 import { collecting, currentJob, onJob, runPipeline, settleInterrupted, STEPS } from "./pipeline.ts";
 import type { Ad, Release, StepName, Store } from "./store.ts";
 import { profile, PUBLICATION as PUBLICATION_ID } from "./profile.ts";
@@ -341,9 +342,9 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           const got = store.latestIssue(date);
           // (the 8-page paper, when it was made from this version of the day's)
           const eight = store.setting<{ version: number; pdf: string; json?: string; ready: boolean } | null>(`eightPages|${date}`, null);
-          const made = !!eight && eight.version === got?.version && existsSync(eight.pdf);
+          const made = !!eight && eight.version === got?.version && existsSync(outFile(eight.pdf));
           return got ? send(res, 200, { date, version: got.version, status: got.status, report: got.report,
-                                        eight: made, eightEditable: made && !!eight!.json && existsSync(eight!.json) })
+                                        eight: made, eightEditable: made && !!eight!.json && existsSync(outFile(eight!.json)) })
                      : send(res, 404, { error: `no issue built for ${date}` });
         }
         if (req.method === "GET" && parts[3] === "editable.pdf") {
@@ -355,20 +356,20 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         if (req.method === "GET" && parts[3] === "editable8.pdf") {
           // the 8-page paper as a PDF whose text stays text in CorelDRAW
           const eight = store.setting<{ json?: string } | null>(`eightPages|${date}`, null);
-          if (!eight?.json || !existsSync(eight.json)) return send(res, 404, { error: `no 8-page paper for CorelDRAW for ${date}: make the paper again` });
-          return sendEditable(res, JSON.parse(await readFile(eight.json, "utf8")));
+          if (!eight?.json || !existsSync(outFile(eight.json))) return send(res, 404, { error: `no 8-page paper for CorelDRAW for ${date}: make the paper again` });
+          return sendEditable(res, JSON.parse(await readFile(outFile(eight.json), "utf8")));
         }
         if (req.method === "GET" && parts[3] === "pdf8") {
           // the 8-page paper (pipeline.ts "sections")
           const eight = store.setting<{ pdf: string } | null>(`eightPages|${date}`, null);
-          if (!eight || !existsSync(eight.pdf)) return send(res, 404, { error: `no 8-page paper made for ${date}` });
-          return send(res, 200, new Uint8Array(await readFile(eight.pdf)), "application/pdf");
+          if (!eight || !existsSync(outFile(eight.pdf))) return send(res, 404, { error: `no 8-page paper made for ${date}` });
+          return send(res, 200, new Uint8Array(await readFile(outFile(eight.pdf))), "application/pdf");
         }
         if (req.method === "GET" && parts[3] === "pdf") {
           const got = store.latestIssue(date);
           const file = (got?.report as { pdf?: string } | undefined)?.pdf;
           if (!file) return send(res, 404, { error: `no issue built for ${date}` });
-          return send(res, 200, new Uint8Array(await readFile(file)), "application/pdf");
+          return send(res, 200, new Uint8Array(await readFile(outFile(file))), "application/pdf");
         }
         if (req.method === "POST" && parts[3] === "build") return startJob(res, date, "build");
         if (req.method === "POST" && parts[3] === "approve") {
@@ -762,6 +763,13 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           articles: articles(all).map((a) => ({ id: a.ids[0], at: a.at, title: a.text.split("\n").find((l) => l.trim())?.trim().slice(0, 80) ?? "" })),
         });
       }
+      if (parts[0] === "api" && parts[1] === "space") {
+        // what the data folder holds; POST clears old files now (tidy.ts)
+        const t = await import("./tidy.ts");
+        let freed: number | undefined;
+        if (req.method === "POST") freed = await t.tidy(store, indiaNow().day, { busy: !!(currentJob() || copiesNow?.()), log });
+        return send(res, 200, { ...(await t.space()), freed, tidied: store.setting("tidied", null) });
+      }
       if (parts[0] === "api" && parts[1] === "backups") {
         const b = await import("./backup.ts");
         if (req.method === "POST") {
@@ -1018,7 +1026,7 @@ function gitVersion(): string {
   return version;
 }
 
-/** A copy of the database every day (backups/, the last 30 kept): SQLite's
+/** A copy of the database every day (backups/, the last 7 kept: 30 more are outside, backup.ts): SQLite's
  * VACUUM INTO, consistent even while the engine writes. */
 function backupDaily(store: Store, log: (s: string) => void) {
   const dir = path.join(DATA_DIR || ROOT, "backups");
@@ -1028,13 +1036,20 @@ function backupDaily(store: Store, log: (s: string) => void) {
     await mkdir(dir, { recursive: true });
     store.db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
     const { readdir, rm } = await import("node:fs/promises");
-    const old = (await readdir(dir)).filter((f) => /^capital-kranti-\d{4}-\d{2}-\d{2}\.sqlite$/.test(f)).sort().slice(0, -30);
+    const old = (await readdir(dir)).filter((f) => /^capital-kranti-\d{4}-\d{2}-\d{2}\.sqlite$/.test(f)).sort().slice(0, -7);
     for (const f of old) await rm(path.join(dir, f));
     log(`database backed up to ${file}`);
   };
   // and a copy outside the app's folder (Settings' backup folder, backup.ts)
   const outside = async () => (await import("./backup.ts")).backUp(store, indiaNow().day, { log });
-  const safe = () => once().catch((e) => log(`backup failed: ${e instanceof Error ? e.message : e}`)).then(() => outside().catch(() => {}));
+  // then, once a day, old files cleared (tidy.ts)
+  const tidyOnce = async () => {
+    const day = indiaNow().day;
+    if (store.setting<{ day?: string }>("tidied", {}).day === day) return;
+    await (await import("./tidy.ts")).tidy(store, day, { busy: !!(currentJob() || copiesNow?.()), log });
+  };
+  const safe = () => once().catch((e) => log(`backup failed: ${e instanceof Error ? e.message : e}`))
+    .then(() => outside().catch(() => {})).then(() => tidyOnce().catch((e) => log(`clearing old files failed: ${e instanceof Error ? e.message : e}`)));
   safe();
   setInterval(safe, 60 * 60_000);
 }
@@ -1113,7 +1128,7 @@ async function papersApi(req: IncomingMessage, res: ServerResponse, parts: strin
       const got = day ? st.latestIssue(day) : null;
       if (!got) return null;
       const rep = got.report as { ready?: boolean; pdf?: string; gates?: unknown[] };
-      return { date: day, version: got.version, ready: rep.ready, pdf: rep.pdf, gates: rep.gates };
+      return { date: day, version: got.version, ready: rep.ready, pdf: rep.pdf && outFile(rep.pdf, path.join(dataOf(id), "out")), gates: rep.gates };
     } finally { st.db.close(); }
   };
   if (req.method === "POST" && parts[2] === "draft") {

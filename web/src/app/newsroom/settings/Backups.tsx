@@ -92,3 +92,25 @@ export function BackupCard({ busy }: { busy: boolean }) {
     </section>
   );
 }
+
+/** The space the paper's data takes, and old files cleared now (backend/src/tidy.ts; once a day by itself). */
+export function SpaceCard({ busy }: { busy: boolean }) {
+  const { t, lang, toast } = useApp();
+  const [x, setX] = useState<{ bytes: number; freed?: number } | null>(null);
+  const [working, setWorking] = useState(false);
+  useEffect(() => { call<{ bytes: number }>("/api/space").then(setX).catch(() => {}); }, []);
+  const gb = (b: number) => num(lang, b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`);
+  if (!x?.bytes) return null;
+  return (
+    <section className={s.card}>
+      <h2 className={s.cardTitle}>{t("space.title")}</h2>
+      <p className={s.muted}>{t("space.body", { size: gb(x.bytes) })}</p>
+      <div><Button disabled={working || busy} onClick={async () => {
+        setWorking(true);
+        try { const r = await call<{ bytes: number; freed: number }>("/api/space", { json: {} }); setX(r); toast(t("space.freed", { size: gb(r.freed) })); }
+        catch { /* shown as it was */ }
+        setWorking(false);
+      }}>{working ? t("space.working") : t("space.go")}</Button></div>
+    </section>
+  );
+}

@@ -13,7 +13,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { buildIssue } from "./build.ts";
-import { OUT_DIR } from "./config.ts";
+import { OUT_DIR, outName } from "./config.ts";
 import type { EnginePage } from "./layout/engine.ts";
 import { sectionsDay, type Job, type JobStep, type Progress, type StepName, type Store } from "./store.ts";
 
@@ -429,7 +429,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         const { writeFile } = await import("node:fs/promises");
         const json = pdfPath.replace(/\.pdf$/, ".json");
         await writeFile(json, JSON.stringify(r.issue));
-        store.putSetting(`eightPages|${date}`, { version: base.version, pdf: pdfPath, json, ready: r.report.ready, pages: r.report.pages, cost });
+        store.putSetting(`eightPages|${date}`, { version: base.version, pdf: outName(pdfPath), json: outName(json), ready: r.report.ready, pages: r.report.pages, cost });
         say(`the 8-page paper: ${r.report.ready ? "READY" : "NOT READY"}${r.report.ready ? "" : ` (${r.report.gates.filter((g) => !g.pass).map((g) => g.gate).join("; ")})`}`);
       } catch (e) {
         if (stopping) throw e;

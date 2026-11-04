@@ -12,7 +12,7 @@ import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promi
 import path from "node:path";
 import { acquireBrowser, releaseBrowser } from "./browser.ts";
 import { existsSync } from "node:fs";
-import { DATA_DIR, PUBLIC_DIR, ROOT } from "./config.ts";
+import { DATA_DIR, outFile, PUBLIC_DIR, ROOT } from "./config.ts";
 import { pageImageDir, type BuildReport } from "./build.ts";
 import type { Store } from "./store.ts";
 
@@ -74,7 +74,7 @@ export async function publishIssue(store: Store, date: string, opts: {
   const numbers = issue.pages.map((p) => p.number).sort((a, b) => a - b);
   await toJpegs(numbers.map((n) => path.join(pageImageDir(date), `${n}.png`)), numbers.map((n) => path.join(dir, `${n}.jpg`)),
                 opts.quality ?? 82);
-  await copyFile(report.pdf, path.join(dir, "issue.pdf"));
+  await copyFile(outFile(report.pdf), path.join(dir, "issue.pdf"));
 
   const published: PublishedIssue = {
     issueDate: date, issueNumber: issue.issueNumber, version: got.version, publishedAt: new Date().toISOString(),

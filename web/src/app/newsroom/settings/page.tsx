@@ -8,7 +8,7 @@ import { useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { num, shortDate } from "../ui/format";
 import { ConnectCard, UpdateCard, WakeCard } from "../ui/desktop";
-import { BackupCard } from "./Backups";
+import { BackupCard, SpaceCard } from "./Backups";
 import { Button, Icon, Note, Skeleton, useApp } from "../ui/kit";
 
 export default function SettingsPage() {
@@ -116,6 +116,8 @@ export default function SettingsPage() {
         </section>
 
         <BackupCard busy={!!status?.running} />
+
+        <SpaceCard busy={!!status?.running} />
 
         <UpdateCard busy={!!status?.running} />
 
