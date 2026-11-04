@@ -11,7 +11,8 @@ import { DEFAULT_MODEL, env, openRouter } from "./rewrite.ts";
 const SYSTEM = `You compare a newspaper story with the press release(s) it was written from. The story may be in another language than the release.
 List only clear errors of these kinds:
 - a person, organisation or place the story names that the release does not, or names differently (a different person, not a different spelling or translation);
-- a date, day or year that differs from the release, or that the release does not give;
+- a date, day or year that differs from the release, or that the release does not give. The release's "today", "tonight" or "tomorrow" count from its date
+  (given with it), and the story may be read the next morning: naming that day by its weekday or date, or as "yesterday", is right;
 - words printed inside quotation marks and given to someone who did not say them in the release, or changed in meaning. A headline such as "words: a person's name" with no quotation marks is the paper's summary, not a quotation.
 Do not list: numbers, general wording, translation choices, spelling or transliteration, the dateline, background every reader knows (the Prime Minister's title, the name of the state or country), or anything you are not sure of.
 Return JSON {"problems": [{"kind": "name"|"place"|"date"|"quote", "says": "<the story's words>", "why": "<a few plain words>"}]}: an empty list when there is nothing wrong.`;

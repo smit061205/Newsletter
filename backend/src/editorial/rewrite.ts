@@ -16,7 +16,7 @@ import path from "node:path";
 import { ENV_FILE } from "../config.ts";
 import { inPaperLanguage } from "../layout/stories.ts";
 import { repeats } from "./quality.ts";
-import { profile } from "../profile.ts";
+import { printedDate, profile } from "../profile.ts";
 import { storyIdOf, type Progress, type Release, type Store, type Story } from "../store.ts";
 
 /** Chosen by backend/test/compare-models.ts on 21 Oct 2026 releases (every
@@ -170,7 +170,10 @@ Rules:
 - Use ONLY facts in the release. Never add names, numbers, dates, places or quotes that are not in it.
 - Keep every number, name and date exactly as in the release, written in ${paperLang.digits} -- except inside English names and codes (ATM 2026, COVID-19).
 ${profile.language.lang !== "en" ? `- A release in English (the editor's own news): write it all in ${paperLang.name}, people's and places' names in ${paperLang.name} letters.\n` : ""}- Start body_long with the dateline the release uses (e.g. "${paperLang.dateline}"), if it has one.
-- Headline: active, specific, no exclamation marks. Always write a deck (the sub-heading: one line adding the next most important fact). The kicker may be empty.
+${profile.issue.datedNextDay ? `- The paper is read the morning after the release (both days are given with it): write every time word as of that morning. ` +
+  `The release's "today" or "tonight" is the weekday it came out${profile.language.lang === "gu" ? ` ("બુધવારે", never "આજે")` : ""}, its "tomorrow" the reader's today. ` +
+  "Something it announces for its own day or earlier (a meeting, a match, a launch) is no longer to come by then: say it was to be held that day, " +
+  "never that it will be, and never what came of it unless the release says.\n" : ""}- Headline: active, specific, no exclamation marks. Always write a deck (the sub-heading: one line adding the next most important fact). The kicker may be empty.
 - body_medium and body_short are shorter versions of body_long, keeping the most important facts first.
 Return JSON matching the schema.`;
 
@@ -239,9 +242,21 @@ export function numbersNotIn(out: string, source: string, date?: string): string
 }
 
 /** What the model is told about a release: where it's from, then its text. */
+const longDate = (iso: string) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+/** The day a release came out and the day its paper is read, as the writer is told them (5 Nov: All India
+ * Radio's "the cabinet meets today" printed as it was in the next morning's paper). */
+export function releasedOn(date: string): string {
+  const day = date.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return "";
+  const paper = printedDate(day);
+  return `Released: ${longDate(day)}. ` +
+    (paper === day ? "The paper it prints in is dated the same day." : `The paper it prints in is dated ${longDate(paper)} and read that morning.`);
+}
+
 export const releaseText = (r: Release) =>
   `${r.source === "pib" ? `Source: PIB (Press Information Bureau), ${r.ministry ?? ""}, ${r.office}` : `Office: ${r.office}`}\n` +
-  `Headline: ${r.headline}\nSubheading: ${r.subhead}\n\n${paragraphs(r.body).join("\n\n")}`;
+  `${releasedOn(r.date) && `${releasedOn(r.date)}\n`}Headline: ${r.headline}\nSubheading: ${r.subhead}\n\n${paragraphs(r.body).join("\n\n")}`;
 
 // Near-identical releases from one office on the same occasion -- PIB
 // issues one "the Prime Minister congratulates ..." per medal winner -- are
@@ -442,7 +457,7 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
           (words > now ? "Add detail ONLY from the release below -- never invent anything." : "Shorten it, keeping the most important facts first.") +
           (avoid ? ` An earlier version wrongly said: ${avoid}. Say only what the release says.` : "") +
           " Keep the dateline. Return JSON {body}." },
-        { role: "user", content: `RELEASE:\n${paragraphs(release.body).join("\n\n")}\n\nCURRENT STORY BODY:\n${current}` },
+        { role: "user", content: `RELEASE (${releasedOn(release.date)}):\n${paragraphs(release.body).join("\n\n")}\n\nCURRENT STORY BODY:\n${current}` },
       ],
     }),
   }, 150); // a long story rewritten in full can take over 90s
@@ -520,7 +535,7 @@ export async function newsBrief(store: Store, story: Story, release: Release, si
         { role: "system", content: SYSTEM + `\nNow you are making this story a brief for a small space on the page: a headline of at most ${size.head} words, ` +
           `a sub-heading of at most ${size.deck} words, and a body of about ${size.words} words (never more than ${Math.round(size.words * 1.1)}), ` +
           "one paragraph, the most important facts first. Use ONLY facts from the release below -- never invent anything. Return JSON {headline, deck, body}." },
-        { role: "user", content: `RELEASE:\n${paragraphs(release.body).join("\n\n")}\n\nCURRENT STORY:\n${story.headline}\n${story.deck}\n${story.bodies.long}` },
+        { role: "user", content: `RELEASE (${releasedOn(release.date)}):\n${paragraphs(release.body).join("\n\n")}\n\nCURRENT STORY:\n${story.headline}\n${story.deck}\n${story.bodies.long}` },
       ],
     }),
   }, 120);
