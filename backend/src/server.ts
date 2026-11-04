@@ -32,12 +32,15 @@
 //   GET   /healthz                     "ok" (for the host's health check)
 //   GET   /reader                      the release reader: a bookmark that sends the release page you're reading here
 //
-// With BACKEND_API_TOKEN set, every POST needs "Authorization: Bearer <token>"
-// (builds and edits cost AI credit; approval publishes). Reads stay open: the
-// website's readers load page images straight from here.
+// With BACKEND_API_TOKEN set, every change (POST, PATCH, DELETE) needs
+// "Authorization: Bearer <token>" (builds and edits cost AI credit; approval
+// publishes). Reads stay open: the website's readers load page images straight
+// from here. On this computer it answers only to its own address, and only the
+// newsroom's pages may read its answers or change anything (newsroomOrigins).
 //
 // It also runs the day at the newsroom's run time (20:00 India time unless
 // changed in Settings): the whole pipeline, as a job.
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -50,18 +53,27 @@ import { profile, PUBLICATION as PUBLICATION_ID } from "./profile.ts";
 import { DEFAULT_EDITIONS, START_RATES, type CostKind, type Edition } from "./editorial/copies.ts";
 
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json") {
-  res.writeHead(status, {
-    "content-type": type,
-    "access-control-allow-origin": "*",
-    "access-control-allow-headers": "content-type, authorization",
-    "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
-    // Chrome asks before a public page may reach a server on this machine
-    // (Private Network Access): the release reader runs on the
-    // Information Department's own page and posts here
-    "access-control-allow-private-network": "true",
-  });
+  res.writeHead(status, { "content-type": type });
   res.end(typeof body === "string" || body instanceof Uint8Array ? body : JSON.stringify(body));
 }
+
+// Who may talk to the engine (5 Nov: every website was let in, public pages too, so any page open in
+// the editor's browser could start a paid run, change his AI key or Telegram bot, delete ads or read
+// the bot's code). Only the newsroom may send it changes or read its answers; on this computer it
+// answers only to its own address, so a website can't pose as it (a name pointed at 127.0.0.1).
+const LOOPBACK = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+/** The newsroom's addresses (the app's and development's), the engine's own, and any in CK_NEWSROOM_ORIGIN. */
+function newsroomOrigins(port: number): Set<string> {
+  const extra = (process.env.CK_NEWSROOM_ORIGIN ?? "").split(",").map((o) => o.trim()).filter(Boolean);
+  return new Set([...[port, 3000, 3100].flatMap((p) => [`http://127.0.0.1:${p}`, `http://localhost:${p}`]), ...extra]);
+}
+/** The release reader's own key: only its page knows it, so no other website can hand the engine a release. */
+function readerKey(store: Store): string {
+  let key = store.setting("readerKey", "");
+  if (!key) { key = randomBytes(16).toString("hex"); store.putSetting("readerKey", key); }
+  return key;
+}
+const sameKey = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
@@ -109,10 +121,10 @@ export async function acceptRelease(store: Store, u: UploadedRelease): Promise<R
  * policy doesn't let it call a local server directly); then, if you like,
  * it opens the previous release. One page at a time, read by you: the
  * site's block on automated readers is respected, not worked around. */
-function readerPage(req: IncomingMessage): string {
+function readerPage(req: IncomingMessage, key: string): string {
   const origin = `http://${req.headers.host ?? "localhost:4000"}`;
   const token = process.env.BACKEND_API_TOKEN?.trim();
-  const target = `${origin}/ingest${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  const target = `${origin}/ingest?key=${key}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
   const js = `(function(){var q=function(s){var e=document.querySelector(s);return e?e.textContent.replace(/\\s+/g," ").trim():""};` +
     `var headline=q(".ttm-service-single-content-area .title h4");` +
     `if(!headline){alert("Capital Kranti: open a press release page (PressReleaseDetails) first, and wait for its text to appear.");return}` +
@@ -279,11 +291,23 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
     runPipeline(store, date, { by: "newsroom", from, log }).catch((e) => log(`run for ${date} stopped: ${e instanceof Error ? e.message : e}`));
     return send(res, 202, currentJob());
   };
+  const local = LOOPBACK.test(opts.host ?? "127.0.0.1");
+  const origins = newsroomOrigins(opts.port);
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
       const parts = url.pathname.split("/").filter(Boolean);
+      // on this computer: only its own address; only the newsroom may read the answers or change anything
+      if (local && !LOOPBACK.test(req.headers.host ?? "")) return send(res, 403, { error: "not this computer's engine" });
+      const origin = req.headers.origin;
+      if (origin && origins.has(origin)) {
+        res.setHeader("access-control-allow-origin", origin);
+        res.setHeader("access-control-allow-headers", "content-type, authorization");
+        res.setHeader("access-control-allow-methods", "GET, POST, PATCH, DELETE, OPTIONS");
+      }
+      res.setHeader("vary", "origin");
       if (req.method === "OPTIONS") return send(res, 204, "");
+      if (req.method !== "GET" && req.method !== "HEAD" && origin && !origins.has(origin)) return send(res, 403, { error: "only the newsroom can change the paper" });
       if (req.method === "GET" && url.pathname === "/healthz") return send(res, 200, "ok", "text/plain");
       // release photos and ads (the newsroom shows them from here: MEDIA_DIR may be the app's data folder)
       if (req.method === "GET" && parts[0] === "media" && parts.length > 1 && !parts.includes("..")) {
@@ -294,7 +318,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         try { return send(res, 200, new Uint8Array(await readFile(file)), type); }
         catch { return send(res, 404, { error: `no file ${url.pathname}` }); }
       }
-      if (req.method === "POST" && !authorized(req)) return send(res, 401, { error: "missing or wrong API token" });
+      if (req.method !== "GET" && req.method !== "HEAD" && !authorized(req)) return send(res, 401, { error: "missing or wrong API token" });
       if (req.method === "GET" && url.pathname === "/api/issue") {
         const date = url.searchParams.get("date") ?? store.latestDate();
         const got = date ? store.latestIssue(date) : null;
@@ -483,7 +507,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           return send(res, 200, { date, version: got.version, status: "approved", published, log: lines });
         }
       }
-      if (req.method === "GET" && url.pathname === "/reader") return send(res, 200, readerPage(req), "text/html; charset=utf-8");
+      if (req.method === "GET" && url.pathname === "/reader") return send(res, 200, readerPage(req, readerKey(store)), "text/html; charset=utf-8");
       if (req.method === "GET" && url.pathname === "/ingest") {
         // A hand-off page for reading releases in a browser: a release page
         // can't call this server (browsers keep public pages off local
@@ -494,8 +518,8 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
             const o = document.getElementById("o");
             try {
               const body = decodeURIComponent(location.hash.slice(1));
-              const token = new URLSearchParams(location.search).get("token");
-              const headers = { "content-type": "application/json", ...(token ? { authorization: "Bearer " + token } : {}) };
+              const q = new URLSearchParams(location.search), token = q.get("token");
+              const headers = { "content-type": "application/json", "x-reader-key": q.get("key") || "", ...(token ? { authorization: "Bearer " + token } : {}) };
               const r = await fetch("/api/releases", { method: "POST", headers, body });
               const j = await r.json();
               document.title = r.ok ? "stored " + j.id : "error";
@@ -530,6 +554,8 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         })));
       }
       if (req.method === "POST" && url.pathname === "/api/releases") {
+        // (from the reader's page only: any website could open /ingest with a release of its own)
+        if (!sameKey(String(req.headers["x-reader-key"] ?? ""), readerKey(store))) return send(res, 403, { error: "only the release reader can send releases" });
         const r = await acceptRelease(store, (await readJson(req)) as UploadedRelease);
         log(`release ${r.id} stored for ${r.date}: ${r.headline.slice(0, 60)} (${r.photos.length} photos)`);
         return send(res, 200, { id: r.id, date: r.date, photos: r.photos.length });
@@ -556,8 +582,7 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         }
       }
       if (req.method === "GET" && url.pathname === "/api/events") {
-        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive",
-                             "access-control-allow-origin": "*" });
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
         res.write(`data: ${JSON.stringify({ job: currentJob() })}\n\n`);
         const off = onJob((job, line) => res.write(`data: ${JSON.stringify({ job, line })}\n\n`));
         const ping = setInterval(() => res.write(": ping\n\n"), 25_000);
