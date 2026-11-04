@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { call, media, type ReleaseRow, type StoryRow } from "../api";
 import s from "../newsroom.module.css";
+import { useStatus } from "../Shell";
 import { num } from "./format";
 import { Badge, Button, Icon, Note, SidePanel, useApp } from "./kit";
 import type { StringKey } from "./strings";
@@ -22,6 +23,7 @@ export async function editStory(date: string, storyId: string, change: Record<st
 
 export function StoryPanel({ story, onClose, onChanged }: { story: StoryRow; onClose: () => void; onChanged: () => void }) {
   const { t, lang, date, toast } = useApp();
+  const { status } = useStatus();
   const [draft, setDraft] = useState<Draft>(draftOf(story));
   const [originals, setOriginals] = useState<ReleaseRow[]>([]);
   const [error, setError] = useState("");
@@ -81,8 +83,9 @@ export function StoryPanel({ story, onClose, onChanged }: { story: StoryRow; onC
       {nums && <Note tone="warn">{t("edit.numbers", { nums: num(lang, nums) })}</Note>}
       {error && <Note tone="bad">{error}</Note>}
 
-      <label className={s.field}><span className={s.label}>{t("edit.kicker")}</span>
-        <input className={s.input} value={draft.kicker} onChange={(e) => set("kicker", e.target.value)} /></label>
+      {/* (a paper that prints no kickers: no field that does nothing) */}
+      {status?.paper.kickers !== false && <label className={s.field}><span className={s.label}>{t("edit.kicker")}</span>
+        <input className={s.input} value={draft.kicker} onChange={(e) => set("kicker", e.target.value)} /></label>}
       <label className={s.field}><span className={s.label}>{t("edit.headline")}</span>
         <textarea className={`${s.textarea} ${s.headlineInput}`} rows={2} value={draft.headline} onChange={(e) => set("headline", e.target.value)} /></label>
       <label className={s.field}><span className={s.label}>{t("edit.deck")}</span>

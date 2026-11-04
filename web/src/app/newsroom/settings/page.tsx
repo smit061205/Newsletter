@@ -7,7 +7,7 @@ import { call, type Settings } from "../api";
 import { useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { num, shortDate } from "../ui/format";
-import { ConnectCard, UpdateCard, WakeCard } from "../ui/desktop";
+import { UpdateCard, WakeCard } from "../ui/desktop";
 import { BackupCard, SpaceCard } from "./Backups";
 import { Button, Icon, Note, Skeleton, useApp } from "../ui/kit";
 
@@ -106,8 +106,6 @@ export default function SettingsPage() {
           <input className={s.input} type="url" placeholder="https://…" value={x.siteUrl} onChange={(e) => setX({ ...x, siteUrl: e.target.value })}
                  onBlur={(e) => e.target.value !== (status?.siteUrl ?? "") && save({ siteUrl: e.target.value })} aria-label={t("settings.site")} />
         </section>
-
-        <ConnectCard />
 
         <section className={s.card}>
           <h2 className={s.cardTitle}>{t("settings.papers")}</h2>

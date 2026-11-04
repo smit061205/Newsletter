@@ -29,7 +29,7 @@ export interface Status {
   costRates: Record<string, number>; copyMinutes: number; samplesOn: boolean;
   issue: { version: number; status: string; ready?: boolean; issueNumber?: number } | null; version: string;
   /** the paper this newsroom is working on */
-  paper: { id: string; name: string };
+  paper: { id: string; name: string; kickers?: boolean };
 }
 export interface ArchiveRow { date: string; version: number; status: string; issueNumber?: number; ready?: boolean; cost?: number; stories: number; pages?: number }
 export interface ReleaseRow {

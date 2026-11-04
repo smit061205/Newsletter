@@ -1,14 +1,14 @@
 "use client";
 // આજે / Today: one card that says where the day's paper stands, in plain
 // words, with the one thing to do next -- make it, watch it being made
-// (live), look at what needs a look, publish it, print it.
+// (live), look at what needs a look, save it for CorelDRAW, print it.
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BACKEND, call, media, type IssueInfo, type Job, type StepName, type StoryRow } from "./api";
 import { TopBar, useStatus } from "./Shell";
 import s from "./newsroom.module.css";
 import { num, problems, rupees } from "./ui/format";
-import { Badge, Button, Dialog, Icon, Note, Ring, Skeleton, useApp } from "./ui/kit";
+import { Badge, Button, Icon, Note, Ring, Skeleton, useApp } from "./ui/kit";
 import { StoryPanel } from "./ui/StoryPanel";
 import type { StringKey } from "./ui/strings";
 
@@ -54,7 +54,6 @@ export default function Today() {
   const [issue, setIssue] = useState<IssueInfo | null>(null);
   const [stories, setStories] = useState<StoryRow[]>([]);
   const [ticker, setTicker] = useState<string[]>([]);
-  const [publishing, setPublishing] = useState<"ask" | "working" | "done" | null>(null);
   const [editing, setEditing] = useState<StoryRow | null>(null);
   const [error, setError] = useState("");
   // the paper asked for while its copies or sister papers are made: it starts when they're done
@@ -77,7 +76,7 @@ export default function Today() {
     return () => clearInterval(id);
   }, [reviewing, loadIssue]);
   useEffect(() => {
-    setJob(null); setTicker([]); setPublishing(null); setWaiting(null);
+    setJob(null); setTicker([]); setWaiting(null);
     call<Job[]>(`/api/jobs?date=${date}`).then((js) => setJob(js[0] ?? null)).catch(() => {});
     call<Job[]>("/api/jobs").then((js) => setLastDone(js.find((j) => j.status === "done"))).catch(() => {});
   }, [date]);
@@ -134,17 +133,12 @@ export default function Today() {
     setStopping(true);
     try { await call("/api/jobs/current/stop", { json: {} }); } catch (e) { setError((e as Error).message); setStopping(false); }
   };
-  const publish = async () => {
-    setPublishing("working");
-    try {
-      await call(`/api/issues/${date}/publish`, { json: { force: !report?.ready } });
-      setPublishing("done");
-      refresh();
-      loadIssue();
-    } catch (e) { setPublishing(null); setError((e as Error).message); }
-  };
   const openPdf = () => issue && pdf({ url: media(`/api/issues/${date}/pdf`), title: t("pdf.title", { issue: num(lang, issue.report.issueNumber) }),
                                        fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")}.pdf` });
+  // the paper as a PDF whose text stays text in CorelDRAW, where the editor finishes it
+  const openCorel = () => issue && pdf({ url: media(`/api/issues/${date}/editable.pdf`),
+    title: t("corel.title", { what: t("pdf.title", { issue: num(lang, issue.report.issueNumber) }) }),
+    fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")} - CorelDRAW.pdf` });
   // (the 8-page paper, made beside it)
   const openPdf8 = () => issue && pdf({ url: media(`/api/issues/${date}/pdf8`), title: t("pdf.title8", { issue: num(lang, issue.report.issueNumber) }),
                                         fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")} - 8.pdf` });
@@ -189,12 +183,7 @@ export default function Today() {
             </Hero>
           ) : !report ? (
             <div className={s.heroTop}><Skeleton h={56} w={56} /><div className={s.heroText} style={{ flex: 1 }}><Skeleton h={28} w="60%" /><Skeleton h={16} w="40%" /></div></div>
-          ) : issue!.status === "approved" ? (
-            <Hero tone="good" icon={Icon.checkCircle()} title={t("today.published.title")} body={t("today.published.body", { issue: num(lang, report.issueNumber) })}>
-              <Button kind="primary" big icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>
-              {issue?.eight && <Button big icon={Icon.print()} onClick={openPdf8}>{t("today.print8")}</Button>}
-              {status?.siteUrl && <a className={`${s.btn} ${s.big}`} href={status.siteUrl} target="_blank" rel="noreferrer">{Icon.globe()}{t("today.website")}</a>}
-            </Hero>
+
           ) : badlyEmpty ? (
             <Hero tone="bad" icon={Icon.alert()} title={t("today.bad.title")} body={t("today.bad.body", { issue: num(lang, report.issueNumber) })}>
               <Button kind="primary" big icon={Icon.refresh()} onClick={() => run()} disabled={!!otherRunning}>{t("today.again")}</Button>
@@ -206,11 +195,11 @@ export default function Today() {
                   body={t("today.ready.body", { issue: num(lang, report.issueNumber), stories: num(lang, report.placed.length), pages: num(lang, report.pages) })}>
               {todo.length > 0 && <Link className={`${s.btn} ${s.big}`} href="/newsroom/review">{t("today.review")}</Link>}
               <Link className={`${s.btn} ${s.big}`} href="/newsroom/pages">{Icon.paper()}{t("today.pages")}</Link>
-              <Button kind="primary" big icon={Icon.publish()} onClick={() => setPublishing("ask")}>{t("today.publish")}</Button>
+              <Button kind="primary" big icon={Icon.download()} onClick={openCorel}>{t("today.corel")}</Button>
             </Hero>
           )}
 
-        {!running && report && todo.length > 0 && issue!.status !== "approved" && (
+        {!running && report && todo.length > 0 && (
           <ul className={s.problemList}>
             {todo.slice(0, 4).map((p, i) => (
               <li key={i}>{Icon.alert()}<span style={{ flex: 1 }}>{p.text}</span>
@@ -235,8 +224,8 @@ export default function Today() {
           <span className={s.faint}>{date === status?.today ? nextRun : ""}</span>
           <span className={s.row}>
             {report && <span className={s.faint}>{t("today.cost", { cost: rupees(lang, report.cost, status?.inrPerUsd ?? 88) })}</span>}
-            {report && !running && issue!.status !== "approved" && <Button kind="quiet" icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>}
-            {report && !running && issue!.status !== "approved" && issue!.eight && <Button kind="quiet" icon={Icon.print()} onClick={openPdf8}>{t("today.print8")}</Button>}
+            {report && !running && <Button kind="quiet" icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>}
+            {report && !running && issue!.eight && <Button kind="quiet" icon={Icon.print()} onClick={openPdf8}>{t("today.print8")}</Button>}
             {report && !running && <Button kind="quiet" icon={Icon.refresh()} onClick={() => run()} disabled={!!otherRunning}>{t("today.again")}</Button>}
           </span>
         </div>
@@ -248,33 +237,6 @@ export default function Today() {
         )}
       </section>
 
-      {publishing && report && (
-        <Dialog onClose={() => publishing !== "working" && setPublishing(null)}>
-          {publishing === "done" ? (
-            <>
-              <div className={s.state} data-tone="good">{Icon.checkCircle()}</div>
-              <h2 className={s.cardTitle}>{t("publish.done", { issue: num(lang, report.issueNumber) })}</h2>
-              <p className={s.muted}>{t("publish.doneBody")}</p>
-              <div className={s.row}>
-                <Button kind="primary" icon={Icon.print()} onClick={() => { setPublishing(null); openPdf(); }}>{t("today.print")}</Button>
-                {status?.siteUrl && <a className={s.btn} href={status.siteUrl} target="_blank" rel="noreferrer">{Icon.globe()}{t("today.website")}</a>}
-                <Button kind="quiet" onClick={() => setPublishing(null)}>{t("common.close")}</Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 className={s.cardTitle}>{t("publish.title")}</h2>
-              <p className={s.muted}>{t("publish.body", { issue: num(lang, report.issueNumber) })}</p>
-              {todo.length > 0 && <Note tone="warn">{t("publish.notReady", { n: num(lang, todo.length) })}</Note>}
-              <div className={s.row} style={{ justifyContent: "flex-end" }}>
-                <Button kind="quiet" onClick={() => setPublishing(null)} disabled={publishing === "working"}>{t("edit.cancel")}</Button>
-                <Button kind="primary" icon={Icon.publish()} onClick={publish} disabled={publishing === "working"}>
-                  {publishing === "working" ? t("publish.working") : t("publish.go")}</Button>
-              </div>
-            </>
-          )}
-        </Dialog>
-      )}
       {editing && <StoryPanel story={editing} onClose={() => setEditing(null)} onChanged={() => { toast(t("toast.rebuilding")); refresh(); }} />}
     </div>
   );
@@ -331,10 +293,12 @@ function TimeMeter({ job }: { job: Job }) {
   const end = live ? now : at(job.endedAt) || now;
   const rows = job.steps.filter((x) => x.startedAt).map((x) => ({ step: x, secs: Math.max(0, ((x.endedAt ? at(x.endedAt) : end) - at(x.startedAt)) / 1000) }));
   const most = Math.max(1, ...rows.map((r) => r.secs));
+  // a part's name in the editor's language ("laying out again 2": the name, then its round)
   const partName = (n: string) => {
-    const key = `time.part.${n}` as StringKey;
+    const [, name, round] = n.match(/^(.*?)(?: (\d+))?$/) ?? [n, n, ""];
+    const key = `time.part.${name}` as StringKey;
     const got = t(key);
-    return got === key ? n : got;
+    return `${got === key ? t("time.part.other") : got}${round ? ` ${num(lang, round)}` : ""}`;
   };
   return (
     <div className={s.timeMeter}>

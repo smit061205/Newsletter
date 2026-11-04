@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { call, media, type AdAt, type AdRow, type PageLayout } from "../api";
 import { TopBar, useStatus } from "../Shell";
+import { DateField } from "../ui/calendar";
 import s from "../newsroom.module.css";
 import { num, shortDate } from "../ui/format";
 import { Button, Icon, Note, useApp } from "../ui/kit";
@@ -174,8 +175,8 @@ export default function Ads() {
           </div>
           <p className={s.faint} style={{ margin: 0 }}>{t("ads.where")}</p>
           <div className={s.row}>
-            <label className={s.field} style={{ flex: 1 }}><span className={s.label}>{t("ads.from")}</span><input className={s.input} type="date" value={from} onChange={(e) => { setFrom(e.target.value); if (e.target.value > to) setTo(e.target.value); }} /></label>
-            <label className={s.field} style={{ flex: 1 }}><span className={s.label}>{t("ads.to")}</span><input className={s.input} type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>
+            <DateField label={t("ads.from")} value={from} onPick={(d) => { setFrom(d); if (d > to) setTo(d); }} />
+            <DateField label={t("ads.to")} value={to} min={from} onPick={setTo} />
           </div>
           <div className={s.field}><span className={s.label}>{t("ads.days")}</span>
             <div className={s.days}>{days.map((d, i) => (
