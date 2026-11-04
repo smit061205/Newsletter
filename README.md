@@ -544,7 +544,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 
 ## 12. Backend API, storage, nightly job
 
-`backend/src/server.ts` uses Node's built-in http module, on port 4000. CORS is open, and Private Network Access headers are sent.
+`backend/src/server.ts` uses Node's built-in http module, on port 4000. On the paper's computer it answers only to its own address, and only the newsroom's pages (ports 3000/3100, or `CK_NEWSROOM_ORIGIN`) may read its answers or change anything; the release reader proves itself with a key of its own.
 
 | Method | Path | What |
 |---|---|---|
@@ -559,6 +559,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 | GET | `/api/pages/:date/:n.png` | page image (150 dpi) |
 | GET | `/ingest#<json>` | browser hand-off page for releases |
 | GET | `/api/export/:date.svg?page=` | one page as editable SVG (CorelDRAW) |
+| GET/POST | `/api/backups` | backups outside the app (`backup.ts`): GET the folder, the last and the list; POST `{folder}`, `{now}` or `{restore: "YYYY-MM-DD"}` (the engine stops; the app starts it again and the backup goes in before the database opens) |
 | GET/POST | `/api/issues/:date/copies` | the day's copies (`editorial/copies.ts`); POST `{count, reword, shuffle}` makes them in the background |
 | GET | `/api/issues/:date/copies/:n.pdf` | one copy's PDF |
 | GET | `/api/layout` | the page in cm, its columns and each page's room for stories (the Ads screen's preview) |
@@ -566,6 +567,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 | GET | `/api/papers`, POST `/api/papers/:id/test` | the papers, a test issue of one (its own process and data folder) |
 
 - **Storage:** `backend/data/capital-kranti.sqlite`, through `node:sqlite`. Tables: `releases`, `stories`, `ads`, `issues` (date, version, status, json, report), `edits`, `fitted`.
+- **Backups:** every day a copy of the database in the data folder's `backups/` (the last 30), and one outside the app (`backend/src/backup.ts`) in Settings' folder, the Documents folder by default: `Capital Kranti backup/<date>/` with the database gzipped, `settings.env`, the customers' designs, the ads' pictures, added papers and every other paper's data, the last 30 kept. A restore keeps what it replaces in `backups/before-restore-<time>/`.
 - **Nightly job:** `everyEvening()` runs `runDay()` at 20:00 Asia/Kolkata: inbox ingest (missing, so it logs and skips), then rewrite, then build. It does nothing useful until 15.2 exists.
 
 ---

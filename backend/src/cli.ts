@@ -36,6 +36,8 @@ const date = flag("date") ?? today();
 const log = (s: string) => console.log(s);
 
 async function main() {
+  // a backup asked to be restored goes in before the database opens (backup.ts)
+  if (command === "serve") await (await import("./backup.ts")).restorePending(log);
   const store = new Store();
   switch (command) {
     case "ingest": {
