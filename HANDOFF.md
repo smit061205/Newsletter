@@ -17,7 +17,7 @@ conversations. **Latest release: v1.1.67** (passed on Windows and Mac). Work hap
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
-his side; every finished improvement merged, tagged and released without asking (tell him the version
+their side; every finished improvement merged, tagged and released without asking (tell them the version
 and what's in it); **one** test paper per change, built on a scratch copy of the database (never
 several days, never the real issues); a plan agreed before any big engine change (root-cause fixes,
 no shortcuts); costs in rupees. His father (the editor) uses the app on Windows every evening.
