@@ -1,6 +1,8 @@
 "use client";
-// સેટિંગ્સ / Settings: language, the automatic paper, the AI key, costs in
-// rupees, the website, other papers, backups, and what this is.
+// સેટિંગ્સ / Settings: what the editor may change -- language, the automatic
+// paper, waking the computer, updates, backups -- and under "More settings"
+// what's set up once: the AI key, Telegram, rupees, the website, papers,
+// space, the new engine's trial, and what this is.
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { call, type Settings } from "../api";
@@ -17,6 +19,9 @@ export default function SettingsPage() {
   const [x, setX] = useState<Settings | null>(null);
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
+  // "More settings" open (a link to #more opens it: the AI key from Tonight's paper)
+  const [more, setMore] = useState(false);
+  useEffect(() => { if (location.hash === "#more") setMore(true); }, []);
 
   useEffect(() => { call<Settings>("/api/settings").then(setX).catch((e) => setError(e.message)); }, []);
   const [tg, setTg] = useState("");
@@ -51,11 +56,19 @@ export default function SettingsPage() {
             <input className={s.input} type="time" value={x.runAt} disabled={!x.autoRun} onChange={(e) => setX({ ...x, runAt: e.target.value })}
                    onBlur={(e) => e.target.value && save({ runAt: e.target.value })} style={{ maxWidth: 160 }} /></label>
           <label className={s.switch}><input type="checkbox" checked={x.notify} onChange={(e) => save({ notify: e.target.checked })} /><span>{t("settings.notify")}</span></label>
-          <label className={s.switch}><input type="checkbox" checked={x.newEngine} onChange={(e) => save({ newEngine: e.target.checked })} /><span>{t("settings.newEngine")}</span></label>
         </section>
 
         <WakeCard runAt={status?.runAt ?? x.runAt} />
 
+        <UpdateCard busy={!!status?.running} />
+
+        <BackupCard busy={!!status?.running} />
+      </div>
+
+      {/* what's set up once, or rarely: out of the way until wanted (#more opens it) */}
+      <details className={s.more} open={more} onToggle={(e) => setMore((e.target as HTMLDetailsElement).open)} id="more">
+        <summary>{t("settings.more")}</summary>
+        <div className={s.grid2}>
         <section className={s.card}>
           <h2 className={s.cardTitle}>{t("settings.key")}</h2>
           <p className={s.muted}>{x.openrouterKey ? t("settings.key.set") : t("settings.key.unset")}</p>
@@ -113,11 +126,12 @@ export default function SettingsPage() {
           <div><Link className={s.btn} href="/newsroom/papers">{Icon.papers()}{t("settings.papers.open")}</Link></div>
         </section>
 
-        <BackupCard busy={!!status?.running} />
-
         <SpaceCard busy={!!status?.running} />
 
-        <UpdateCard busy={!!status?.running} />
+        <section className={s.card}>
+          <h2 className={s.cardTitle}>{t("settings.trial")}</h2>
+          <label className={s.switch}><input type="checkbox" checked={x.newEngine} onChange={(e) => save({ newEngine: e.target.checked })} /><span>{t("settings.newEngine")}</span></label>
+        </section>
 
         <section className={s.card}>
           <h2 className={s.cardTitle}>{t("settings.about")}</h2>
@@ -126,7 +140,8 @@ export default function SettingsPage() {
             <dt>{t("settings.version")}</dt><dd>{status?.version ?? "—"}</dd>
           </dl>
         </section>
-      </div>
+        </div>
+      </details>
     </div>
   );
 }

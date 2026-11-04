@@ -1,5 +1,6 @@
 "use client";
-// નકલો / Copies: copies of the day's paper -- how many, what the AI rewords,
+// બીજાં છાપાં / Other papers: the day's sister papers (./Editions.tsx), then
+// copies of the day's paper -- how many, what the AI rewords,
 // how far the stories move -- made in the background, each copy a print PDF
 // with its masthead, page headers and footer left empty for the paper's own
 // (backend/src/editorial/copies.ts), or printed on the designs of the paper it
@@ -15,6 +16,7 @@ import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
 import { artOf, Articles, blankArt, Swaps, type Art } from "./Articles";
 import { designName, Designs } from "./Designs";
+import { Editions } from "./Editions";
 
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
 // (Urdu waits for its own fonts and layout)
@@ -151,15 +153,17 @@ export default function Copies() {
   if (!has) {
     return (
       <div className={s.inner}>
-        <TopBar title={t("copies.title")} />
+        <TopBar title={t("nav.copies")} />
         <div className={s.card}><Empty icon={Icon.copies()} title={t("copies.none")}><Link className={`${s.btn} ${s.primary}`} href="/newsroom">{t("today.make")}</Link></Empty></div>
       </div>
     );
   }
   return (
     <div className={s.inner}>
-      <TopBar title={t("copies.title")} />
+      <TopBar title={t("nav.copies")} />
+      <Editions />
       <section className={s.card}>
+        <h2 className={s.cardTitle}>{t("copies.title")}</h2>
         <p className={s.muted} style={{ margin: 0 }}>{t("copies.body")}</p>
         <div className={s.grid2} style={{ gap: 24 }}>
           <div className={s.field}>

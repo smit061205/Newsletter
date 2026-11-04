@@ -14,6 +14,7 @@
 //   GET   /api/releases?date=          the day's releases, each with what became of it
 //   POST  /api/releases/:id/translate  translate a Hindi release into a story now
 //   GET   /api/ads?date= POST /api/ads DELETE /api/ads/:id   the ad bookings (an image, its size, its page and days)
+//   GET   /api/ads/month?month=YYYY-MM   how many ads are booked on each day of a month
 //   POST  /api/issues/:date/publish    approve the latest version and put it on the website
 //   GET   /api/status  GET|POST /api/settings   the newsroom's dashboard and settings
 //   POST  /api/papers/draft            {pdfs: [base64]} -- a new paper's profile, drafted from its PDFs
@@ -606,6 +607,18 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         return send(res, 200, { story: got.story, cost: got.cost });
       }
       if (parts[0] === "api" && parts[1] === "ads") {
+        if (req.method === "GET" && parts[2] === "month") {
+          // how many ads are booked on each day of a month (the Ads screen's month), sample ads left out
+          const month = url.searchParams.get("month") ?? indiaNow().day.slice(0, 7);
+          if (!/^\d{4}-\d{2}$/.test(month)) return send(res, 400, { error: "the month is YYYY-MM" });
+          const { sampleAdsOf } = await import("./build.ts");
+          const samples = sampleAdsOf(store);
+          const days: Record<string, number> = {};
+          for (const r of store.db.prepare("select id, date from ads where date like ?").all(`${month}-%`) as { id: string; date: string }[]) {
+            if (!samples.isSample(r.id.split("@")[0]) && !samples.isSample(r.id)) days[r.date] = (days[r.date] ?? 0) + 1;
+          }
+          return send(res, 200, days);
+        }
         if (req.method === "GET") {
           const { standInsMovable, referenceAds } = await import("./layout/stories.ts");
           const { sampleAdsOf } = await import("./build.ts");
