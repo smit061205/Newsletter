@@ -26,6 +26,8 @@ const DATA = app.getPath("userData");
 const LOGS = path.join(DATA, "logs");
 const STATE = path.join(DATA, "app-state.json");
 fs.mkdirSync(LOGS, { recursive: true });
+// the window's own web cache, kept small (it had grown to 700 MB beside the paper's data)
+app.commandLine.appendSwitch("disk-cache-size", String(64 * 1024 * 1024));
 
 const readState = () => { try { return JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { return {}; } };
 const writeState = (patch) => fs.writeFileSync(STATE, JSON.stringify({ ...readState(), ...patch }, null, 1));

@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { IssueRenderSchema, type Element, type IssueRender, type TextElement } from "@ck/shared/contract";
 import { printIssue } from "@ck/shared/pdf";
-import { assetFile, OUT_DIR, PLOT_ORIGIN } from "./config.ts";
+import { assetFile, OUT_DIR, outName, PLOT_ORIGIN } from "./config.ts";
 import { chromeFor, printedDate } from "./chrome/chrome.ts";
 import { Measurer } from "./layout/measure.ts";
 
@@ -737,7 +737,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     whiteSpace,
     leftOut: result.leftOut.map((s) => ({ story: s.id, headline: s.headline })),
     warnings: [...warnings.map((w) => ({ page: w.page, elementId: w.elementId, kind: w.kind, detail: w.detail })), ...checks],
-    pdf: pdfPath, fingerprint,
+    pdf: outName(pdfPath), fingerprint,
     gates, ready, cost: Math.round((result.spent + planCost + (review?.cost ?? 0)) * 10000) / 10000,
     review: review?.findings ?? [], plan: planEntries,
     style: style.stats,

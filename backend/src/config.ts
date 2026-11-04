@@ -27,6 +27,15 @@ export function publicationDir(id: string): string {
   const added = path.join(PAPERS_HOME, "publications", id);
   return existsSync(path.join(added, "profile.json")) ? added : path.join(ROOT, "publications", id);
 }
+/** A file of the out folder as the database keeps it: its place in `out` (from
+ * Nov 2026), or the full path older days saved, looked for in `out` by name when
+ * that path is gone (the data folder moved, or restored on another computer). */
+export function outFile(saved: string, out = OUT_DIR): string {
+  if (!path.isAbsolute(saved)) return path.join(out, saved);
+  return existsSync(saved) ? saved : path.join(out, path.basename(saved));
+}
+/** A file in the out folder as the database keeps it (outFile reads it back). */
+export const outName = (file: string) => path.relative(OUT_DIR, file);
 /** Release photos, served as /media/<date>/<file>. */
 export const MEDIA_DIR = process.env.CK_MEDIA_DIR?.trim() || (DATA_DIR ? path.join(DATA_DIR, "media") : path.join(PUBLIC_DIR, "media"));
 
