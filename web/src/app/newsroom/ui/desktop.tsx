@@ -19,6 +19,7 @@ interface Ck {
   checkUpdate?(): Promise<Update>;
   applyUpdate?(): Promise<void>;
   onUpdate?(fn: (u: Update) => void): void;
+  pickFolder?(): Promise<string>;
 }
 /** Where updating the app stands (desktop/main.js). */
 export interface Update { state: "idle" | "checking" | "none" | "downloading" | "ready" | "error"; current: string; latest: string; error: string; building?: boolean;

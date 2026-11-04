@@ -29,6 +29,7 @@
 //   POST  /api/designs/assign {copy | upTo, id|null}   POST /api/designs/save {date, names}   POST /api/designs/stamp {date, copy, name, base64}
 //   POST  /api/designs/reveal {date}   the copies on their designs, saved in a folder in Downloads (and that folder opened)
 //   GET   /api/layout                  the page, its columns and each page's room for stories (the Ads screen's preview)
+//   GET   /api/backups  POST /api/backups {folder} | {now} | {restore: "YYYY-MM-DD"}   backups outside the app (backup.ts); a restore restarts the engine
 //   GET   /healthz                     "ok" (for the host's health check)
 //   GET   /reader                      the release reader: a bookmark that sends the release page you're reading here
 //
@@ -761,6 +762,30 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
           articles: articles(all).map((a) => ({ id: a.ids[0], at: a.at, title: a.text.split("\n").find((l) => l.trim())?.trim().slice(0, 80) ?? "" })),
         });
       }
+      if (parts[0] === "api" && parts[1] === "backups") {
+        const b = await import("./backup.ts");
+        if (req.method === "POST") {
+          const body = (await readJson(req)) as { folder?: string; now?: boolean; restore?: string };
+          if (body.folder !== undefined) {
+            const folder = body.folder.trim();
+            if (folder && (!path.isAbsolute(folder) || !existsSync(folder))) return send(res, 400, { error: "that folder isn't there" });
+            store.putSetting("backupFolder", folder);
+            // the new place gets today's backup at once
+            await b.backUp(store, indiaNow().day, { again: true, log }).catch(() => {});
+          }
+          if (body.now) await b.backUp(store, indiaNow().day, { again: true, log }).catch(() => {});
+          if (body.restore !== undefined) {
+            if (currentJob() || copiesNow?.()) return send(res, 409, { error: "the paper is being made; restore when it's done" });
+            try { await b.askRestore(store, String(body.restore)); } catch (e) { return send(res, 400, { error: e instanceof Error ? e.message : String(e) }); }
+            send(res, 202, { restarting: true });
+            // the next engine (the app starts one again) puts the backup in place before it opens the database
+            log(`restoring the backup of ${body.restore}: the engine stops`);
+            setTimeout(() => process.exit(0), 300);
+            return;
+          }
+        }
+        return send(res, 200, await b.backupState(store));
+      }
       if (parts[0] === "api" && parts[1] === "papers") return await papersApi(req, res, parts, url);
       if (parts[0] === "api" && parts[1] === "designs") {
         const d = await import("./export/designs.ts");
@@ -1007,7 +1032,9 @@ function backupDaily(store: Store, log: (s: string) => void) {
     for (const f of old) await rm(path.join(dir, f));
     log(`database backed up to ${file}`);
   };
-  const safe = () => once().catch((e) => log(`backup failed: ${e instanceof Error ? e.message : e}`));
+  // and a copy outside the app's folder (Settings' backup folder, backup.ts)
+  const outside = async () => (await import("./backup.ts")).backUp(store, indiaNow().day, { log });
+  const safe = () => once().catch((e) => log(`backup failed: ${e instanceof Error ? e.message : e}`)).then(() => outside().catch(() => {}));
   safe();
   setInterval(safe, 60 * 60_000);
 }

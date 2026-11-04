@@ -17,4 +17,6 @@ contextBridge.exposeInMainWorld("ck", {
   checkUpdate: () => ipcRenderer.invoke("ck:check-update"),
   applyUpdate: () => ipcRenderer.invoke("ck:apply-update"),
   onUpdate: (fn) => ipcRenderer.on("ck:update", (_e, u) => fn(u)),
+  // the backup folder, chosen in the computer's folder window
+  pickFolder: () => ipcRenderer.invoke("ck:pick-folder"),
 });

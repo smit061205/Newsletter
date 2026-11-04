@@ -89,6 +89,8 @@ async function startAll() {
     PLAYWRIGHT_BROWSERS_PATH: "0",
     // the app's version, for the newsroom's About line (the app has no .git to read it from)
     CK_APP_VERSION: app.getVersion(),
+    // the backups' place unless the editor chooses another (backend/src/backup.ts)
+    CK_DOCUMENTS: app.getPath("documents"),
   };
   fs.mkdirSync(engineEnv.DATA_DIR, { recursive: true });
   if (!(await answers(`http://127.0.0.1:${ENGINE}/healthz`))) {
@@ -572,6 +574,12 @@ ipcMain.handle("ck:cancel-wake", async () => {
   if (isMac) execFileSync("osascript", ["-e", 'do shell script "pmset repeat cancel" with administrator privileges']);
   if (isWin) { try { execFileSync("schtasks", ["/Delete", "/TN", "Capital Kranti (wake)", "/F"], { stdio: "ignore" }); } catch {} }
   writeState({ wakeSet: "" });
+});
+/** Settings' backup folder: one chosen in the computer's own folder window ("" when closed). */
+ipcMain.handle("ck:pick-folder", async () => {
+  const r = await dialog.showOpenDialog(win, { title: lastStatus?.lang === "en" ? "Where to keep the backups" : "બેકઅપ ક્યાં રાખવા",
+                                               properties: ["openDirectory", "createDirectory"] });
+  return r.canceled ? "" : r.filePaths[0] || "";
 });
 
 /* ---------------- the menu */

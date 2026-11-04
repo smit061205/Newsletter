@@ -1,6 +1,6 @@
 "use client";
 // સેટિંગ્સ / Settings: language, the automatic paper, the AI key, costs in
-// rupees, the website, other papers, and what this is.
+// rupees, the website, other papers, backups, and what this is.
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { call, type Settings } from "../api";
@@ -8,6 +8,7 @@ import { useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { num, shortDate } from "../ui/format";
 import { ConnectCard, UpdateCard, WakeCard } from "../ui/desktop";
+import { BackupCard } from "./Backups";
 import { Button, Icon, Note, Skeleton, useApp } from "../ui/kit";
 
 export default function SettingsPage() {
@@ -113,6 +114,8 @@ export default function SettingsPage() {
           <p className={s.muted}>{t("settings.papers.body")}</p>
           <div><Link className={s.btn} href="/newsroom/papers">{Icon.papers()}{t("settings.papers.open")}</Link></div>
         </section>
+
+        <BackupCard busy={!!status?.running} />
 
         <UpdateCard busy={!!status?.running} />
 
