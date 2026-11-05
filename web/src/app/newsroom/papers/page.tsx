@@ -152,8 +152,8 @@ export default function Papers() {
           {shown.map((p) => (
             <div key={p.id} className={s.paperRow}>
               <div className={s.field} style={{ gap: 2 }}>
-                {/* (its own name: the profile's carries the English and the place, for the AI) */}
-                <span className={s.listTitle}>{p.name.split(" (")[0]}</span>
+                {/* (its own name, as the paper writes it: the profile's carries the English and the place, for the AI) */}
+                <span className={s.listTitle} translate="no">{p.name.split(" (")[0]}</span>
                 <span className={s.listMeta}>{langName(p.lang)} · {t("papers.pagesLang", { pages: num(lang, p.pages) })}
                   {p.issue ? ` · ${t("papers.lastIssue", { date: shortDate(lang, p.issue.date) })}` : ""}</span>
               </div>

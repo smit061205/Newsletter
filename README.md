@@ -125,7 +125,7 @@ Macs with an Intel processor are no longer built for (26 Oct 2026). Everything i
 | **Checks**: the layout engine on two papers, the paper's rules read off the pages, every screen in Gujarati | Done (`backend/test/`, the `apps` workflow) |
 | **CorelDRAW SVG export** | Done (`export/svg.ts`, `/api/export/:date.svg?page=N`) |
 | **Add a newspaper** (profile drafted from PDFs, saved as a paper, test issue) | Done (`onboard/`, Papers screen) |
-| Urdu (right to left) | Works (`sample-urdu`); Nastaliq tuning waits for the paper's chosen font |
+| Urdu (right to left) | Works: the Urdu sister paper (`edition-ur`, Noto Nastaliq Urdu made fit by `scripts/urdu-fonts.py`) and `sample-urdu` |
 | State news (Gujarat Info Dept) | Off (PIB only, by choice): the `/reader` bookmark remains; email ingest not built |
 
 ---
@@ -639,7 +639,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 
 1. **Install on the father's Windows PC** with the user: the Windows installer from the latest GitHub release, paste the OpenRouter key in Settings, choose the backup folder (a pen drive or another disk), set the run time, and watch one 8 PM run.
 2. **The other five papers** (1 Urdu, 1 Hindi, 3 Gujarati): each through the Papers screen with its PDFs, fonts and masthead art. The app switches the newsroom between papers (each in its own data folder, `papers/<id>/`, sharing the AI key); what's left is every paper in the 8 PM run, not only the chosen one. Papers added in the app live in its data folder (`publications/<id>/` there), so updates keep them.
-3. **Urdu polish** once the paper's Nastaliq font is known: line spacing, display fitting and the overlap tolerance for tall Nastaliq letters (`sample-urdu` shows where).
+3. **Urdu polish:** a tall stacked loan word now and then touches a deep tail in the line above (the print check flags it); `sample-urdu` still uses the system's Nastaliq.
 4. **Print specs** from the printer: bleed, crop marks, CMYK/PDF-X (the preflight gate has the hook).
 5. **Needed from the user:** BBharatiMaruti (condensed headlines), confirmation that the Bharati licence covers this PC, the printer's specs, the other papers' PDFs and fonts.
 6. **English hyphenation**, only if an English paper is ever added (none of the six is English).

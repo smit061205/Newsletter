@@ -20,6 +20,7 @@
  "issue": {
   "referenceDate": "2026-08-08",
   "referenceNumber": 196,
+  "datedNextDay": true,
   "pages": 4
  },
  "page": {
@@ -30,13 +31,24 @@
   "left": 14.4,
   "columns": 8,
   "column": 124.2,
-  "gutter": 11.884
+  "gutter": 11.884,
+  "leadFullWidth": true
  },
  "ink": "#231f20",
  "fonts": {
   "nastaliq": {
-   "file": "/private/edition-ur/fonts/NotoNastaliqUrdu.ttf",
+   "file": "/private/edition-ur/fonts/NotoNastaliqUrdu-Regular.ttf",
    "weight": 400,
+   "fallback": "serif-regular"
+  },
+  "nastaliq-bold": {
+   "file": "/private/edition-ur/fonts/NotoNastaliqUrdu-Bold.ttf",
+   "weight": 700,
+   "fallback": "serif-regular"
+  },
+  "nastaliq-semibold": {
+   "file": "/private/edition-ur/fonts/NotoNastaliqUrdu-SemiBold.ttf",
+   "weight": 600,
    "fallback": "serif-regular"
   },
   "serif-regular": {
@@ -48,13 +60,13 @@
   "body": {
    "font": "nastaliq",
    "size": 10.5,
-   "pitch": 22.5,
+   "pitch": 24,
    "indent": 10,
    "pitches": [
-    22.5,
-    23,
-    23.5,
-    22
+    24,
+    24.5,
+    25,
+    23.5
    ],
    "sizes": [
     10.5,
@@ -62,29 +74,29 @@
    ]
   },
   "headline": {
-   "font": "nastaliq",
+   "font": "nastaliq-bold",
    "leading": 1.65,
    "capByColumns": [
     0,
-    17,
-    22,
-    28,
-    34,
-    40,
-    44,
-    48,
-    52
+    24,
+    30,
+    38,
+    46,
+    52,
+    56,
+    60,
+    64
    ],
-   "min": 16,
+   "min": 24,
    "rankScale": [
     1.0,
+    0.92,
+    0.86,
     0.8,
-    0.66,
-    0.56,
-    0.48
+    0.75
    ],
    "maxLines": [
-    2,
+    3,
     3,
     3,
     3,
@@ -92,15 +104,16 @@
    ]
   },
   "kicker": {
-   "font": "nastaliq",
+   "none": true,
+   "font": "nastaliq-semibold",
    "ratio": 0.45,
    "min": 10,
    "leading": 1.7
   },
   "deck": {
-   "font": "nastaliq",
+   "font": "nastaliq-semibold",
    "ratio": 0.6,
-   "min": 12.5,
+   "min": 14,
    "leading": 1.65
   },
   "caption": {
@@ -133,7 +146,8 @@
   "leadModel": "google/gemini-3.8-flash",
   "leadStories": 3,
   "translateModel": "google/gemini-3.8-flash",
-  "fillTarget": 1.35
+  "fillTarget": 1.35,
+  "minWords": 100
  },
  "fontLicence": "Noto Nastaliq Urdu, from Google Fonts: SIL Open Font License 1.1 (licence file in fonts/).",
  "fillers": {

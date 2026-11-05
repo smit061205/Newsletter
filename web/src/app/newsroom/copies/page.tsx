@@ -19,8 +19,7 @@ import { designName, Designs } from "./Designs";
 import { Editions } from "./Editions";
 
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
-// (Urdu waits for its own fonts and layout)
-const LANGS: PaperLang[] = ["gu", "hi"];
+const LANGS: PaperLang[] = ["gu", "hi", "ur"];
 const SHUFFLES: Shuffle[] = ["keepLead", "anywhere", "samePage"];
 /** The most copies at once. */
 const MOST = 50;

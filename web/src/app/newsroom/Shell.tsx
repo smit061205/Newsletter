@@ -98,7 +98,8 @@ function Frame({ children }: { children: React.ReactNode }) {
       <nav className={s.side} aria-label={t("app.sub")}>
         <div className={s.logo}>
           <Mark className={s.mark} />
-          <div className={s.logoText}><span className={s.logoName}>{!status || status.paper.id === "capital-kranti" ? t("app.name") : status.paper.name}</span><span className={s.logoSub}>{t("app.sub")}</span></div>
+          {/* (another paper's own name, in its own words: not the newsroom's, so not translated) */}
+          <div className={s.logoText}><span className={s.logoName} translate={status && status.paper.id !== "capital-kranti" ? "no" : undefined}>{!status || status.paper.id === "capital-kranti" ? t("app.name") : status.paper.name}</span><span className={s.logoSub}>{t("app.sub")}</span></div>
         </div>
         {NAV.map(([href, key, icon]) => (
           <Link key={href} href={href} className={`${s.navItem} ${href === "/newsroom/archive" || href === "/newsroom/papers" ? s.navExtra : ""}`}
