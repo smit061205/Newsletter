@@ -239,6 +239,8 @@ export default function Copies() {
                 </div>
                 <Button icon={Icon.print()} onClick={() => open(f.n)}>{t("copies.open")}</Button>
                 <Button kind="quiet" icon={Icon.download()} onClick={() => open(f.n, true)}>{t("corel.pdf")}</Button>
+                {run.lang && run.lang !== "gu" && <Button kind="quiet" icon={Icon.download()} onClick={() => call<{ folder: string }>(`/api/issues/${date}/copies/${f.n}/editable-folder`, { json: { name: nameOf(f.n, false).replace(/\.pdf$/, "") } })
+                  .then((r) => toast(t("corel.saved", { folder: r.folder }))).catch((x) => toast((x as Error).message))}>{t("corel.editable")}</Button>}
                 {paperOf(f.n) && <span className={s.faint} style={{ overflowWrap: "anywhere" }}>{designName(paperOf(f.n)!.name)}</span>}
               </div>
             ))}
