@@ -50,8 +50,14 @@ Capital Kranti's; one engine and one evening run; "make again" makes that paper 
   engine's last way out of a one-column gap (`layout/engine.ts` solvePage `anyWidth`). Capital Kranti's
   saved days keep the rule. Its test reports it without failing until the engine is changed (needs a plan).
 
+**The Urdu paper packed tight like a real Urdu daily** (5 Nov, v1.1.80; the user's picture of Aman Ki
+Awaz, page 16: lines almost touching, little space between stories): body 12/16.5pt (was 13/22),
+headlines at 1.2 line spacing and sub-headings at 1.3 (were 1.5/1.55), 4pt between stories (was 8),
+3pt after headlines and sub-headings. Test paper on 4 Nov's news: 31 stories on 4 pages,
+no gaps; its gate failures were headline order on p3 and a translated number, not the spacing.
+
 **The Urdu paper on Jameel Noori Nastaleeq** (5 Nov, the font the developer brought, with permission to
-ship it): body 13/22pt, headlines and sub-headings thickened in print (the font has no bold: the fonts'
+ship it): body 13/22pt (12/16.5 since v1.1.80), headlines and sub-headings thickened in print (the font has no bold: the fonts'
 `embolden`, `build.ts`); the Noto files stay beside it unused. Its columns end level by its profile
 (`type.body.levelColumns`): on every paper the same rule left the Sample Herald a 56pt hole no filler
 fitted (its own 4-column story ends 2 lines apart: **open**, all papers level needs a plan).
