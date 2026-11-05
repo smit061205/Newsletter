@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.74** (5 Nov). Work happens on branch
+conversations. **Latest release: v1.1.75** (5 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -38,6 +38,24 @@ no shortcuts); costs in rupees. His father (the editor) uses the app on Windows 
 - **Open:** the Sample Herald (`sample-english`) runs a story down one column with no ad beside it: the
   engine's last way out of a one-column gap (`layout/engine.ts` solvePage `anyWidth`). Capital Kranti's
   saved days keep the rule. Its test reports it without failing until the engine is changed (needs a plan).
+
+**Done 5 Nov 2026 (v1.1.75), the Urdu paper back** (the user: "make urdu paper on capital kranti sized
+and grid paper, just like we make its hindi"): `ur-1` is in the sister papers again and Urdu in Copies.
+- Its fonts are static instances of Noto Nastaliq Urdu made by `scripts/urdu-fonts.py` from the variable
+  file beside them: a word space of 0.24 em (the font's own 0.132 em was as wide as the gap after a
+  letter that doesn't join forward, so words ran together), and the variable font's fault mended (its
+  bold "ھ" after "د" is 1500 units wide for 731 of ink: bold "گاندھی" printed "گاند ھی"). Static fonts
+  stay fonts in the PDF (the variable one was written as Type 3, failing the preflight).
+- `edition-ur/profile.json`: bold headlines (24pt at the least, Capital Kranti's rank steps, 3 lines),
+  semi-bold sub-headings, no kickers, body pitch 24pt (tall stacked loan words reached the line above),
+  the next day's date, 100 words the shortest story, the front lead may run full width.
+- The print check (`shared/src/plot.ts`) compares letters, not boxes: where two words' ink boxes cross
+  (or a word's and a photo's or rule's), both are drawn and only letters that meet are an overlap. A
+  Nastaliq word's box is mostly empty: 57 false overlaps on the first Urdu test, 1 real one now.
+- The test paper (4 Nov's news, on a copy): 4 pages in about 2 minutes, ₹62 the first time (translation),
+  nothing when its wording was kept. **Open:** a real touch now and then where a tall loan word
+  ("یکجہتی") sits under a deep tail; the Hindi paper still lacks `minWords` 100, `kicker.none` and
+  `leadFullWidth` (not changed: untested).
 
 **Done 3-4 Nov 2026 (v1.1.63-v1.1.67):**
 - Every Telegram news of the editor's in every copy; photos never blown up (150 ppi, but the narrowest,
@@ -199,7 +217,7 @@ Repository: <https://github.com/smit061205/Newsletter> (**public**). Branch `mai
    - **Faster:** PIB read 4 pages at once a quarter-second apart, backing off to one at a time on trouble (`pib.ts slot`); every photo of a release at once; the Hindi and English releases read in the first step (`readForeign`); the CM's office and All India Radio 3 at a time each; world news translated beside the PIB top-up; the editorial plan beside the AI-written sub-headings; the page review after the paper is saved (`reviewSaved`; gate 5 says "running", the newsroom looks again every 15 s).
    - **Self-repair (`pipeline.ts` build step, `editorial/repair.ts`):** after the checks, a story with a number its source doesn't have is written again told to leave it out, and a failed layout check lays the paper out another way (`seedShift`), twice at most; what can't be mended stays for the editor.
    - **Fixes:** a word-final halant dropped ("કાર્યરત્" isn't in Gopika); filler slots never shorter than six lines (`FILL_MIN`); Hindi body lines broken at 98.5% of the column and justified to 98% (it prints ~1.4% wider than it measures).
-   - **No Urdu paper** for now (the user's decision): its Nastaliq never set right; it waits for the fonts and layout the user will give. Kept in the code (`edition-ur`), left out of the sister papers and the Copies screen.
+   - **No Urdu paper** for now (the user's decision): its Nastaliq never set right; it waits for the fonts and layout the user will give. Kept in the code (`edition-ur`), left out of the sister papers and the Copies screen. (Back on 5 Nov, v1.1.75: see above.)
    - **Next agreed:** sister papers that never keep a blank (a last fill that always succeeds), up to three arrangements keeping the best, the page review for them too, and a release test that replays recent real days; then a Gemma-vs-current translation test (Gemma 4 26B is ~15x cheaper than Gemini 3.8 Flash; the free one is rate-limited and lacks strict JSON).
 
 **Published so far:** issues 269–271 (20–22 Oct 2026) on the website. Issue numbers come from the date (22 Oct 2026 = 271).

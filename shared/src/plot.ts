@@ -262,7 +262,8 @@ const PROBE = `
           Array.prototype.forEach.call(range.getClientRects(), function (r) {
             var base = r.top + m.fontBoundingBoxAscent;
             inks.push({ id: el.dataset.el, x0: r.left, x1: r.right, y0: base - m.actualBoundingBoxAscent,
-                        y1: base + m.actualBoundingBoxDescent });
+                        y1: base + m.actualBoundingBoxDescent,
+                        word: word, font: ctx.font, dir: cs.direction, base: base, width: m.width });
           });
         }
       }
@@ -288,6 +289,54 @@ const PROBE = `
     function hit(a, b) {
       return Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > GRACE && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > GRACE;
     }
+    // Two words' ink boxes crossing is not yet their letters touching: a
+    // Nastaliq word runs down a slope, its box mostly empty, and the boxes
+    // of words on lines one under the other cross where no letter meets
+    // (the Urdu paper, 5 Nov: 57 such "overlaps", none on the page). Where
+    // two words' boxes cross, both are drawn as they print and their letters
+    // compared: more than a touch (GRACE each way) is letters running into letters.
+    var SCALE = 2;
+    function draw(c, w, ox, oy) {
+      c.font = w.font;
+      c.direction = w.dir === "rtl" ? "rtl" : "ltr";
+      c.textAlign = "left";
+      c.textBaseline = "alphabetic";
+      c.save();
+      c.translate(w.x0 - ox, w.base - oy);
+      // the word as wide as it printed (a line squeezed or spaced to fit)
+      if (w.width > 0) c.scale((w.x1 - w.x0) / w.width, 1);
+      c.fillText(w.word, 0, 0);
+      c.restore();
+    }
+    // (b a word, or a picture, rule or box edge: a rectangle)
+    function lettersMeet(a, b) {
+      if (!a.word) return true;
+      var pad = Math.max(a.y1 - a.y0, b.y1 - b.y0);
+      var x0 = Math.min(a.x0, b.x0) - pad, y0 = Math.min(a.y0, b.y0) - pad;
+      var w = Math.ceil(Math.max(a.x1, b.x1) + pad - x0), h = Math.ceil(Math.max(a.y1, b.y1) + pad - y0);
+      var canvas = document.createElement("canvas");
+      canvas.width = w * SCALE;
+      canvas.height = h * SCALE;
+      var c = canvas.getContext("2d", { willReadFrequently: true });
+      c.scale(SCALE, SCALE);
+      draw(c, a, x0, y0);
+      // what of the second word's letters (or rectangle) lands on the first's
+      c.globalCompositeOperation = "source-in";
+      if (b.word) draw(c, b, x0, y0);
+      else c.fillRect(b.x0 - x0, b.y0 - y0, b.x1 - b.x0, b.y1 - b.y0);
+      // the letters meet past a touch: what overlaps, more than GRACE across both ways (as hit())
+      var px = c.getImageData(0, 0, canvas.width, canvas.height).data;
+      var mx0 = Infinity, mx1 = -1, my0 = Infinity, my1 = -1;
+      for (var k = 3; k < px.length; k += 4) {
+        if (px[k] <= 128) continue;
+        var p = (k - 3) / 4, x = p % canvas.width, y = (p - x) / canvas.width;
+        if (x < mx0) mx0 = x;
+        if (x > mx1) mx1 = x;
+        if (y < my0) my0 = y;
+        if (y > my1) my1 = y;
+      }
+      return mx1 >= 0 && (mx1 - mx0 + 1) / SCALE > GRACE && (my1 - my0 + 1) / SCALE > GRACE;
+    }
     var said = {};
     function report(a, otherId, what) {
       var key = a.id + "|" + otherId;
@@ -298,12 +347,12 @@ const PROBE = `
     inks.sort(function (a, b) { return a.y0 - b.y0; });
     for (var i = 0; i < inks.length; i++) {
       for (var j = i + 1; j < inks.length && inks[j].y0 < inks[i].y1; j++) {
-        if (inks[i].id !== inks[j].id && hit(inks[i], inks[j])) report(inks[i], inks[j].id, "text");
+        if (inks[i].id !== inks[j].id && hit(inks[i], inks[j]) && lettersMeet(inks[i], inks[j])) report(inks[i], inks[j].id, "text");
       }
       others.forEach(function (o) {
         // text set wholly inside a picture is printed on it on purpose (a date on the masthead art)
         var inside = o.what === "image" && inks[i].x0 >= o.x0 && inks[i].x1 <= o.x1 && inks[i].y0 >= o.y0 && inks[i].y1 <= o.y1;
-        if (!inside && hit(inks[i], o)) report(inks[i], o.id, o.what);
+        if (!inside && hit(inks[i], o) && lettersMeet(inks[i], o)) report(inks[i], o.id, o.what);
       });
     }
     window.__plotWarnings = out;
