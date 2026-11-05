@@ -1,7 +1,8 @@
 "use client";
-// આજે / Today: one card that says where the day's paper stands, in plain
-// words, with the one thing to do next -- make it, watch it being made
-// (live), look at what needs a look, save it for CorelDRAW, print it.
+// આજનું છાપું / Tonight's paper: one card that says where the day's paper
+// stands, in plain words, with the one thing to do next -- make it, watch it
+// being made (live), look at what needs a look, save it for CorelDRAW, print
+// it -- and the pages under it, any story opening its editor (ui/PaperView).
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BACKEND, call, media, type IssueInfo, type Job, type StepName, type StoryRow } from "./api";
@@ -9,6 +10,7 @@ import { TopBar, useStatus } from "./Shell";
 import s from "./newsroom.module.css";
 import { num, problems, rupees } from "./ui/format";
 import { Badge, Button, Icon, Note, Ring, Skeleton, useApp } from "./ui/kit";
+import { PaperView } from "./ui/PaperView";
 import { StoryPanel } from "./ui/StoryPanel";
 import type { StringKey } from "./ui/strings";
 
@@ -139,6 +141,9 @@ export default function Today() {
   const openCorel = () => issue && pdf({ url: media(`/api/issues/${date}/editable.pdf`),
     title: t("corel.title", { what: t("pdf.title", { issue: num(lang, issue.report.issueNumber) }) }),
     fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")} - CorelDRAW.pdf` });
+  const openCorel8 = () => issue && pdf({ url: media(`/api/issues/${date}/editable8.pdf`),
+    title: t("corel.title", { what: t("pdf.title8", { issue: num(lang, issue.report.issueNumber) }) }),
+    fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")} - 8 - CorelDRAW.pdf` });
   // (the 8-page paper, made beside it)
   const openPdf8 = () => issue && pdf({ url: media(`/api/issues/${date}/pdf8`), title: t("pdf.title8", { issue: num(lang, issue.report.issueNumber) }),
                                         fileName: `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${issue.report.issueNumber} - ${date.split("-").reverse().join("-")} - 8.pdf` });
@@ -147,13 +152,13 @@ export default function Today() {
     : t("today.auto.off");
 
   return (
-    <div className={s.inner}>
+    <div className={`${s.inner} ${s.wide}`}>
       <TopBar title={t("nav.today")} />
       {status && !status.openrouterKey && (
         <div className={s.card}>
           <div className={s.cardHead}>
             <div><h2 className={s.cardTitle}>{t("today.setup.title")}</h2><p className={s.muted}>{t("today.setup.body")}</p></div>
-            <Link className={`${s.btn} ${s.primary}`} href="/newsroom/settings">{t("today.setup.go")}</Link>
+            <Link className={`${s.btn} ${s.primary}`} href="/newsroom/settings#more">{t("today.setup.go")}</Link>
           </div>
         </div>
       )}
@@ -187,14 +192,12 @@ export default function Today() {
           ) : badlyEmpty ? (
             <Hero tone="bad" icon={Icon.alert()} title={t("today.bad.title")} body={t("today.bad.body", { issue: num(lang, report.issueNumber) })}>
               <Button kind="primary" big icon={Icon.refresh()} onClick={() => run()} disabled={!!otherRunning}>{t("today.again")}</Button>
-              <Link className={`${s.btn} ${s.big}`} href="/newsroom/pages">{Icon.paper()}{t("today.pages")}</Link>
             </Hero>
           ) : (
             <Hero tone={todo.length ? "warn" : "good"} icon={todo.length ? Icon.alert() : Icon.checkCircle()}
                   title={todo.length ? t("today.look.title", { n: num(lang, todo.length) }) : t("today.ready.title")}
                   body={t("today.ready.body", { issue: num(lang, report.issueNumber), stories: num(lang, report.placed.length), pages: num(lang, report.pages) })}>
               {todo.length > 0 && <Link className={`${s.btn} ${s.big}`} href="/newsroom/review">{t("today.review")}</Link>}
-              <Link className={`${s.btn} ${s.big}`} href="/newsroom/pages">{Icon.paper()}{t("today.pages")}</Link>
               <Button kind="primary" big icon={Icon.download()} onClick={openCorel}>{t("today.corel")}</Button>
             </Hero>
           )}
@@ -214,8 +217,9 @@ export default function Today() {
             <Button kind="danger" onClick={stop} disabled={stopping}>{stopping && !restarting ? t("stop.stopping") : t("stop.paper")}</Button>
           </div>
         )}
-        {job && <Stepper job={job} />}
-        {job && <TimeMeter job={job} />}
+        {/* the steps and their times while it's made (or where it stopped); after, under the details */}
+        {job && (running || job.status === "failed") && <Stepper job={job} />}
+        {job && running && <TimeMeter job={job} />}
         {reviewing && !running && <p className={s.faint}>{t("today.reviewing")}</p>}
         {error && <Note tone="bad">{error}</Note>}
         {waiting && <Note>{t(waiting === "copies" ? "today.waitCopies" : "today.waitPapers")}</Note>}
@@ -226,17 +230,20 @@ export default function Today() {
             {report && <span className={s.faint}>{t("today.cost", { cost: rupees(lang, report.cost, status?.inrPerUsd ?? 88) })}</span>}
             {report && !running && <Button kind="quiet" icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>}
             {report && !running && issue!.eight && <Button kind="quiet" icon={Icon.print()} onClick={openPdf8}>{t("today.print8")}</Button>}
+            {report && !running && issue!.eightEditable && <Button kind="quiet" icon={Icon.download()} onClick={openCorel8}>{t("corel.pdf8")}</Button>}
             {report && !running && <Button kind="quiet" icon={Icon.refresh()} onClick={() => run()} disabled={!!otherRunning}>{t("today.again")}</Button>}
           </span>
         </div>
         {job && (
           <details className={s.details}>
             <summary>{t("today.details")}</summary>
+            {!running && <TimeMeter job={job} />}
             <div className={s.logBox}>{job.steps.flatMap((x) => x.log.map((l, i) => <div key={`${x.name}${i}`}>{l}</div>)).slice(-300)}</div>
           </details>
         )}
       </section>
 
+      {hasIssue && !running && <PaperView onChanged={loadIssue} />}
       {editing && <StoryPanel story={editing} onClose={() => setEditing(null)} onChanged={() => { toast(t("toast.rebuilding")); refresh(); }} />}
     </div>
   );

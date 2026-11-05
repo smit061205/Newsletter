@@ -1,7 +1,8 @@
 "use client";
-// જાહેરાત / Ads: book an ad -- its image, its size, its page, where on the page
-// (tapped on the page drawn to scale, or a quick choice), and its days; the
-// day's bookings as cards (moved to another page or place, or removed), and the
+// જાહેરાત / Ads: book an ad in four steps -- its image, its size, its page and
+// where on it (tapped on the page drawn to scale, or a quick choice), and its
+// days; the month's bookings at a glance, a day chosen to see them; the day's
+// bookings as cards (moved to another page or place, or removed), and the
 // sample ads that print on a day with nothing booked (each on or off, or all).
 import { useCallback, useEffect, useState } from "react";
 import { call, media, type AdAt, type AdRow, type PageLayout } from "../api";
@@ -40,6 +41,8 @@ export default function Ads() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [needsLayout, setNeedsLayout] = useState(false);
+  // the booking's step: 0 the picture, 1 its size, 2 its place, 3 its days
+  const [step, setStep] = useState(0);
 
   useEffect(() => { call<PageLayout>("/api/layout").then(setLayout).catch((e) => setError(e.message)); }, []);
   const load = useCallback(() => { call<AdRow[]>(`/api/ads?date=${date}`).then(setAds).catch((e) => setError(e.message)); }, [date]);
@@ -70,6 +73,8 @@ export default function Ads() {
     setError("");
     if (f && !/^image\/(jpeg|png)$/.test(f.type)) return setError(t("ads.image"));
     setFile(f ?? null);
+    // a picture chosen: on to its size
+    if (f) setStep(1);
   };
   const book = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +86,7 @@ export default function Ads() {
       const got = await call<{ booked: string[] }>("/api/ads", { json: { name: file.name, base64: await toBase64(file), cols, heightCm: height, page, at, from, to, weekdays } });
       toast(t("ads.booked", { n: num(lang, got.booked.length) }));
       setFile(null);
+      setStep(0);
       // the day's paper is made already: the ad reaches its page when it's laid out again
       setNeedsLayout(!!status?.issue && got.booked.includes(date));
       load();
@@ -138,56 +144,80 @@ export default function Ads() {
       <div className={s.grid2}>
         <form className={s.card} onSubmit={book}>
           <h2 className={s.cardTitle}>{t("ads.new")}</h2>
-          <label className={s.drop} data-over={over} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
-                 onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files[0]); }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {preview ? <img src={preview} alt="" style={{ maxHeight: 160, maxWidth: "100%" }} /> : <>{Icon.image()}<div>{t("ads.drop")}</div></>}
-            <input type="file" accept="image/jpeg,image/png" aria-label={t("ads.image")} onChange={(e) => pick(e.target.files?.[0])} />
-          </label>
-          <div className={s.adPreview}>
-            <div className={s.field} style={{ flex: 1 }}>
-              <span className={s.label}>{t("ads.width")}</span>
-              <select className={s.select} value={cols} onChange={(e) => setCols(Number(e.target.value))}>
-                {Array.from({ length: layout?.columns ?? 8 }, (_, i) => i + 1).map((c) => (
-                  <option key={c} value={c}>{t("ads.cols", { n: num(lang, c) })}{layout ? ` · ${num(lang, round1(widthOf(c)))} cm` : ""}</option>
-                ))}
-              </select>
-              <span className={s.label}>{t("ads.height")}</span>
-              {aspect > 0 && (
-                <label className={s.switch}><input type="checkbox" checked={autoHeight} onChange={(e) => { setAutoHeight(e.target.checked); setHeightCm(height); }} />
-                  <span>{t("ads.autoHeight")}</span></label>
-              )}
-              <input className={s.input} type="number" min={1} max={room || 50} step={0.5} value={height} disabled={autoHeight && aspect > 0}
-                     onChange={(e) => setHeightCm(Number(e.target.value))} aria-label={t("ads.height")} />
-              {band && <span className={s.hint} data-tone={tooTall ? "bad" : undefined}>{tooTall ? t("ads.tooTall", { cm: num(lang, room) }) : t("ads.maxHeight", { cm: num(lang, room) })}</span>}
-              <span className={s.label}>{t("ads.page")}</span>
-              <div className={s.segmented}>{pages.map((p) => <button type="button" key={p} aria-pressed={page === p} onClick={() => setPage(p)}>{num(lang, p)}</button>)}</div>
-              <span className={s.label}>{t("ads.place")}</span>
-              <div className={s.presets}>{PRESETS.map((p) => {
-                const got = layout && band ? presetAt(p, layout, band, cols, height) : null;
-                return <button type="button" key={p} aria-pressed={!!got && sameAt(got, at)} onClick={() => got && setSpot(got)}>{t(`ads.place.${p}`)}</button>;
-              })}</div>
-            </div>
-            <div className={s.field} style={{ alignItems: "center" }}>
-              <PagePreview layout={layout} page={page} cols={cols} height={height} tooTall={tooTall} preview={preview} at={at} onPick={setSpot} width={170} />
-              <span className={s.faint} style={{ maxWidth: 170, textAlign: "center" }}>{t("ads.preview")}</span>
-            </div>
+          {/* four steps: the picture, its size, its place, its days */}
+          <div className={s.adSteps} role="tablist">
+            {STEPS.map((k, i) => (
+              <button type="button" key={k} role="tab" aria-selected={step === i} data-done={i < step}
+                      disabled={i > 0 && !file} onClick={() => setStep(i)}>
+                <b>{num(lang, i + 1)}</b>{t(`ads.step.${k}`)}
+              </button>
+            ))}
           </div>
-          <p className={s.faint} style={{ margin: 0 }}>{t("ads.where")}</p>
-          <div className={s.row}>
-            <DateField label={t("ads.from")} value={from} onPick={(d) => { setFrom(d); if (d > to) setTo(d); }} />
-            <DateField label={t("ads.to")} value={to} min={from} onPick={setTo} />
-          </div>
-          <div className={s.field}><span className={s.label}>{t("ads.days")}</span>
-            <div className={s.days}>{days.map((d, i) => (
-              <label key={d}><input type="checkbox" checked={weekdays.includes(i)} onChange={(e) => setWeekdays(e.target.checked ? [...weekdays, i] : weekdays.filter((x) => x !== i))} />{d}</label>
-            ))}</div></div>
+          {step === 0 && (
+            <label className={s.drop} data-over={over} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
+                   onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files[0]); }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {preview ? <img src={preview} alt="" style={{ maxHeight: 220, maxWidth: "100%" }} /> : <>{Icon.image()}<div>{t("ads.drop")}</div></>}
+              <input type="file" accept="image/jpeg,image/png" aria-label={t("ads.image")} onChange={(e) => pick(e.target.files?.[0])} />
+            </label>
+          )}
+          {(step === 1 || step === 2) && (
+            <div className={s.adPreview}>
+              <div className={s.field} style={{ flex: 1 }}>
+                {step === 1 ? <>
+                  <span className={s.label}>{t("ads.width")}</span>
+                  <select className={s.select} value={cols} onChange={(e) => setCols(Number(e.target.value))}>
+                    {Array.from({ length: layout?.columns ?? 8 }, (_, i) => i + 1).map((c) => (
+                      <option key={c} value={c}>{t("ads.cols", { n: num(lang, c) })}{layout ? ` · ${num(lang, round1(widthOf(c)))} cm` : ""}</option>
+                    ))}
+                  </select>
+                  <span className={s.label}>{t("ads.height")}</span>
+                  {aspect > 0 && (
+                    <label className={s.switch}><input type="checkbox" checked={autoHeight} onChange={(e) => { setAutoHeight(e.target.checked); setHeightCm(height); }} />
+                      <span>{t("ads.autoHeight")}</span></label>
+                  )}
+                  <input className={s.input} type="number" min={1} max={room || 50} step={0.5} value={height} disabled={autoHeight && aspect > 0}
+                         onChange={(e) => setHeightCm(Number(e.target.value))} aria-label={t("ads.height")} />
+                  {band && <span className={s.hint} data-tone={tooTall ? "bad" : undefined}>{tooTall ? t("ads.tooTall", { cm: num(lang, room) }) : t("ads.maxHeight", { cm: num(lang, room) })}</span>}
+                </> : <>
+                  <span className={s.label}>{t("ads.page")}</span>
+                  <div className={s.segmented}>{pages.map((p) => <button type="button" key={p} aria-pressed={page === p} onClick={() => setPage(p)}>{num(lang, p)}</button>)}</div>
+                  <span className={s.label}>{t("ads.place")}</span>
+                  <div className={s.presets}>{PRESETS.map((p) => {
+                    const got = layout && band ? presetAt(p, layout, band, cols, height) : null;
+                    return <button type="button" key={p} aria-pressed={!!got && sameAt(got, at)} onClick={() => got && setSpot(got)}>{t(`ads.place.${p}`)}</button>;
+                  })}</div>
+                  <p className={s.faint} style={{ margin: 0 }}>{t("ads.where")}</p>
+                </>}
+              </div>
+              <div className={s.field} style={{ alignItems: "center" }}>
+                <PagePreview layout={layout} page={page} cols={cols} height={height} tooTall={tooTall} preview={preview} at={at} onPick={step === 2 ? setSpot : undefined} width={190} />
+                <span className={s.faint} style={{ maxWidth: 190, textAlign: "center" }}>{t(step === 2 ? "ads.preview" : "ads.previewSize")}</span>
+              </div>
+            </div>
+          )}
+          {step === 3 && <>
+            <div className={s.row}>
+              <DateField label={t("ads.from")} value={from} onPick={(d) => { setFrom(d); if (d > to) setTo(d); }} />
+              <DateField label={t("ads.to")} value={to} min={from} onPick={setTo} />
+            </div>
+            <div className={s.field}><span className={s.label}>{t("ads.days")}</span>
+              <div className={s.days}>{days.map((d, i) => (
+                <label key={d}><input type="checkbox" checked={weekdays.includes(i)} onChange={(e) => setWeekdays(e.target.checked ? [...weekdays, i] : weekdays.filter((x) => x !== i))} />{d}</label>
+              ))}</div></div>
+          </>}
           {error && <Note tone="bad">{error}</Note>}
-          <Button kind="primary" type="submit" disabled={saving || tooTall} icon={Icon.check()}>{t("ads.book")}</Button>
+          <div className={s.row} style={{ justifyContent: "space-between" }}>
+            {step > 0 ? <Button kind="quiet" onClick={() => setStep(step - 1)} icon={Icon.left()}>{t("common.back")}</Button> : <span />}
+            {step < 3
+              ? <Button kind="primary" onClick={() => setStep(step + 1)} disabled={!file || (step === 1 && tooTall)}>{t("ads.next")}</Button>
+              : <Button kind="primary" type="submit" disabled={saving || tooTall} icon={Icon.check()}>{t("ads.book")}</Button>}
+          </div>
         </form>
         <div className={s.field} style={{ gap: 16 }}>
+          <MonthAds key={ads ? ads.length : -1} />
           <section className={s.card}>
-            <h2 className={s.cardTitle}>{t("ads.bookedOnDay")}</h2>
+            <h2 className={s.cardTitle}>{t("ads.bookedOnDay", { date: shortDate(lang, date) })}</h2>
             {ads && !booked.length && <p className={s.muted}>{t("ads.noneBooked")}</p>}
             <div className={s.adGrid}>
               {booked.map((a) => (
@@ -234,6 +264,42 @@ export default function Ads() {
         </div>
       </div>
     </div>
+  );
+}
+
+const STEPS = ["picture", "size", "place", "days"] as const;
+
+/** The month's bookings: how many ads on each day, a day chosen to see its
+ * bookings (the app's day, as the day switcher sets it). */
+function MonthAds() {
+  const { t, lang, date, setDate } = useApp();
+  const [month, setMonth] = useState(date.slice(0, 7));
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  useEffect(() => { setMonth(date.slice(0, 7)); }, [date]);
+  useEffect(() => { call<Record<string, number>>(`/api/ads/month?month=${month}`).then(setCounts).catch(() => setCounts({})); }, [month]);
+  const [y, m] = month.split("-").map(Number);
+  const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  const length = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const step = (k: number) => { const d = new Date(Date.UTC(y, m - 1 + k, 1)); setMonth(d.toISOString().slice(0, 7)); };
+  const iso = (d: number) => `${month}-${String(d).padStart(2, "0")}`;
+  return (
+    <section className={s.card}>
+      <div className={s.calHead}>
+        <button type="button" onClick={() => step(-1)} aria-label={t("cal.prevMonth")}>{Icon.left()}</button>
+        <strong>{t("ads.month")} · {t("months").split(",")[m - 1]} {num(lang, y)}</strong>
+        <button type="button" onClick={() => step(1)} aria-label={t("cal.nextMonth")}>{Icon.right()}</button>
+      </div>
+      <div className={s.calGrid}>
+        {t("weekdays").split(",").map((d) => <span key={d} className={s.calDow}>{d}</span>)}
+        {Array.from({ length: first }, (_, i) => <span key={`e${i}`} />)}
+        {Array.from({ length }, (_, i) => i + 1).map((d) => (
+          <button type="button" key={d} aria-pressed={iso(d) === date} onClick={() => setDate(iso(d))}
+                  title={counts[iso(d)] ? t("ads.countOnDay", { n: num(lang, counts[iso(d)]) }) : undefined}>
+            {num(lang, d)}{counts[iso(d)] ? <small className={s.adCount}>{num(lang, counts[iso(d)])}</small> : null}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
