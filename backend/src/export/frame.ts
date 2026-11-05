@@ -16,6 +16,8 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 // "Thursday, 05 November, 2026" and the like, as a frame writes its date
 const DATE = new RegExp(`(${DAYS.join("|")})(,?\\s*)(\\d{1,2})(\\s+)(${MONTHS.join("|")})(,?\\s*)(\\d{4})`);
+// "Issue No. 65": one more each day, as the paper's own (build.ts issueNumber)
+const ISSUE = /(Issue\s*No\.?\s*:?\s*)(\d+)/i;
 // the standard fonts a frame may name without carrying them (every letter there to write a new date in)
 const STANDARD: Record<string, StandardFonts> = {
   "Times-Roman": StandardFonts.TimesRoman, "Times-Bold": StandardFonts.TimesRomanBold, "Times-Italic": StandardFonts.TimesRomanItalic,
@@ -33,11 +35,10 @@ function sameWay(m: RegExpExecArray, date: string): string {
 const unescape = (s: string) => s.replace(/\\([()\\])/g, "$1");
 const escape = (s: string) => s.replace(/([()\\])/g, "\\$1");
 
-/** A frame page's dates changed to `date`, where it writes them in a standard font as plain
- * text (pieces of one line, as CorelDRAW writes them): the first piece takes the whole new date,
- * the others nothing, its letters spaced (a little) and the line moved (half the rest) so it
- * keeps its place. How many it changed. */
-async function redatePage(doc: PDFDocument, page: PDFPage, date: string, measure: Map<string, PDFFont>): Promise<number> {
+type Swap = { re: RegExp; make: (m: RegExpExecArray) => string };
+
+/** A page's content, decoded (null: one it can't read). */
+function contentOf(doc: PDFDocument, page: PDFPage): string | null {
   const contents = page.node.get(PDFName.of("Contents"));
   const refs = contents instanceof PDFArray ? contents.asArray() : contents ? [contents] : [];
   const parts: string[] = [];
@@ -45,9 +46,42 @@ async function redatePage(doc: PDFDocument, page: PDFPage, date: string, measure
     const s = r instanceof PDFRef ? doc.context.lookup(r) : r;
     if (s instanceof PDFRawStream) parts.push(Buffer.from(decodePDFRawStream(s).decode()).toString("latin1"));
     else if (s instanceof PDFStream) parts.push(Buffer.from(s.getContents()).toString("latin1"));
-    else return 0;
+    else return null;
   }
-  let text = parts.join("\n");
+  return parts.join("\n");
+}
+
+/** A text block's strings shown, each with the font, size and letter spacing it's shown in. */
+function piecesOf(block: string) {
+  const pieces: { at: number; len: number; text: string; font: string; size: number; tc: number }[] = [];
+  let font = "", size = 0, tc = 0;
+  const ops = /\/(\S+)\s+([-\d.]+)\s+Tf|([-\d.]+)\s+Tc|\(((?:\\.|[^\\)])*)\)\s*Tj/g;
+  for (let m; (m = ops.exec(block)); ) {
+    if (m[1]) { font = m[1]; size = +m[2]; }
+    else if (m[3] !== undefined) tc = +m[3];
+    else pieces.push({ at: m.index, len: m[0].length, text: unescape(m[4]), font, size, tc });
+  }
+  return pieces;
+}
+
+/** The date a frame is written for (its first), as ISO. */
+function writtenDate(doc: PDFDocument): string | null {
+  for (const page of doc.getPages()) {
+    for (const block of contentOf(doc, page)?.match(/BT[\s\S]*?ET/g) ?? []) {
+      const m = DATE.exec(piecesOf(block).map((p) => p.text).join(""));
+      if (m) return new Date(Date.UTC(+m[7], MONTHS.indexOf(m[5]), +m[3])).toISOString().slice(0, 10);
+    }
+  }
+  return null;
+}
+
+/** A frame page's dates (and issue number) changed, where it writes them in a standard font as
+ * plain text (pieces of one line, as CorelDRAW writes them): the first piece takes the whole new
+ * text, the others nothing, its letters spaced (a little) and the line moved (half the rest) so it
+ * keeps its place. How many it changed. */
+async function redatePage(doc: PDFDocument, page: PDFPage, swaps: Swap[], measure: Map<string, PDFFont>): Promise<number> {
+  let text = contentOf(doc, page);
+  if (text === null) return 0;
   const fontsDict = page.node.Resources()?.lookup(PDFName.of("Font"));
   const baseOf = (name: string) => {
     const f = fontsDict instanceof PDFDict ? fontsDict.lookup(PDFName.of(name)) : null;
@@ -55,18 +89,10 @@ async function redatePage(doc: PDFDocument, page: PDFPage, date: string, measure
     return base instanceof PDFName ? base.decodeText() : "";
   };
   let changed = 0;
-  text = text.replace(/BT[\s\S]*?ET/g, (block) => {
-    // the block's strings shown, each with the font, size and letter spacing it's shown in
-    const pieces: { at: number; len: number; text: string; font: string; size: number; tc: number }[] = [];
-    let font = "", size = 0, tc = 0;
-    const ops = /\/(\S+)\s+([-\d.]+)\s+Tf|([-\d.]+)\s+Tc|\(((?:\\.|[^\\)])*)\)\s*Tj/g;
-    for (let m; (m = ops.exec(block)); ) {
-      if (m[1]) { font = m[1]; size = +m[2]; }
-      else if (m[3] !== undefined) tc = +m[3];
-      else pieces.push({ at: m.index, len: m[0].length, text: unescape(m[4]), font, size, tc });
-    }
+  const swap = (block: string, { re, make }: Swap): string => {
+    const pieces = piecesOf(block);
     const all = pieces.map((p) => p.text).join("");
-    const m = DATE.exec(all);
+    const m = re.exec(all);
     if (!m) return block;
     // the pieces the date runs over
     let from = 0, i = 0;
@@ -80,7 +106,7 @@ async function redatePage(doc: PDFDocument, page: PDFPage, date: string, measure
     if (!metrics || !first.size) return block; // a font it carries: its letters for a new date may not be there
     const before = first.text.slice(0, m.index - from);
     const after = pieces[j].text.slice(m.index + m[0].length - to);
-    const fresh = sameWay(m, date);
+    const fresh = make(m);
     // the width it had (each piece in its own spacing) and the new date's in the first's
     const w = (s: string, p: typeof first) => metrics.widthOfTextAtSize(s, p.size) + p.tc * s.length;
     const had = pieces.slice(i, j + 1).reduce((a, p) => a + w(p.text, p), 0);
@@ -98,18 +124,24 @@ async function redatePage(doc: PDFDocument, page: PDFPage, date: string, measure
     }
     changed++;
     return out;
-  });
+  };
+  text = text.replace(/BT[\s\S]*?ET/g, (block) => swaps.reduce(swap, block));
   if (changed) page.node.set(PDFName.of("Contents"), doc.context.register(doc.context.flateStream(Buffer.from(text, "latin1"))));
   return changed;
 }
 
-/** The frame's dates changed to `date` (the paper's printed day); how many it had. */
+/** The frame's dates changed to `date` (the paper's printed day), and its issue number counted on
+ * a day at a time from the date it's written for; how many it changed. */
 async function redated(frame: Uint8Array, date: string): Promise<{ pdf: Uint8Array; dates: number }> {
   const doc = await PDFDocument.load(frame);
   const measure = new Map<string, PDFFont>();
   for (const f of Object.values(STANDARD)) measure.set(f, await doc.embedFont(f));
+  const was = writtenDate(doc);
+  if (!was) return { pdf: frame, dates: 0 };
+  const days = Math.round((Date.parse(date) - Date.parse(was)) / 86_400_000);
+  const swaps: Swap[] = [{ re: DATE, make: (m) => sameWay(m, date) }, { re: ISSUE, make: (m) => `${m[1]}${Math.max(1, +m[2] + days)}` }];
   let dates = 0;
-  for (const page of doc.getPages()) dates += await redatePage(doc, page, date, measure);
+  for (const page of doc.getPages()) dates += await redatePage(doc, page, swaps, measure);
   return { pdf: dates ? await doc.save() : frame, dates };
 }
 

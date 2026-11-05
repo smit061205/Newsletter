@@ -63,7 +63,7 @@ of Aman Ki Awaz's frame):
   (`export/frame.ts`: Paper's Print PDF, Copies' sister papers). A day without its own takes the
   latest given before it, its dates ("Thursday, 05 November, 2026" in a standard font, as CorelDRAW
   writes it) changed to the day the paper carries (`printedDate`), spaced to keep their place.
-  Its issue number isn't changed yet. Every sister paper has all of this. The pages still leave masthead,
+  Its issue number ("Issue No. 65") counts on a day at a time from the date it is written for. Every sister paper has all of this. The pages still leave masthead,
   heads and last page's foot empty for it. The page pictures in the newsroom don't show it.
 - Its Tonight's paper shows the run's timer and log as Capital Kranti's does; Copies is in its sidebar.
 - CorelDRAW's PDF for the Urdu and Hindi papers (the father uses CorelDRAW): simple-font text can't
