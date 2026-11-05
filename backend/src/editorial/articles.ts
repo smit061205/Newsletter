@@ -4,19 +4,22 @@
 // any, the paper prints the first. They're kept beside the day's photos
 // (media/<date>/articles.json) and go into the paper as stories of their own:
 // never reworded, cut, held back or left without their photo (store.ts
-// wordForWord, alwaysPrinted). The copies and sister papers have their own.
+// wordForWord, alwaysPrinted). The copies have their own; so does each sister paper
+// worked on as its own (sister.ts), kept in its folder and printed in it alone.
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR } from "../config.ts";
+import { sisterDir } from "../sister.ts";
 import type { Story } from "../store.ts";
 import type { Article } from "./copies.ts";
 
-const fileOf = (date: string) => path.join(MEDIA_DIR, date, "articles.json");
+const fileOf = (date: string, sister?: string) =>
+  sister ? path.join(sisterDir(sister), "articles", `${date}.json`) : path.join(MEDIA_DIR, date, "articles.json");
 
-/** The day's own articles (none if the editor added none). */
-export function paperArticles(date: string): Article[] {
-  const file = fileOf(date);
+/** The day's own articles (none if the editor added none): Capital Kranti's, or `sister`'s. */
+export function paperArticles(date: string, sister?: string): Article[] {
+  const file = fileOf(date, sister);
   if (!existsSync(file)) return [];
   try { return JSON.parse(readFileSync(file, "utf8")) as Article[]; } catch { return []; }
 }
@@ -50,9 +53,9 @@ export async function takeArticles(date: string, given: GivenArticle[], prefix: 
 }
 
 /** The day's own articles saved (an empty list takes them out of the paper). */
-export async function savePaperArticles(date: string, articles: Article[]): Promise<void> {
-  await mkdir(path.dirname(fileOf(date)), { recursive: true });
-  await writeFile(fileOf(date), JSON.stringify(articles, null, 2));
+export async function savePaperArticles(date: string, articles: Article[], sister?: string): Promise<void> {
+  await mkdir(path.dirname(fileOf(date, sister)), { recursive: true });
+  await writeFile(fileOf(date, sister), JSON.stringify(articles, null, 2));
 }
 
 /** The day's own articles as the paper prints them: each a story of its own, kept whole. */

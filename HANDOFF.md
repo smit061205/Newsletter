@@ -50,6 +50,25 @@ Capital Kranti's; one engine and one evening run; "make again" makes that paper 
   engine's last way out of a one-column gap (`layout/engine.ts` solvePage `anyWidth`). Capital Kranti's
   saved days keep the rule. Its test reports it without failing until the engine is changed (needs a plan).
 
+**A sister paper's own articles, title and footer** (5 Nov, v1.1.82; the developer, working on the
+Urdu paper: "i want to add custom articles", then its masthead and printer's line "like this", a PDF
+of Aman Ki Awaz's frame):
+- Its own articles: "Your articles in this paper" on its Tonight's paper (Stories' articles tab), kept
+  in its folder (`sister-papers/<id>/articles/<date>.json`, `editorial/articles.ts`) and printed in it
+  alone, word for word, never translated, the day's story on the same news left out (`makeEditions`).
+  A word-for-word article keeps its own title however short: one that couldn't fill a width was left
+  out with "no setting keeps the desk's rules" (`blocks.ts`; S2 lets it through, `style.ts`).
+- Its title and footer: a PDF of the paper's page size uploaded per day on its Tonight's paper
+  (`sister-papers/<id>/frames/<date>.pdf`), drawn over its pages whenever its PDF is given out
+  (`export/frame.ts`: Paper's Print PDF, Copies' sister papers). The pages still leave masthead,
+  heads and last page's foot empty for it. The page pictures in the newsroom don't show it.
+- Its Tonight's paper shows the run's timer and log as Capital Kranti's does; Copies is in its sidebar.
+- CorelDRAW's PDF for the Urdu and Hindi papers (the father uses CorelDRAW): simple-font text can't
+  carry joined letters, so their text is shaped by HarfBuzz (`harfbuzzjs`, in the paper's own font)
+  and every letter drawn as a filled outline (`export/shapes.ts`): it opens as it prints, its words
+  not retypeable there. A sister paper's has its title and footer too. **Not yet tried in CorelDRAW
+  on Windows.**
+
 **The Urdu paper packed tight like a real Urdu daily** (5 Nov, v1.1.80-81; the user's picture of Aman Ki
 Awaz, page 16, then a closer crop: "we want this level of density"): body 11/14pt (13/22 in v1.1.79,
 12/16.5 in v1.1.80), headlines at 1.15 line spacing and sub-headings at 1.25, 3pt between stories,

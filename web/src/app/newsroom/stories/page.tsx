@@ -16,7 +16,7 @@ type Filter = "all" | "placed" | "out";
 export default function Stories() {
   const { t, lang, date, toast } = useApp();
   const { status, refresh } = useStatus();
-  // (a sister paper's stories alone: the sources and the editor's own articles are Capital Kranti's)
+  // (a sister paper's stories and its own articles: the sources are Capital Kranti's)
   const sister = !!status?.paper.sister;
   const [tab, setTab] = useState<"stories" | "sources" | "articles">("stories");
   const [stories, setStories] = useState<StoryRow[] | null>(null);
@@ -29,7 +29,7 @@ export default function Stories() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    try { const k = new URLSearchParams(location.search).get("tab"); if (!sister && (k === "sources" || k === "articles")) setTab(k); } catch {}
+    try { const k = new URLSearchParams(location.search).get("tab"); if ((k === "sources" && !sister) || k === "articles") setTab(k); } catch {}
   }, [sister]);
   const load = useCallback(() => {
     call<StoryRow[]>(`/api/stories?date=${date}`).then(setStories).catch((e) => setError(e.message));
@@ -56,7 +56,7 @@ export default function Stories() {
         <div className={s.segmented} role="tablist">
           <button role="tab" aria-pressed={tab === "stories"} onClick={() => setTab("stories")}>{t("stories.tab.stories")}</button>
           {!sister && <button role="tab" aria-pressed={tab === "sources"} onClick={() => setTab("sources")}>{t("stories.tab.sources")}</button>}
-          {!sister && <button role="tab" aria-pressed={tab === "articles"} onClick={() => setTab("articles")}>{t("stories.tab.articles")}</button>}
+          <button role="tab" aria-pressed={tab === "articles"} onClick={() => setTab("articles")}>{t("stories.tab.articles")}</button>
         </div>
         {tab === "stories" && (
           <div className={s.row}>

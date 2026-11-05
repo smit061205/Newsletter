@@ -10,6 +10,7 @@ import type { StepName } from "../store.ts";
 import { sendEditable } from "./copies.ts";
 import { readJson, send, type Ctx } from "./http.ts";
 import { SisterStore, sisterOut, textEdit } from "../sister.ts";
+import { frameInfo, removeFrame, saveFrame, withFrame } from "../export/frame.ts";
 import { copiesNow } from "./runs.ts";
 
 export async function issuesRoutes(c: Ctx) {
@@ -46,7 +47,7 @@ export async function issuesRoutes(c: Ctx) {
       // the paper as a PDF whose text stays text in CorelDRAW (export/pdf-editable.ts)
       const got = store.latestIssue(date);
       if (!got) return send(res, 404, { error: `no issue built for ${date}` });
-      return sendEditable(res, got.issue);
+      return sendEditable(res, got.issue, undefined, sister?.id);
     }
     if (req.method === "GET" && parts[3] === "editable8.pdf") {
       // the 8-page paper as a PDF whose text stays text in CorelDRAW
@@ -64,7 +65,22 @@ export async function issuesRoutes(c: Ctx) {
       const got = store.latestIssue(date);
       const file = (got?.report as { pdf?: string } | undefined)?.pdf;
       if (!file) return send(res, 404, { error: `no issue built for ${date}` });
-      return send(res, 200, new Uint8Array(await readFile(outFile(file))), "application/pdf");
+      const pdf = new Uint8Array(await readFile(outFile(file)));
+      // (a sister paper's with its title and footer for the day, if it has them)
+      return send(res, 200, sister ? await withFrame(sister.id, date, pdf) : pdf, "application/pdf");
+    }
+    if (sister && parts[3] === "frame") {
+      // a sister paper's title and footer for the day: a PDF of its page size, laid over its pages (export/frame.ts)
+      if (req.method === "GET") return send(res, 200, { frame: await frameInfo(sister.id, date) });
+      if (req.method === "DELETE") { await removeFrame(sister.id, date); return send(res, 200, { frame: null }); }
+      if (req.method === "POST") {
+        const body = (await readJson(req)) as { base64?: string };
+        if (!body.base64) return send(res, 400, { error: "no file" });
+        // (the sister papers are printed at the paper's own size)
+        const wrong = await saveFrame(sister.id, date, body.base64, (await import("../profile.ts")).profile.page);
+        if (wrong) return send(res, 400, { error: wrong });
+        return send(res, 200, { frame: await frameInfo(sister.id, date) });
+      }
     }
     if (req.method === "POST" && parts[3] === "build") return startJob(res, date, "build");
     if (req.method === "POST" && parts[3] === "approve") {
@@ -76,13 +92,13 @@ export async function issuesRoutes(c: Ctx) {
     if (parts[3] === "articles") {
       // the editor's own articles in the day's paper, word for word (editorial/articles.ts)
       const { paperArticles, savePaperArticles, takeArticles } = await import("../editorial/articles.ts");
-      if (req.method === "GET") return send(res, 200, paperArticles(date));
+      // (a sister paper's are its own, printed in it alone)
+      if (req.method === "GET") return send(res, 200, paperArticles(date, sister?.id));
       if (req.method === "POST") {
-        if (sister) return send(res, 400, { error: "The editor's own articles go in Capital Kranti: go back to it to add them." });
         const body = (await readJson(req)) as { articles?: import("../editorial/articles.ts").GivenArticle[] };
-        const articles = await takeArticles(date, body.articles ?? [], "paper");
+        const articles = await takeArticles(date, body.articles ?? [], sister ? `paper-${sister.id}` : "paper");
         if (typeof articles === "string") return send(res, 400, { error: articles });
-        await savePaperArticles(date, articles);
+        await savePaperArticles(date, articles, sister?.id);
         // the paper laid out again with them, as after an edit
         if (!store.latestIssue(date)) return send(res, 200, { saved: true });
         if (currentJob() || copiesNow?.()?.date === date) {

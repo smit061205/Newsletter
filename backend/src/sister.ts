@@ -17,6 +17,8 @@ import { Store, type Ad, type Edit, type Release, type Story } from "./store.ts"
 
 /** A sister paper's own folder (its database), beside the paper's. */
 export const sisterDir = (id: string) => path.join(path.dirname(DB_FILE), "sister-papers", id);
+/** A sister paper's title and footer for a day, laid over its PDF (export/frame.ts). */
+export const frameFile = (id: string, date: string) => path.join(sisterDir(id), "frames", `${date}.pdf`);
 /** Where a sister paper's PDFs and page pictures for a day are kept. */
 export const sisterOut = (id: string, date: string) => path.join(OUT_DIR, "sister-papers", id, date);
 

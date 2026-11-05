@@ -2,14 +2,17 @@
 // Tonight's paper on a sister paper worked on as its own (backend/src/sister.ts):
 // where its day stands, "make this paper (again)" from Capital Kranti's day with
 // its own ads and changes, its PDF (and CorelDRAW's, in Gujarati), and its pages,
-// any story opening its editor (ui/PaperView). No news gathering or evening run here:
+// any story opening its editor (ui/PaperView); its own articles, printed in it alone;
+// and its title and footer for the day, a PDF laid over its pages (backend export/frame.ts). No news gathering or evening run here:
 // those are Capital Kranti's.
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { call, media, type CopiesRun, type Edition, type IssueInfo } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { copyDoing, num, problems, rupees } from "./format";
 import { Button, Icon, Note, Ring, Skeleton, useApp } from "./kit";
+import { BatchTime } from "./BatchTime";
 import { PaperView } from "./PaperView";
 
 export function SisterToday() {
@@ -91,22 +94,82 @@ export function SisterToday() {
         ) : (
           <Hero tone={todo ? "warn" : "good"} icon={todo ? Icon.alert() : Icon.checkCircle()} title={todo ? t("today.look.title", { n: num(lang, todo) }) : t("today.ready.title")}
                 body={t("sister.ready.body", { issue: num(lang, report.issueNumber), stories: num(lang, report.placed.length), pages: num(lang, report.pages) })}>
-            {paper.lang !== "hi" && paper.lang !== "ur" && <Button kind="primary" big icon={Icon.download()} onClick={openCorel}>{t("today.corel")}</Button>}
+            <Button kind="primary" big icon={Icon.download()} onClick={openCorel}>{t("today.corel")}</Button>
             <Button big icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>
           </Hero>
         )}
         {mine && <div className={s.row} style={{ justifyContent: "flex-end" }}>
           <Button kind="danger" onClick={stop} disabled={stopping}>{stopping ? t("stop.stopping") : t("stop.papers")}</Button></div>}
+        {/* (how long it's taking, and what it's doing, as Capital Kranti's run shows) */}
+        {run && (mine || run.files.some((f) => f.id === id)) && <>
+          <BatchTime run={run} />
+          <details className={s.details} open={mine}>
+            <summary>{t("today.details")}</summary>
+            <div className={s.logBox}>{run.log.map((l, i) => <div key={i}>{l}</div>)}</div>
+          </details>
+        </>}
         {error && <Note tone="bad">{error}</Note>}
         {failed && <Note tone="bad">{t("sister.failed", { error: run?.error ?? "" })}</Note>}
         {(waiting || (going && !mine)) && <Note>{t("sister.waiting")}</Note>}
         <div className={s.row} style={{ justifyContent: "space-between" }}>
           <span className={s.faint}>{t("sister.cost", { cost: rupees(lang, 45 * rate, status?.inrPerUsd ?? 88) })}</span>
-          {has && !mine && <Button kind="quiet" icon={Icon.refresh()} onClick={make} disabled={waiting || going}>{t("sister.again")}</Button>}
+          <div className={s.row}>
+            <Link className={s.btn} href="/newsroom/stories?tab=articles">{Icon.stories()}{t("sister.articles")}</Link>
+            {has && !mine && <Button kind="quiet" icon={Icon.refresh()} onClick={make} disabled={waiting || going}>{t("sister.again")}</Button>}
+          </div>
         </div>
       </section>
+      <Frame date={date} />
       {has && !mine && <PaperView problems />}
     </div>
+  );
+}
+
+/** The day's title and footer: a PDF of the paper's size, printed over its pages. */
+function Frame({ date }: { date: string }) {
+  const { t, lang, toast } = useApp();
+  const [pages, setPages] = useState<number | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    setPages(undefined); setError("");
+    call<{ frame: { pages: number } | null }>(`/api/issues/${date}/frame`).then((x) => setPages(x.frame?.pages ?? null)).catch((e) => setError(e.message));
+  }, [date]);
+  const add = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true); setError("");
+    try {
+      const base64 = await new Promise<string>((ok, bad) => {
+        const r = new FileReader();
+        r.onload = () => ok(String(r.result).split(",")[1]);
+        r.onerror = () => bad(new Error("couldn't read that file"));
+        r.readAsDataURL(file);
+      });
+      const x = await call<{ frame: { pages: number } | null }>(`/api/issues/${date}/frame`, { json: { base64 } });
+      setPages(x.frame?.pages ?? null);
+      toast(t("frame.saved"));
+    } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+  const remove = async () => {
+    setBusy(true); setError("");
+    try { await call(`/api/issues/${date}/frame`, { method: "DELETE" }); setPages(null); } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+  return (
+    <section className={s.card}>
+      <h2 className={s.cardTitle}>{t("frame.title")}</h2>
+      <p className={s.muted}>{pages ? t("frame.has", { n: num(lang, pages) }) : t("frame.none")}</p>
+      {error && <Note tone="bad">{error}</Note>}
+      <div className={s.row}>
+        <label className={s.btn} aria-disabled={busy || pages === undefined}>
+          {Icon.download()}{pages ? t("frame.replace") : t("frame.add")}
+          <input type="file" accept="application/pdf,.pdf" hidden disabled={busy || pages === undefined}
+                 onChange={(e) => { add(e.target.files?.[0]); e.target.value = ""; }} />
+        </label>
+        {!!pages && <Button kind="quiet" onClick={remove} disabled={busy}>{t("frame.remove")}</Button>}
+      </div>
+    </section>
   );
 }
 

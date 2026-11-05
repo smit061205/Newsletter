@@ -40,6 +40,7 @@ import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.
 import { settable } from "./quality.ts";
 import { applyTextEdits, droppedBy, foreignLetters } from "../layout/stories.ts";
 import { newsOverlap } from "./translate.ts";
+import { paperArticles } from "./articles.ts";
 
 export type Reword = "headline" | "headlineDeck" | "all";
 export type Shuffle = CopyOpts["shuffle"];
@@ -862,11 +863,23 @@ export async function makeEditions(store: Store, date: string, editions: Edition
     await mkdir(editionsDir(date), { recursive: true });
     say(list.map((e) => `${e.name} (${LANG_NAME[e.lang]})`).join(", "));
     // each paper's own seed, from its place in the full list: the same paper lays out the same way each time;
-    // each with its own ads and edits, its pages kept as pictures for the newsroom (sister.ts)
+    // each with its own ads, edits and articles (word for word, never translated: the day's story
+    // on the same news left out), its pages kept as pictures for the newsroom (sister.ts)
+    const own = new Map<string, { articles: Article[]; drop: string[] }>();
+    for (const e of list) {
+      const articles = paperArticles(date, e.id);
+      if (!articles.length) continue;
+      const same = await sameAsArticles(store, date, articles, say);
+      batch.cost += same.cost;
+      if (same.headlines.length) say(`${e.name}: its own article in place of ${same.headlines.join("; ")}`);
+      own.set(e.id, { articles, drop: same.ids });
+    }
     const tasks: Task[] = list.map((e): Task => ({
       lang: e.lang, label: e.name, seen: day.seen,
       spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: day.pageOf, lead: day.lead,
-              ads: sisterStore(store, e.id).ads(date), ...sisterStore(store, e.id).layoutEdits(date) },
+              ads: sisterStore(store, e.id).ads(date), ...sisterStore(store, e.id).layoutEdits(date),
+              ...(own.get(e.id)?.articles.length ? { articles: own.get(e.id)!.articles } : {}),
+              ...(own.get(e.id)?.drop.length ? { drop: own.get(e.id)!.drop } : {}) },
       item: { n: 100 + editions.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + editions.indexOf(e),
               images: path.join(sisterOut(e.id, date), "pages") },
     }))

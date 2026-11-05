@@ -13,7 +13,8 @@
 //
 // Legacy (Bharati) and Latin text only: a Unicode script that needs shaping
 // (Hindi, Urdu, Unicode Gujarati) can't be written as simple-font text, so a
-// paper set in one gets null (the print PDF is what there is).
+// paper set in one gets its letters as shapes instead (export/shapes.ts: it opens
+// in CorelDRAW as it prints, its words not editable there).
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -182,13 +183,14 @@ export function editableText(issue: IssueRender): boolean {
   return true;
 }
 
-/** The issue as an editable-text PDF, or null if its text needs shaping (Hindi, Urdu). */
+/** The issue as a PDF for CorelDRAW: its text editable, or (Hindi, Urdu: text that needs shaping) as letter shapes. */
 export async function editablePdf(issue: IssueRender): Promise<Uint8Array | null> {
-  if (!editableText(issue)) return null;
+  const shaped = editableText(issue) ? null : await (await import("./shapes.ts")).shapers(issue);
+  const draw = shaped && (await import("./shapes.ts")).drawShapes;
   const doc = await PDFDocument.create();
   doc.setTitle(`Issue ${issue.issueNumber}, ${issue.issueDate}`);
-  doc.setCreator("Capital Kranti newsroom (editable text)");
-  const fonts = await embedFonts(doc, issue);
+  doc.setCreator(`Capital Kranti newsroom (${shaped ? "letters as shapes" : "editable text"})`);
+  const fonts = shaped ? new Map<string, PdfFont>() : await embedFonts(doc, issue);
   const k = 72 / (issue.dpi ?? 300); // contract px -> pt
   const images = new Map<string, Awaited<ReturnType<PDFDocument["embedJpg"]>> | null>();
   const image = async (url: string) => {
@@ -251,7 +253,8 @@ export async function editablePdf(issue: IssueRender): Promise<Uint8Array | null
           break;
         }
         case "text":
-          drawText(page, e, fonts, k, H);
+          if (shaped && draw) draw(page, e, shaped.hb, shaped.fonts, k, H, rgb);
+          else drawText(page, e, fonts, k, H);
           break;
       }
     }

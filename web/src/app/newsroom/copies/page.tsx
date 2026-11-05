@@ -238,7 +238,7 @@ export default function Copies() {
                   <Badge tone={f.ready ? "good" : "warn"} dot>{f.ready ? t("archive.ready") : t("archive.look")}</Badge>
                 </div>
                 <Button icon={Icon.print()} onClick={() => open(f.n)}>{t("copies.open")}</Button>
-                {(f.lang ?? "gu") === "gu" && <Button kind="quiet" icon={Icon.download()} onClick={() => open(f.n, true)}>{t("corel.pdf")}</Button>}
+                <Button kind="quiet" icon={Icon.download()} onClick={() => open(f.n, true)}>{t("corel.pdf")}</Button>
                 {paperOf(f.n) && <span className={s.faint} style={{ overflowWrap: "anywhere" }}>{designName(paperOf(f.n)!.name)}</span>}
               </div>
             ))}

@@ -95,7 +95,7 @@ function Frame({ children }: { children: React.ReactNode }) {
     if (status && !status.onboarded && path !== "/newsroom/welcome") router.replace("/newsroom/welcome");
   }, [status, path, router]);
   if (path === "/newsroom/welcome") return <>{children}</>;
-  // a sister paper worked on as its own: its own name, and no other papers from inside it
+  // a sister paper worked on as its own: its own name (its copies still made from the newsroom's Copies)
   const sister = status?.paper.sister ? status.paper : null;
   const own = !status || (status.paper.id === "capital-kranti" && !sister);
   return (
@@ -106,7 +106,7 @@ function Frame({ children }: { children: React.ReactNode }) {
           {/* (another paper's own name, in its own words: not the newsroom's, so not translated) */}
           <div className={s.logoText}><span className={s.logoName} translate={own ? undefined : "no"}>{own ? t("app.name") : status!.paper.name}</span><span className={s.logoSub}>{t("app.sub")}</span></div>
         </div>
-        {NAV.filter(([href]) => !sister || href !== "/newsroom/copies").map(([href, key, icon]) => (
+        {NAV.map(([href, key, icon]) => (
           <Link key={href} href={href} className={`${s.navItem} ${href === "/newsroom/archive" || href === "/newsroom/papers" ? s.navExtra : ""}`}
                 aria-current={path === href ? "page" : undefined}>{icon()}<span>{t(key)}</span></Link>
         ))}
