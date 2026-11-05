@@ -125,15 +125,18 @@ export function SisterToday() {
   );
 }
 
-/** The day's title and footer: a PDF of the paper's size, printed over its pages. */
+/** The day's title and footer: a PDF of the paper's size, printed over its pages (an earlier day's
+ * where this one has none), its date changed to the day the paper carries. */
+type FrameInfo = { pages: number; dates: number; from: string };
 function Frame({ date }: { date: string }) {
   const { t, lang, toast } = useApp();
-  const [pages, setPages] = useState<number | null | undefined>(undefined);
+  const [frame, setFrame] = useState<FrameInfo | null | undefined>(undefined);
+  const pages = frame === undefined ? undefined : frame?.pages ?? null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    setPages(undefined); setError("");
-    call<{ frame: { pages: number } | null }>(`/api/issues/${date}/frame`).then((x) => setPages(x.frame?.pages ?? null)).catch((e) => setError(e.message));
+    setFrame(undefined); setError("");
+    call<{ frame: FrameInfo | null }>(`/api/issues/${date}/frame`).then((x) => setFrame(x.frame)).catch((e) => setError(e.message));
   }, [date]);
   const add = async (file: File | undefined) => {
     if (!file) return;
@@ -145,21 +148,22 @@ function Frame({ date }: { date: string }) {
         r.onerror = () => bad(new Error("couldn't read that file"));
         r.readAsDataURL(file);
       });
-      const x = await call<{ frame: { pages: number } | null }>(`/api/issues/${date}/frame`, { json: { base64 } });
-      setPages(x.frame?.pages ?? null);
+      const x = await call<{ frame: FrameInfo | null }>(`/api/issues/${date}/frame`, { json: { base64 } });
+      setFrame(x.frame);
       toast(t("frame.saved"));
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
   };
   const remove = async () => {
     setBusy(true); setError("");
-    try { await call(`/api/issues/${date}/frame`, { method: "DELETE" }); setPages(null); } catch (e) { setError((e as Error).message); }
+    try { await call(`/api/issues/${date}/frame`, { method: "DELETE" }); setFrame(null); } catch (e) { setError((e as Error).message); }
     setBusy(false);
   };
   return (
     <section className={s.card}>
       <h2 className={s.cardTitle}>{t("frame.title")}</h2>
-      <p className={s.muted}>{pages ? t("frame.has", { n: num(lang, pages) }) : t("frame.none")}</p>
+      <p className={s.muted}>{!frame ? t("frame.none") : frame.from === date ? t("frame.has", { n: num(lang, frame.pages) })
+        : t("frame.earlier", { day: num(lang, frame.from.split("-").reverse().join("-")) })}{frame && frame.dates > 0 ? ` ${t("frame.dated")}` : ""}</p>
       {error && <Note tone="bad">{error}</Note>}
       <div className={s.row}>
         <label className={s.btn} aria-disabled={busy || pages === undefined}>
@@ -167,7 +171,7 @@ function Frame({ date }: { date: string }) {
           <input type="file" accept="application/pdf,.pdf" hidden disabled={busy || pages === undefined}
                  onChange={(e) => { add(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
-        {!!pages && <Button kind="quiet" onClick={remove} disabled={busy}>{t("frame.remove")}</Button>}
+        {frame && frame.from === date && <Button kind="quiet" onClick={remove} disabled={busy}>{t("frame.remove")}</Button>}
       </div>
     </section>
   );
