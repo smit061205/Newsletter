@@ -61,25 +61,25 @@
  "type": {
   "body": {
    "font": "nastaliq",
-   "size": 13,
-   "pitch": 22,
+   "size": 12,
+   "pitch": 16.5,
    "indent": 10,
    "pitches": [
-    22,
-    22.5,
-    23,
-    21.5
+    16.5,
+    17,
+    16,
+    17.5
    ],
    "sizes": [
-    13,
-    12.5
+    12,
+    11.5
    ],
    "wordSpaceMax": 3,
    "levelColumns": true
   },
   "headline": {
    "font": "nastaliq-bold",
-   "leading": 1.5,
+   "leading": 1.2,
    "capByColumns": [
     0,
     24,
@@ -112,30 +112,30 @@
    "font": "nastaliq-semibold",
    "ratio": 0.45,
    "min": 10,
-   "leading": 1.55
+   "leading": 1.3
   },
   "deck": {
    "font": "nastaliq-semibold",
    "ratio": 0.6,
    "min": 15.5,
-   "leading": 1.55
+   "leading": 1.3
   },
   "caption": {
    "font": "nastaliq",
-   "size": 10.5,
-   "pitch": 18
+   "size": 10,
+   "pitch": 15
   }
  },
  "spacing": {
-  "top": 2,
-  "afterKicker": 2,
-  "afterHeadline": 5,
-  "afterDeck": 5,
-  "afterPhoto": 3,
-  "afterCaption": 5,
-  "betweenStories": 8,
+  "top": 1,
+  "afterKicker": 1,
+  "afterHeadline": 3,
+  "afterDeck": 3,
+  "afterPhoto": 2,
+  "afterCaption": 3,
+  "betweenStories": 4,
   "storyRule": 0.75,
-  "underHeader": 5
+  "underHeader": 3
  },
  "photo": {
   "maxCrop": 0.15,
