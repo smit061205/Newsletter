@@ -51,6 +51,9 @@ export interface Module {
   displayFill: number;
   /** the sub-heading's size (0 without one) */
   deckSize: number;
+  /** lines its text columns end short of its foot, in all (0: level; a column under a photo
+   * holding none aside) -- a short column is white space in the story (5 Nov) */
+  short?: number;
   /** a headline size band set from outside (layout/fit.ts, so two
    * neighbours' headlines differ): kept by every rebuild */
   head?: HeadBand;
@@ -294,19 +297,23 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   // last column(s) short, the body is set a line or two looser (columns end
   // level at the same foot) or else tighter (level a line higher) -- a short column is white space in the story
   const capacity = (tops: number[], b: number) => tops.reduce((a, t) => a + Math.max(0, Math.floor((b - t + 0.01) / pitch)), 0);
-  const level = (tops: number[]): { lines: Line[]; bottom: number; caps: number[] } => {
+  // (how many lines short of the foot the columns holding text end; a column under the
+  // photo with none is the photo's, and checked against its foot below)
+  const shortOf = (tops: number[], b: number, caps: number[]) => tops.reduce((a, t, i) =>
+    a + (caps[i] > 0 || t === Math.min(...tops) ? Math.max(0, Math.floor((b - t + 0.01) / pitch)) - caps[i] : 0), 0);
+  const level = (tops: number[]): { lines: Line[]; bottom: number; caps: number[]; short: number } => {
     const got = { lines, ...balance(tops, lines.length, pitch) };
     const spare = capacity(tops, got.bottom) - lines.length;
-    if (spare <= 0) return got;
+    if (spare <= 0) return { ...got, short: shortOf(tops, got.bottom, got.caps) };
     const up = capacity(tops, got.bottom - pitch) - lines.length; // negative: lines to lose
     // looser first: the story keeps the height it was planned at
     for (const d of [spare, up].filter((d) => d !== 0)) {
       const ls = withDelta(d);
       if (!ls) continue;
       const b = balance(tops, ls.length, pitch);
-      if (capacity(tops, b.bottom) === ls.length) return { lines: ls, ...b };
+      if (capacity(tops, b.bottom) === ls.length) return { lines: ls, ...b, short: 0 };
     }
-    return got;
+    return { ...got, short: shortOf(tops, got.bottom, got.caps) };
   };
 
   // ---- photo options: natural shape, the print desk's rules
@@ -333,7 +340,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     const pair = await photoPair(story, cols, cursor, m);
     if (!pair) return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize };
     const tops = Array.from({ length: cols }, () => pair.bottom);
-    const { lines: body, bottom, caps } = level(tops);
+    const { lines: body, bottom, caps, short } = level(tops);
     const out: Element[] = [...pair.elements];
     let li = 0;
     tops.forEach((top, i) => {
@@ -349,10 +356,10 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
       return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize };
     }
     return { story, rank, cols, variant, photoMode, width: w, height, elements: [...els, ...out], photoDropped: false,
-             headlineHeight, bodyLines: body.length, pitch, headSize, displayFill, deckSize };
+             headlineHeight, bodyLines: body.length, pitch, headSize, displayFill, deckSize, short };
   }
 
-  let best: { elements: Element[]; height: number; k: number; lines: number } | null = null;
+  let best: { elements: Element[]; height: number; k: number; lines: number; short: number } | null = null;
   for (const k of spans) {
     const out: Element[] = [];
     let photoFoot = cursor; // the foot of the photo (and its caption)
@@ -394,7 +401,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     }
     // columns under the photo start below it; the rest right under the header
     const tops = Array.from({ length: columns }, (_, i) => (k && i >= cols - k ? photoBottom : cursor));
-    const { lines: body, bottom, caps } = level(tops);
+    const { lines: body, bottom, caps, short } = level(tops);
     const height = Math.max(bottom, k ? photoFoot : cursor);
     // (a customer's article always shows its photo, however short its text)
     if (k && photo && !wordForWord(story) && spanWidth(k) * (spanWidth(k) * photo.height / photo.width) > maxShare * w * height) continue;
@@ -412,7 +419,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
       const f: Frame = { x: i * (GRID.column + GRID.gutter), y: top, w: measure, h: bottom - top };
       out.push(...columnElements(take, `${aid}-c${i}`, aid, f, BODY.size, pitch, m.isLegacy(BODY.font)));
     });
-    best = { elements: out, height, k, lines: body.length };
+    best = { elements: out, height, k, lines: body.length, short };
     break; // spans are in order of preference
   }
   if (!best) {
@@ -436,6 +443,6 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     story, rank, cols, variant, photoMode, width: w + 2 * inset, height: best.height + inset,
     elements: [...banner, ...[...els, ...best.elements].map(inside)],
     photoDropped: !!photo && best.k === 0,
-    headlineHeight, bodyLines: best.lines, pitch, headSize, displayFill, deckSize,
+    headlineHeight, bodyLines: best.lines, pitch, headSize, displayFill, deckSize, short: best.short,
   };
 }

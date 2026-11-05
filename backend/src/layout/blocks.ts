@@ -17,6 +17,7 @@ import { buildModule, type Module, type PhotoMode } from "./module.ts";
 import { headlineHeavy, spansFor } from "./pack.ts";
 import { STORY_P90_EM, storyLooseness } from "./style.ts";
 import { BODY, GRID, HEADLINE, MAX_STORY_COLS, PT } from "./typography.ts";
+import { profile } from "../profile.ts";
 
 export interface Option {
   module: Module;
@@ -42,6 +43,9 @@ export function stretchOf(mod: Module): number {
   const hasDeck = mod.deckSize > 0;
   return (hasDeck ? 2 * HEAD_SPREAD : HEAD_SPREAD) + columnLines(mod) * mod.pitch * PITCH_STRETCH;
 }
+
+/** Every story's columns end level where they can (the profile's `levelColumns`: the Urdu paper). */
+const LEVEL = !!profile.type.body.levelColumns;
 
 /** How much a story's copy matters, by rank: losing a lead's copy costs most. */
 const WEIGHT = [3, 2, 1.5, 1, 0.7];
@@ -132,7 +136,9 @@ export class Blocks {
             + (mod.photoDropped ? 1 + WEIGHT[Math.min(rank, 5) - 1] : 0) + (mode ? 0.1 : 0) + (r.from === "longer" ? 0.15 : 0) + loose * 2
             + (spansFor(rank).includes(cols) ? 0 : cols === 1 ? 1 : 0.3) + k * 0.4
             // (a customer's article prints the photos its copy was given: a width that shows fewer costs)
-            + (wordForWord(story) ? 0.5 * Math.max(0, (story.photos?.length ?? 0) - mod.elements.filter((e) => e.kind === "image").length) : 0);
+            + (wordForWord(story) ? 0.5 * Math.max(0, (story.photos?.length ?? 0) - mod.elements.filter((e) => e.kind === "image").length) : 0)
+            // (columns ending a line apart: a width where it can end level wins)
+            + (LEVEL && mod.short ? 2 : 0);
           out.push({ module: mod, rung: i, height: mod.height, stretch: stretchOf(mod), cost });
           break;
         }
@@ -140,6 +146,9 @@ export class Blocks {
     }
     // a customer's article always shows its photo: a width where it can't is no option for it
     // (and any story keeps its photo at a width with lengths that show it: the editor's pages have one with every story)
+    // (and its columns end level where any of its settings at this width do: Urdu's joined letters take
+    // no spacing, so its uneven settings were many, 5 Nov; a width with none level keeps them for the planner)
+    if (LEVEL && out.some((o) => !o.module.short)) out.splice(0, out.length, ...out.filter((o) => !o.module.short));
     const shown = out.filter((o) => !o.module.photoDropped);
     // (a customer's article given its copy's few photos prints them side by side where the width takes them, 3 Nov)
     const row = wordForWord(story) ? shown.filter((o) => o.module.photoMode === 2) : [];

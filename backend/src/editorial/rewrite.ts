@@ -43,10 +43,16 @@ const STALL_MINUTES = 5;
 let stalledAt = 0;
 export const aiStalled = () => Date.now() - stalledAt < STALL_MINUTES * 60_000;
 
-export async function openRouter(init: RequestInit, seconds = 90): Promise<Response> {
+export async function openRouter(init: RequestInit, seconds = 90, thinkInFull = false): Promise<Response> {
   // every AI call of a step goes out at once (no cap of our own: OpenRouter
   // sets none for paid models): one turned away as too many, or a provider's
   // hiccup, waits a moment -- longer each time, as long as asked -- and goes again
+  // (a thinking model told how long to think by the paper's profile, unless a request says its own)
+  const effort = profile.editorial.reasoningEffort;
+  if (effort && !thinkInFull && typeof init.body === "string") {
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    if (!body.reasoning) init = { ...init, body: JSON.stringify({ ...body, reasoning: { effort } }) };
+  }
   let last: Response | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {

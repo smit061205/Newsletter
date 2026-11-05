@@ -601,9 +601,14 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   } finally {
     await m.close();
   }
+  // (a font with no bold of its own printed bolder where the profile says: its `embolden`)
+  const bolder = (e: Element): Element => {
+    const by = e.kind === "text" && !e.thicken ? profile.fonts[e.font]?.embolden : 0;
+    return by && e.kind === "text" ? { ...e, thicken: by * e.size } : e;
+  };
   const pages = chrome.map((c, i) => ({
     number: i + 1, width: PAGE.width, height: PAGE.height,
-    elements: [...c.elements, ...(result.pages.get(i + 1) ?? [])] as Element[],
+    elements: [...c.elements, ...(result.pages.get(i + 1) ?? [])].map((e) => bolder(e as Element)) as Element[],
   }));
   const issue = IssueRenderSchema.parse({ issueDate: date, issueNumber, dpi: DPI, fonts: FONTS, pages });
 
@@ -660,6 +665,11 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       }
     }
   }
+  // a story whose columns end a line apart: white space inside it, however small (5 Nov: most
+  // of the Urdu paper's, under the gap check's line and a half)
+  // of the paper's own whose columns must end level (the profile's `levelColumns`)
+  const uneven = !profile.type.body.levelColumns ? [] : result.plans.flatMap((plan) => plan.placed.filter((p) => p.module.short)
+    .map((p) => `p${plan.page} ${p.module.story.id} (${p.module.short} line(s) short)`));
   // ---- style: what a reader sees (layout/style.ts)
   const style = styleChecks(issue, result.plans, chrome.map((c) => ({ top: c.bodyTop, bottom: c.bodyBottom })));
   const lead = result.placed.find((p) => p.page === 1 && p.rank === 1);
@@ -731,8 +741,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       detail: missingGlyphs.size ? [...missingGlyphs].map(([ch, at]) => `"${ch}" (U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}) in ${[...at].slice(0, 3).join(", ")}`).join("; ") : "ok" },
     { gate: "P print preflight: trim size, fonts embedded, photos sharp enough, nothing off the page", pass: print.every((c) => c.pass),
       detail: print.map((c) => `${c.name} ${c.pass ? "ok" : c.detail}`).join("; ") },
-    { gate: "2 no empty space on the page (every column filled to what's below)", pass: result.gaps.length === 0,
-      detail: `${result.gaps.length} empty stretch(es)` },
+    { gate: "2 no empty space on the page (every column filled to what's below)", pass: result.gaps.length === 0 && uneven.length === 0,
+      detail: `${result.gaps.length} empty stretch(es)` + (uneven.length ? `; columns ending uneven: ${uneven.join(", ")}` : "") },
     { gate: "3 no tombstoned headlines", pass: tombstones.length === 0, detail: tombstones.join(", ") || "none" },
     { gate: "3 headline sizes follow importance", pass: hierarchy.length === 0, detail: hierarchy.join(", ") || "ok" },
     { gate: "3 no headline over 30% of its story", pass: headShare.length === 0, detail: headShare.join(", ") || "ok" },

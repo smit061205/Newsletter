@@ -27,6 +27,9 @@ export const FontRoleSchema = z.object({
   /** For a Unicode font: the font (a fonts key) that sets the characters it
    * lacks (e.g. ₹), instead of whatever face the browser would pick. */
   fallback: z.string().optional(),
+  /** Printed bolder: each letter thickened by this share of its size (a font with no bold of its
+   * own: the Urdu paper's Jameel Noori Nastaleeq, 5 Nov). Its width is the font's own. */
+  embolden: z.number().min(0).max(0.1).optional(),
 });
 
 const TextStyleSchema = z.object({
@@ -104,6 +107,14 @@ export const ProfileSchema = z.object({
       /** looser / tighter pitches allowed to fit a story, pt */
       pitches: z.array(pt.positive()).min(1),
       sizes: z.array(pt.positive()).min(1),
+      /** the widest a word space may be spread, as a share of the font's own (2 when not given):
+       * a script whose letters join can't be letter-spaced, so its lines stretch at their spaces alone */
+      wordSpaceMax: z.number().min(1).optional(),
+      /** every story's columns end level: a setting with a column short is never chosen where the story
+       * has a level one at that width, a gap filler ends level where one can, and the paper isn't ready with
+       * a story uneven (the Urdu paper, 5 Nov: 15 of 20 stories ended a line apart). Not yet every paper's:
+       * on the Sample Herald, preferring level settings left a hole no filler fitted */
+      levelColumns: z.boolean().optional(),
     }),
     headline: TextStyleSchema.extend({
       leading: z.number().positive(),
@@ -170,6 +181,10 @@ export const ProfileSchema = z.object({
     columnPrefers: z.string().min(1).optional(),
     /** translates Hindi releases into the paper's language when its own don't fill it */
     translateModel: z.string().min(1).default("google/gemini-3.8-flash"),
+    /** how long a thinking model thinks before it writes (OpenRouter's reasoning effort; its own default
+     * when not given): GPT-6 Luna thought 7,000 tokens over a 300-word Urdu story, 60 seconds, at "low"
+     * 11 seconds and a seventh of the cost (5 Nov). Fact checks always think in full */
+    reasoningEffort: z.enum(["minimal", "low", "medium", "high"]).optional(),
     /** the copy wanted, as a share of the pages at natural size: over 1, so the
      * layout has choices and a reserve of stories for holes and short pages */
     fillTarget: z.number().positive().default(1.35),

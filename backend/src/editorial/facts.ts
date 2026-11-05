@@ -44,7 +44,7 @@ export async function checkFacts(store: Store, story: Story, log: (s: string) =>
         response_format: { type: "json_schema", json_schema: SCHEMA },
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: `${source}\n\n${text}` }],
       }),
-    }, 60);
+    }, 60, true);
     if (!res.ok) { log(`  ${story.id}: names and dates not checked (OpenRouter ${res.status})`); return { problems: [], cost: 0 }; }
     const data = (await res.json()) as { choices: { message: { content: string } }[]; usage?: { cost?: number } };
     const got = JSON.parse(data.choices[0].message.content) as { problems: { kind: string; says: string; why: string }[] };
