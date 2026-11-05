@@ -77,7 +77,7 @@ Macs with an Intel processor are no longer built for (26 Oct 2026). Everything i
   The client ID isn't a secret. Each user's sign-in token is kept encrypted by the system keychain.
 - Signing: macOS notarisation (an Apple Developer account) and Windows code signing would remove the first-open warnings. electron-builder picks up `CSC_LINK` / `APPLE_ID` secrets when they're added.
 - The desktop app's code is in `desktop/` (`main.js`, `preload.js`, `stage.mjs`, which gathers what it carries, and the icons in `desktop/icon/`). Developing: `npm install --prefix desktop`, `npm run build --prefix web`, then `npm start --prefix desktop` runs it against this checkout.
-- The old script installers (`windows/`, `mac/`, `scripts/launch.mjs`) still work for development.
+- The old script installers (`windows/`, `mac/`, `scripts/launch.mjs`) still work for development, and stay until every computer runs the desktop app (an old install updates itself from `main`: its shortcut needs them).
 
 ---
 
@@ -105,7 +105,7 @@ Macs with an Intel processor are no longer built for (26 Oct 2026). Everything i
 
 ## 1. Current status
 
-**Last verified build:** 22 October 2026 (issue 271), 4 pages, 29 stories from PIB (Gujarati, plus Hindi translated), **every release gate passing (READY)**, made by the 8 PM run and finished from the newsroom.
+**Last verified build:** 4 November 2026 (issue 285), 4 pages, 31 stories (the editor's Telegram news first, then PIB, Gujarati plus Hindi and English translated), **every release gate passing (READY)** and every one of the paper's rules kept (`backend/test/rules.ts`), with the 8-page paper beside it. The app is at v1.1.73.
 
 | Area | State |
 |---|---|
@@ -118,8 +118,11 @@ Macs with an Intel processor are no longer built for (26 Oct 2026). Everything i
 | **News from the editor's Telegram** (his own news and photos, sent to the paper's bot through the day) | Done (`ingest/telegram.ts`) |
 | AI: rewrite, round-ups, length fitting, **editorial plan**, page review | Done (`editorial/`) |
 | **One pipeline as jobs** (fetch → rewrite → top-up → features → build), 8 PM, live log, retry | Done (`pipeline.ts`) |
-| **Newsroom website** (Today, News, Stories, Pages, Ads, Papers, Settings) | Done (`web/src/app/newsroom/`, only where `NEWSROOM=1`) |
-| **Apps: Windows installer and Mac app** (one launcher, log-in start, evening wake) | Done (`windows/`, `mac/`, `scripts/launch.mjs`) |
+| **Newsroom** (Tonight's paper with the page large and every story clickable, Ads in 4 steps with a month calendar, Other papers, the archive, Settings with the rest under "More settings"; the older screens still open but leave the sidebar) | Done (`web/src/app/newsroom/`, only where `NEWSROOM=1`) |
+| **Apps: Windows installer and Mac app** (log-in start, evening wake, updates), built and checked by the release workflow | Done (`desktop/`) |
+| **Copies and sister papers** (copies on customers' designs, the Hindi and Urdu papers), **the 8-page paper** | Done (`editorial/copies.ts`, `editorial/sections.ts`) |
+| **Backups** outside the app, with a restore, and the data folder kept to a size | Done (`backup.ts`, `tidy.ts`) |
+| **Checks**: the layout engine on two papers, the paper's rules read off the pages, every screen in Gujarati | Done (`backend/test/`, the `apps` workflow) |
 | **CorelDRAW SVG export** | Done (`export/svg.ts`, `/api/export/:date.svg?page=N`) |
 | **Add a newspaper** (profile drafted from PDFs, saved as a paper, test issue) | Done (`onboard/`, Papers screen) |
 | Urdu (right to left) | Works (`sample-urdu`); Nastaliq tuning waits for the paper's chosen font |
@@ -130,9 +133,9 @@ Macs with an Intel processor are no longer built for (26 Oct 2026). Everything i
 ## 2. Quick start
 
 ### The app (what the paper's computer runs)
-- **Windows:** double-click `windows\Install Capital Kranti.cmd`. **Mac:** `mac/Install Capital Kranti.command`. They install Node and Git if needed, copy the app, its Chromium and the Gopika fonts (from a folder you pick), sign in to GitHub for Publish, build the newsroom, put **Capital Kranti** on the desktop / in Applications, start it at log-in and wake the computer at 7:55 PM.
+- **The installers** come from the GitHub release (see **Install the app** above): Windows and Apple-silicon Macs. They put **Capital Kranti** on the desktop / in Applications, start it at log-in and wake the computer before the evening run.
 - **The newsroom** opens at `http://127.0.0.1:3000/newsroom`; the engine at `http://127.0.0.1:4000` (both local only). One launcher behind both apps: `node scripts/launch.mjs [--background | --stop | --update | --status]`.
-- **Every evening** the engine runs the day (PIB → rewrite → Hindi top-up → features if short → build) at the Settings' time; the editor reviews it on **Today / Pages / Stories**, then **Approve & Publish** (website) and **Print PDF**. The editor's guide: `docs/NEWSROOM_GUIDE.md` (Gujarati and English).
+- **Every evening** the engine runs the day (PIB → rewrite → Hindi top-up → features if short → build) at the Settings' time; the editor reviews it on **Tonight's paper** (the pages large, a story clicked to edit it), then **Save for CorelDRAW** or **Print**. The editor's guide: `docs/NEWSROOM_GUIDE.md` (Gujarati and English).
 - By hand: `cli.ts all --date D [--from fetch|rewrite|topup|fill|build]`, `cli.ts pib --date D --lang gu|hi`, `cli.ts topup --date D`.
 
 ### Requirements
@@ -229,7 +232,11 @@ backend/
                             publication folder (licensed fonts, never public)
   src/profile.ts            loads publications/$CK_PUBLICATION/profile.json
   src/store.ts              SQLite (releases, stories, ads, issues, edits, fitted)
-  src/server.ts             HTTP API + the 20:00 Asia/Kolkata job
+  src/server.ts             HTTP API: who may talk to the engine, the runs in line, the start
+  src/api/                  its routes, one file per area (issues, copies, releases, ads,
+                            settings, papers) and upkeep.ts: the evening run, daily backup, hourly news
+  src/backup.ts             backups outside the app, and a restore
+  src/tidy.ts               the data folder kept to a size
   src/build.ts              the whole issue build + release gates
   src/chrome/chrome.ts      masthead / running headers / footer with the day's fields
   src/fonts/bharati.ts      Unicode Gujarati -> Bharati Gopika glyph codes
@@ -259,7 +266,9 @@ backend/
     stories.ts              dedupe, related stories, edits, stand-in ads
     compose.ts              older box-filling composer; its helpers (stackLines,
                             columnElements...) are used by module.ts. Rest is dead code.
-  test/                     bharati-roundtrip.ts, compare-models.ts, recompose-0808.ts (stale)
+  test/                     pack-0808.ts, sample-english.ts (the CI layout tests), rules.ts (the
+                            paper's rules read off the pages), screens.ts (every screen in
+                            Gujarati), replay.ts, bharati-roundtrip.ts, compare-models.ts
 publications/capital-kranti/
   profile.json              everything that makes Capital Kranti look like itself
   chrome.json               masthead/header/footer art + field positions + stand-in ads
@@ -290,8 +299,8 @@ scripts/
 docs/
   RENDER_CONTRACT.md        the JSON spec (for anyone writing a backend)
   FRONTEND_ROADMAP.md, PRECISION_ROADMAP.md   history
-archive/                    retired code, kept for reference (frontend-layout-engine,
-                            legacy-pipeline). The 8 August article boxes in
+archive/                    retired code and studies, kept for reference (frontend-layout-engine,
+                            legacy-pipeline, august-study: the August measurements). The 8 August article boxes in
                             archive/frontend-layout-engine/article-level-issue-2026-08-08.json
                             are still used by recompose-0808.ts.
 (196) Capital Kranti_08 august.pdf   THE reference issue (the only one that exists)
@@ -544,7 +553,7 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 
 ## 12. Backend API, storage, nightly job
 
-`backend/src/server.ts` uses Node's built-in http module, on port 4000. On the paper's computer it answers only to its own address, and only the newsroom's pages (ports 3000/3100, or `CK_NEWSROOM_ORIGIN`) may read its answers or change anything; the release reader proves itself with a key of its own.
+`backend/src/server.ts` uses Node's built-in http module, on port 4000; each area's routes are in `backend/src/api/`, and the full list is at the top of `server.ts`. On the paper's computer it answers only to its own address, and only the newsroom's pages (ports 3000/3100, or `CK_NEWSROOM_ORIGIN`) may read its answers or change anything; the release reader proves itself with a key of its own.
 
 | Method | Path | What |
 |---|---|---|
@@ -565,11 +574,17 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
 | GET | `/api/layout` | the page in cm, its columns and each page's room for stories (the Ads screen's preview) |
 | GET/POST/DELETE | `/api/ads` | ad bookings: GET `?date=` (each with every day it runs), POST books one, DELETE `/api/ads/:id` removes it from all its days |
 | GET | `/api/papers`, POST `/api/papers/:id/test` | the papers, a test issue of one (its own process and data folder) |
+| GET | `/api/issues/:date/editable.pdf`, `/pdf8`, `/editable8.pdf` | the paper for CorelDRAW (text stays text); the 8-page paper, and it for CorelDRAW |
+| GET/POST | `/api/issues/:date/editions` | the sister papers (Hindi, Urdu); POST `{only?}` makes them |
+| GET/POST | `/api/jobs`, GET `/api/events` | the day's runs; POST `{date, from?}` starts one; the live log as server-sent events |
+| GET | `/api/ads/month?month=YYYY-MM` | how many ads are booked on each day of the month |
+| GET/POST | `/api/status`, `/api/settings` | the newsroom's dashboard and settings |
+| GET/POST | `/api/space` | what the data folder holds; POST clears old files now (`tidy.ts`) |
 
 - **Storage:** `backend/data/capital-kranti.sqlite`, through `node:sqlite`. Tables: `releases`, `stories`, `ads`, `issues` (date, version, status, json, report), `edits`, `fitted`.
 - **Backups:** every day a copy of the database in the data folder's `backups/` (the last 7), and one outside the app (`backend/src/backup.ts`) in Settings' folder, the Documents folder by default: `Capital Kranti backup/<date>/` with the database gzipped, `settings.env`, the customers' designs, the ads' pictures, added papers and every other paper's data, the last 30 kept. A restore keeps what it replaces in `backups/before-restore-<time>/`.
 - **Clean-up** (`backend/src/tidy.ts`, once a day and Settings' "Free up space"): a day's older versions go from 3 days back (the last and any approved kept), copies' and sister papers' PDFs and page images after 30 days, release and Telegram photos after 90, the copy workers' databases after each batch; then the database is compacted. The day's own PDFs and issues stay. Files the database names are kept relative to `out/` (`config.ts` `outFile`), so a moved or restored data folder still finds them.
-- **Nightly job:** `everyEvening()` runs `runDay()` at 20:00 Asia/Kolkata: inbox ingest (missing, so it logs and skips), then rewrite, then build. It does nothing useful until 15.2 exists.
+- **The evening run** (`api/upkeep.ts` `everyEvening`): the whole pipeline at Settings' time (20:00 India time by default), then the sister papers. Skipped without an AI key. **Every hour** the day's news is collected and written ahead (`collectHourly`), so the evening is left with little but the layout.
 
 ---
 
@@ -614,13 +629,15 @@ Style gates (`layout/style.ts`), what a reader sees, held to the 8 August paper'
   ```
   Page images land in `$DATA_DIR/out/pages/dev-test/2026-08-08/`. `backend/test/gaps.mts <date>` lists a build's empty stretches.
 - **Typography by numbers:** `python3 scripts/replica/style_stats.py <issue.pdf>` prints word gaps, letter spacing, display-line fill, headline sizes and body lines per page, read back from any PDF. The 8 August reference: word gap p50 4.5 / p90 6.7pt, letter spacing up to 0.72pt, display lines 96-100% full, 273-390 body lines a page.
+- **The paper's rules, a second time:** `backend/test/rules.ts` reads the printed pages apart from the build's gates (headlines at the paper's least size, headline over sub-heading over body, no one-column story without an ad, no photo in one, no story twice, no message squares, one house ad at most, the paper's page size). Both CI layout tests run it; on its own it checks a saved day on a copy of the database: `CK_PUBLICATION=capital-kranti DATA_DIR=<copy> CK_ENV_FILE=/dev/null node --experimental-strip-types --experimental-sqlite --no-warnings backend/test/rules.ts DATE`. The Sample Herald (`sample-english`) still runs a story down one column with no ad beside it (the engine's last way out of a one-column gap), so its test reports that without failing.
+- **Every screen in Gujarati:** `backend/test/screens.ts [newsroom] [engine]` opens each newsroom screen of a started app and fails on a page error, a console error, a 500 or English words (names like CorelDRAW and PIB allowed; text marked `lang="en"`, a release as PIB wrote it, set aside). CI runs it on the app it starts.
 - **Stale:** `backend/test/recompose-0808.ts` uses the old box composer and the rough 8 August ad regions, so it reports ad overlaps. Superseded by `pack-0808.ts`; remove it (15.9).
 
 ---
 
 ## 15. Remaining work
 
-1. **Install on the father's Windows PC** with the user: `windows\Install Capital Kranti.cmd` (after this branch is merged: the installer clones `main`), paste the OpenRouter key in Settings, set the run time, and watch one 8 PM run.
+1. **Install on the father's Windows PC** with the user: the Windows installer from the latest GitHub release, paste the OpenRouter key in Settings, choose the backup folder (a pen drive or another disk), set the run time, and watch one 8 PM run.
 2. **The other five papers** (1 Urdu, 1 Hindi, 3 Gujarati): each through the Papers screen with its PDFs, fonts and masthead art. The app switches the newsroom between papers (each in its own data folder, `papers/<id>/`, sharing the AI key); what's left is every paper in the 8 PM run, not only the chosen one. Papers added in the app live in its data folder (`publications/<id>/` there), so updates keep them.
 3. **Urdu polish** once the paper's Nastaliq font is known: line spacing, display fitting and the overlap tolerance for tall Nastaliq letters (`sample-urdu` shows where).
 4. **Print specs** from the printer: bleed, crop marks, CMYK/PDF-X (the preflight gate has the hook).

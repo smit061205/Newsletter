@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.67** (passed on Windows and Mac). Work happens on branch
+conversations. **Latest release: v1.1.74** (5 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -21,6 +21,23 @@ their side; every finished improvement merged, tagged and released without askin
 and what's in it); **one** test paper per change, built on a scratch copy of the database (never
 several days, never the real issues); a plan agreed before any big engine change (root-cause fixes,
 no shortcuts); costs in rupees. His father (the editor) uses the app on Windows every evening.
+
+**Done 5 Nov 2026 (v1.1.68-v1.1.74), the newsroom made simpler and safer:**
+- Stale news fixed (v1.1.68). The engine answers only the newsroom on this computer (v1.1.69).
+- Backups outside the app, in Settings' folder (Documents by default), the last 30, with a restore
+  (`backup.ts`, v1.1.70); the data folder kept to a size, once a day and from Settings' "Free up space"
+  (`tidy.ts`, v1.1.71: old versions after 3 days, copies' PDFs and page images after 30, photos after 90).
+- Publish is gone from the newsroom (the website doesn't read the e-paper); "Save for CorelDRAW" is the
+  main button; Gujarati calendar for ads; every screen word in Gujarati (v1.1.72).
+- The newsroom reorganised (v1.1.73): Tonight's paper shows the page large, a story clicked opens its
+  editor; Ads in 4 steps with a month calendar; Copies and sister papers together as Other papers;
+  Settings' set-once cards under "More settings". The old screens still open, out of the sidebar.
+- New checks (v1.1.74): `backend/test/rules.ts` reads the paper's rules off the pages apart from the
+  gates (in both CI layout tests); `backend/test/screens.ts` opens every screen in Gujarati and fails on
+  an error or English (in the `apps` workflow). `server.ts` split by area into `backend/src/api/`.
+- **Open:** the Sample Herald (`sample-english`) runs a story down one column with no ad beside it: the
+  engine's last way out of a one-column gap (`layout/engine.ts` solvePage `anyWidth`). Capital Kranti's
+  saved days keep the rule. Its test reports it without failing until the engine is changed (needs a plan).
 
 **Done 3-4 Nov 2026 (v1.1.63-v1.1.67):**
 - Every Telegram news of the editor's in every copy; photos never blown up (150 ppi, but the narrowest,
