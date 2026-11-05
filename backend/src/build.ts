@@ -73,6 +73,8 @@ export interface SectionsOpts {
 const LEAD_WORDS = 250;
 /** How many of the day's stories, most important first, are checked before the layout (a paper prints 20 to 30). */
 const FACTS_AHEAD = 30;
+/** A translated paper's stories put into its language this many at a time, until its pages have enough. */
+const TRANSLATE_BATCH = 10;
 /** Under this a story is a short item, ranked below the day's ordinary stories (set as a brief). */
 const SHORT_WORDS = 200;
 /** Two reports sharing this much of their opening words and figures are the same
@@ -451,24 +453,66 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         pool = [...pool.filter((s, i) => !stuck(s, i)), ...pool.filter((s, i) => stuck(s, i))];
       }
     }
+    const packer = new Packer(m);
+    // spread the day's copy over all the pages: each page's share of it is
+    // its share of the room the pages have (their band, less their ads)
+    const room = Array.from({ length: total }, (_, i) => {
+      const band = (chrome[i].bodyBottom - chrome[i].bodyTop) * spanWidth(GRID.columns);
+      const adArea = ads.filter((a) => a.page === i + 1).reduce((s, a) =>
+        s + a.width * Math.max(0, Math.min(a.y + a.height, chrome[i].bodyBottom) - Math.max(a.y, chrome[i].bodyTop)), 0);
+      return Math.max(0, band - adArea);
+    });
     let rewordCost = 0;
     let originals: Map<string, Story> | undefined;
+    let longerBy: Map<string, number> | undefined;
     if (opts.copy) {
       const c = opts.copy;
       // (the day's report of a customer's news gives way to his own article: never printed twice, 2 Nov)
       originals = new Map(pool.map((s) => [s.id, s]));
-      const got = await c.reword(c.drop?.length ? pool.filter((s) => !c.drop!.includes(s.id)) : pool);
-      rewordCost = got.cost;
-      // a story that couldn't be put into the paper's language stays out
-      if (c.translate) got.pool = got.pool.filter((s) => inPaperLanguage(s));
+      const given = c.drop?.length ? pool.filter((s) => !c.drop!.includes(s.id)) : pool;
       // the order the pages are filled in, shuffled: importance still counts,
       // with enough chance that every copy comes out its own
       const spread = c.shuffle === "anywhere" ? 4 : 2.5;
-      const lead = c.lead && got.pool.some((s) => s.id === c.lead) ? c.lead : got.pool[0]?.id;
+      const shuffled = (list: Story[]) => {
+        const lead = c.lead && list.some((s) => s.id === c.lead) ? c.lead : list[0]?.id;
+        const keyed = list.map((s) => ({ s, k: c.shuffle === "keepLead" && s.id === lead ? -Infinity : s.priority + c.rng() * spread }));
+        return keyed.sort((a, b) => a.k - b.k).map((x) => x.s);
+      };
       // (the copy's fixed articles, as given: never reworded)
-      const list = [...got.pool, ...(c.extras ?? [])];
-      const keyed = list.map((s) => ({ s, k: c.shuffle === "keepLead" && s.id === lead ? -Infinity : s.priority + c.rng() * spread }));
-      pool = keyed.sort((a, b) => a.k - b.k).map((x) => x.s) as typeof pool;
+      const extras = new Set(c.extras ?? []);
+      if (c.translate) {
+        // a translated paper: its order first, then translated down it only as far as
+        // its pages need (copy to fill them fillTarget times over at its natural size,
+        // as the Hindi top-up counts it) -- the editor's news always. 5 Nov: all 58 of
+        // the day's stories were translated for an Urdu paper printing 22
+        const order = shuffled([...given, ...extras]);
+        const place = new Map(order.map((s, i) => [s.id, i]));
+        const rooms = room.reduce((a, b) => a + b, 0);
+        const words: Story[] = order.filter((s) => extras.has(s));
+        let have = 0, next = 0;
+        for (let round = 0; next < order.length && have < profile.editorial.fillTarget * rooms; round++) {
+          const batch = round ? order.slice(next, next + TRANSLATE_BATCH) : order.filter((s, i) => i < TRANSLATE_BATCH || alwaysPrinted(s));
+          next = round ? next + TRANSLATE_BATCH : TRANSLATE_BATCH;
+          const got = await c.reword(batch.filter((s) => !extras.has(s) && (round === 0 || !alwaysPrinted(s))));
+          rewordCost += got.cost;
+          // (one that couldn't be put into the paper's language stays out)
+          for (const s of got.pool.filter((x) => inPaperLanguage(x))) {
+            words.push(s);
+            have += await packer.naturalArea(s, place.get(s.id) === 0);
+          }
+        }
+        pool = words.sort((a, b) => place.get(a.id)! - place.get(b.id)!) as typeof pool;
+        // (how much longer each runs in the paper's language: its facts written to a slot go as far)
+        const was = (s: Story) => wordCount(originals!.get(s.id)?.bodies.long ?? "");
+        longerBy = new Map(words.filter((s) => was(s) > 0).map((s) => [s.id, Math.min(2, Math.max(0.5, wordCount(s.bodies.long) / was(s)))]));
+        const left = Math.max(0, order.length - next);
+        log(`  translated ${words.length - extras.size} of ${order.length - extras.size} stories, ${Math.round((have / rooms) * 100)}% of the pages` +
+            (left ? `: the other ${left} not needed` : ""));
+      } else {
+        const got = await c.reword(given);
+        rewordCost = got.cost;
+        pool = shuffled([...got.pool, ...extras]) as typeof pool;
+      }
     }
     // the 8-page paper: the day's last page laid out again as an inside page, with its own stories, and each
     // section page with its section's; the day's other pages kept as they are
@@ -494,18 +538,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
           sectionList.map((x, k) => `page ${n + 1 + k} ${x.id}: ${own.filter((o) => o.section === x.id).length} stories`).join(", "));
     }
     log(`planning ${date} (issue ${issueNumber}): ${pool.length} stories, ${ads.length} ads, ${total} pages`);
-    const packer = new Packer(m);
     let spent = 0;
     const factChecks: { story: string; detail: string }[] = [];
     const finalPlans: PagePlan[] = [];
-    // spread the day's copy over all the pages: each page's share of it is
-    // its share of the room the pages have (their band, less their ads)
-    const room = Array.from({ length: total }, (_, i) => {
-      const band = (chrome[i].bodyBottom - chrome[i].bodyTop) * spanWidth(GRID.columns);
-      const adArea = ads.filter((a) => a.page === i + 1).reduce((s, a) =>
-        s + a.width * Math.max(0, Math.min(a.y + a.height, chrome[i].bodyBottom) - Math.max(a.y, chrome[i].bodyTop)), 0);
-      return Math.max(0, band - adArea);
-    });
     const content = (await Promise.all(pool.map((s, i) => packer.naturalArea(s, i === 0)))).reduce((a, b) => a + b, 0);
     const share = Math.min(1.05, content / room.reduce((a, b) => a + b, 0));
     log(`  the day's copy fills ${(share * 100).toFixed(0)}% of the pages at its natural size`);
@@ -521,8 +556,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (the old packer, and its AI gap closing, no longer lay out a page: 26 Oct)
     // (a copy carries no house ad: it's the paper's own name and number, and a copy is another paper's)
     const fillers: FillerCount = { messages: new Set(), houseAds: opts.copy ? Infinity : 0 };
+    // (a translated paper's stories too are written to their slots, in its language from their
+    // releases' facts and read against them: whole translations left its columns uneven, 5 Nov)
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, toFit: modular && !!opts.copy && !opts.copy.translate, columnPicks,
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, toFit: modular && !!opts.copy, ...(longerBy ? { longerBy } : {}), columnPicks,
       // (a page repaired alone is planned exactly: it has already failed by trial)
       modular, ...(keep ? { keep } : {}), ...(noItems ? { noItems } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,

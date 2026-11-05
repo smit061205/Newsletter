@@ -37,7 +37,7 @@ import { profile } from "../profile.ts";
 import { sectionsDay, type Store, type Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
 import { settable } from "./quality.ts";
-import { applyTextEdits, droppedBy } from "../layout/stories.ts";
+import { applyTextEdits, droppedBy, foreignLetters } from "../layout/stories.ts";
 import { newsOverlap } from "./translate.ts";
 
 export type Reword = "headline" | "headlineDeck" | "all";
@@ -257,10 +257,14 @@ async function rewordStory(store: Store, s: Story, n: number, reword: Reword, ke
   const model = translate ? profile.editorial.translateModel ?? DEFAULT_MODEL : env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
   let got: Record<string, string> | null = null;
   let cost = 0;
+  // (a translation with letters of another script, a name spelled in Hindi inside Urdu, done again once)
+  const mixed = (g: Record<string, string> | null) => translate && !!g && fields.some((f) => foreignLetters(g[f] ?? "").length > 0);
   const cached = store.fitted(cacheKey);
   if (cached) {
     try { got = JSON.parse(cached.body); } catch { got = null; }
-  } else if (process.env.CK_FAKE_AI === "1") {
+  }
+  const tries = !cached ? 2 : mixed(got) ? 1 : 0;
+  for (let t = 0; t < tries && (t === 0 || mixed(got)); t++) if (process.env.CK_FAKE_AI === "1") {
     // TESTS ONLY: Hindi "translated" letter for letter (Gujarati and Devanagari share their Unicode layout)
     const fake = (t: string) => (translate && profile.language.lang === "hi" ? t.replace(/[\u0A80-\u0AFF]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x180)) : t);
     got = Object.fromEntries(fields.map((f) => [f, fake(original[f])]));
@@ -268,7 +272,7 @@ async function rewordStory(store: Store, s: Story, n: number, reword: Reword, ke
     const ask = translate
       ? `\nNow you are translating a finished Gujarati story into ${LANG_NAME[profile.language.lang as Lang] ?? profile.language.lang} for this paper. ` +
         "Translate it faithfully and completely into natural, formal newspaper language: the same meaning and facts, every name, number and date exactly " +
-        "(numbers in Latin digits 0-9), nothing added and nothing left out. Keep the body's paragraphs (separated by a blank line) and its dateline. " +
+        "(numbers in Latin digits 0-9), every name spelled in this language's own letters, nothing added and nothing left out. Keep the body's paragraphs (separated by a blank line) and its dateline. " +
         `Return JSON {${fields.join(", ")}}.`
       : "\nNow you are rewording a finished story for another edition of the paper (edition " + n + "). " +
         "Say the same thing in slightly different words: the same meaning, the same facts, every name, number and date exactly as they are, " +
@@ -305,6 +309,7 @@ async function rewordStory(store: Store, s: Story, n: number, reword: Reword, ke
     if (!v) return false;
     // letters the paper's font can't print (Gopika has no "ૅ", nor some joins): they'd fall back to a system font
     if (!settable(v)) return false;
+    if (translate && foreignLetters(v).length) return false;
     const was = original[f];
     if (numbersNotIn(v, was).length || numbersNotIn(was, v).length) return false;
     if (translate) return true;
@@ -416,7 +421,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
     let spent = 0;
     for (let attempt = 0; attempt < 4; attempt++) {
       const built = await buildIssue(store, spec.date, {
-        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:)/.test(l)) say(`  ${l.trim()}`); },
+        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:|  translated)/.test(l)) say(`  ${l.trim()}`); },
         noReview: true,
         progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0),
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
@@ -451,7 +456,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
       const mine = new Set(made.built.report.placed.map((p) => p.story));
       progress(0.95, "the 8 pages");
       const eight = await buildIssue(store, spec.date, {
-        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:)/.test(l)) say(`  ${l.trim()}`); },
+        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:|  translated)/.test(l)) say(`  ${l.trim()}`); },
         noReview: true, seedShift: item.seed,
         sections: { base: made.built.pages, stories: w.stories.filter((s) => !mine.has(s.id)), pdfPath: item.pdf, blank: true },
       });
@@ -710,11 +715,14 @@ async function runBatch(batch: Batch, dir: string, work: (say: Say) => Promise<v
  * (its own paper's language; no browser) rewording or translating the day's
  * stories into the shared cache, which the layout workers then read. A
  * preparation already under way for the day (started beside the evening's
- * layout, prepareEditions) is waited for, not repeated. */
+ * layout, prepareEditions) is waited for, not repeated. A translated paper prepares
+ * nothing: it translates only the stories its pages need, as it's laid out (build.ts). */
 let preparing: { date: string; work: Promise<void> } | null = null;
-async function prepareAll(store: Store, tasks: Task[], say: Say): Promise<void> {
+async function prepareAll(store: Store, all: Task[], say: Say): Promise<void> {
   const t = Date.now();
-  if (preparing?.date === tasks[0]?.spec.date) await preparing.work;
+  if (preparing?.date === all[0]?.spec.date) await preparing.work;
+  const tasks = all.filter((task) => !task.spec.translate);
+  if (!tasks.length) return;
   await Promise.all(tasks.map((task, i) => runWorker(store, { ...task, spec: { ...task.spec, prepare: true } }, 50 + i, () => {}, () => {},
     (c) => spend(task, c.cost, c.stories))
     .catch((e: unknown) => say(`${task.label}: couldn't prepare its wording ahead (${e instanceof Error ? e.message : e}); it words them as it's laid out`))));
@@ -722,11 +730,13 @@ async function prepareAll(store: Store, tasks: Task[], say: Say): Promise<void> 
   timeMark("wording", (Date.now() - t) / 1000);
 }
 
-/** The sister papers' wording and translations started while the day's own
- * paper is still being laid out (pipeline.ts): done by the time they're made. */
+/** The Gujarati sister papers' wording started while the day's own paper is
+ * still being laid out (pipeline.ts): done by the time they're made. */
 export function prepareEditions(store: Store, date: string, all: Edition[]): Promise<void> {
-  if (!all.length) return Promise.resolve();
-  const tasks: Task[] = all.map((e) => ({
+  // (the translated ones translate as they're laid out: prepareAll)
+  const own = all.filter((e) => e.lang === profile.language.lang);
+  if (!own.length) return Promise.resolve();
+  const tasks: Task[] = own.map((e) => ({
     lang: e.lang, label: e.name, seen: [],
     spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: [] },
     item: { n: 100 + all.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + all.indexOf(e) },

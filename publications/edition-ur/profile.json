@@ -145,7 +145,7 @@
   "workhorseModel": "openai/gpt-6-luna",
   "leadModel": "google/gemini-3.8-flash",
   "leadStories": 3,
-  "translateModel": "google/gemini-3.8-flash",
+  "translateModel": "openai/gpt-6-luna",
   "fillTarget": 1.35,
   "minWords": 100
  },

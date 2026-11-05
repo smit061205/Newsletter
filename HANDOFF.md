@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.75** (5 Nov). Work happens on branch
+conversations. **Latest release: v1.1.76** (5 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -38,6 +38,25 @@ no shortcuts); costs in rupees. His father (the editor) uses the app on Windows 
 - **Open:** the Sample Herald (`sample-english`) runs a story down one column with no ad beside it: the
   engine's last way out of a one-column gap (`layout/engine.ts` solvePage `anyWidth`). Capital Kranti's
   saved days keep the rule. Its test reports it without failing until the engine is changed (needs a plan).
+
+**Done 5 Nov 2026 (v1.1.76), a translated paper cheaper and packed tight** (the user: ₹62 for the
+Urdu paper's translation was too much, and its columns ended uneven):
+- Translated by GPT-6 Luna (`edition-ur` `translateModel`; the user chose it after a blind A/B with
+  Gemini: about 15 times cheaper, as good to read). The Hindi paper is still on Gemini.
+- Its stories' order is fixed first, then they're translated down it 10 at a time only until there's
+  copy for its pages 1.35 times over (`TRANSLATE_BATCH`, `build.ts`): 38 of 59 on 4 Nov. The editor's
+  news always.
+- Its stories are written to their slots like a copy's (`toFit`), in its own language from the
+  release's facts and read against it; the fits are cached per language (`fitKey`, `rewrite.ts`). A
+  whole translation can't be fitted, so its columns ended a line apart. The longest a story may be
+  written grows with how much longer its translation ran (`longerBy`: Urdu ~1.37 times the Gujarati
+  words; capped at the release's word count, the stories came out short and page 4 had a gap).
+- A translation with letters of another script (Luna spelled "Jadhav" in Hindi letters inside Urdu)
+  is done again once, then left out (`foreignLetters`, `layout/stories.ts`).
+- The test paper (4 Nov, on a copy): ₹8.60 from nothing cached (four layout tries), no white-space
+  gap, no touching lines. **Open:** headline order now and then (a long Nastaliq headline shrinks below
+  a lesser one's); a "50 lakh" flagged against an English "5 million" (the Gujarati story has the same
+  flag); the Hindi paper's new translate flow untested by a real paper.
 
 **Done 5 Nov 2026 (v1.1.75), the Urdu paper back** (the user: "make urdu paper on capital kranti sized
 and grid paper, just like we make its hindi"): `ur-1` is in the sister papers again and Urdu in Copies.

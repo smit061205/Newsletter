@@ -125,7 +125,7 @@ Macs with an Intel processor are no longer built for (26 Oct 2026). Everything i
 | **Checks**: the layout engine on two papers, the paper's rules read off the pages, every screen in Gujarati | Done (`backend/test/`, the `apps` workflow) |
 | **CorelDRAW SVG export** | Done (`export/svg.ts`, `/api/export/:date.svg?page=N`) |
 | **Add a newspaper** (profile drafted from PDFs, saved as a paper, test issue) | Done (`onboard/`, Papers screen) |
-| Urdu (right to left) | Works: the Urdu sister paper (`edition-ur`, Noto Nastaliq Urdu made fit by `scripts/urdu-fonts.py`) and `sample-urdu` |
+| Urdu (right to left) | Works: the Urdu sister paper (`edition-ur`, Noto Nastaliq Urdu made fit by `scripts/urdu-fonts.py`; translated by GPT-6 Luna only as far as its pages need, each story written to its slot) and `sample-urdu` |
 | State news (Gujarat Info Dept) | Off (PIB only, by choice): the `/reader` bookmark remains; email ingest not built |
 
 ---

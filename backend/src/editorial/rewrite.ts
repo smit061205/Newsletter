@@ -418,6 +418,11 @@ const FIT_SCHEMA = {
   },
 };
 
+/** The key the AI's work on a story is saved under, in this paper's language: a sister
+ * paper starts from Capital Kranti's saved work, and its Gujarati fit of a story is
+ * no Urdu one (5 Nov: a translated paper's fits would find the Gujarati and throw it away). */
+export const fitKey = (key: string) => (profile.language.lang === "gu" ? key : `${key}|${profile.language.lang}`);
+
 let fits = 0;
 /** AI length fits asked for so far (build.ts times the layout with it). */
 export const fitCalls = () => fits;
@@ -428,7 +433,7 @@ export async function fitLength(store: Store, story: Story, release: Release, wo
                                 opts: { log?: (s: string) => void;
                                         /** the space exactly: the body lines it must fill, and the words a line holds */
                                         lines?: number; perLine?: number } = {}): Promise<{ body: string; cost: number; factCheck?: string } | null> {
-  const key = `${story.id}|${words}`;
+  const key = fitKey(`${story.id}|${words}`);
   const cached = store.fitted(key);
   if (cached) return repeats(cached.body) ? null : { body: cached.body, cost: 0, ...(cached.factCheck ? { factCheck: cached.factCheck } : {}) };
   if (process.env.CK_FAKE_AI === "1") {
@@ -509,7 +514,7 @@ const NEWS_BRIEF_SCHEMA = {
  * per story and size. Null without an API key, or when it can't be trusted. */
 export async function newsBrief(store: Store, story: Story, release: Release, size: { words: number; head: number; deck: number },
                                 opts: { log?: (s: string) => void } = {}): Promise<{ story: Story; cost: number } | null> {
-  const key = `newsbrief|${story.id}|${size.head}|${size.deck}|${size.words}`;
+  const key = fitKey(`newsbrief|${story.id}|${size.head}|${size.deck}|${size.words}`);
   const make = (b: { headline: string; deck: string; body: string }): Story => {
     const body = paragraphs(b.body).join(" ");
     return { ...story, kicker: "", headline: b.headline.trim(), deck: b.deck.trim(), bodies: { long: body, medium: body, short: body } };
