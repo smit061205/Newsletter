@@ -97,7 +97,8 @@ function textHtml(el: TextElement, px: (v: number) => string): string {
   const fit = el.nowrap && el.align === "justify-all" ? " data-fit" : "";
   const dir = el.direction === "rtl" ? ` dir="rtl"` : "";
   const lang = el.lang ? ` lang="${esc(el.lang)}"` : "";
-  return `<div class="t" data-el="${esc(el.id)}"${fit}${label}${dir}${lang} style="${styles.join(";")}">${body}</div>`;
+  const touch = el.mayTouch ? ` data-touch="${px(el.mayTouch)}"` : "";
+  return `<div class="t" data-el="${esc(el.id)}"${fit}${touch}${label}${dir}${lang} style="${styles.join(";")}">${body}</div>`;
 }
 
 /** The element's text as styled runs (a plain string is one unstyled run). */
@@ -261,7 +262,7 @@ const PROBE = `
           var m = ctx.measureText(word);
           Array.prototype.forEach.call(range.getClientRects(), function (r) {
             var base = r.top + m.fontBoundingBoxAscent;
-            inks.push({ id: el.dataset.el, x0: r.left, x1: r.right, y0: base - m.actualBoundingBoxAscent,
+            inks.push({ id: el.dataset.el, touch: parseFloat(el.dataset.touch) || 0, x0: r.left, x1: r.right, y0: base - m.actualBoundingBoxAscent,
                         y1: base + m.actualBoundingBoxDescent,
                         word: word, font: ctx.font, dir: cs.direction, base: base, width: m.width });
           });
@@ -308,9 +309,12 @@ const PROBE = `
       c.fillText(w.word, 0, 0);
       c.restore();
     }
-    // (b a word, or a picture, rule or box edge: a rectangle)
+    // (b a word, or a picture, rule or box edge: a rectangle). Lines of one story set so
+    // tight their letters may touch (both marked data-touch): letters meeting no deeper
+    // than that, top to bottom, are let through as a touch.
     function lettersMeet(a, b) {
       if (!a.word) return true;
+      var may = a.touch && b.touch && meta[a.id] && meta[a.id] === meta[b.id] ? Math.min(a.touch, b.touch) : 0;
       var pad = Math.max(a.y1 - a.y0, b.y1 - b.y0);
       var x0 = Math.min(a.x0, b.x0) - pad, y0 = Math.min(a.y0, b.y0) - pad;
       var w = Math.ceil(Math.max(a.x1, b.x1) + pad - x0), h = Math.ceil(Math.max(a.y1, b.y1) + pad - y0);
@@ -335,7 +339,7 @@ const PROBE = `
         if (y < my0) my0 = y;
         if (y > my1) my1 = y;
       }
-      return mx1 >= 0 && (mx1 - mx0 + 1) / SCALE > GRACE && (my1 - my0 + 1) / SCALE > GRACE;
+      return mx1 >= 0 && (mx1 - mx0 + 1) / SCALE > GRACE && (my1 - my0 + 1) / SCALE > Math.max(GRACE, may);
     }
     var said = {};
     function report(a, otherId, what) {

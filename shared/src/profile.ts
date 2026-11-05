@@ -115,6 +115,10 @@ export const ProfileSchema = z.object({
        * a story uneven (the Urdu paper, 5 Nov: 15 of 20 stories ended a line apart). Not yet every paper's:
        * on the Sample Herald, preferring level settings left a hole no filler fitted */
       levelColumns: z.boolean().optional(),
+      /** lines set so close that a letter's tail may touch the line under it, as in Urdu dailies (the
+       * developer, 5 Nov): how far, as a share of the size, letters of one story's lines in this font
+       * may run into each other before the plotter calls it an overlap (none when not given) */
+      linesMayTouch: z.number().positive().max(0.5).optional(),
     }),
     headline: TextStyleSchema.extend({
       leading: z.number().positive(),
