@@ -121,7 +121,7 @@ function Sources({ releases, open, setOpen, busy, translate }: { releases: Relea
                 <div key={r.id}>
                   <button className={s.listItem} onClick={() => setOpen(open === r.id ? null : r.id)} aria-expanded={open === r.id}>
                     <span className={s.listTitle} lang={r.lang}>{r.headline}</span>
-                    <span className={s.listMeta}>{r.ministry}</span>
+                    <span className={s.listMeta} lang={r.lang}>{r.ministry}</span>
                     <span className={s.listBadges}>{r.inPaper && <Badge tone="good">{t("sources.inPaper")}</Badge>}</span>
                   </button>
                   {open === r.id && (
