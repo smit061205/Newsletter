@@ -16,7 +16,7 @@ import { BatchTime } from "./BatchTime";
 import { PaperView } from "./PaperView";
 
 export function SisterToday() {
-  const { t, lang, date, pdf } = useApp();
+  const { t, lang, date, pdf, toast } = useApp();
   const { status, refresh } = useStatus();
   const paper = status!.paper;
   const id = paper.sister!;
@@ -68,6 +68,9 @@ export function SisterToday() {
   const openPdf = () => report && pdf({ url: media(`/api/issues/${date}/pdf?v=${version}`), title: `${paper.name} · ${t("pdf.title", { issue: num(lang, report.issueNumber) })}`, fileName: fileName("") });
   const openCorel = () => report && pdf({ url: media(`/api/issues/${date}/editable.pdf?v=${version}`),
     title: t("corel.title", { what: `${paper.name} · ${t("pdf.title", { issue: num(lang, report.issueNumber) })}` }), fileName: fileName(" - CorelDRAW") });
+  // (Hindi or Urdu for CorelDRAW with its text editable: a folder in Downloads)
+  const saveFolder = () => call<{ folder: string }>(`/api/issues/${date}/editable-folder`, { json: {} })
+    .then((r) => toast(t("corel.saved", { folder: r.folder }))).catch((e) => setError((e as Error).message));
   // (what making it again costs: a day of about 45 stories, from what these papers really cost)
   const rate = status?.costRates?.[paper.lang && paper.lang !== "gu" ? `translate-${paper.lang}` : "headlineDeck"] ?? 0;
   const failed = !going && run?.status === "failed" && !run.files.some((f) => f.id === id);
@@ -95,6 +98,7 @@ export function SisterToday() {
           <Hero tone={todo ? "warn" : "good"} icon={todo ? Icon.alert() : Icon.checkCircle()} title={todo ? t("today.look.title", { n: num(lang, todo) }) : t("today.ready.title")}
                 body={t("sister.ready.body", { issue: num(lang, report.issueNumber), stories: num(lang, report.placed.length), pages: num(lang, report.pages) })}>
             <Button kind="primary" big icon={Icon.download()} onClick={openCorel}>{t("today.corel")}</Button>
+            {(paper.lang === "ur" || paper.lang === "hi") && <Button big icon={Icon.download()} onClick={saveFolder}>{t("corel.editable")}</Button>}
             <Button big icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>
           </Hero>
         )}
