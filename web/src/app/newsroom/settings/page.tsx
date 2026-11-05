@@ -137,7 +137,7 @@ export default function SettingsPage() {
           <h2 className={s.cardTitle}>{t("settings.about")}</h2>
           <dl className={s.facts}>
             <dt>{t("settings.news")}</dt><dd>{t("settings.newsBody")}</dd>
-            <dt>{t("settings.version")}</dt><dd>{status?.version ?? "—"}</dd>
+            <dt>{t("settings.version")}</dt><dd translate="no">{status?.version ?? "—"}</dd>
           </dl>
         </section>
         </div>

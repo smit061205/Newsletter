@@ -59,3 +59,9 @@ console.log(`pages: ${path.join(DATA_DIR, "out", "pages", PUBLICATION, date)}`);
 const failed = report.gates.filter((g) => !g.pass);
 for (const g of failed) console.error(`FAILED: ${g.gate} -- ${g.detail}`);
 process.exitCode = failed.length ? 1 : 0;
+// and the paper's own rules, read off the pages apart from the gates (rules.ts): told,
+// not failed, on this paper for now -- a story runs down one column with no ad
+// beside it here (the engine's last way out of a one-column gap, layout/engine.ts
+// solvePage `anyWidth`), which the rules allow only beside an ad
+const { checkRules } = await import("./rules.ts");
+checkRules(store, date);

@@ -100,3 +100,6 @@ console.log(`pages: ${path.join(DATA_DIR, "out", "pages", PUBLICATION, date)}`);
 const failed = report.gates.filter((g) => !g.pass);
 for (const g of failed) console.error(`FAILED: ${g.gate} -- ${g.detail}`);
 process.exitCode = failed.length ? 1 : 0;
+// and the paper's own rules, read off the pages apart from the gates (rules.ts)
+const { checkRules } = await import("./rules.ts");
+if (!checkRules(store, date)) process.exitCode = 1;
