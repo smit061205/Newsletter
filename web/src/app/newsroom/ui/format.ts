@@ -48,6 +48,17 @@ const BADLY_EMPTY = 72;
 /** Points to centimetres (the PDF's points: 1/72 inch). */
 const CM = 2.54 / 72;
 
+/** What a copy (or sister paper) being made is doing, in plain words. */
+export function copyDoing(lang: Lang, w: string): string {
+  // a copy laid out again: which try, then what it's doing
+  const again = w.match(/^again (\d+): (.*)$/);
+  if (again) return `${tr(lang, "copies.doing.again", { n: num(lang, again[1]) })} · ${copyDoing(lang, again[2])}`;
+  const m = w.match(/^(planning|finishing) (\d+)$/);
+  if (m) return tr(lang, m[1] === "planning" ? "progress.planning" : "progress.finishing", { item: num(lang, m[2]) });
+  if (w.startsWith("lengths")) return tr(lang, "copies.doing.lengths");
+  return w === "checking" ? tr(lang, "progress.checking") : w === "translating" ? tr(lang, "copies.doing.translating") : w === "rewording" ? tr(lang, "copies.doing.rewording") : w;
+}
+
 /** The checks that failed, as things the editor can look at, in plain words. */
 export function problems(lang: Lang, gates: Gate[], headlineOf: (id: string) => string | undefined,
                          whiteSpace: { page: number; height: number }[] = []): Problem[] {

@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { call, type Status } from "./api";
+import { call, switchPaper, type Status } from "./api";
 import s from "./newsroom.module.css";
 import { Calendar } from "./ui/calendar";
 import { useUpdate } from "./ui/desktop";
@@ -95,15 +95,18 @@ function Frame({ children }: { children: React.ReactNode }) {
     if (status && !status.onboarded && path !== "/newsroom/welcome") router.replace("/newsroom/welcome");
   }, [status, path, router]);
   if (path === "/newsroom/welcome") return <>{children}</>;
+  // a sister paper worked on as its own: its own name, and no other papers from inside it
+  const sister = status?.paper.sister ? status.paper : null;
+  const own = !status || (status.paper.id === "capital-kranti" && !sister);
   return (
     <div className={s.frame}>
       <nav className={s.side} aria-label={t("app.sub")}>
         <div className={s.logo}>
           <Mark className={s.mark} />
           {/* (another paper's own name, in its own words: not the newsroom's, so not translated) */}
-          <div className={s.logoText}><span className={s.logoName} translate={status && status.paper.id !== "capital-kranti" ? "no" : undefined}>{!status || status.paper.id === "capital-kranti" ? t("app.name") : status.paper.name}</span><span className={s.logoSub}>{t("app.sub")}</span></div>
+          <div className={s.logoText}><span className={s.logoName} translate={own ? undefined : "no"}>{own ? t("app.name") : status!.paper.name}</span><span className={s.logoSub}>{t("app.sub")}</span></div>
         </div>
-        {NAV.map(([href, key, icon]) => (
+        {NAV.filter(([href]) => !sister || href !== "/newsroom/copies").map(([href, key, icon]) => (
           <Link key={href} href={href} className={`${s.navItem} ${href === "/newsroom/archive" || href === "/newsroom/papers" ? s.navExtra : ""}`}
                 aria-current={path === href ? "page" : undefined}>{icon()}<span>{t(key)}</span></Link>
         ))}
@@ -113,7 +116,15 @@ function Frame({ children }: { children: React.ReactNode }) {
         )}
         <button className={`${s.navItem} ${s.navExtra}`} onClick={() => setHelp(true)}>{Icon.help()}<span>{t("nav.help")}</span></button>
       </nav>
-      <main className={s.content}>{down && status ? <EngineDown /> : children}</main>
+      <main className={s.content}>
+        {sister && (
+          <div className={s.sisterBar} role="status">
+            <span>{t("sister.on", { name: sister.name })}</span>
+            <Button onClick={() => switchPaper(null)} icon={Icon.left()}>{t("sister.back")}</Button>
+          </div>
+        )}
+        {down && status ? <EngineDown /> : children}
+      </main>
       {help && <Help onClose={() => setHelp(false)} />}
     </div>
   );

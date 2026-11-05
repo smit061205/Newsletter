@@ -401,3 +401,7 @@
 .adSteps button[aria-selected="true"] b, .adSteps button[data-done="true"] b { background: var(--accent); color: #fff; }
 .adSteps button:disabled { opacity: 0.45; cursor: default; }
 .adCount { position: absolute; top: 2px; right: 4px; font-size: 10px; line-height: 14px; min-width: 14px; padding: 0 3px; border-radius: 999px; background: var(--accent); color: #fff; }
+
+/* a sister paper worked on as its own: its name across the top, and the way back */
+.sisterBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; max-width: 1320px; margin: 0 auto 20px;
+             padding: 10px 14px 10px 18px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font-weight: 600; }

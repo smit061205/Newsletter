@@ -100,6 +100,8 @@ export interface CopyOpts {
   reword: (pool: Story[]) => Promise<{ pool: Story[]; cost: number }>;
   /** where this copy's PDF goes */
   pdfPath: string;
+  /** a folder for its pages as pictures too (a sister paper's, for the newsroom: sister.ts) */
+  images?: string;
   /** the store the gap closer caches its length fits in (a reworded body has its own) */
   store?: Store;
   /** the stories come in another language (`reword` translates them): not filtered by language until then */
@@ -613,7 +615,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   let printed: Awaited<ReturnType<typeof printIssue>>;
   try {
     printed = await printIssue(issue, { origin: PLOT_ORIGIN, resolve: assetFile, browser,
-                                        ...((restricted || opts.images) && !opts.copy && !opts.sections ? { images: 150 } : {}) });
+                                        ...(((restricted || opts.images) && !opts.copy && !opts.sections) || opts.copy?.images ? { images: 150 } : {}) });
   } finally { releaseBrowser(); }
   const { pdf, warnings, images } = printed;
   timing.print = Date.now() - t2;
@@ -621,7 +623,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   await mkdir(path.dirname(pdfPath), { recursive: true });
   await writeFile(pdfPath, pdf);
   if (images) {
-    const dir = pageImageDir(date);
+    const dir = opts.copy?.images ?? pageImageDir(date);
     await mkdir(dir, { recursive: true });
     await Promise.all(images.map((png, i) => writeFile(path.join(dir, `${i + 1}.png`), png)));
   }

@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.76** (5 Nov). Work happens on branch
+conversations. **Latest release: v1.1.78** (5 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -21,6 +21,17 @@ their side; every finished improvement merged, tagged and released without askin
 and what's in it); **one** test paper per change, built on a scratch copy of the database (never
 several days, never the real issues); a plan agreed before any big engine change (root-cause fixes,
 no shortcuts); costs in rupees. His father (the editor) uses the app on Windows every evening.
+
+**Done 5 Nov 2026 (v1.1.77-v1.1.78):** Paper back in the sidebar, and the 4-page PDF opens while the
+8-page paper is still being made (v1.1.77). **A sister paper worked on as its own** (v1.1.78; the developer:
+"like changing profiles in netflix"): Other papers → "Work on this paper" puts the whole newsroom on it
+(`?paper=<id>` on every call, `web/.../api.ts`; a bar across the top and "Back to Capital Kranti"). Its own
+store (`backend/src/sister.ts`, `data/sister-papers/<id>/paper.sqlite`): its ads start each day from
+Capital Kranti's until it changes that day's; Capital Kranti's edits go through unless it changed that
+story; its own text edits are put over its reworded or translated words; every make saves an issue
+there (latest per day, its PDF and page pictures under `out/sister-papers/<id>/<date>/`). Its news is
+Capital Kranti's; one engine and one evening run; "make again" makes that paper alone (`makeEditions`
+`only`). Not yet: the sister databases aren't in the backups (`backup.ts`).
 
 **Done 5 Nov 2026 (v1.1.68-v1.1.74), the newsroom made simpler and safer:**
 - Stale news fixed (v1.1.68). The engine answers only the newsroom on this computer (v1.1.69).

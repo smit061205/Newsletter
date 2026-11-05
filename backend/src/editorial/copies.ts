@@ -25,16 +25,17 @@
 // out/editions/<date>/<id>.pdf. Neither ever becomes the day's issue.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { copyFile as copyTo, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { DB_FILE, ENV_FILE, MEDIA_DIR, OUT_DIR, PAPERS_HOME, ROOT } from "../config.ts";
+import { DB_FILE, ENV_FILE, MEDIA_DIR, OUT_DIR, outName, PAPERS_HOME, ROOT } from "../config.ts";
 import { buildIssue, type CopyOpts } from "../build.ts";
 import { checkFacts } from "./facts.ts";
 import { browserServer, closeBrowser } from "../browser.ts";
 import { profile } from "../profile.ts";
-import { sectionsDay, type Store, type Story } from "../store.ts";
+import { sisterOut, sisterStore } from "../sister.ts";
+import { sectionsDay, type Ad, type Edit, type Store, type Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
 import { settable } from "./quality.ts";
 import { applyTextEdits, droppedBy, foreignLetters } from "../layout/stories.ts";
@@ -353,7 +354,8 @@ async function rewordStory(store: Store, s: Story, n: number, reword: Reword, ke
 /** What one layout set needs: where each one goes, how to shuffle and word it. */
 interface SetSpec {
   date: string;
-  items: { n: number; id?: string; name?: string; pdf: string; seed: number }[];
+  /** `images`: a folder for its pages as pictures (a sister paper's) */
+  items: { n: number; id?: string; name?: string; pdf: string; seed: number; images?: string }[];
   reword: Reword; shuffle: Shuffle; translate: boolean;
   /** the articles in every copy, word for word */
   articles?: Article[];
@@ -369,6 +371,9 @@ interface SetSpec {
   /** only reword (or translate) the day's stories for each item, caching them, and lay nothing out:
    * every copy's AI work done at once before the layouts, which run a couple at a time (memory) */
   prepare?: boolean;
+  /** a sister paper's own day (sister.ts): its ads, the edits it's laid out with (Capital Kranti's
+   * and its own, but its own text edits), and those text edits, put over its own wording after it */
+  ads?: Ad[]; edits?: Edit[]; mine?: Edit[];
 }
 type Say = (line: string) => void;
 type OnFile = (f: { n: number; ready: boolean; pages: number; cost: number; sig: string[] }) => void;
@@ -398,7 +403,8 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
       }));
       rewordCost += cost;
       say(`  ${item.name ?? `copy ${n}`}: ${changed} of ${pool.length} stories ${spec.translate ? "translated" : "reworded"}`);
-      return { pool: out, cost };
+      // (a sister paper's own words for a story, typed in its language: over its wording, not reworded)
+      return { pool: spec.mine?.length ? applyTextEdits(out, spec.mine) : out, cost };
     };
     if (spec.prepare) {
       // the day's stories as the build hands them to `reword` (edits applied,
@@ -417,7 +423,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
     own.fitted = (k: string) => store.fitted(`copy${n}|${k}`) ?? (spec.reword === "all" ? null : store.fitted(k));
     own.putFitted = (k: string, v: Parameters<Store["putFitted"]>[1]) => store.putFitted(`copy${n}|${k}`, v);
     own.forgetFitted = (id: string) => store.forgetFitted(`copy${n}|${id}`);
-    let made: { built: Awaited<ReturnType<typeof buildIssue>>; sig: string; layout: string; fails: number } | null = null;
+    let made: { built: Awaited<ReturnType<typeof buildIssue>>; sig: string; layout: string; fails: number; attempt: number } | null = null;
     let spent = 0;
     for (let attempt = 0; attempt < 4; attempt++) {
       const built = await buildIssue(store, spec.date, {
@@ -426,6 +432,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
         progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0),
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
         copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, reword, pdfPath: item.pdf,
+                ...(item.images ? { images: `${item.images}-${attempt}` } : {}),
                 translate: spec.translate, ...(!spec.translate ? { store: own } : {}),
                 ...(spec.articles?.length ? { extras: spec.articles.map((a, i) => articleStory(a, i, n, spec.date)) } : {}),
                 ...(spec.drop?.length ? { drop: spec.drop } : {}) },
@@ -439,7 +446,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
       if (repeat) say(`  ${item.name ?? `copy ${n}`} came out like an earlier one: laying it out again`);
       else if (!made || fails < made.fails) {
         // the best so far: its PDF kept aside (the next try writes the same file)
-        made = { built, sig, layout, fails };
+        made = { built, sig, layout, fails, attempt };
         await copyTo(item.pdf, `${item.pdf}.best`);
       }
       if (!repeat && fails === 0) break;
@@ -448,6 +455,12 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
     }
     if (!made) throw new Error(`${item.name ?? `copy ${n}`} couldn't be laid out unlike the others`);
     await rename(`${item.pdf}.best`, item.pdf);
+    // (its page pictures: the best try's)
+    if (item.images) {
+      await rm(item.images, { recursive: true, force: true });
+      await rename(`${item.images}-${made.attempt}`, item.images);
+      for (let a = 0; a < TRIES; a++) await rm(`${item.images}-${a}`, { recursive: true, force: true });
+    }
     // the 8-page paper: this copy's pages, its last laid out again as an inside page, then the
     // section pages as the evening chose and wrote them (none paid for twice), each copy laid out its own way
     if (spec.eight) {
@@ -465,6 +478,10 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
     }
     // its pages as laid out, for the editable PDF (export/pdf-editable.ts)
     await writeFile(item.pdf.replace(/\.pdf$/, ".json"), JSON.stringify(made.built.issue));
+    // and its report, for a sister paper's own issues (sister.ts), with each story's words as printed
+    // (reworded or translated: what its editor sees and changes)
+    const printed = made.built.pages.flatMap((p) => p?.placed.map(({ module: { story: x } }) => ({ id: x.id, headline: x.headline, deck: x.deck, body: x.bodies.long })) ?? []);
+    await writeFile(item.pdf.replace(/\.pdf$/, ".report.json"), JSON.stringify({ ...made.built.report, printed }));
     seen.add(made.sig); seen.add(made.layout);
     onFile({ n, ready: made.built.report.ready, pages: made.built.report.pages, cost: spent, sig: [made.sig, made.layout] });
   }
@@ -617,6 +634,15 @@ export async function copiesIn(store: Store, specFile: string) {
       // copies printed seven sample ads with them switched off
       store.db.exec("insert or replace into settings select * from src.settings where key in ('samplesOn', 'samplesOff')");
     } finally { store.db.exec("detach database src"); }
+    // a sister paper's own ads and edits, in place of the day's (sister.ts)
+    if (spec.ads) {
+      store.db.prepare("delete from ads where date = ?").run(d);
+      for (const a of spec.ads) store.putAd(a);
+    }
+    if (spec.edits) {
+      store.db.prepare("delete from edits where issue_date = ?").run(d);
+      for (const e of spec.edits) store.addEdit(e);
+    }
     let last = 0;
     await layOutHere(store, spec, (l) => console.log(`[copies] ${l}`), (f) => console.log(`@@file ${JSON.stringify(f)}`),
       // at most twice a second
@@ -805,6 +831,22 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
   }, opts.log);
 }
 
+/** A sister paper made: its pages, PDF and report kept as its own issue (sister.ts). */
+function keepIssue(store: Store, id: string, date: string) {
+  const pdf = editionFile(date, id);
+  const [issue, report] = [".json", ".report.json"].map((x) => JSON.parse(readFileSync(pdf.replace(/\.pdf$/, x), "utf8")));
+  const st = sisterStore(store, id);
+  const version = st.saveIssue(date, issue, report);
+  // (its own PDF of each version: making all the papers again clears the day's folder)
+  const kept = path.join(sisterOut(id, date), `v${version}.pdf`);
+  mkdirSync(path.dirname(kept), { recursive: true });
+  copyFileSync(pdf, kept);
+  st.updateReport(date, version, { ...report, pdf: outName(kept) });
+  // (a day's earlier versions: only its latest is kept, as for the paper's, tidy.ts)
+  st.db.prepare("delete from issues where date = ? and version < ?").run(date, version);
+  for (let v = 1; v < version; v++) rmSync(path.join(sisterOut(id, date), `v${v}.pdf`), { force: true });
+}
+
 /** Make the day's sister papers: each its own layout, the Gujarati ones
  * reworded (headline and sub-heading), the others translated. */
 export async function makeEditions(store: Store, date: string, editions: Edition[], opts: { log: Say; only?: string }): Promise<Batch> {
@@ -819,11 +861,14 @@ export async function makeEditions(store: Store, date: string, editions: Edition
     if (!opts.only) await rm(editionsDir(date), { recursive: true, force: true });
     await mkdir(editionsDir(date), { recursive: true });
     say(list.map((e) => `${e.name} (${LANG_NAME[e.lang]})`).join(", "));
-    // each paper's own seed, from its place in the full list: the same paper lays out the same way each time
+    // each paper's own seed, from its place in the full list: the same paper lays out the same way each time;
+    // each with its own ads and edits, its pages kept as pictures for the newsroom (sister.ts)
     const tasks: Task[] = list.map((e): Task => ({
       lang: e.lang, label: e.name, seen: day.seen,
-      spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: day.pageOf, lead: day.lead },
-      item: { n: 100 + editions.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + editions.indexOf(e) },
+      spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: day.pageOf, lead: day.lead,
+              ads: sisterStore(store, e.id).ads(date), ...sisterStore(store, e.id).layoutEdits(date) },
+      item: { n: 100 + editions.indexOf(e), id: e.id, name: e.name, pdf: editionFile(date, e.id), seed: 100 + editions.indexOf(e),
+              images: path.join(sisterOut(e.id, date), "pages") },
     }))
       // the Urdu paper last: it takes longest (its tall Nastaliq), the others shouldn't wait behind it
       .sort((a, b) => Number(a.lang === "ur") - Number(b.lang === "ur"));
@@ -834,6 +879,7 @@ export async function makeEditions(store: Store, date: string, editions: Edition
       batch.cost += f.cost;
       batch.files = [...batch.files.filter((x) => x.id !== e.id), { n: f.n, id: e.id, name: e.name, lang: e.lang, ready: f.ready, pages: f.pages }];
       batch.done++;
+      try { keepIssue(store, e.id, date); } catch (x) { say(`${e.name}: not kept in its past issues (${x instanceof Error ? x.message : x})`); }
       say(`${e.name} ready${f.ready ? "" : " (some checks need a look)"}`);
     });
     learn(store, batch);

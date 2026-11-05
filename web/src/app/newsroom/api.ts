@@ -28,8 +28,10 @@ export interface Status {
   /** what a story costs in each kind of copy (US$), learned from real batches, and a copy's minutes */
   costRates: Record<string, number>; copyMinutes: number; samplesOn: boolean;
   issue: { version: number; status: string; ready?: boolean; issueNumber?: number } | null; version: string;
-  /** the paper this newsroom is working on */
-  paper: { id: string; name: string; kickers?: boolean };
+  /** the paper this newsroom is working on; `sister`: one of its sister papers, worked on as its own */
+  paper: { id: string; name: string; kickers?: boolean; sister?: string; lang?: PaperLang };
+  /** the sister papers */
+  editions: Edition[];
 }
 export interface ArchiveRow { date: string; version: number; status: string; issueNumber?: number; ready?: boolean; cost?: number; stories: number; pages?: number }
 export interface ReleaseRow {
@@ -94,11 +96,30 @@ export function batchProgress(run: CopiesRun, guess: number): { share: number; m
 
 export const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:4000";
 
+// The paper the newsroom is on (the developer, 5 Nov: "like changing profiles in netflix"):
+// Capital Kranti, or one of its sister papers worked on as its own -- every call says which
+// (backend/src/sister.ts). Kept in this browser; switching reloads the newsroom.
+const PAPER_KEY = "ck-paper";
+/** The sister paper being worked on, or null (Capital Kranti). */
+export function openPaper(): string | null {
+  try { return typeof window === "undefined" ? null : localStorage.getItem(PAPER_KEY); } catch { return null; }
+}
+/** Work on a sister paper (an id), or go back to Capital Kranti (null): the newsroom starts again on it. */
+export function switchPaper(id: string | null) {
+  try { if (id) localStorage.setItem(PAPER_KEY, id); else localStorage.removeItem(PAPER_KEY); } catch {}
+  window.location.href = "/newsroom";
+}
+/** An engine path on the open paper. */
+const onPaper = (path: string) => {
+  const id = openPaper();
+  return id && path.startsWith("/api/") ? `${path}${path.includes("?") ? "&" : "?"}paper=${encodeURIComponent(id)}` : path;
+};
+
 /** A backend call; its error message (in plain words) when it fails. */
 export async function call<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${BACKEND}${path}`, {
+    res = await fetch(`${BACKEND}${onPaper(path)}`, {
       ...init,
       ...(init?.json !== undefined ? { method: init.method ?? "POST", body: JSON.stringify(init.json), headers: { "content-type": "application/json" } } : {}),
     });
@@ -107,10 +128,12 @@ export async function call<T>(path: string, init?: RequestInit & { json?: unknow
   }
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
+  // (a sister paper taken out of the list: back to Capital Kranti)
+  if (res.status === 404 && openPaper() && data?.error === `no paper ${openPaper()}`) switchPaper(null);
   if (!res.ok) throw new Error((data && data.error) || `the engine answered ${res.status}`);
   return data as T;
 }
 
 /** A file the backend serves (page images, photos, the PDF) -- or, for the
  * paper's own art (/chrome/..., /fonts/...), one the newsroom serves itself. */
-export const media = (path: string) => (/^https?:/.test(path) ? path : /^\/(media|api)\//.test(path) ? `${BACKEND}${path}` : path);
+export const media = (path: string) => (/^https?:/.test(path) ? path : /^\/(media|api)\//.test(path) ? `${BACKEND}${onPaper(path)}` : path);

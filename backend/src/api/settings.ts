@@ -9,7 +9,11 @@ import { DEFAULT_EDITIONS, START_RATES, type CostKind, type Edition } from "../e
 import { currentJob } from "../pipeline.ts";
 import { profile, PUBLICATION as PUBLICATION_ID } from "../profile.ts";
 import type { Store } from "../store.ts";
+import { SisterStore } from "../sister.ts";
 import { indiaNow, readJson, send, type Ctx } from "./http.ts";
+
+/** A sister paper's name and language, for the newsroom. */
+const pick = (e: Edition | undefined) => (e ? { name: e.name, lang: e.lang } : {});
 import { copiesNow } from "./runs.ts";
 
 export async function settingsRoutes(c: Ctx) {
@@ -28,7 +32,9 @@ export async function settingsRoutes(c: Ctx) {
                         issueNumber: (latest.report as { issueNumber?: number }).issueNumber } : null,
       version: gitVersion(),
       // (kickers: whether this paper prints them; the story editor hides the field when not)
-      paper: { id: profile.id, name: profile.name, kickers: !(await import("../layout/typography.ts")).KICKER.none },
+      paper: { id: profile.id, name: profile.name, kickers: !(await import("../layout/typography.ts")).KICKER.none,
+               // a sister paper worked on as its own (sister.ts): its name and language
+               ...(store instanceof SisterStore ? { sister: store.id, ...pick(s.editions.find((e) => e.id === store.id)) } : {}) },
     });
   }
   if (parts[0] === "api" && parts[1] === "settings") {
