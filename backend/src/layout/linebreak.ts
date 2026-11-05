@@ -17,10 +17,13 @@
 //
 // Widths are measured in Chromium (measure.ts); the breaking runs here.
 
+import { profile } from "../profile.ts";
+
 /** How far each kind of spacing may move, as a share. */
 export const MICRO = {
-  /** word space, as a share of the font's own space */
-  spaceMin: 0.7, spaceMax: 2.0,
+  /** word space, as a share of the font's own space (Urdu's to 3: its joined letters take no
+   * spacing, and at 2 only 7 of 129 paragraphs could set a line looser to end its columns level, 5 Nov) */
+  spaceMin: 0.7, spaceMax: profile.type.body.wordSpaceMax ?? 2.0,
   /** letter spacing, in em (the 8 August body runs up to about 0.055) */
   letterMin: -0.02, letterMax: 0.06,
   /** a hard ceiling for letter spacing on a line past its budget */

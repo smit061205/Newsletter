@@ -37,19 +37,21 @@
  "ink": "#231f20",
  "fonts": {
   "nastaliq": {
-   "file": "/private/edition-ur/fonts/NotoNastaliqUrdu-Regular.ttf",
+   "file": "/private/edition-ur/fonts/JameelNooriNastaleeq.ttf",
    "weight": 400,
    "fallback": "serif-regular"
   },
   "nastaliq-bold": {
-   "file": "/private/edition-ur/fonts/NotoNastaliqUrdu-Bold.ttf",
-   "weight": 700,
-   "fallback": "serif-regular"
+   "file": "/private/edition-ur/fonts/JameelNooriNastaleeq.ttf",
+   "weight": 400,
+   "fallback": "serif-regular",
+   "embolden": 0.025
   },
   "nastaliq-semibold": {
-   "file": "/private/edition-ur/fonts/NotoNastaliqUrdu-SemiBold.ttf",
-   "weight": 600,
-   "fallback": "serif-regular"
+   "file": "/private/edition-ur/fonts/JameelNooriNastaleeq.ttf",
+   "weight": 400,
+   "fallback": "serif-regular",
+   "embolden": 0.012
   },
   "serif-regular": {
    "file": "/fonts/LiberationSerif-Regular.ttf",
@@ -59,23 +61,25 @@
  "type": {
   "body": {
    "font": "nastaliq",
-   "size": 10.5,
-   "pitch": 24,
+   "size": 13,
+   "pitch": 22,
    "indent": 10,
    "pitches": [
-    24,
-    24.5,
-    25,
-    23.5
+    22,
+    22.5,
+    23,
+    21.5
    ],
    "sizes": [
-    10.5,
-    10
-   ]
+    13,
+    12.5
+   ],
+   "wordSpaceMax": 3,
+   "levelColumns": true
   },
   "headline": {
    "font": "nastaliq-bold",
-   "leading": 1.65,
+   "leading": 1.5,
    "capByColumns": [
     0,
     24,
@@ -108,17 +112,17 @@
    "font": "nastaliq-semibold",
    "ratio": 0.45,
    "min": 10,
-   "leading": 1.7
+   "leading": 1.55
   },
   "deck": {
    "font": "nastaliq-semibold",
    "ratio": 0.6,
-   "min": 14,
-   "leading": 1.65
+   "min": 15.5,
+   "leading": 1.55
   },
   "caption": {
    "font": "nastaliq",
-   "size": 9,
+   "size": 10.5,
    "pitch": 18
   }
  },
@@ -146,10 +150,11 @@
   "leadModel": "google/gemini-3.8-flash",
   "leadStories": 3,
   "translateModel": "openai/gpt-6-luna",
+  "reasoningEffort": "low",
   "fillTarget": 1.35,
   "minWords": 100
  },
- "fontLicence": "Noto Nastaliq Urdu, from Google Fonts: SIL Open Font License 1.1 (licence file in fonts/).",
+ "fontLicence": "Jameel Noori Nastaleeq (free of charge, 2008), used with permission (the developer, 5 Nov 2026). Its embedding flag (fsType 4) allows print embedding. It has no bold: headlines and sub-headings are thickened in print (the fonts' `embolden`).",
  "fillers": {
   "houseAd": [],
   "messages": [

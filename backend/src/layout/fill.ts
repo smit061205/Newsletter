@@ -83,10 +83,16 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
   const pitch = BODY.pitch;
   // fills the hole to its foot, or leaves room for another item under it
   const close = (mod: Module) => mod.height <= h + 0.5 && (h - mod.height < 1.5 * pitch || h - mod.height >= 4 * pitch + GAP.betweenStories);
+  // columns ending level win over a taller item ending a line apart (Urdu's, 5 Nov), and that over a hole
+  // (the Sample Herald's only filler for one ended a line apart: refused, its page kept a 56pt hole)
+  // (where the paper's columns must end level: the profile's `levelColumns`)
+  const short = (m: Module) => !!profile.type.body.levelColumns && !!m.short;
+  const better = (a: Module, b: Module | null | undefined) => !b || (!short(a) && short(b)) || (short(a) === short(b) && a.height > b.height);
   // 1. a held story as a brief
   for (const s of heldFor(ctx, page)) {
     const opts = await ctx.blocks.options(s, 5, cols);
-    const fit = opts.filter((o) => o.height <= h + 0.5 && o.height + o.stretch >= h - 1.5 * pitch).sort((a, b) => b.height - a.height)[0];
+    const fit = opts.filter((o) => o.height <= h + 0.5 && o.height + o.stretch >= h - 1.5 * pitch)
+      .sort((a, b) => Number(short(a.module)) - Number(short(b.module)) || b.height - a.height)[0];
     if (!fit || !ctx.held.includes(s)) continue;
     ctx.held.splice(ctx.held.indexOf(s), 1);
     const mod = await stretchTo(fit.module, h, ctx.m);
@@ -107,10 +113,10 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
         if (!Number.isFinite(mod.height) || mod.height > h + 0.5) continue;
         const heads = mod.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length;
         if ((mod.displayFill >= 0.97 || cols === 1) && heads <= (cols === 1 ? ONE_COLUMN_HEAD_LINES : 4) && mod.headlineHeight <= 0.45 * mod.height && close(mod)
-            && (!best || mod.height > best.mod.height)) best = { s, mod };
-        break; // (the longest cut that fits: shorter ones fill less)
+            && better(mod, best?.mod)) best = { s, mod };
+        if (!short(mod)) break; // (the longest cut that fits and ends level: shorter ones fill less)
       }
-      if (best && h - best.mod.height < 1.5 * pitch) break;
+      if (best && !short(best.mod) && h - best.mod.height < 1.5 * pitch) break;
     }
     if (best && ctx.held.includes(best.s)) {
       ctx.held.splice(ctx.held.indexOf(best.s), 1);
@@ -139,18 +145,20 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
         ctx.cost += got.cost;
         // a hair long: whole sentences off its end
         const sentences = got.story.bodies.long.split(/(?<=[.।!?])\s+/);
-        let tried: Module | null = null;
+        let tried: Module | null = null, uneven: Module | null = null;
         for (let k = sentences.length; k >= 1; k--) {
           const body = sentences.slice(0, k).join(" ");
           if (words(body) < ITEM_WORDS) break;
           if (!whole(body)) continue;
           tried = await buildModule({ ...got.story, bodies: { long: body, medium: body, short: body } }, 5, cols, "long", ctx.m, 0, BODY.pitch, HEADLINE.filler);
-          if (Number.isFinite(tried.height) && tried.height <= h + 0.5) break;
+          if (Number.isFinite(tried.height) && tried.height <= h + 0.5) { if (!short(tried)) break; uneven ??= tried; }
         }
+        // (none of its cuts ends level: the longest that fits)
+        if (uneven && !(tried && !short(tried) && tried.height <= h + 0.5)) tried = uneven;
         const heads = tried ? tried.elements.filter((e) => new RegExp(`^${s.id}-h\\d+$`).test(e.id)).length : 0;
         if (tried && tried.height <= h + 0.5 && (tried.displayFill >= 0.97 || cols === 1) && heads <= (cols === 1 ? ONE_COLUMN_HEAD_LINES : 4)
-            && tried.headlineHeight <= 0.45 * tried.height && close(tried) && (!mod || tried.height > mod.height)) mod = tried;
-        filled = !!mod && h - mod.height < 1.5 * pitch;
+            && tried.headlineHeight <= 0.45 * tried.height && close(tried) && better(tried, mod)) mod = tried;
+        filled = !!mod && !short(mod) && h - mod.height < 1.5 * pitch;
         if (filled || !tried || !Number.isFinite(tried.height)) break;
         // the next try's length from what this one measured, short of the hole or over it
         const perLine = words(tried.story.bodies.long) / Math.max(1, tried.bodyLines);
@@ -192,8 +200,8 @@ async function fillOne(page: number, col: number, cols: number, y: number, h: nu
         brief = await set({ ...got.story, bodies: { long: body, medium: body, short: body } });
       }
       const fitsHere = brief.height <= h + 0.5 && (brief.displayFill >= 0.97 || cols === 1) && words(brief.story.bodies.long) >= ITEM_WORDS;
-      if (fitsHere && (!best || brief.height > best.height)) best = brief;
-      if (best && h - best.height < 1.5 * pitch) break;
+      if (fitsHere && better(brief, best)) best = brief;
+      if (best && !short(best) && h - best.height < 1.5 * pitch) break;
       const perLine = words(got.story.bodies.long) / Math.max(1, brief.bodyLines);
       target = Math.max(ITEM_WORDS, Math.round(words(brief.story.bodies.long) + Math.floor((h - brief.height) / pitch) * cols * perLine * 0.9));
     }

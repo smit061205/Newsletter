@@ -50,6 +50,31 @@ Capital Kranti's; one engine and one evening run; "make again" makes that paper 
   engine's last way out of a one-column gap (`layout/engine.ts` solvePage `anyWidth`). Capital Kranti's
   saved days keep the rule. Its test reports it without failing until the engine is changed (needs a plan).
 
+**The Urdu paper on Jameel Noori Nastaleeq** (5 Nov, the font the developer brought, with permission to
+ship it): body 13/22pt, headlines and sub-headings thickened in print (the font has no bold: the fonts'
+`embolden`, `build.ts`); the Noto files stay beside it unused. Its columns end level by its profile
+(`type.body.levelColumns`): on every paper the same rule left the Sample Herald a 56pt hole no filler
+fitted (its own 4-column story ends 2 lines apart: **open**, all papers level needs a plan).
+
+**Urdu columns end level** (5 Nov, released with Jameel Noori Nastaleeq) (the user's screenshot: a 4-column Urdu story
+ending 5-5-4-4 lines, a white gap under it):
+- Why: Urdu's letters join, so a line stretches at its word spaces alone; at five words a line almost
+  no paragraph could set a line looser or tighter (7 of 129 at the old limit), which is how a story's
+  columns are ended level. 15 of 20 stories on the test paper ended a line uneven, under the gap
+  check's line and a half. The Gujarati paper of 4 Nov had none.
+- Urdu's word spaces may spread to 3 times the font's own (`type.body.wordSpaceMax`, profile; 2 for
+  every other paper): 70 of 129 paragraphs can then take a line more.
+- A story's setting records the lines its columns end short (`Module.short`, `module.ts`); the layout
+  takes a level setting wherever the story has one at that width, and a width with none costs more
+  (`blocks.ts`); gap fillers must end level; gate 2 fails on any uneven story.
+- GPT-6 Luna is a thinking model: 7,000 tokens of thought over a 300-word Urdu story, 60 seconds, and
+  the test papers took an hour. The Urdu paper sets `editorial.reasoningEffort` "low" (11 seconds, a
+  seventh of the cost); fact checks always think in full (`openRouter(..., thinkInFull)`). **The
+  Gujarati paper's Luna calls still think in full** (not changed: its writing untested at "low").
+- The test paper (4 Nov, on a copy): under 2 minutes, no gaps, no uneven columns. **Open:** an ad that
+  leaves a one-column strip can't be filled in Urdu (its headlines run too long down one column; the
+  scratch copy's test ad on page 4 left the page unlaid); headline order now and then.
+
 **Done 5 Nov 2026 (v1.1.76), a translated paper cheaper and packed tight** (the user: ₹62 for the
 Urdu paper's translation was too much, and its columns ended uneven):
 - Translated by GPT-6 Luna (`edition-ur` `translateModel`; the user chose it after a blind A/B with
