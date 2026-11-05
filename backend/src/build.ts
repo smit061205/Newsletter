@@ -601,10 +601,14 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   } finally {
     await m.close();
   }
-  // (a font with no bold of its own printed bolder where the profile says: its `embolden`)
+  // (a font with no bold of its own printed bolder where the profile says: its `embolden`;
+  // lines set so tight their letters may touch: the body font's, as far as `linesMayTouch`)
+  const touch = profile.type.body.linesMayTouch;
   const bolder = (e: Element): Element => {
-    const by = e.kind === "text" && !e.thicken ? profile.fonts[e.font]?.embolden : 0;
-    return by && e.kind === "text" ? { ...e, thicken: by * e.size } : e;
+    if (e.kind !== "text") return e;
+    const by = !e.thicken ? profile.fonts[e.font]?.embolden : 0;
+    const t = by ? { ...e, thicken: by * e.size } : e;
+    return touch && e.font === profile.type.body.font ? { ...t, mayTouch: touch * e.size } : t;
   };
   const pages = chrome.map((c, i) => ({
     number: i + 1, width: PAGE.width, height: PAGE.height,

@@ -56,6 +56,9 @@ export const TextElementSchema = z.object({
   wordSpacing: num.optional(),
   /** Letters spread this wide in their own colour, to make a thin font print heavier. */
   thicken: z.number().positive().optional(),
+  /** How far this text's letters may run into another line of the same story's text that also allows it
+   * before the plotter reports an overlap (a tight-set paper's body: profile `linesMayTouch`). */
+  mayTouch: z.number().positive().optional(),
   // One line set by the backend to exactly its width (its spacing and hScale
   // already computed): it never wraps, and the plotter checks it fills the box.
   nowrap: z.boolean().optional(),
