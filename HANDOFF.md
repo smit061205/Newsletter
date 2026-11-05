@@ -60,7 +60,10 @@ of Aman Ki Awaz's frame):
   out with "no setting keeps the desk's rules" (`blocks.ts`; S2 lets it through, `style.ts`).
 - Its title and footer: a PDF of the paper's page size uploaded per day on its Tonight's paper
   (`sister-papers/<id>/frames/<date>.pdf`), drawn over its pages whenever its PDF is given out
-  (`export/frame.ts`: Paper's Print PDF, Copies' sister papers). The pages still leave masthead,
+  (`export/frame.ts`: Paper's Print PDF, Copies' sister papers). A day without its own takes the
+  latest given before it, its dates ("Thursday, 05 November, 2026" in a standard font, as CorelDRAW
+  writes it) changed to the day the paper carries (`printedDate`), spaced to keep their place.
+  Its issue number isn't changed yet. Every sister paper has all of this. The pages still leave masthead,
   heads and last page's foot empty for it. The page pictures in the newsroom don't show it.
 - Its Tonight's paper shows the run's timer and log as Capital Kranti's does; Copies is in its sidebar.
 - CorelDRAW's PDF for the Urdu and Hindi papers (the father uses CorelDRAW): simple-font text can't
