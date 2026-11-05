@@ -98,6 +98,9 @@ export default function Today() {
   }, [date, refresh]);
 
   const running = job?.status === "running";
+  // the 4 pages are saved before the 8-page paper is made: theirs to open meanwhile
+  // (the developer, 5 Nov: "i can't access my 4 page pdf even if it is made")
+  const fourMade = !running || !!job?.steps.some((x) => x.name === "build" && (x.status === "done" || x.status === "skipped"));
   const otherRunning = status?.running && status.running.date !== date;
   const report = issue?.report;
   const headlineOf = useCallback((id: string) => stories.find((x) => x.id === id)?.headline, [stories]);
@@ -228,7 +231,8 @@ export default function Today() {
           <span className={s.faint}>{date === status?.today ? nextRun : ""}</span>
           <span className={s.row}>
             {report && <span className={s.faint}>{t("today.cost", { cost: rupees(lang, report.cost, status?.inrPerUsd ?? 88) })}</span>}
-            {report && !running && <Button kind="quiet" icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>}
+            {report && running && fourMade && <Button kind="quiet" icon={Icon.download()} onClick={openCorel}>{t("today.corel")}</Button>}
+            {report && fourMade && <Button kind="quiet" icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>}
             {report && !running && issue!.eight && <Button kind="quiet" icon={Icon.print()} onClick={openPdf8}>{t("today.print8")}</Button>}
             {report && !running && issue!.eightEditable && <Button kind="quiet" icon={Icon.download()} onClick={openCorel8}>{t("corel.pdf8")}</Button>}
             {report && !running && <Button kind="quiet" icon={Icon.refresh()} onClick={() => run()} disabled={!!otherRunning}>{t("today.again")}</Button>}

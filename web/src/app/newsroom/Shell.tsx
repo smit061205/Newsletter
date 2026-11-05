@@ -19,10 +19,12 @@ const StatusContext = createContext<StatusCtx>({ status: null, down: false, refr
 /** The engine's status (polled), for every screen. */
 export const useStatus = () => useContext(StatusContext);
 
-// five screens, around the editor's evening (5 Nov): the paper's pages, stories
-// and sources open from Tonight's paper; adding a newspaper from Settings
+// six screens, around the editor's evening (5 Nov): the paper's stories and sources open
+// from Tonight's paper, its pages from Paper too (the developer, 5 Nov: "give pages its
+// separate section just like before"); adding a newspaper from Settings
 const NAV: [string, StringKey, () => React.ReactElement][] = [
   ["/newsroom", "nav.today", Icon.today],
+  ["/newsroom/pages", "nav.paper", Icon.paper],
   ["/newsroom/ads", "nav.ads", Icon.ads],
   ["/newsroom/copies", "nav.copies", Icon.copies],
   ["/newsroom/archive", "nav.archive", Icon.archive],
