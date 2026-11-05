@@ -7,6 +7,7 @@ import { currentJob } from "../pipeline.ts";
 import { profile } from "../profile.ts";
 import { readJson, send, type Ctx } from "./http.ts";
 import { settingsOf } from "./settings.ts";
+import { withFrame } from "../export/frame.ts";
 
 export async function copiesRoutes(c: Ctx) {
   const { store, log, req, res, parts } = c;
@@ -79,13 +80,14 @@ export async function copiesRoutes(c: Ctx) {
         const id = parts[4].replace(/\.editable\.pdf$/, "");
         const json = editions.some((e) => e.id === id) ? editionFile(date, id).replace(/\.pdf$/, ".json") : "";
         if (!json || !existsSync(json)) return send(res, 404, { error: "make the papers again for their CorelDRAW PDF" });
-        return sendEditable(res, JSON.parse(await readFile(json, "utf8")));
+        return sendEditable(res, JSON.parse(await readFile(json, "utf8")), undefined, id);
       }
       if (req.method === "GET" && parts[4]) {
         const id = parts[4].replace(/\.pdf$/, "");
         const file = editions.some((e) => e.id === id) ? editionFile(date, id) : "";
         if (!file || !existsSync(file)) return send(res, 404, { error: `no paper ${id} for ${date}` });
-        return send(res, 200, new Uint8Array(await readFile(file)), "application/pdf");
+        // (with its title and footer for the day, if it has them: export/frame.ts)
+        return send(res, 200, await withFrame(id, date, new Uint8Array(await readFile(file))), "application/pdf");
       }
       if (req.method === "GET") return send(res, 200, { editions, run: batchOf("editions", date) });
       if (req.method === "POST") {
@@ -129,7 +131,7 @@ export async function copiesRoutes(c: Ctx) {
           const design = await d.designFor(f.n);
           if (!design) { without.push(f.n); continue; }
           const json = copyFile(body.date, f.n).replace(/\.pdf$/, ".json");
-          const corel = f.lang === "gu" && existsSync(json) ? await editablePdf(JSON.parse(await readFile(json, "utf8"))) : null;
+          const corel = existsSync(json) ? await editablePdf(JSON.parse(await readFile(json, "utf8"))) : null;
           const pdf = corel ? new Uint8Array(corel) : new Uint8Array(await readFile(copyFile(body.date, f.n)));
           const name = (body.names?.[String(f.n)] ?? `copy ${f.n}.pdf`).replace(/[\\/:*?"<>|]/g, "-");
           await d.stampFile(body.date, f.n, name, pdf);
@@ -160,11 +162,13 @@ export async function copiesRoutes(c: Ctx) {
 
 /** An issue as the CorelDRAW PDF, or why there's none (a Hindi or Urdu paper's text needs shaping). */
 /** `copy`: a copy's number, printed onto the designs of the paper it goes to (export/designs.ts). */
-export async function sendEditable(res: ServerResponse, issue: import("@ck/shared/contract").IssueRender, copy?: number) {
+/** `sister`: a sister paper's, with its title and footer for the day (export/frame.ts). */
+export async function sendEditable(res: ServerResponse, issue: import("@ck/shared/contract").IssueRender, copy?: number, sister?: string) {
   const { editablePdf } = await import("../export/pdf-editable.ts");
   const pdf = await editablePdf(issue);
-  if (!pdf) return send(res, 400, { error: "a Hindi or Urdu paper has no CorelDRAW PDF: use its print PDF" });
-  return send(res, 200, copy ? await onDesign(new Uint8Array(pdf), copy) : pdf, "application/pdf");
+  if (!pdf) return send(res, 400, { error: "this paper has no CorelDRAW PDF: use its print PDF" });
+  return send(res, 200, copy ? await onDesign(new Uint8Array(pdf), copy)
+    : sister ? await withFrame(sister, issue.issueDate, new Uint8Array(pdf)) : pdf, "application/pdf");
 }
 /** Copy `n`'s PDF on the title, headers and footer of the paper it goes to, if it has one. */
 async function onDesign(pdf: Uint8Array, n: number): Promise<Uint8Array> {

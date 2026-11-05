@@ -119,8 +119,9 @@ export class Blocks {
           const head = f === 1 ? undefined : { max: Math.max(HEADLINE.min, full * f), min: Math.max(HEADLINE.min, full * f * 0.72) };
           const mod = await buildModule(atRung(story, r), rank, cols, "long", this.m, mode, BODY.pitch, head);
           if (!Number.isFinite(mod.height)) break; // a photo layout the rules don't allow
-          // (down one column too: a word wider than the column ran into the next line, 28 Oct)
-          if (mod.displayFill < 0.97) continue;
+          // (down one column too: a word wider than the column ran into the next line, 28 Oct; an article
+          // printed word for word keeps its own title, however short: a sister paper's left out for one, 5 Nov)
+          if (mod.displayFill < 0.97 && !wordForWord(story)) continue;
           if (headlineHeavy(mod)) continue;
           // a brief's headline too: at most four lines, under half the brief
           // (22 Oct: a one-column brief under a nine-line headline)
