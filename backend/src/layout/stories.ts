@@ -86,6 +86,15 @@ export function inPaperLanguage(s: Story): boolean {
   }
 }
 
+/** Letters of another Indian or Arabic script than the paper's (a translation that spelled
+ * a name in Hindi letters inside Urdu: "جाधو", 5 Nov); none for an English paper. */
+export function foreignLetters(text: string): string[] {
+  const own: Record<string, RegExp> = { gu: /[઀-૿]/, ur: /[؀-ۿ]/, hi: /[ऀ-ॿ]/ };
+  const mine = own[profile.language.lang];
+  if (!mine) return [];
+  return [...new Set(text.match(/[ऀ-ॿ઀-૿؀-ۿ]/g) ?? [])].filter((c) => !mine.test(c));
+}
+
 /** Story text an editor changed wins over the generated one. */
 export function applyTextEdits(stories: Story[], edits: Edit[]): Story[] {
   return stories.map((s) => {

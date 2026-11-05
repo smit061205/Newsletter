@@ -171,6 +171,10 @@ export async function layOut(args: {
   mend?: { narrowLead?: boolean };
   /** the stories that may be the editor's column, best first */
   columnPicks?: string[];
+  /** a translated paper: each story's words in its language for each of the day's paper's
+   * (its release's facts go further in Urdu's longer wording: capped at the release's word
+   * count, its stories were written short of their slots, 5 Nov) */
+  longerBy?: Map<string, number>;
   /** a copy's stories as the day's paper words them (its own wording may not set) */
   originals?: Map<string, Story>;
   /** the page planned (layout/planner.ts), and written to what the plan measures */
@@ -284,8 +288,8 @@ export async function layOut(args: {
     sized = (await Promise.all(sized.map((s, i) => sizeOf(s.story, i === 0)))).filter((x): x is Sized => !!x);
     log(`  short of copy: longer versions written (${secs(t2)}s)`);
   }
-  // (a translation writes nothing: its stories run to the lengths there are)
-  const factsOf = (s: Story) => { const r = args.releases.get(s.id); return (args.longer || args.toFit) && r && !wordForWord(s) ? wordCount(paragraphs(r.body).join(" ")) : 0; };
+  // (how long each story may be written from its release's facts, a translated paper's too, 5 Nov)
+  const factsOf = (s: Story) => { const r = args.releases.get(s.id); return (args.longer || args.toFit) && r && !wordForWord(s) ? Math.round(wordCount(paragraphs(r.body).join(" ")) * (args.longerBy?.get(s.id) ?? 1)) : 0; };
   const pageAds = (n: number) => args.ads.filter((a) => a.page === n);
   const rooms = args.bands.map((b, i) => roomOf(b, pageAds(i + 1)));
   const rng = seeded(args.seed);
@@ -342,7 +346,7 @@ export async function layOut(args: {
       const release = args.releases.get(story.id);
       const ladder = ladders.get(story.id);
       if (!release || !ladder) return false;
-      let more = await writtenTo(args.store, story, release, ladder, lines, perLine, log);
+      let more = await writtenTo(args.store, story, release, ladder, lines, perLine, log, factsOf(story));
       if (!more) return false;
       // what it now says read before it goes on the page; written once more if it's wrong
       const read = async (body: string) => {
@@ -354,7 +358,7 @@ export async function layOut(args: {
       if (wrong.length) {
         args.store.forgetFitted(story.id);
         args.store.putFitted(`avoid|${story.id}`, { body: wrong.join("; "), model: "facts" });
-        more = await writtenTo(args.store, story, release, ladder, lines, perLine, log);
+        more = await writtenTo(args.store, story, release, ladder, lines, perLine, log, factsOf(story));
         if (!more || (await read(more.rungs[0].body)).length) return false;
       }
       ladders.set(story.id, more.rungs);

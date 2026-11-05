@@ -12,7 +12,7 @@
 //     important first).
 // Every rung passes editorial/quality.ts (never says a thing twice, every
 // letter printable) and is in the paper's language.
-import { aiStalled, fitLength, paragraphs } from "./rewrite.ts";
+import { aiStalled, fitKey, fitLength, paragraphs } from "./rewrite.ts";
 import { repeats, settable, withoutRepeats, wordCount } from "./quality.ts";
 import { inPaperLanguage } from "../layout/stories.ts";
 import { profile } from "../profile.ts";
@@ -70,7 +70,7 @@ export async function ladderOf(store: Store, story: Story, release: Release | un
     if (have >= longest * MORE_IN_RELEASE && longest < 700) {
       const target = Math.round(Math.min(have, longest * 1.6));
       // ("cached": a copy takes the day's paper's longer version, never asks for one)
-      const got = opts.longer === "cached" && !store.fitted(`${story.id}|${target}`) ? null
+      const got = opts.longer === "cached" && !store.fitted(fitKey(`${story.id}|${target}`)) ? null
         : await fitLength(store, story, release, target, { log: opts.log });
       if (got) {
         cost += got.cost;
@@ -140,10 +140,11 @@ export async function grown(store: Store, story: Story, release: Release, ladder
  * in order. Facts from its release only: null if the release can't reach it, or the
  * new text can't be printed. */
 export async function writtenTo(store: Store, story: Story, release: Release, ladder: Rung[], lines: number, perLine: number,
-                                log?: (s: string) => void): Promise<{ rungs: Rung[]; cost: number } | null> {
+                                log?: (s: string) => void, most?: number): Promise<{ rungs: Rung[]; cost: number } | null> {
   if (wordForWord(story) || aiStalled()) return null;
-  // (a line or two long: whole sentences come off it to fit, and a miss is written again)
-  const target = Math.round(Math.min(wordCount(paragraphs(release.body).join(" ")), (lines + 1.5) * perLine));
+  // (a line or two long: whole sentences come off it to fit, and a miss is written again;
+  // `most`, as far as its facts reach in the paper's language: Urdu says them in more words)
+  const target = Math.round(Math.min(most ?? wordCount(paragraphs(release.body).join(" ")), (lines + 1.5) * perLine));
   const got = await fitLength(store, story, release, target, { log, lines: Math.round(lines), perLine });
   if (!got || got.factCheck) return null;
   const rungs: Rung[] = [{ body: got.body, words: wordCount(got.body), from: "longer" }];
