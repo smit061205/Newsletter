@@ -11,7 +11,7 @@ import { batchProgress, call, media, type CopiesRun, type IssueInfo, type Job, t
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { BatchTime } from "../ui/BatchTime";
-import { num, rupees } from "../ui/format";
+import { copyDoing, num, rupees } from "../ui/format";
 import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
 import { artOf, Articles, blankArt, Swaps, type Art } from "./Articles";
@@ -122,15 +122,7 @@ export default function Copies() {
   const issueNo = info?.report.issueNumber ?? status?.issue?.issueNumber ?? 0;
   const paperName = status?.paper.name.split(" (")[0] ?? "Capital Kranti";
   // what a copy is doing, in plain words
-  const whatOf = (w: string): string => {
-    // a copy laid out again: which try, then what it's doing
-    const again = w.match(/^again (\d+): (.*)$/);
-    if (again) return `${t("copies.doing.again", { n: num(lang, again[1]) })} · ${whatOf(again[2])}`;
-    const m = w.match(/^(planning|finishing) (\d+)$/);
-    if (m) return t(m[1] === "planning" ? "progress.planning" : "progress.finishing", { item: num(lang, m[2]) });
-    if (w.startsWith("lengths")) return t("copies.doing.lengths");
-    return w === "checking" ? t("progress.checking") : w === "translating" ? t("copies.doing.translating") : w === "rewording" ? t("copies.doing.rewording") : w;
-  };
+  const whatOf = (w: string): string => copyDoing(lang, w);
   // a copy's print PDF, or (`corel`) the one whose text stays text in CorelDRAW
   // a copy's file name: on its paper's design, that paper's
   const nameOf = (n: number, corel = true) => {

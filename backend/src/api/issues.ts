@@ -9,10 +9,13 @@ import { currentJob, onJob, STEPS } from "../pipeline.ts";
 import type { StepName } from "../store.ts";
 import { sendEditable } from "./copies.ts";
 import { readJson, send, type Ctx } from "./http.ts";
-import { afterRun, copiesNow } from "./runs.ts";
+import { SisterStore, sisterOut, textEdit } from "../sister.ts";
+import { copiesNow } from "./runs.ts";
 
 export async function issuesRoutes(c: Ctx) {
-  const { store, log, req, res, url, parts, startJob } = c;
+  const { store, log, req, res, url, parts, startJob, later } = c;
+  // (a sister paper worked on as its own: sister.ts)
+  const sister = store instanceof SisterStore ? store : null;
   if (req.method === "GET" && url.pathname === "/api/issue") {
     const date = url.searchParams.get("date") ?? store.latestDate();
     const got = date ? store.latestIssue(date) : null;
@@ -75,6 +78,7 @@ export async function issuesRoutes(c: Ctx) {
       const { paperArticles, savePaperArticles, takeArticles } = await import("../editorial/articles.ts");
       if (req.method === "GET") return send(res, 200, paperArticles(date));
       if (req.method === "POST") {
+        if (sister) return send(res, 400, { error: "The editor's own articles go in Capital Kranti: go back to it to add them." });
         const body = (await readJson(req)) as { articles?: import("../editorial/articles.ts").GivenArticle[] };
         const articles = await takeArticles(date, body.articles ?? [], "paper");
         if (typeof articles === "string") return send(res, 400, { error: articles });
@@ -82,7 +86,7 @@ export async function issuesRoutes(c: Ctx) {
         // the paper laid out again with them, as after an edit
         if (!store.latestIssue(date)) return send(res, 200, { saved: true });
         if (currentJob() || copiesNow?.()?.date === date) {
-          afterRun.add(date);
+          later(date);
           return send(res, 202, { saved: true, rebuilding: "after the run that's going" });
         }
         return startJob(res, date, "build");
@@ -95,7 +99,7 @@ export async function issuesRoutes(c: Ctx) {
       // laid out again in the background; while a run goes (this day's or
       // another's), the day is laid out again as soon as it's done
       if (currentJob() || copiesNow?.()?.date === date) {
-        afterRun.add(date);
+        later(date);
         return send(res, 202, { saved: true, rebuilding: "after the run that's going" });
       }
       return startJob(res, date, "build");
@@ -103,6 +107,7 @@ export async function issuesRoutes(c: Ctx) {
     if (req.method === "POST" && parts[3] === "publish") {
       const got = store.latestIssue(date);
       if (!got) return send(res, 404, { error: `no issue built for ${date}` });
+      if (sister) return send(res, 400, { error: "Only Capital Kranti goes on the website." });
       // the app (no Git) publishes through the one-time GitHub sign-in
       if (!existsSync(path.join(ROOT, ".git")) && !process.env.GITHUB_TOKEN) {
         return send(res, 400, { error: "The website isn't connected yet. Open Settings and press Connect (once), then publish again." });
@@ -119,7 +124,7 @@ export async function issuesRoutes(c: Ctx) {
     // a page as an image (for papers whose fonts may not be served publicly)
     const { pageImageDir } = await import("../build.ts");
     try {
-      const png = await readFile(path.join(pageImageDir(parts[2]), parts[3]));
+      const png = await readFile(path.join(sister ? path.join(sisterOut(sister.id, parts[2]), "pages") : pageImageDir(parts[2]), parts[3]));
       return send(res, 200, new Uint8Array(png), "image/png");
     } catch {
       return send(res, 404, { error: `no image of page ${parts[3]} for ${parts[2]}` });
@@ -131,9 +136,19 @@ export async function issuesRoutes(c: Ctx) {
     const { applyTextEdits, droppedBy } = await import("../layout/stories.ts");
     const edits = store.edits(date);
     const dropped = droppedBy(edits);
-    const report = store.latestIssue(date)?.report as { placed?: { page: number; story: string; cols: number }[] } | undefined;
+    const report = store.latestIssue(date)?.report as { placed?: { page: number; story: string; cols: number }[];
+                                                         printed?: { id: string; headline: string; deck: string; body: string }[] } | undefined;
     const where = new Map((report?.placed ?? []).map((p) => [p.story, p]));
-    return send(res, 200, applyTextEdits(store.stories(date), edits).map((s) => ({
+    let stories = applyTextEdits(store.stories(date), edits);
+    if (sister) {
+      // a sister paper's stories in its own words, as it printed them (reworded or translated), its own edits over them
+      const printed = new Map((report?.printed ?? []).map((p) => [p.id, p]));
+      stories = applyTextEdits(stories.map((s) => {
+        const p = printed.get(s.id);
+        return p ? { ...s, headline: p.headline, deck: p.deck, bodies: { long: p.body, medium: p.body, short: p.body } } : s;
+      }), sister.ownEdits(date).filter(textEdit));
+    }
+    return send(res, 200, stories.map((s) => ({
       ...s, dropped: dropped.has(s.id), edited: edits.some((e) => e.storyId === s.id),
       page: where.get(s.id)?.page ?? null, cols: where.get(s.id)?.cols ?? null,
     })));

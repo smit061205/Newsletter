@@ -45,8 +45,8 @@ export default function Paper() {
         <Button kind="quiet" icon={Icon.refresh()} onClick={rebuild} disabled={running}>{running ? t("paper.rebuilding") : t("paper.rebuild")}</Button>
         <Button icon={Icon.print()} disabled={!info} onClick={() => info && pdf({ url: media(`/api/issues/${date}/pdf`),
           title: t("pdf.title", { issue: num(lang, info.report.issueNumber) }), fileName: fileName("") })}>{t("today.print")}</Button>
-        <Button kind="primary" icon={Icon.download()} disabled={!info} onClick={() => info && pdf({ url: media(`/api/issues/${date}/editable.pdf`),
-          title: t("corel.title", { what: t("pdf.title", { issue: num(lang, info.report.issueNumber) }) }), fileName: fileName(" - CorelDRAW") })}>{t("corel.pdf")}</Button>
+        {status?.paper.lang !== "hi" && status?.paper.lang !== "ur" && <Button kind="primary" icon={Icon.download()} disabled={!info} onClick={() => info && pdf({ url: media(`/api/issues/${date}/editable.pdf`),
+          title: t("corel.title", { what: t("pdf.title", { issue: num(lang, info.report.issueNumber) }) }), fileName: fileName(" - CorelDRAW") })}>{t("corel.pdf")}</Button>}
       </TopBar>
       {error && <Note tone="bad">{error}</Note>}
       <PaperView problems />

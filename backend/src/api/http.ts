@@ -59,6 +59,9 @@ export interface Ctx {
   url: URL;
   /** the path's parts: /api/issues/2026-11-05 -> ["api", "issues", "2026-11-05"] */
   parts: string[];
-  /** start a run of the day in the background and answer with its job (server.ts) */
+  /** start a run of the day in the background and answer with its job (server.ts); on a sister
+   * paper (sister.ts), make that paper again */
   startJob: (res: ServerResponse, date: string, from?: StepName) => true;
+  /** the day laid out again once what's being made is done (edits made meanwhile) */
+  later: (date: string) => void;
 }

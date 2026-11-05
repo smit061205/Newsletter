@@ -59,7 +59,8 @@ import { authorized, LOOPBACK, newsroomOrigins, send, type Ctx } from "./api/htt
 import { issuesRoutes } from "./api/issues.ts";
 import { papersApi } from "./api/papers.ts";
 import { releasesRoutes } from "./api/releases.ts";
-import { afterBatch, afterRun, copiesNow, loadCopies } from "./api/runs.ts";
+import { afterBatch, afterRun, afterSister, copiesNow, loadCopies } from "./api/runs.ts";
+import { sisterStore } from "./sister.ts";
 import { rupeeRate, settingsOf, settingsRoutes } from "./api/settings.ts";
 import { backupDaily, collectHourly, everyEvening } from "./api/upkeep.ts";
 
@@ -82,6 +83,15 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
       runPipeline(store, waited, { by: "newsroom", from, log }).catch((e) => log(`run for ${waited} stopped: ${e instanceof Error ? e.message : e}`));
       return;
     }
+    // a sister paper edited while something was being made: made again now
+    const sister = [...afterSister][0];
+    if (sister) {
+      afterSister.delete(sister);
+      const [id, date] = sister.split("|");
+      log(`making ${id} for ${date} again for the edits made meanwhile`);
+      makeSister(id, date);
+      return;
+    }
     const day = [...afterRun][0];
     if (!day) return;
     afterRun.delete(day);
@@ -101,6 +111,21 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
     }
     runPipeline(store, date, { by: "newsroom", from, log }).catch((e) => log(`run for ${date} stopped: ${e instanceof Error ? e.message : e}`));
     return send(res, 202, currentJob());
+  };
+  /** A sister paper made again from the day's paper, with its own ads and edits (sister.ts). */
+  const makeSister = (id: string, date: string) => {
+    import("./editorial/copies.ts").then(({ makeEditions }) => makeEditions(store, date, settingsOf(store).editions, { log, only: id }))
+      .catch((e) => log(`${id} stopped: ${e instanceof Error ? e.message : e}`));
+  };
+  /** On a sister paper, "make it again": once the day's paper and anything being made are done. */
+  const startSister = (id: string) => (res: ServerResponse, date: string): true => {
+    if (!store.latestIssue(date)) return send(res, 404, { error: "Make Capital Kranti's paper for this day first: this paper is made from it." });
+    if (currentJob()?.date === date || copiesNow()) {
+      afterSister.add(`${id}|${date}`);
+      return send(res, 202, { waitingFor: currentJob()?.date === date ? "paper" : copiesNow()!.kind });
+    }
+    makeSister(id, date);
+    return send(res, 202, { making: id });
   };
   const local = LOOPBACK.test(opts.host ?? "127.0.0.1");
   const origins = newsroomOrigins(opts.port);
@@ -130,8 +155,13 @@ export async function serve(store: Store, opts: { port: number; host?: string; l
         catch { return send(res, 404, { error: `no file ${url.pathname}` }); }
       }
       if (req.method !== "GET" && req.method !== "HEAD" && !authorized(req)) return send(res, 401, { error: "missing or wrong API token" });
-      const c: Ctx = { store, log, req, res, url, parts, startJob };
-      if (await issuesRoutes(c) || await copiesRoutes(c) || await releasesRoutes(c) || await adsRoutes(c) || await settingsRoutes(c)) return;
+      const main: Ctx = { store, log, req, res, url, parts, startJob, later: (date) => afterRun.add(date) };
+      // the paper the newsroom is on: Capital Kranti, or one of its sister papers worked on as its
+      // own (?paper=<id>: its pages, ads, edits and past issues; the news and the rest stay the paper's)
+      const paper = url.searchParams.get("paper");
+      if (paper && !settingsOf(store).editions.some((e) => e.id === paper)) return send(res, 404, { error: `no paper ${paper}` });
+      const c: Ctx = paper ? { ...main, store: sisterStore(store, paper), startJob: startSister(paper), later: (date) => afterSister.add(`${paper}|${date}`) } : main;
+      if (await issuesRoutes(c) || await copiesRoutes(main) || await releasesRoutes(main) || await adsRoutes(c) || await settingsRoutes(c)) return;
       if (parts[0] === "api" && parts[1] === "papers") return await papersApi(req, res, parts, url);
       return send(res, 404, { error: "not found" });
     } catch (e) {

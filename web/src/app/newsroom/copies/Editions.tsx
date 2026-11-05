@@ -4,7 +4,7 @@
 // masthead, page headers and footer left empty (editorial/copies.ts): make
 // them, open them, rename them.
 import { useCallback, useEffect, useState } from "react";
-import { batchProgress, call, media, type CopiesRun, type Edition, type Settings } from "../api";
+import { batchProgress, call, media, switchPaper, type CopiesRun, type Edition, type Settings } from "../api";
 import { useStatus } from "../Shell";
 import s from "../newsroom.module.css";
 import { BatchTime } from "../ui/BatchTime";
@@ -101,6 +101,8 @@ export function Editions() {
                 {f && <Button icon={Icon.print()} onClick={() => open(e)}>{t("copies.open")}</Button>}
                 {f && e.lang === "gu" && <Button kind="quiet" icon={Icon.download()} onClick={() => open(e, true)}>{t("corel.short")}</Button>}
                 {f && !running && <Button kind="quiet" icon={Icon.refresh()} onClick={() => make(e.id)} disabled={!!status?.running}>{t("eds.again")}</Button>}
+                {/* (the newsroom on that paper alone: its pages, ads, changes and past issues) */}
+                {renaming?.id !== e.id && <Button icon={Icon.right()} onClick={() => switchPaper(e.id)}>{t("sister.enter")}</Button>}
               </span>
             </div>
           );

@@ -11,6 +11,7 @@ import s from "./newsroom.module.css";
 import { num, problems, rupees } from "./ui/format";
 import { Badge, Button, Icon, Note, Ring, Skeleton, useApp } from "./ui/kit";
 import { PaperView } from "./ui/PaperView";
+import { SisterToday } from "./ui/SisterToday";
 import { StoryPanel } from "./ui/StoryPanel";
 import type { StringKey } from "./ui/strings";
 
@@ -49,6 +50,12 @@ function minutesLeft(job: Job, previous: Job | undefined): number | null {
 }
 
 export default function Today() {
+  const { status } = useStatus();
+  // (a sister paper worked on as its own: its own day, made from Capital Kranti's)
+  return status?.paper.sister ? <SisterToday /> : <PaperToday />;
+}
+
+function PaperToday() {
   const { t, lang, date, toast, pdf } = useApp();
   const { status, refresh } = useStatus();
   const [job, setJob] = useState<Job | null>(null);

@@ -5,12 +5,17 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR } from "../config.ts";
 import { profile } from "../profile.ts";
+import { ownAds, syncAds } from "../sister.ts";
 import type { Ad, Store } from "../store.ts";
 import { indiaNow, readJson, send, type Ctx } from "./http.ts";
 
 export async function adsRoutes(c: Ctx) {
   const { store, req, res, url, parts } = c;
   if (parts[0] === "api" && parts[1] === "ads") {
+    // (a sister paper's ads: Capital Kranti's on every day it hasn't changed, sister.ts)
+    syncAds(store);
+    /** The days a booking runs (a row per day: "<id>@<date>"), made a sister paper's own before they change. */
+    const own = (id: string) => ownAds(store, (store.db.prepare("select date from ads where id = ? or id like ?").all(id, `${id}@%`) as { date: string }[]).map((r) => r.date));
     if (req.method === "GET" && parts[2] === "month") {
       // how many ads are booked on each day of a month (the Ads screen's month), sample ads left out
       const month = url.searchParams.get("month") ?? indiaNow().day.slice(0, 7);
@@ -53,6 +58,7 @@ export async function adsRoutes(c: Ctx) {
       const body = (await readJson(req)) as { page?: number; place?: Ad["place"]; at?: Ad["at"] | null };
       if (body.page !== undefined && !(body.page >= 1 && body.page <= allPages())) return send(res, 400, { error: `the paper has pages 1 to ${allPages()}` });
       if (body.place !== undefined && !["left", "middle", "right"].includes(body.place)) return send(res, 400, { error: "the place is left, middle or right" });
+      own(id);
       const rows = store.db.prepare("select id, json from ads where id = ? or id like ?").all(id, `${id}@%`) as { id: string; json: string }[];
       if (!rows.length) return send(res, 404, { error: "no such ad" });
       for (const r of rows) {
@@ -71,6 +77,7 @@ export async function adsRoutes(c: Ctx) {
     if (req.method === "DELETE" && parts[2]) {
       // a booking is a row per day it runs ("<id>@<date>")
       const id = decodeURIComponent(parts[2]);
+      own(id);
       store.db.prepare("delete from ads where id = ? or id like ?").run(id, `${id}@%`);
       return send(res, 200, { deleted: parts[2] });
     }
@@ -146,6 +153,7 @@ async function bookAd(store: Store, b: AdBooking): Promise<{ booked: string[] }>
     const max = Math.floor(((band.bodyBottom - band.bodyTop) / PT / 72) * 2.54 * 10) / 10;
     throw new Error(`that's taller than page ${b.page} has room for: at most ${max} cm`);
   }
+  ownAds(store, [...days]);
   for (const date of days) {
     // the day's first booking replaces the 8 August stand-ins
     const ads = store.ads(date);

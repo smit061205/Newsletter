@@ -5,6 +5,8 @@ import type { StepName } from "../store.ts";
 
 /** Days to lay out again once the run that's going ends (edits made meanwhile). */
 export const afterRun = new Set<string>();
+/** Sister papers to make again ("<id>|<date>") once what's being made is done (edits made meanwhile: sister.ts). */
+export const afterSister = new Set<string>();
 /** Days to make again once their copies or sister papers are done, and the step to start from. */
 export const afterBatch = new Map<string, StepName | undefined>();
 
