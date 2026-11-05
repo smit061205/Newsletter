@@ -602,8 +602,6 @@ const gu = {
   "corel.pdf": "CorelDRAW માટે PDF",
   "corel.short": "CorelDRAW",
   "corel.title": "{what} · CorelDRAW માટે (લખાણ સુધારી શકાય)",
-  "corel.editable": "CorelDRAW (લખાણ બદલી શકાય)",
-  "corel.saved": "Downloads માં સાચવ્યું: {folder} — અંદરની \"વાંચો\" ફાઈલ જુઓ",
   "help.title": "મદદ",
 } as const;
 
@@ -1207,8 +1205,6 @@ const en: Record<StringKey, string> = {
   "corel.pdf": "PDF for CorelDRAW",
   "corel.short": "CorelDRAW",
   "corel.title": "{what} · for CorelDRAW (editable text)",
-  "corel.editable": "CorelDRAW (editable text)",
-  "corel.saved": "Saved in Downloads: {folder} — see the \"Read me\" file inside",
   "help.title": "Help",
 };
 
