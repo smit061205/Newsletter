@@ -116,11 +116,8 @@ function textSvg(e: TextElement, family: (id: string) => string, baseline: (id: 
     });
   }
   const justify = e.align === "justify" || e.align === "justify-all";
-  // (right-to-left text, Urdu: each line hangs from its right edge, its first indent there;
-  // CorelDRAW sets its letters joined in the installed font, its own way round)
-  const rtl = e.direction === "rtl";
-  const anchor = e.align === "center" ? "middle" : e.align === "right" || (rtl && e.align !== "left") ? "end" : "start";
-  const x0 = anchor === "middle" ? e.x + e.width / 2 : anchor === "end" ? e.x + e.width - (rtl ? e.indent ?? 0 : 0) : e.x + (e.indent ?? 0);
+  const anchor = e.align === "center" ? "middle" : e.align === "right" ? "end" : "start";
+  const x0 = anchor === "middle" ? e.x + e.width / 2 : anchor === "end" ? e.x + e.width : e.x + (e.indent ?? 0);
   const h = e.hScale ?? 1;
   const out: string[] = [];
   lines.forEach((line, i) => {
@@ -130,10 +127,7 @@ function textSvg(e: TextElement, family: (id: string) => string, baseline: (id: 
     const stretch = justify && (e.nowrap || !last || e.align === "justify-all");
     const attrs = [`x="${n(x0)}"`, `y="${n(y)}"`, family(e.font), `font-size="${n(e.size)}"`, `fill="${e.color ?? "#000"}"`,
       anchor !== "start" ? `text-anchor="${anchor}"` : "", e.letterSpacing ? `letter-spacing="${n(e.letterSpacing)}"` : "",
-      // (joined letters spread apart come unjoined: a right-to-left line isn't stretched to its width)
-      rtl ? `direction="rtl"` : "", e.wordSpacing ? `word-spacing="${n(e.wordSpacing)}"` : "", stretch && !rtl ? `textLength="${n(e.width / h)}" lengthAdjust="spacing"` : "",
-      // (a font with no bold printed heavier: an outline in its own colour, as wide as the print's)
-      e.thicken ? `stroke="${e.color ?? "#000"}" stroke-width="${n(e.thicken)}" stroke-linejoin="round"` : "",
+      e.wordSpacing ? `word-spacing="${n(e.wordSpacing)}"` : "", stretch ? `textLength="${n(e.width / h)}" lengthAdjust="spacing"` : "",
       h !== 1 ? `transform="translate(${n(e.x)} 0) scale(${h} 1) translate(${n(-e.x)} 0)"` : "", `xml:space="preserve"`].filter(Boolean).join(" ");
     const body = line.map((r) => {
       const style = [r.font ? family(r.font) : "", r.size ? `font-size="${n(r.size)}"` : "", r.color ? `fill="${r.color}"` : ""].filter(Boolean).join(" ");

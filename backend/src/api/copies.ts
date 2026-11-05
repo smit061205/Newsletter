@@ -3,7 +3,6 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { ServerResponse } from "node:http";
-import path from "node:path";
 import { currentJob } from "../pipeline.ts";
 import { profile } from "../profile.ts";
 import { readJson, send, type Ctx } from "./http.ts";
@@ -24,19 +23,6 @@ export async function copiesRoutes(c: Ctx) {
         const json = copyFile(date, Number(parts[4].replace(/\.editable\.pdf$/, ""))).replace(/\.pdf$/, ".json");
         if (!existsSync(json)) return send(res, 404, { error: "make the copies again for their CorelDRAW PDF" });
         return sendEditable(res, JSON.parse(await readFile(json, "utf8")), Number(parts[4].replace(/\.editable\.pdf$/, "")));
-      }
-      if (req.method === "POST" && parts[5] === "editable-folder") {
-        // a Hindi or Urdu copy for CorelDRAW with its text editable, its paper's design beside it (export/corel-folder.ts)
-        const n = Number(parts[4]);
-        const json = copyFile(date, n).replace(/\.pdf$/, ".json");
-        if (!existsSync(json)) return send(res, 404, { error: "make the copies again for CorelDRAW" });
-        const { designFor, DESIGNS_DIR } = await import("../export/designs.ts");
-        const design = await designFor(n);
-        const file = design ? path.join(DESIGNS_DIR, `${design.id}.pdf`) : "";
-        const extras = file && existsSync(file) ? [{ name: "title and footer.pdf", pdf: new Uint8Array(await readFile(file)) }] : [];
-        const { saveEditable } = await import("../export/corel-folder.ts");
-        const body = (await readJson(req)) as { name?: string };
-        return send(res, 200, { folder: await saveEditable(JSON.parse(await readFile(json, "utf8")), body.name || `copy ${n}`, extras) });
       }
       if (req.method === "GET" && parts[4]) {
         const n = Number(parts[4].replace(/\.pdf$/, ""));
@@ -95,16 +81,6 @@ export async function copiesRoutes(c: Ctx) {
         const json = editions.some((e) => e.id === id) ? editionFile(date, id).replace(/\.pdf$/, ".json") : "";
         if (!json || !existsSync(json)) return send(res, 404, { error: "make the papers again for their CorelDRAW PDF" });
         return sendEditable(res, JSON.parse(await readFile(json, "utf8")), undefined, id);
-      }
-      if (req.method === "POST" && parts[5] === "editable-folder") {
-        // a Hindi or Urdu paper for CorelDRAW with its text editable (export/corel-folder.ts)
-        const ed = editions.find((e) => e.id === parts[4]);
-        const json = ed ? editionFile(date, ed.id).replace(/\.pdf$/, ".json") : "";
-        if (!ed || !existsSync(json)) return send(res, 404, { error: "make the papers again for CorelDRAW" });
-        const { frameFor } = await import("../export/frame.ts");
-        const { saveEditable } = await import("../export/corel-folder.ts");
-        const frame = await frameFor(ed.id, date);
-        return send(res, 200, { folder: await saveEditable(JSON.parse(await readFile(json, "utf8")), ed.name, frame ? [{ name: "title and footer.pdf", pdf: frame }] : []) });
       }
       if (req.method === "GET" && parts[4]) {
         const id = parts[4].replace(/\.pdf$/, "");

@@ -10,7 +10,7 @@ import type { StepName } from "../store.ts";
 import { sendEditable } from "./copies.ts";
 import { readJson, send, type Ctx } from "./http.ts";
 import { SisterStore, sisterOut, textEdit } from "../sister.ts";
-import { frameFor, frameInfo, removeFrame, saveFrame, withFrame } from "../export/frame.ts";
+import { frameInfo, removeFrame, saveFrame, withFrame } from "../export/frame.ts";
 import { copiesNow } from "./runs.ts";
 
 export async function issuesRoutes(c: Ctx) {
@@ -48,14 +48,6 @@ export async function issuesRoutes(c: Ctx) {
       const got = store.latestIssue(date);
       if (!got) return send(res, 404, { error: `no issue built for ${date}` });
       return sendEditable(res, got.issue, undefined, sister?.id);
-    }
-    if (req.method === "POST" && parts[3] === "editable-folder") {
-      // a Hindi or Urdu paper for CorelDRAW with its text editable: a folder in Downloads (export/corel-folder.ts)
-      const got = store.latestIssue(date);
-      if (!got) return send(res, 404, { error: `no issue built for ${date}` });
-      const { saveEditable } = await import("../export/corel-folder.ts");
-      const frame = sister ? await frameFor(sister.id, date) : null;
-      return send(res, 200, { folder: await saveEditable(got.issue, sister?.id ?? "paper", frame ? [{ name: "title and footer.pdf", pdf: frame }] : []) });
     }
     if (req.method === "GET" && parts[3] === "editable8.pdf") {
       // the 8-page paper as a PDF whose text stays text in CorelDRAW

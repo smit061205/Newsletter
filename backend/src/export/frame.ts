@@ -174,12 +174,6 @@ export async function withFrame(id: string, date: string, pdf: Uint8Array): Prom
   return framed(pdf, (await redated(new Uint8Array(await readFile(got.file)), printedDate(date))).pdf);
 }
 
-/** A sister paper's title and footer for a day on their own, dated the day the paper carries (for CorelDRAW: export/corel-folder.ts). */
-export async function frameFor(id: string, date: string): Promise<Uint8Array | null> {
-  const got = frameOf(id, date);
-  return got ? (await redated(new Uint8Array(await readFile(got.file)), printedDate(date))).pdf : null;
-}
-
 /** The day's frame: how many pages, how many dates it changes by itself, and the day it was given for. */
 export async function frameInfo(id: string, date: string): Promise<{ pages: number; dates: number; from: string } | null> {
   const got = frameOf(id, date);

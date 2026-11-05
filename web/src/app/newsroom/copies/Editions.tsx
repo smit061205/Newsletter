@@ -100,8 +100,6 @@ export function Editions() {
                 {renaming?.id !== e.id && <Button kind="quiet" onClick={() => setRenaming({ id: e.id, name: e.name })}>{t("eds.rename")}</Button>}
                 {f && <Button icon={Icon.print()} onClick={() => open(e)}>{t("copies.open")}</Button>}
                 {f && <Button kind="quiet" icon={Icon.download()} onClick={() => open(e, true)}>{t("corel.short")}</Button>}
-                {f && e.lang !== "gu" && <Button kind="quiet" icon={Icon.download()} onClick={() => call<{ folder: string }>(`/api/issues/${date}/editions/${e.id}/editable-folder`, { json: {} })
-                  .then((r) => toast(t("corel.saved", { folder: r.folder }))).catch((x) => toast((x as Error).message))}>{t("corel.editable")}</Button>}
                 {f && !running && <Button kind="quiet" icon={Icon.refresh()} onClick={() => make(e.id)} disabled={!!status?.running}>{t("eds.again")}</Button>}
                 {/* (the newsroom on that paper alone: its pages, ads, changes and past issues) */}
                 {renaming?.id !== e.id && <Button icon={Icon.right()} onClick={() => switchPaper(e.id)}>{t("sister.enter")}</Button>}
