@@ -9,12 +9,14 @@
 // its CorelDRAW PDF -- and copies made before (PDFs from elsewhere) can be put
 // on theirs too, saved in a folder in Downloads.
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { clip, endPath, PDFDocument, popGraphicsState, pushGraphicsState, rectangle } from "pdf-lib";
 import { bandOf } from "../chrome/chrome.ts";
 import { DATA_DIR, ROOT } from "../config.ts";
+import { printedDate } from "../profile.ts";
+import { redate } from "./redate.ts";
 
 export const DESIGNS_DIR = DATA_DIR ? path.join(DATA_DIR, "designs") : path.join(ROOT, "backend", "data", "designs");
 const LIST = path.join(DESIGNS_DIR, "pool.json");
@@ -85,15 +87,30 @@ export async function designFor(n: number): Promise<Design | null> {
   return d.designs.find((x) => x.id === d.copies[String(n)] && existsSync(fileOf(x.id))) ?? null;
 }
 
+// (each design dated once a day: one design may go with many copies)
+const datedCache = new Map<string, Promise<Uint8Array>>();
+/** `design` dated for `date`'s copies: its dates, weekdays and issue number changed to the day they
+ * carry (export/redate.ts; the developer, 6 Nov: designs made once keep an old date). */
+async function dated(design: Design, date: string): Promise<Uint8Array> {
+  const key = `${design.id}|${date}|${(await stat(fileOf(design.id))).mtimeMs}`;
+  let got = datedCache.get(key);
+  if (!got) {
+    if (datedCache.size > 100) datedCache.clear();
+    got = readFile(fileOf(design.id)).then(async (b) => (await redate(new Uint8Array(b), printedDate(date))).pdf).catch(async () => new Uint8Array(await readFile(fileOf(design.id))));
+    datedCache.set(key, got);
+  }
+  return got;
+}
+
 /** `pdf` (a copy, print or CorelDRAW) with `design`'s pages laid over its own,
  * page for page: one of the page's shape over the whole page, any other fitted
  * in from the top -- shown only above and below where the copy's stories go
  * (27 Oct: a paper's PageMaker design carried a white box that, laid over the
  * copy, blanked the foot of page 3's first columns; laid under, the print PDF's
  * white page hid the design). */
-export async function withDesign(pdf: Uint8Array, design: Design): Promise<Uint8Array> {
+export async function withDesign(pdf: Uint8Array, design: Design, date?: string): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdf, { ignoreEncryption: true });
-  const src = await PDFDocument.load(await readFile(fileOf(design.id)), { ignoreEncryption: true });
+  const src = await PDFDocument.load(date ? await dated(design, date) : await readFile(fileOf(design.id)), { ignoreEncryption: true });
   const have = src.getPageCount(), count = doc.getPageCount();
   for (const [i, page] of doc.getPages().entries()) {
     // page for page; a 4-page design on the 8-page paper (4 Nov): its last page (the footer) on the last,
@@ -133,6 +150,6 @@ export async function stampFile(date: string, n: number, name: string, pdf: Uint
   const dir = outFolder(date);
   await mkdir(dir, { recursive: true });
   const out = path.join(dir, path.basename(name).replace(/\.pdf$/i, "") + ".pdf");
-  await writeFile(out, await withDesign(pdf, design));
+  await writeFile(out, await withDesign(pdf, design, date));
   return out;
 }

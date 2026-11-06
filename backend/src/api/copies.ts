@@ -28,7 +28,7 @@ export async function copiesRoutes(c: Ctx) {
         const n = Number(parts[4].replace(/\.pdf$/, ""));
         const file = copyFile(date, n);
         if (!Number.isInteger(n) || n < 1 || !existsSync(file)) return send(res, 404, { error: `no copy ${parts[4]} for ${date}` });
-        return send(res, 200, await onDesign(new Uint8Array(await readFile(file)), n), "application/pdf");
+        return send(res, 200, await onDesign(new Uint8Array(await readFile(file)), n, date), "application/pdf");
       }
       if (req.method === "GET") return send(res, 200, copiesOf(date));
       // which of the day's stories a customer's articles take the place of in the copies (shown before they're made)
@@ -167,12 +167,13 @@ export async function sendEditable(res: ServerResponse, issue: import("@ck/share
   const { editablePdf } = await import("../export/pdf-editable.ts");
   const pdf = await editablePdf(issue);
   if (!pdf) return send(res, 400, { error: "this paper has no CorelDRAW PDF: use its print PDF" });
-  return send(res, 200, copy ? await onDesign(new Uint8Array(pdf), copy)
+  return send(res, 200, copy ? await onDesign(new Uint8Array(pdf), copy, issue.issueDate)
     : sister ? await withFrame(sister, issue.issueDate, new Uint8Array(pdf)) : pdf, "application/pdf");
 }
-/** Copy `n`'s PDF on the title, headers and footer of the paper it goes to, if it has one. */
-async function onDesign(pdf: Uint8Array, n: number): Promise<Uint8Array> {
+/** Copy `n`'s PDF on the title, headers and footer of the paper it goes to, if it has one,
+ * dated for `date`'s copies. */
+async function onDesign(pdf: Uint8Array, n: number, date: string): Promise<Uint8Array> {
   const { designFor, withDesign } = await import("../export/designs.ts");
   const design = Number.isInteger(n) && n > 0 ? await designFor(n) : null;
-  return design ? withDesign(pdf, design) : pdf;
+  return design ? withDesign(pdf, design, date) : pdf;
 }
