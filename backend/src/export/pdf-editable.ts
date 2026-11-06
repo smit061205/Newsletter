@@ -38,6 +38,8 @@ export interface Ttf {
   bbox: [number, number, number, number]; capHeight: number; italicAngle: number;
   /** Unicode -> advance width (font units), for every character the font has */
   advance: Map<number, number>;
+  /** the characters it draws something for (a cut-down font keeps the rest's places, empty) */
+  drawn: Set<number>;
 }
 
 /** What the PDF needs of a TrueType font: names, metrics, and each character's width. */
@@ -63,6 +65,10 @@ export function readTtf(b: Buffer): Ttf {
   const nh = b.readUInt16BE(hhea + 34);
   const widthOf = (g: number) => b.readUInt16BE(hmtx + 4 * Math.min(g, nh - 1));
   const advance = new Map<number, number>();
+  const drawn = new Set<number>();
+  const loca = tables.get("loca"), glyf = tables.get("glyf"), long = b.readInt16BE(head + 50) === 1;
+  const outlined = (g: number) => loca === undefined || glyf === undefined
+    || (long ? b.readUInt32BE(loca + 4 * g + 4) > b.readUInt32BE(loca + 4 * g) : b.readUInt16BE(loca + 2 * g + 2) > b.readUInt16BE(loca + 2 * g));
   const nt = b.readUInt16BE(cmap + 2);
   let sub = -1;
   for (let i = 0; i < nt; i++) {
@@ -85,7 +91,7 @@ export function readTtf(b: Buffer): Ttf {
         }
         // a symbol font maps its codes at 0xF000 + code
         const u = c >= 0xf000 && c <= 0xf0ff ? c - 0xf000 : c;
-        if (g && !advance.has(u)) advance.set(u, widthOf(g));
+        if (g && !advance.has(u)) { advance.set(u, widthOf(g)); if (outlined(g)) drawn.add(u); }
       }
     }
   }
@@ -99,7 +105,7 @@ export function readTtf(b: Buffer): Ttf {
     bbox: [b.readInt16BE(head + 36), b.readInt16BE(head + 38), b.readInt16BE(head + 40), b.readInt16BE(head + 42)],
     capHeight: os2 !== undefined && b.readUInt16BE(os2) >= 2 ? b.readInt16BE(os2 + 88) : b.readInt16BE(hhea + 4),
     italicAngle: post !== undefined ? b.readInt32BE(post + 4) / 65536 : 0,
-    advance,
+    advance, drawn,
   };
 }
 

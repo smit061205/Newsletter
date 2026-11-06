@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.89** (6 Nov). Work happens on branch
+conversations. **Latest release: v1.1.90** (6 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -84,6 +84,14 @@ number after "અંક" / "Issue No." counted on from the date the PDF was writ
 The new text keeps its place; what follows on the line stays where it was (TJ adjustments). A design's
 fonts are subsets holding only its own letters: a date they can't draw is written in the app's Gopika
 (Gujarati fonts) or a standard font. Tried on 3 of the father's 33 designs (2 Nov) and Aman Ki Awaz.
+
+**In the design's own font** (6 Nov, v1.1.90; the developer: "the date and day's typography looks
+odd"): a date a design's subset can't draw is written in the same font whole, found by its name among
+the app's fonts and the computer's (Windows' Fonts folders on the paper's PC, where the Bharati fonts
+are), put in a copy of its font entry for the new text alone; the app's Gopika only when the computer
+hasn't got it (on this Mac, B Bharati TitleTwo). No letter-spacing nudge any more (a wider one is drawn
+up to 3% closer). "Can it draw it" now means the glyph has a shape (a cut-down font keeps empty places:
+a ન came out as a box).
 
 **Copies on their own screen; the 8-page paper on Paper** (6 Nov, v1.1.88): the sidebar has "Other
 papers" (the sister papers, `newsroom/others`) and "Copies" (`newsroom/copies`, with the designs)

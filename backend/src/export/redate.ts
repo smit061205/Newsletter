@@ -9,9 +9,11 @@
 // counted on a day at a time from the date the PDF is written for. Every date within a year of the
 // day is the paper's (an RNI number's year is never near it). The new text keeps the old one's
 // place: everything after it on the line stays exactly where it was. A design's fonts are subsets
-// that hold only the letters it already uses: a date that needs others is written in the app's own
-// Gopika (the same family) or a standard font of its kind.
-import { readFileSync } from "node:fs";
+// that hold only the letters it already uses: a date that needs others is written in the same font
+// whole, found among the computer's fonts (the developer, 6 Nov: "the date and day's typography
+// looks odd" in another), else in the app's own Gopika (the same family) or a standard font of its kind.
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   decodePDFRawStream, PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFRef, PDFStream, StandardFontEmbedder,
@@ -119,12 +121,61 @@ function fontOf(dict: PDFDict): Font {
     const file = descriptor.lookup(PDFName.of("FontFile2"));
     if (file instanceof PDFRawStream) {
       try {
-        const advance = readTtf(Buffer.from(decodePDFRawStream(file).decode())).advance;
-        has = (b) => advance.has(b) || advance.has(fromWin(b));
+        // (a symbolic one by its codes as they are, else as WinAnsi letters; a space draws nothing and is there)
+        const drawn = readTtf(Buffer.from(decodePDFRawStream(file).decode())).drawn;
+        const flags = (descriptor.lookup(PDFName.of("Flags")) as PDFNumber | undefined)?.asNumber() ?? 0;
+        has = flags & 4 ? (b) => b === 32 || drawn.has(b) : (b) => b === 32 || drawn.has(fromWin(b));
       } catch { has = () => false; }
     } else if (descriptor.lookup(PDFName.of("FontFile")) || descriptor.lookup(PDFName.of("FontFile3"))) has = () => false;
   }
   return { base, cid: false, width, has };
+}
+
+// ---- a design's font whole: the cut-down copy inside it named the same as one of the computer's fonts
+// (the app's own first, then the system's: on the paper's PC the Bharati fonts its designs are made in)
+let fontIndex: Map<string, string> | null = null;
+const plainName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/^b?bharati/, "");
+const keyOf = (family: string, bold: boolean, italic: boolean) => `${plainName(family)}|${bold ? "b" : ""}${italic ? "i" : ""}`;
+function fontFolders(): string[] {
+  const home = os.homedir();
+  const own = path.join(publicationDir("capital-kranti"), "fonts");
+  if (process.platform === "win32") {
+    return [own, path.join(process.env.WINDIR ?? "C:\\Windows", "Fonts"),
+            ...(process.env.LOCALAPPDATA ? [path.join(process.env.LOCALAPPDATA, "Microsoft", "Windows", "Fonts")] : [])];
+  }
+  if (process.platform === "darwin") return [own, "/Library/Fonts", path.join(home, "Library", "Fonts"), "/System/Library/Fonts/Supplemental"];
+  return [own, "/usr/share/fonts", path.join(home, ".local", "share", "fonts")];
+}
+/** The whole font a subset font was cut from (`sub`: its file, `base`: its PDF name), if this computer has it. */
+function wholeFont(sub: Buffer, base: string): Buffer | null {
+  if (!fontIndex) {
+    fontIndex = new Map();
+    for (const dir of fontFolders()) {
+      let files: string[];
+      try { files = readdirSync(dir, { recursive: true }) as string[]; } catch { continue; }
+      for (const f of files) {
+        if (!/\.ttf$/i.test(f)) continue;
+        const file = path.join(dir, f);
+        try {
+          // (the old Gujarati fonts are small: the big ones are other scripts' and not read)
+          if (statSync(file).size > 3_000_000) continue;
+          const t = readTtf(readFileSync(file));
+          const key = keyOf(t.family, t.bold, t.italic);
+          if (t.family && !fontIndex.has(key)) fontIndex.set(key, file);
+        } catch { /* not a font it can read */ }
+      }
+    }
+  }
+  // its name as the subset gives it, else as the PDF does ("BBharatiGopikaTwo,Bold")
+  let t: { family: string; bold: boolean; italic: boolean } | null = null;
+  try { t = readTtf(sub); } catch { /* a subset without its names */ }
+  const [family, style = ""] = base.split(",");
+  const keys = [t?.family ? keyOf(t.family, t.bold, t.italic) : "", keyOf(family, /bold|black|heavy/i.test(style), /italic|oblique/i.test(style))];
+  for (const k of keys) {
+    const file = k && fontIndex.get(k);
+    if (file) { try { return readFileSync(file); } catch { /* gone since */ } }
+  }
+  return null;
 }
 
 /** A string shown: its codes, and the TJ adjustment after each (thousandths of the size). */
@@ -289,6 +340,47 @@ export async function redate(pdf: Uint8Array, date: string): Promise<{ pdf: Uint
     }
     return got;
   };
+  // a design's font with its whole file in place of the subset's: for the new text alone, the rest left as it was
+  const wholes = new Map<PDFDict, { ref: PDFRef; width(b: number): number; has(b: number): boolean } | null>();
+  const wholeOf = (dict: PDFDict, base: string) => {
+    if (wholes.has(dict)) return wholes.get(dict)!;
+    let got: { ref: PDFRef; width(b: number): number; has(b: number): boolean } | null = null;
+    try {
+      const descriptor = dict.lookup(PDFName.of("FontDescriptor"));
+      const file = descriptor instanceof PDFDict ? descriptor.lookup(PDFName.of("FontFile2")) : undefined;
+      const bytes = descriptor instanceof PDFDict && file instanceof PDFRawStream ? wholeFont(Buffer.from(decodePDFRawStream(file).decode()), base) : null;
+      if (bytes && descriptor instanceof PDFDict) {
+        const ttf = readTtf(bytes);
+        // a Unicode font is shown as WinAnsi letters (the subset may have been a symbolic one, by its codes);
+        // its few codes WinAnsi has nothing for by their own names
+        const unicode = ttf.advance.has(0x2122) || [...ttf.advance.keys()].some((u) => u > 0xff);
+        const units = (b: number) => (unicode ? ttf.advance.get(fromWin(b)) ?? ttf.advance.get(b) : ttf.advance.get(b));
+        const ctx = doc.context;
+        const desc = descriptor.clone(ctx);
+        const font = dict.clone(ctx);
+        if (unicode) {
+          const flags = (descriptor.lookup(PDFName.of("Flags")) as PDFNumber | undefined)?.asNumber() ?? 32;
+          desc.set(PDFName.of("Flags"), PDFNumber.of((flags & ~4) | 32));
+          const odd = Array.from({ length: 32 }, (_, i) => 0x80 + i).filter((b) => !FROM_WIN.has(b) && ttf.advance.has(b));
+          font.set(PDFName.of("Encoding"), odd.length
+            ? ctx.obj({ Type: "Encoding", BaseEncoding: "WinAnsiEncoding", Differences: odd.flatMap((b) => [b, PDFName.of(`uni00${b.toString(16).toUpperCase()}`)]) })
+            : PDFName.of("WinAnsiEncoding"));
+        }
+        desc.set(PDFName.of("FontFile2"), ctx.register(ctx.flateStream(bytes, { Length1: bytes.length })));
+        desc.set(PDFName.of("FontName"), PDFName.of(base));
+        font.set(PDFName.of("BaseFont"), PDFName.of(base));
+        font.set(PDFName.of("FontDescriptor"), ctx.register(desc));
+        font.set(PDFName.of("FirstChar"), PDFNumber.of(32));
+        font.set(PDFName.of("LastChar"), PDFNumber.of(255));
+        const widths = Array.from({ length: 224 }, (_, i) => Math.round(((units(32 + i) ?? 0) * 1000) / ttf.upm));
+        font.set(PDFName.of("Widths"), ctx.obj(widths));
+        const drawn = (b: number) => b === 32 || (unicode ? ttf.drawn.has(fromWin(b)) || ttf.drawn.has(b) : ttf.drawn.has(b));
+        got = { ref: ctx.register(font), width: (b) => (b >= 32 && b <= 255 ? widths[b - 32] : 0), has: drawn };
+      }
+    } catch { got = null; }
+    wholes.set(dict, got);
+    return got;
+  };
   const named = new Map<PDFDict, Map<string, string>>();
   const nameIn = (fonts: PDFDict, ref: PDFRef) => {
     let byRef = named.get(fonts);
@@ -344,20 +436,24 @@ export async function redate(pdf: Uint8Array, date: string): Promise<{ pdf: Uint
           const old = wide(p.codes.slice(s.from, s.to), font, p.tc);
           if (s.text === null) out += `[${num((-old * 1000) / p.size)}]TJ `;
           else {
-            // in its own font if that can draw every letter, else the app's
+            // in its own font if that can draw every letter, else the same font whole, else the app's
             const said = [...s.text];
             const own = said.map((ch) => toWin(ch.codePointAt(0)!));
             const inOwn = own.every((b) => b !== null && font.has(b));
-            const other = inOwn || !h.fonts ? null : stand(font.base);
-            const bytes = inOwn ? own as number[] : other?.encode(s.text) ?? null;
+            const dict = inOwn ? undefined : h.fonts?.lookup(PDFName.of(p.font));
+            const whole = dict instanceof PDFDict ? wholeOf(dict, font.base) : null;
+            const inWhole = !!whole && own.every((b) => b !== null && whole.has(b));
+            const other = inOwn || inWhole || !h.fonts ? null : stand(font.base);
+            const bytes = inOwn || inWhole ? own as number[] : other?.encode(s.text) ?? null;
             if (!bytes) { out += run(s.from, s.to, 0); cursor = s.to; changed--; continue; }
-            const w = (b: number) => (inOwn ? font.width(b) : other!.width(said[bytes.indexOf(b)].codePointAt(0)!));
+            const w = (b: number) => (inOwn ? font.width(b) : inWhole ? whole!.width(b) : other!.width(said[bytes.indexOf(b)].codePointAt(0)!));
             const natural = bytes.reduce((a, b) => a + (w(b) / 1000) * p.size + p.tc + (b === 32 ? p.tw : 0), 0);
-            // (letters spaced a little to keep its width; whatever's left, the line after it is put back where it was)
-            const give = Math.max(-0.06 * p.size, Math.min(0.06 * p.size, (old - natural) / Math.max(1, bytes.length)));
+            // (set as the design sets it: only a wider one drawn a little closer, and the line after it put back where it was)
+            const give = Math.min(0, Math.max(-0.03 * p.size, (old - natural) / Math.max(1, bytes.length)));
             const now = natural + give * bytes.length;
-            const shown = `${num(p.tc + give)} Tc [${lit(bytes)} ${num(((now - old) * 1000) / p.size)}]TJ ${num(p.tc)} Tc `;
-            out += other ? `/${nameIn(h.fonts!, other.ref)} ${num(p.size)} Tf ${shown}/${p.font} ${num(p.size)} Tf ` : shown;
+            const shown = `${give ? `${num(p.tc + give)} Tc ` : ""}[${lit(bytes)} ${num(((now - old) * 1000) / p.size)}]TJ ${give ? `${num(p.tc)} Tc ` : ""}`;
+            const swap = inWhole ? whole!.ref : other?.ref;
+            out += swap ? `/${nameIn(h.fonts!, swap)} ${num(p.size)} Tf ${shown}/${p.font} ${num(p.size)} Tf ` : shown;
           }
           cursor = s.to;
         }
