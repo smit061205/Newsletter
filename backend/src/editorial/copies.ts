@@ -198,7 +198,7 @@ export const editionFile = (date: string, id: string) => path.join(editionsDir(d
  * full-width story. (A headline that won't fill its width or a heavy one
  * came back in every arrangement on 23 Oct: retrying them only tripled the time; a lead without its photo gets another go,
  * and so does a copy missing a news the editor sent, 3 Nov.) */
-const LAYOUT_GATES = ["1", "2", "W", "S13", "S14"];
+const LAYOUT_GATES = ["1", "2", "W", "S13", "S14", "S16"];
 /** Tries per copy when a layout check fails (a copy placed like another is always tried again). */
 const TRIES = 4;
 /** How far a try is from clean: each failed layout check, then what it is that failed --
@@ -209,7 +209,9 @@ function badness(r: Awaited<ReturnType<typeof buildIssue>>["report"]): number {
   const failed = r.gates.filter((g) => !g.pass && LAYOUT_GATES.includes(g.gate.split(" ")[0])).length;
   if (!failed) return 0;
   const how = r.warnings.reduce((a, w) => a + (w.kind === "white-space" ? 5 : w.kind === "line-fit" && !/past/.test(w.detail) ? 1 : 10), 0);
-  return failed * 1000 + how;
+  // (a customer's article missing is worse than any gap: the try that prints them all is kept)
+  const missing = r.gates.find((g) => g.gate.startsWith("S16") && !g.pass)?.detail.split(", ").length ?? 0;
+  return failed * 1000 + how + missing * 1_000_000;
 }
 
 let running: Batch | null = null;

@@ -754,6 +754,9 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       detail: `lead ${lead?.story.id ?? "missing"}; left out (no room): ${result.leftOut.map((s) => s.id).join(", ") || "none"}` },
     { gate: "S14 every news sent on Telegram printed", pass: unsent.length === unwritten.length, detail: unsent.filter((id) => !unwritten.includes(id)).join(", ") || "ok" },
     { gate: "S15 every news sent on Telegram written", pass: unwritten.length === 0, detail: unwritten.join(", ") || "ok" },
+    // (a copy's customer's articles, every one: 7 Nov's copies left out one or two)
+    ...(opts.copy?.extras?.length ? [{ gate: "S16 every article given for the copies printed",
+      pass: opts.copy.extras.every((x) => printedIds.has(x.id)), detail: opts.copy.extras.filter((x) => !printedIds.has(x.id)).map((x) => x.id).join(", ") || "ok" }] : []),
     { gate: "W no story across the whole page unless the editor allowed it",
       pass: !result.placed.some((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth),
       detail: result.placed.filter((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth).map((p) => `p${p.page} ${p.story.id} (${p.cols} columns)`).join(", ") || "ok" },
