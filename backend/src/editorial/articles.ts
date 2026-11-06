@@ -31,12 +31,21 @@ export interface GivenArticle { titles?: string[]; decks?: string[]; bodies?: st
 
 /** Articles from the newsroom, checked, their new photos saved with the day's
  * (`prefix` names the files: the copies' and the paper's apart). A string is what's wrong. */
+/** The most articles taken at once (a 4-page copy holds about 30 stories in all). */
+const MOST_ARTICLES = 30;
+
 export async function takeArticles(date: string, given: GivenArticle[], prefix: string): Promise<Article[] | string> {
   const articles: Article[] = [];
   const line = (x: string) => x.replace(/\s+/g, " ").trim();
-  for (const [k, a] of given.slice(0, 10).entries()) {
+  // (every one given is printed: 7 Nov, 16 given and the first 10 taken without a word)
+  if (given.length > MOST_ARTICLES) return `at most ${MOST_ARTICLES} articles at a time`;
+  for (const [k, a] of given.entries()) {
     const titles = (a.titles ?? []).map(line).filter(Boolean).slice(0, 12);
     const bodies = (a.bodies ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 12);
+    // (nothing dropped without a word)
+    if ((a.titles ?? []).filter((x) => x.trim()).length > 12 || (a.bodies ?? []).filter((x) => x.trim()).length > 12 || (a.photos ?? []).length > 12) {
+      return `article ${k + 1}: at most 12 titles, 12 texts and 12 photos`;
+    }
     if (!titles.length || !bodies.length) return `article ${k + 1} needs its text and at least one title`;
     const dir = path.join(MEDIA_DIR, date);
     await mkdir(dir, { recursive: true });

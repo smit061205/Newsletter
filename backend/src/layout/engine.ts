@@ -540,7 +540,8 @@ export async function layOut(args: {
     for (let attempt = 0; attempt < 6 && !pages[i]; attempt++) {
       // (three tries with the page's stories, then another story in the place of its last)
       if (attempt >= 3 && held.length && shares[i].length > 1) {
-        const other = [...held].sort(toBring).find((s) => (i > 0 || !s.story.editorsColumn) && mayGo(s, i)), out = shares[i].findLast((s) => !s.story.editorsColumn);
+        // (never one the editor sent or a customer's article: it all prints)
+        const other = [...held].sort(toBring).find((s) => (i > 0 || !s.story.editorsColumn) && mayGo(s, i)), out = shares[i].findLast((s) => !sent(s));
         if (other && out) { held.splice(held.indexOf(other), 1, out); shares[i] = shares[i].map((s) => (s === out ? other : s)); }
       }
       fill.held = held.map((s) => s.story);
@@ -549,6 +550,40 @@ export async function layOut(args: {
       pages[i] = got.page;
       for (const s of [...held]) if (!fill.held.includes(s.story)) held.splice(held.indexOf(s), 1);
     }
+  }
+  // what must print and didn't find a place (7 Nov: copies left out one or two of a customer's
+  // articles, held back from a crowded page like any story): in the place of lesser stories, a
+  // customer's article first, then the editor's news; the page laid out again, its nearest design
+  // taken if none is exact (a gap is reported; a missing article is worse)
+  const stranded = [...held, ...shares.flatMap((p, i) => (pages[i] ? [] : p))].filter((x) => alwaysPrinted(x.story) && !x.story.editorsColumn)
+    .sort((a, b) => Number(wordForWord(b.story)) - Number(wordForWord(a.story)));
+  for (const s of stranded) {
+    let home = false;
+    const order = new Map(sized.map((x, k) => [x.story.id, k]));
+    // (the pages with the most lesser stories first, the front page last)
+    const lesserOf = (i: number) => shares[i].slice(1).filter((x) => !sent(x)).sort(toHold);
+    const tries = shares.map((_, i) => i).filter((i) => pages[i] && mayGo(s, i) && lesserOf(i).length)
+      .sort((a, b) => Number(a === 0) - Number(b === 0) || lesserOf(b).length - lesserOf(a).length);
+    for (const i of tries) {
+      for (let drop = 1; drop <= Math.min(3, lesserOf(i).length) && !home; drop++) {
+        const outs = lesserOf(i).slice(0, drop);
+        const list = [...shares[i].filter((x) => !outs.includes(x)), s].sort((a, b) => (order.get(a.story.id) ?? 0) - (order.get(b.story.id) ?? 0));
+        fill.held = held.filter((x) => x !== s).map((x) => x.story);
+        const got = await solvePage(i + 1, list.map((x) => x.story), args.bands[i], pageAds(i + 1), blocks, m, !!args.modular, seeded(args.seed * 41 + i + drop * 7919),
+                                    args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), true, false, undefined, Infinity, !!args.mend);
+        if (!got.page) continue;
+        pages[i] = got.page;
+        shares[i] = list;
+        if (held.includes(s)) held.splice(held.indexOf(s), 1);
+        for (const k of shares.keys()) if (k !== i && shares[k].includes(s)) shares[k] = shares[k].filter((x) => x !== s);
+        held.push(...outs);
+        for (const x of [...held]) if (x !== s && !outs.includes(x) && !fill.held.includes(x.story)) held.splice(held.indexOf(x), 1);
+        log(`  page ${i + 1}: ${s.story.id} must print: in the place of ${outs.map((x) => x.story.id).join(", ")}`);
+        home = true;
+      }
+      if (home) break;
+    }
+    if (!home) log(`  ${s.story.id} must print, but no page could take it`);
   }
   for (const p of pages) {
     for (const x of p?.placed ?? []) if (x.module.story.factCheck) factChecks.push({ story: x.module.story.id, detail: x.module.story.factCheck });

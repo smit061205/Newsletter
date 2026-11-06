@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.91** (7 Nov). Work happens on branch
+conversations. **Latest release: v1.1.92** (7 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -84,6 +84,16 @@ number after "અંક" / "Issue No." counted on from the date the PDF was writ
 The new text keeps its place; what follows on the line stays where it was (TJ adjustments). A design's
 fonts are subsets holding only its own letters: a date they can't draw is written in the app's Gopika
 (Gujarati fonts) or a standard font. Tried on 3 of the father's 33 designs (2 Nov) and Aman Ki Awaz.
+
+**Every article given prints** (7 Nov, v1.1.92; the developer: "none of the articles should be
+missed"): 16 articles were given and the engine took the first 10 without a word
+(`takeArticles` sliced them); now up to 30 are taken and more is refused with a message, as are more
+than 12 titles, texts or photos to an article. In the layout a customer's article could still be held
+back from a crowded page like any story, and three of five copies left one or two out: what must print
+and has no place at the end goes in the place of lesser stories (an article first, then the editor's
+Telegram news), the page laid out again (`layout/engine.ts`, "must print"); never swapped out by the
+last-round fallback; gate S16 fails a copy missing one, and the copies keep the try that prints them all
+(`badness`). Tried with 16 articles on one copy of 6 Nov's: all 16 printed, no white space, 3.4 min.
 
 **Copies with many fixed articles** (7 Nov, v1.1.91): ten of a customer's articles (kept word for word)
 and five Telegram items were all first in line for every page, so no page's choice of stories worked
