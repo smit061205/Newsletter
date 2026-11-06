@@ -482,7 +482,9 @@ export async function layOut(args: {
           continue;
         }
       }
-      if (d.short > d.long || (round >= 1 && isShort && !shortBy.has(i))) {
+      // (by its stories' usual sizes it's short; but a page known too tall isn't given more: 7 Nov's
+      // front page had an article held back and added again, round after round)
+      if (d.short > d.long || (round >= 1 && isShort && !shortBy.has(i) && d.long === 0)) {
         // too little copy for the page: a held story, else the smallest from a page that has the most to spare
         // (the front page isn't filled with more short stories: its own written longer)
         if (i === 0 && shares[0].length >= FRONT_MOST && (round < LAST || args.modular)) {
@@ -732,20 +734,33 @@ async function share(sized: Sized[], rooms: number[], open: number[], perPage: (
   const unsure: number[] = [];
   // the front page, then the page with the most ads, which has the fewest ways of working
   const order = [...open.filter((i) => i === 0), ...open.filter((i) => i > 0).sort((a, b) => perPage(b).length - perPage(a).length || rooms[a] - rooms[b])];
-  for (const i of order) {
+  for (const [j, i] of order.entries()) {
     const mean = left.slice(0, 12).reduce((a, s) => a + s.mid, 0) / Math.max(1, Math.min(12, left.length));
     const most = i === 0 ? FRONT_MOST : insideMost, least = Math.min(most, Math.max(i === 0 ? 3 : 2, perPage(i).length));
     const want = Math.min(most, Math.max(least, Math.round(rooms[i] / Math.max(1, mean))));
     const counts = [0, -1, 1, -2, 2, 3].map((d) => want + d).filter((k, x, all) => k >= least && k <= most && all.indexOf(k) === x);
+    // the editor's own news (and a customer's articles) first in line; when that can't work, shared
+    // out over the pages left: 7 Nov's copies had ten articles and five Telegram items first, and no
+    // page's choice worked (its first places all theirs, kept word for word). This page takes its
+    // share, or one or two fewer (the last page what's left); the rest wait behind the others
+    const must = left.filter((s) => sent(s) && s !== lead);
+    const fair = Math.ceil(must.length / (order.length - j));
+    const shares = [must.length, ...(j < order.length - 1 ? [fair, fair - 1, fair - 2] : [])].filter((q, x, all) => q >= 0 && all.indexOf(q) === x);
     let chosen: Sized[] | null = null;
-    for (const k of counts) {
-      // the most important k; then, a story at a time from the end, the next ones in their place
-      for (let skip = 0; skip <= 5 && !chosen; skip++) {
-        const head = left.slice(0, Math.max(1, k - 1 - (column && i > 0 ? 1 : 0) - Math.min(skip, 2)));
-        // (the editor's own news is never passed over for another: it all prints)
-        if (left.slice(head.length, head.length + skip).some(sent)) continue;
-        const list = [...head, ...left.slice(head.length + skip, k + skip - (column && i > 0 ? 1 : 0)), ...(column && i > 0 ? [column] : [])];
-        if (list.length && await fits(i, list)) chosen = list;
+    for (const q of shares) {
+      const now = must.slice(0, q);
+      const line = [...(left[0] === lead ? [lead] : []), ...now, ...left.filter((s) => s !== lead && !now.includes(s) && !sent(s)),
+                    ...left.filter((s) => s !== lead && !now.includes(s) && sent(s))];
+      for (const k of counts) {
+        // the most important k; then, a story at a time from the end, the next ones in their place
+        for (let skip = 0; skip <= 5 && !chosen; skip++) {
+          const head = line.slice(0, Math.max(1, k - 1 - (column && i > 0 ? 1 : 0) - Math.min(skip, 2)));
+          // (the editor's own news is never passed over for another: it all prints)
+          if (line.slice(head.length, head.length + skip).some(sent)) continue;
+          const list = [...head, ...line.slice(head.length + skip, k + skip - (column && i > 0 ? 1 : 0)), ...(column && i > 0 ? [column] : [])];
+          if (list.length && await fits(i, list)) chosen = list;
+        }
+        if (chosen) break;
       }
       if (chosen) break;
     }
