@@ -17,7 +17,7 @@ const GU = (
     <h3>જાહેરાત</h3>
     <p><b>જાહેરાત</b> માં ચાર પગલાં: ચિત્ર, માપ, પાના પર જગ્યા, અને દિવસ. મહિનાના કૅલેન્ડરમાં કયા દિવસે કેટલી જાહેરાત છે તે દેખાય છે.</p>
     <h3>બીજાં છાપાં</h3>
-    <p><b>બીજાં છાપાં</b> માં આપણાં બીજાં છાપાં (હિન્દી વગેરે) અને નકલો એક જ જગ્યાએ બને છે.</p>
+    <p><b>બીજાં છાપાં</b> માં આપણાં બીજાં છાપાં (હિન્દી, ઉર્દૂ વગેરે) બને છે, અને <b>નકલો</b> માં આજના છાપાની નકલો.</p>
     <h3>કંઈ અટકે તો</h3>
     <ul>
       <li>“ફરી પ્રયત્ન કરો” દબાવો — અત્યાર સુધીનું કામ સચવાયેલું રહે છે.</li>
@@ -40,7 +40,7 @@ const EN = (
     <h3>Ads</h3>
     <p>In <b>Ads</b>, four steps: the picture, its size, its place on the page, and its days. The month's calendar shows how many ads each day has.</p>
     <h3>Other papers</h3>
-    <p>In <b>Other papers</b>, the sister papers (Hindi and the rest) and the copies are made in one place.</p>
+    <p>In <b>Other papers</b>, the sister papers (Hindi, Urdu and the rest) are made; in <b>Copies</b>, copies of the day's paper.</p>
     <h3>If something stops</h3>
     <ul>
       <li>Press “Try again” — everything done so far is kept.</li>

@@ -23,13 +23,17 @@ export default function Paper() {
     if (has) call<IssueInfo>(`/api/issues/${date}`).then(setInfo).catch((e) => setError(e.message));
   }, [date, has, version]);
   const running = !!status?.running && status.running.date === date;
+  // the day's paper, or its 8-page paper (once the evening has made it)
+  const [pages, setPages] = useState<4 | 8>(4);
+  const eight = pages === 8 && !!info?.eight;
 
   const rebuild = async () => {
     setError("");
     try { await call(`/api/issues/${date}/build`, { json: {} }); toast(t("paper.rebuilding")); refresh(); }
     catch (e) { setError((e as Error).message); }
   };
-  const fileName = (what: string) => `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${info?.report.issueNumber ?? ""} - ${date.split("-").reverse().join("-")}${what}.pdf`;
+  const fileName = (what: string) => `${status?.paper.name.split(" (")[0] ?? "Capital Kranti"} ${info?.report.issueNumber ?? ""} - ${date.split("-").reverse().join("-")}${eight ? " - 8" : ""}${what}.pdf`;
+  const pdfTitle = () => t(eight ? "pdf.title8" : "pdf.title", { issue: num(lang, info!.report.issueNumber) });
 
   if (!has) {
     return (
@@ -42,14 +46,17 @@ export default function Paper() {
   return (
     <div className={`${s.inner} ${s.wide}`}>
       <TopBar title={t("paper.title")}>
+        {info?.eight && <div className={s.segmented} role="radiogroup" aria-label={t("copies.pages")}>
+          {([4, 8] as const).map((k) => <button key={k} type="button" aria-pressed={pages === k} onClick={() => setPages(k)}>{t("copies.pages.n", { n: num(lang, k) })}</button>)}
+        </div>}
         <Button kind="quiet" icon={Icon.refresh()} onClick={rebuild} disabled={running}>{running ? t("paper.rebuilding") : t("paper.rebuild")}</Button>
-        <Button icon={Icon.print()} disabled={!info} onClick={() => info && pdf({ url: media(`/api/issues/${date}/pdf`),
-          title: t("pdf.title", { issue: num(lang, info.report.issueNumber) }), fileName: fileName("") })}>{t("today.print")}</Button>
-        {status?.paper.lang !== "hi" && status?.paper.lang !== "ur" && <Button kind="primary" icon={Icon.download()} disabled={!info} onClick={() => info && pdf({ url: media(`/api/issues/${date}/editable.pdf`),
-          title: t("corel.title", { what: t("pdf.title", { issue: num(lang, info.report.issueNumber) }) }), fileName: fileName(" - CorelDRAW") })}>{t("corel.pdf")}</Button>}
+        <Button icon={Icon.print()} disabled={!info} onClick={() => info && pdf({ url: media(`/api/issues/${date}/${eight ? "pdf8" : "pdf"}`),
+          title: pdfTitle(), fileName: fileName("") })}>{t("today.print")}</Button>
+        {status?.paper.lang !== "hi" && status?.paper.lang !== "ur" && (!eight || info?.eightEditable) && <Button kind="primary" icon={Icon.download()} disabled={!info} onClick={() => info && pdf({ url: media(`/api/issues/${date}/${eight ? "editable8.pdf" : "editable.pdf"}`),
+          title: t("corel.title", { what: pdfTitle() }), fileName: fileName(" - CorelDRAW") })}>{t("corel.pdf")}</Button>}
       </TopBar>
       {error && <Note tone="bad">{error}</Note>}
-      <PaperView problems />
+      <PaperView problems eight={eight} />
     </div>
   );
 }

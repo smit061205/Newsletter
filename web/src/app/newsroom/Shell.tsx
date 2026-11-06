@@ -26,6 +26,7 @@ const NAV: [string, StringKey, () => React.ReactElement][] = [
   ["/newsroom", "nav.today", Icon.today],
   ["/newsroom/pages", "nav.paper", Icon.paper],
   ["/newsroom/ads", "nav.ads", Icon.ads],
+  ["/newsroom/others", "nav.others", Icon.papers],
   ["/newsroom/copies", "nav.copies", Icon.copies],
   ["/newsroom/archive", "nav.archive", Icon.archive],
   ["/newsroom/settings", "nav.settings", Icon.settings],

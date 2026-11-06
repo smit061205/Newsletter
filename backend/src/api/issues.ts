@@ -55,6 +55,18 @@ export async function issuesRoutes(c: Ctx) {
       if (!eight?.json || !existsSync(outFile(eight.json))) return send(res, 404, { error: `no 8-page paper for CorelDRAW for ${date}: make the paper again` });
       return sendEditable(res, JSON.parse(await readFile(outFile(eight.json), "utf8")));
     }
+    if (req.method === "GET" && parts[3] === "pages8") {
+      // the 8-page paper's pages: their sizes, or (pages8/<n>.png) one as a picture (export/eight-images.ts)
+      const eight = store.setting<{ json?: string } | null>(`eightPages|${date}`, null);
+      if (!eight?.json || !existsSync(outFile(eight.json))) return send(res, 404, { error: `no 8-page paper to show for ${date}: make the paper again` });
+      if (!parts[4]) {
+        const issue = JSON.parse(await readFile(outFile(eight.json), "utf8")) as { pages: { number: number; width: number; height: number }[] };
+        return send(res, 200, { pages: issue.pages.map((p) => ({ number: p.number, width: p.width, height: p.height })) });
+      }
+      const { eightPageImage } = await import("../export/eight-images.ts");
+      const png = /^\d+\.png$/.test(parts[4]) ? await eightPageImage(date, parseInt(parts[4]), outFile(eight.json)) : null;
+      return png ? send(res, 200, new Uint8Array(png), "image/png") : send(res, 404, { error: `no page ${parts[4]} in the 8-page paper` });
+    }
     if (req.method === "GET" && parts[3] === "pdf8") {
       // the 8-page paper (pipeline.ts "sections")
       const eight = store.setting<{ pdf: string } | null>(`eightPages|${date}`, null);

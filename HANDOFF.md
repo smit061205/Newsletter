@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.78** (5 Nov). Work happens on branch
+conversations. **Latest release: v1.1.88** (6 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -70,7 +70,15 @@ of Aman Ki Awaz's frame):
   carry joined letters, so their text is shaped by HarfBuzz (`harfbuzzjs`, in the paper's own font)
   and every letter drawn as a filled outline (`export/shapes.ts`): it opens as it prints, its words
   not retypeable there. A sister paper's has its title and footer too. **Not yet tried in CorelDRAW
-  on Windows.**
+  on Windows.** An "editable text" export (a folder of page SVGs, the font, the title PDF) shipped in
+  v1.1.86 and was taken out in v1.1.87: the developer wants one PDF, not a folder.
+
+**Copies on their own screen; the 8-page paper on Paper** (6 Nov, v1.1.88): the sidebar has "Other
+papers" (the sister papers, `newsroom/others`) and "Copies" (`newsroom/copies`, with the designs)
+apart. Paper has a 4 / 8 pages switch once the evening's 8-page paper is made: its pages shown (to
+look at; stories are changed on the 4-page paper), its Print and CorelDRAW PDFs. Its page pictures
+are drawn from its kept layout the first time they're asked for (`export/eight-images.ts`,
+`/api/issues/<date>/pages8[/<n>.png]`), beside the day's own pictures, again when it's made again.
 
 **The Urdu paper packed tight like a real Urdu daily** (5 Nov, v1.1.80-81; the user's picture of Aman Ki
 Awaz, page 16, then a closer crop: "we want this level of density"): body 11/14pt (13/22 in v1.1.79,

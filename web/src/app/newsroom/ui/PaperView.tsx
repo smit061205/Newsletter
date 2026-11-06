@@ -28,8 +28,9 @@ function storyBoxes(page: Issue["pages"][number], ids: Set<string>) {
   return boxes;
 }
 
-/** `problems`: the issue's problems listed beside the page too (where nothing above lists them). */
-export function PaperView({ problems: showProblems = false, onChanged }: { problems?: boolean; onChanged?: () => void }) {
+/** `problems`: the issue's problems listed beside the page too (where nothing above lists them).
+ * `eight`: the day's 8-page paper instead, to look at (its stories are changed on the day's paper). */
+export function PaperView({ problems: showProblems = false, onChanged, eight = false }: { problems?: boolean; onChanged?: () => void; eight?: boolean }) {
   const { t, lang, date } = useApp();
   const { status, refresh } = useStatus();
   const [info, setInfo] = useState<IssueInfo | null>(null);
@@ -45,17 +46,18 @@ export function PaperView({ problems: showProblems = false, onChanged }: { probl
   const load = useCallback(() => {
     if (!has) return;
     call<IssueInfo>(`/api/issues/${date}`).then(setInfo).catch((e) => setError(e.message));
-    call<Issue>(`/api/issue?date=${date}`).then(setIssue).catch((e) => setError(e.message));
+    call<Issue>(eight ? `/api/issues/${date}/pages8` : `/api/issue?date=${date}`).then(setIssue).catch((e) => setError(e.message));
     call<StoryRow[]>(`/api/stories?date=${date}`).then(setStories).catch(() => {});
-  }, [date, has]);
-  useEffect(() => { setN(1); setInfo(null); setIssue(null); }, [date]);
+  }, [date, has, eight]);
+  useEffect(() => { setN(1); setInfo(null); setIssue(null); }, [date, eight]);
+  const picture = (k: number) => media(eight ? `/api/issues/${date}/pages8/${k}.png?v=${version}` : `/api/pages/${date}/${k}.png?v=${version}`);
   useEffect(() => { load(); }, [load, version]);
   useEffect(() => setImgFailed(false), [n, version]);
 
   const placed = useMemo(() => new Map((info?.report.placed ?? []).map((p) => [p.story, p])), [info]);
   const page = issue?.pages.find((p) => p.number === n);
-  const boxes = page ? storyBoxes(page, new Set(placed.keys())) : new Map();
-  const todo = info && showProblems ? problems(lang, info.report.gates, (id) => stories.find((x) => x.id === id)?.headline, info.report.whiteSpace) : [];
+  const boxes = page && !eight ? storyBoxes(page, new Set(placed.keys())) : new Map();
+  const todo = info && showProblems && !eight ? problems(lang, info.report.gates, (id) => stories.find((x) => x.id === id)?.headline, info.report.whiteSpace) : [];
   const open = (id: string) => setEditing(stories.find((x) => x.id === id) ?? null);
   if (!has) return null;
 
@@ -67,7 +69,7 @@ export function PaperView({ problems: showProblems = false, onChanged }: { probl
           {(issue?.pages ?? [1, 2, 3, 4].map((k) => ({ number: k }))).map((p) => (
             <button key={p.number} className={s.thumb} aria-pressed={p.number === n} onClick={() => setN(p.number)} aria-label={t("paper.page", { n: num(lang, p.number) })}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {version ? <img src={media(`/api/pages/${date}/${p.number}.png?v=${version}`)} alt="" /> : <Skeleton h={120} />}
+              {version ? <img src={picture(p.number)} alt="" /> : <Skeleton h={120} />}
               <span>{num(lang, p.number)}</span>
             </button>
           ))}
@@ -76,7 +78,7 @@ export function PaperView({ problems: showProblems = false, onChanged }: { probl
           {page ? (
             <div className={s.pageView} style={{ aspectRatio: `${page.width} / ${page.height}` }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={media(`/api/pages/${date}/${n}.png?v=${version}`)} alt={t("paper.page", { n: num(lang, n) })} onError={() => setImgFailed(true)} />
+              <img src={picture(n)} alt={t("paper.page", { n: num(lang, n) })} onError={() => setImgFailed(true)} />
               {[...boxes].map(([id, b]) => (
                 <button key={id} className={s.storyBox} title={placed.get(id)?.headline}
                         style={{ left: `${(b.x0 / page.width) * 100}%`, top: `${(b.y0 / page.height) * 100}%`,
@@ -91,12 +93,12 @@ export function PaperView({ problems: showProblems = false, onChanged }: { probl
         <aside className={s.paperSide}>
           <div className={s.card}>
             <h2 className={s.cardTitle}>{t("paper.page", { n: num(lang, n) })}</h2>
-            <p className={s.faint}>{t("paper.click")}</p>
-            <ul className={s.onPage}>
+            <p className={s.faint}>{t(eight ? "paper.eightLook" : "paper.click")}</p>
+            {!eight && <ul className={s.onPage}>
               {[...placed.values()].filter((p) => p.page === n).map((p) => (
                 <li key={p.story}><button onClick={() => open(p.story)}>{p.headline}</button></li>
               ))}
-            </ul>
+            </ul>}
             <Link className={s.btn} href="/newsroom/stories">{Icon.stories()}{t("paper.allStories")}</Link>
           </div>
           {todo.length > 0 && (
@@ -107,7 +109,7 @@ export function PaperView({ problems: showProblems = false, onChanged }: { probl
               </ul>
             </div>
           )}
-          {info && (
+          {info && !eight && (
             <details className={`${s.card} ${s.details}`}>
               <summary>{t("today.details")}</summary>
               <ul className={s.onPage}>{info.report.gates.map((g) => <li key={g.gate} className={s.faint} style={{ padding: "4px 0" }}>{g.pass ? "✓" : "!"} {checkName(lang, g.gate)}</li>)}</ul>
