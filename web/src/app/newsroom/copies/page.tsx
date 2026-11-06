@@ -1,6 +1,6 @@
 "use client";
-// બીજાં છાપાં / Other papers: the day's sister papers (./Editions.tsx), then
-// copies of the day's paper -- how many, what the AI rewords,
+// નકલો / Copies (the developer, 6 Nov: a screen of its own; the sister papers are on
+// Other papers, ../others): copies of the day's paper -- how many, what the AI rewords,
 // how far the stories move -- made in the background, each copy a print PDF
 // with its masthead, page headers and footer left empty for the paper's own
 // (backend/src/editorial/copies.ts), or printed on the designs of the paper it
@@ -16,7 +16,6 @@ import { Badge, Button, Empty, Icon, Note, Ring, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
 import { artOf, Articles, blankArt, Swaps, type Art } from "./Articles";
 import { designName, Designs } from "./Designs";
-import { Editions } from "./Editions";
 
 const REWORDS: Reword[] = ["headline", "headlineDeck", "all"];
 const LANGS: PaperLang[] = ["gu", "hi", "ur"];
@@ -152,7 +151,6 @@ export default function Copies() {
   return (
     <div className={s.inner}>
       <TopBar title={t("nav.copies")} />
-      <Editions />
       <section className={s.card}>
         <h2 className={s.cardTitle}>{t("copies.title")}</h2>
         <p className={s.muted} style={{ margin: 0 }}>{t("copies.body")}</p>
