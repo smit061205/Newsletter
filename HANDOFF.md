@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.88** (6 Nov). Work happens on branch
+conversations. **Latest release: v1.1.89** (6 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -72,6 +72,18 @@ of Aman Ki Awaz's frame):
   not retypeable there. A sister paper's has its title and footer too. **Not yet tried in CorelDRAW
   on Windows.** An "editable text" export (a folder of page SVGs, the font, the title PDF) shipped in
   v1.1.86 and was taken out in v1.1.87: the developer wants one PDF, not a folder.
+
+**Designs and frames date themselves** (6 Nov, v1.1.89; the developer: "some titles have outdated
+dates so date gets automatically adjusted and the aank number also", "do it for the day also"): a
+copy's paper's design (Copies → designs) and a sister paper's frame get the day the paper carries
+(`printedDate`) wherever they write a date — "તારીખ : 03-11-2026, મંગળવાર" in the old Gopika code,
+"Date : 03-11-2026", "Thursday, 05 November, 2026" — its weekday (beside the date or on its own,
+English or Gujarati, each typist's spelling: a letter typed whole or as half + stem), and the issue
+number after "અંક" / "Issue No." counted on from the date the PDF was written for
+(`export/redate.ts`). Only dates within 400 days of the day change (an RNI number's year never does).
+The new text keeps its place; what follows on the line stays where it was (TJ adjustments). A design's
+fonts are subsets holding only its own letters: a date they can't draw is written in the app's Gopika
+(Gujarati fonts) or a standard font. Tried on 3 of the father's 33 designs (2 Nov) and Aman Ki Awaz.
 
 **Copies on their own screen; the 8-page paper on Paper** (6 Nov, v1.1.88): the sidebar has "Other
 papers" (the sister papers, `newsroom/others`) and "Copies" (`newsroom/copies`, with the designs)
