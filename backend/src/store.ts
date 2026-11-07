@@ -19,8 +19,8 @@ export interface Release {
   photos: string[]; // local URLs under /media/
   fetchedAt: string;
   /** where it came from: the state's Information Department (the default, for older rows), PIB,
-   * the Gujarat CM's office or All India Radio's Gujarati news (ingest/official.ts) */
-  source?: "gujinfo" | "pib" | "cmo" | "air" | "un" | "telegram" | "section";
+   * the Gujarat CM's office or All India Radio's Gujarati news (ingest/official.ts), the paper's own website (ingest/site.ts) */
+  source?: "gujinfo" | "pib" | "cmo" | "air" | "un" | "telegram" | "section" | "site";
   /** its language: Gujarati (the default), or Hindi or English, which are translated */
   lang?: "gu" | "hi" | "en";
   /** PIB: the ministry that issued it */
@@ -32,8 +32,8 @@ export interface Release {
 }
 
 /** The story made from a release: "p<PRID>" for PIB's, "c…" the CM's office's, "a…" All India Radio's, "u…" UN News's,
- * "t…" one sent to the paper's Telegram bot, "r<id>" the state's. */
-export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u", telegram: "t", section: "s" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
+ * "t…" one sent to the paper's Telegram bot, "w…" the paper's website's, "r<id>" the state's. */
+export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u", telegram: "t", section: "s", site: "w" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
 
 /** Where the 8-page paper's own news (its pages after the day's) is kept: a day of its own beside
  * the paper's, so nothing that makes the day's paper, its copies or its checks ever sees it (3 Nov). */

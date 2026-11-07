@@ -115,6 +115,8 @@ export function priorityOf(r: Release): number {
   }
   // (the paper's own reporter's news, sent to its Telegram bot: never a filler)
   if (r.source === "telegram") return 2;
+  // (the paper's website's news: after the official sources', Gujarat's ahead of the rest)
+  if (r.source === "site") return r.ministry === "પ્રાદેશિક" && r.photos.length ? 3 : r.ministry === "પ્રાદેશિક" ? 4 : 5;
   const o = r.office + " " + r.headline;
   if (/મુખ્યમંત્રી/.test(o)) return 1;
   if (/ગાંધીનગર|રાજ્યપાલ|લોકભવન|વિભાગ/.test(o)) return 2;
@@ -391,7 +393,8 @@ export async function rewriteDay(store: Store, date: string, opts: { log: (s: st
     const r = merged(group);
     const ids = group.map((m) => m.id);
     const withIds = (s: Story): Story => (group.length > 1 ? { ...s, mergedFrom: ids } : s);
-    if (!key) return withIds(asIs(r));
+    // (the paper's website's news is written and checked there: printed as it is, no AI between, 7 Nov)
+    if (!key || r.source === "site") return withIds(asIs(r));
     // already rewritten by a model, from the same releases: keep it (a rebuild shouldn't pay twice)
     const have = store.story(storyIdOf(r));
     if (have && have.model !== "as-is" && !opts.force && String(have.mergedFrom ?? [r.id]) === String(group.length > 1 ? ids : [r.id])) return have;

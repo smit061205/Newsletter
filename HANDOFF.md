@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.95** (7 Nov). Work happens on branch
+conversations. **Latest release: v1.1.96** (7 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -110,6 +110,10 @@ had one fixed length, and stories side by side must end level -- three fixed len
   the gates. Test copy: READY, no gaps, 1.0 min.
 - **v1.1.95:** a shortened length that says a sentence twice has that sentence taken out rather than being
   thrown away (6 Nov's 873-word article got no shorter length; now 15 of 15 do).
+- **v1.1.96:** the paper's own website as a source, allowed on all pages (the user, 7 Nov): its published
+  stories (`/api/paper` in the website repo) taken after the official sources, duplicates left out, printed
+  as written; Aavtikal's articles fill a thin day before AI features (`ingest/site.ts`). 7 Nov: 80 listed,
+  72 taken on a scratch copy (5 duplicates, 3 with letters the fonts can't print), 0 government photos.
 - **Open:** on 6 Nov's copy the first try still leaves page 4 unlaid. Measured (7 Nov): its stories fit by area
   (37-63 thousand against 47 thousand of room), yet none of the ~700 designs drawn can be made any height
   (every one "neither too short nor too tall"), so it is read as "no design of these widths", a narrow story

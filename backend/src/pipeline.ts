@@ -209,6 +209,11 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         if (profile.language.lang !== "gu") return;
         const { dropTwinsOfPib } = await import("./ingest/official.ts");
         dropTwinsOfPib(store, date, say);
+        // then the paper's own website: its news after theirs, so the same news is theirs (7 Nov)
+        const { ingestSite } = await import("./ingest/site.ts");
+        await timed("the paper's website", () => ingestSite(store, date, { log: say }))
+          .then((w) => say(`the paper's website: ${w.listed} listed, ${w.taken} new`))
+          .catch((e: unknown) => { if (stopping) throw e; say(`the paper's website couldn't be read (${e instanceof Error ? e.message : e})`); });
       };
       let r: Awaited<ReturnType<typeof ingestPib>> | null = null;
       for (let attempt = 0; !r; attempt++) {
@@ -285,6 +290,13 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         if (share >= WANT) return say(`the copy fills ${(share * 100).toFixed(0)}% of the pages${round ? "" : ": no features needed"}`);
         // how many more, from a feature's size (a first guess: an eighth of a page)
         const need = Math.ceil(((WANT - share) * ctx.room) / (each || ctx.room / (8 * profile.issue.pages)));
+        // Aavtikal's articles first, already written and checked: the AI only for what's still short (7 Nov:
+        // it didn't answer for most of an hour, and only 2 of 14 features came)
+        if (round === 0 && profile.language.lang === "gu") {
+          const { takeAavtikal } = await import("./ingest/site.ts");
+          const took = await takeAavtikal(store, date, need, say).catch((e: unknown) => { say(`  Aavtikal couldn't be read (${e instanceof Error ? e.message : e})`); return 0; });
+          if (took) { say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: ${took} of Aavtikal's articles taken`); continue; }
+        }
         say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: writing ${need} feature article(s)`);
         progress({ done: round, total: round + 1, label: "features", item: `${(share * 100).toFixed(0)}%` });
         // all at once, three to a request, each request its own subjects (so no two write on the same thing)
