@@ -411,6 +411,10 @@ export async function layOut(args: {
   let pagesDone = 0;
   // (a page no design was made for at all: a narrow story added once, then stories held back)
   const narrowed = new Set<number>();
+  // (a story added to a page of a customer's articles, then held back from it as too much: not added
+  // there again -- 7 Nov's page 4 went short, too tall, short with one story, round after round)
+  const added = new Map<number, Set<string>>(), bounced = new Map<number, Set<string>>();
+  const theirs = (i: number) => shares[i].some((x) => wordForWord(x.story));
   for (let round = 0; round < ROUNDS; round++) {
     const todo = shares.map((_, i) => i).filter((i) => !pages[i] && tried.get(i) !== shares[i].map((s) => s.story.id).join() + round);
     if (!todo.length) break;
@@ -542,10 +546,11 @@ export async function layOut(args: {
           if (args.longer && !args.modular) await lengthen(i, shares[0].map((s) => s.story).slice(1), 80);
           continue;
         }
-        const spare = held.filter((s) => (i > 0 || !s.story.editorsColumn) && mayGo(s, i)).sort((a, b) => toBring(a, b) || b.mid - a.mid)[0];
+        const spare = held.filter((s) => (i > 0 || !s.story.editorsColumn) && mayGo(s, i) && !bounced.get(i)?.has(s.story.id)).sort((a, b) => toBring(a, b) || b.mid - a.mid)[0];
         if (spare) {
           held.splice(held.indexOf(spare), 1);
           shares[i].push(spare);
+          if (theirs(i)) added.set(i, (added.get(i) ?? new Set()).add(spare.story.id));
           log(`  page ${i + 1}: short of copy: ${spare.story.id} added`);
         } else {
           const from = shares.map((_, k) => k).filter((k) => k !== i && shares[k].length > 2 && !args.fixedPage
@@ -566,6 +571,7 @@ export async function layOut(args: {
         const s = shares[i].slice(1).sort((a, b) => toHold(a, b) || a.mid - b.mid)[0];
         shares[i] = shares[i].filter((x) => x !== s);
         held.push(s);
+        if (added.get(i)?.has(s.story.id)) bounced.set(i, (bounced.get(i) ?? new Set()).add(s.story.id));
         log(`  page ${i + 1}: more copy than room: ${s.story.id} held back`);
       }
       // (neither: just other designs next round)

@@ -3,7 +3,7 @@
 // set out as elements. (The old packer that lived here -- a skyline and a
 // beam search -- was taken out on 26 Oct 2026: every page is the engine's.)
 import type { Element } from "@ck/shared/contract";
-import type { Story } from "../store.ts";
+import { wordForWord, type Story } from "../store.ts";
 import type { Measurer } from "./measure.ts";
 import { buildModule, place, type Module, type PhotoMode, type Variant } from "./module.ts";
 import { BODY, GAP, GRID, INK, PT } from "./typography.ts";
@@ -53,9 +53,13 @@ export function tombstoned(a: PlacedModule, b: PlacedModule): boolean {
     && Math.abs(ha - hb) < 0.15 * Math.max(ha, hb);
 }
 
-/** `b` is less important than `a`, no wider, yet has the bigger headline. */
+/** `b` is less important than `a`, no wider, yet has the bigger headline. (A customer's article in a
+ * copy isn't ranked by the desk -- its tick isn't importance, and its own title, often long, sets its
+ * size: 7 Nov's copies failed this on articles beside each other and the day's news. None may outdo
+ * a page's lead of the day's news.) */
 export const outranks = (a: Module, b: Module) =>
-  a.rank < b.rank && b.cols <= a.cols && b.headSize > a.headSize + 0.5 * PT;
+  a.rank < b.rank && b.cols <= a.cols && b.headSize > a.headSize + 0.5 * PT
+  && !wordForWord(a.story) && (a.rank === 1 || !wordForWord(b.story));
 
 /** A headline (with kicker) taking over 30% of its story -- briefs aside. */
 export const headlineHeavy = (m: Module) => m.headSize > 0 && m.rank < 5 && m.headlineHeight / m.height > 0.3;
