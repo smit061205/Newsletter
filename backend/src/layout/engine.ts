@@ -240,7 +240,7 @@ export async function layOut(args: {
   }
   // a story shorter than the paper's shortest (profile minWords) isn't printed,
   // unless the editor sent it: no items of a few lines under a big headline
-  const tooShort = args.pool.filter((s) => !alwaysPrinted(s) && Math.max(...(ladders.get(s.id) ?? []).map((r) => r.words)) < MIN_WORDS);
+  const tooShort = args.pool.filter((s) => !alwaysPrinted(s) && !wordForWord(s) && Math.max(...(ladders.get(s.id) ?? []).map((r) => r.words)) < MIN_WORDS);
   if (tooShort.length) log(`  shorter than ${MIN_WORDS} words, left out: ${tooShort.map((s) => s.id).join(", ")}`);
   args = { ...args, pool: args.pool.filter((s) => !tooShort.includes(s)) };
   const blocks = new Blocks(m, ladders);
@@ -555,13 +555,16 @@ export async function layOut(args: {
   // articles, held back from a crowded page like any story): in the place of lesser stories, a
   // customer's article first, then the editor's news; the page laid out again, its nearest design
   // taken if none is exact (a gap is reported; a missing article is worse)
-  const stranded = [...held, ...shares.flatMap((p, i) => (pages[i] ? [] : p))].filter((x) => alwaysPrinted(x.story) && !x.story.editorsColumn)
-    .sort((a, b) => Number(wordForWord(b.story)) - Number(wordForWord(a.story)));
+  // (then a customer's article not ticked "always print", in the place of the day's news only: it
+  // gives way when the pages are his and the customer's, 7 Nov)
+  const must = (x: Sized) => alwaysPrinted(x.story) && !x.story.editorsColumn;
+  const stranded = [...held, ...shares.flatMap((p, i) => (pages[i] ? [] : p))].filter((x) => must(x) || wordForWord(x.story))
+    .sort((a, b) => Number(must(b)) - Number(must(a)) || Number(wordForWord(b.story)) - Number(wordForWord(a.story)));
   for (const s of stranded) {
     let home = false;
     const order = new Map(sized.map((x, k) => [x.story.id, k]));
     // (the pages with the most lesser stories first, the front page last)
-    const lesserOf = (i: number) => shares[i].slice(1).filter((x) => !sent(x)).sort(toHold);
+    const lesserOf = (i: number) => shares[i].slice(1).filter((x) => !sent(x) && (must(s) || !wordForWord(x.story))).sort(toHold);
     const tries = shares.map((_, i) => i).filter((i) => pages[i] && mayGo(s, i) && lesserOf(i).length)
       .sort((a, b) => Number(a === 0) - Number(b === 0) || lesserOf(b).length - lesserOf(a).length);
     for (const i of tries) {
@@ -569,8 +572,9 @@ export async function layOut(args: {
         const outs = lesserOf(i).slice(0, drop);
         const list = [...shares[i].filter((x) => !outs.includes(x)), s].sort((a, b) => (order.get(a.story.id) ?? 0) - (order.get(b.story.id) ?? 0));
         fill.held = held.filter((x) => x !== s).map((x) => x.story);
+        // (one not ticked only on a page that comes out exact: no white space for it)
         const got = await solvePage(i + 1, list.map((x) => x.story), args.bands[i], pageAds(i + 1), blocks, m, !!args.modular, seeded(args.seed * 41 + i + drop * 7919),
-                                    args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), true, false, undefined, Infinity, !!args.mend);
+                                    args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), must(s), false, undefined, Infinity, !!args.mend);
         if (!got.page) continue;
         pages[i] = got.page;
         shares[i] = list;
@@ -578,12 +582,12 @@ export async function layOut(args: {
         for (const k of shares.keys()) if (k !== i && shares[k].includes(s)) shares[k] = shares[k].filter((x) => x !== s);
         held.push(...outs);
         for (const x of [...held]) if (x !== s && !outs.includes(x) && !fill.held.includes(x.story)) held.splice(held.indexOf(x), 1);
-        log(`  page ${i + 1}: ${s.story.id} must print: in the place of ${outs.map((x) => x.story.id).join(", ")}`);
+        log(`  page ${i + 1}: ${s.story.id} ${must(s) ? "must print" : "printed"}: in the place of ${outs.map((x) => x.story.id).join(", ")}`);
         home = true;
       }
       if (home) break;
     }
-    if (!home) log(`  ${s.story.id} must print, but no page could take it`);
+    if (!home) log(`  ${s.story.id} ${must(s) ? "must print, but no page could take it" : "left out: no room for it"}`);
   }
   for (const p of pages) {
     for (const x of p?.placed ?? []) if (x.module.story.factCheck) factChecks.push({ story: x.module.story.id, detail: x.module.story.factCheck });

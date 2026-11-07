@@ -101,7 +101,7 @@ export default function Copies() {
     if (missing >= 0) { setError(t("copies.extra.need", { n: num(lang, missing + 1) })); return; }
     try {
       const articles = withExtra ? await Promise.all(arts.map(async (a) => ({
-        titles: lines(a.titles), decks: lines(a.decks), bodies: lines(a.bodies),
+        titles: lines(a.titles), decks: lines(a.decks), bodies: lines(a.bodies), must: !!a.must,
         photos: await Promise.all(a.pics.map(async (p) => ("url" in p ? { url: p.url } : { name: p.file.name, base64: await toBase64(p.file) }))),
       }))) : [];
       setXTouched(true);

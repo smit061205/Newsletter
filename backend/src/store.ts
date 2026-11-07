@@ -101,8 +101,9 @@ export interface Story {
 /** Always printed: news the editor sent the paper's Telegram bot, and a copy's
  * fixed article (a customer's, editorial/copies.ts). */
 export const alwaysPrinted = (s: Pick<Story, "source">) => !!s.source && (s.source.startsWith("telegram:") || s.source.startsWith("fixed:"));
-/** Printed word for word: a copy's fixed article is never reworded, cut or left without its photo. */
-export const wordForWord = (s: Pick<Story, "source">) => !!s.source?.startsWith("fixed:");
+/** Printed word for word: a copy's fixed article is never reworded, cut or left without its photo
+ * (one not ticked "always print", "given:", prints while there's room: 7 Nov). */
+export const wordForWord = (s: Pick<Story, "source">) => !!s.source && (s.source.startsWith("fixed:") || s.source.startsWith("given:"));
 
 export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build" | "sections";
 /** How far a step has got: `done` of `total`, in words, with the item in hand (a headline, a page). */

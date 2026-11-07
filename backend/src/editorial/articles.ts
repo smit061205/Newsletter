@@ -27,7 +27,7 @@ export function paperArticles(date: string, sister?: string): Article[] {
 /** A photo as the newsroom sends it: a new one's file, or one already saved. */
 export type GivenPhoto = { name: string; base64: string } | { url: string };
 /** An article as the newsroom sends it. */
-export interface GivenArticle { titles?: string[]; decks?: string[]; bodies?: string[]; photos?: GivenPhoto[] }
+export interface GivenArticle { titles?: string[]; decks?: string[]; bodies?: string[]; photos?: GivenPhoto[]; must?: boolean }
 
 /** Articles from the newsroom, checked, their new photos saved with the day's
  * (`prefix` names the files: the copies' and the paper's apart). A string is what's wrong. */
@@ -56,7 +56,7 @@ export async function takeArticles(date: string, given: GivenArticle[], prefix: 
       await writeFile(path.join(dir, name), Buffer.from(p.base64, "base64"));
       photos.push(`/media/${date}/${name}`);
     }
-    articles.push({ titles, decks: (a.decks ?? []).map(line).filter(Boolean).slice(0, 12), bodies, photos });
+    articles.push({ titles, decks: (a.decks ?? []).map(line).filter(Boolean).slice(0, 12), bodies, photos, ...(a.must ? { must: true } : {}) });
   }
   return articles;
 }

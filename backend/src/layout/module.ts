@@ -69,6 +69,9 @@ export const spanWidth = (cols: number) => cols * GRID.column + (cols - 1) * GRI
  * and two thirds of it at the narrowest (PIB's photos, 466 pixels wide, print 2 columns at 129:
  * held to 150 they were left out, the front lead's with them, 3 Nov). */
 export const leastPpi = (k: number) => (k <= PHOTO.minCols ? PHOTO.minPpi * 2 / 3 : PHOTO.minPpi);
+/** A photo too small to print sharp at any width, even the narrowest: only then may a customer's
+ * print a little soft (7 Nov: one that was sharp at 3 columns ran across 5 at 111 ppi). */
+const neverSharp = (px: number) => px / (spanWidth(PHOTO.minCols) / 300) < leastPpi(PHOTO.minCols);
 
 /** Move a module's elements to (dx, dy). */
 export function place(elements: Element[], dx: number, dy: number): Element[] {
@@ -155,7 +158,7 @@ async function photoRow(story: Story, urls: string[], cols: number, y: number, m
   const h = Math.min(...naturals);
   // (a customer's photos, of all shapes, may lose a little more to share one height: 3 Nov)
   if (naturals.some((n) => h < n * (1 - (theirs ? 0.25 : PHOTO.maxCrop))) || h < PHOTO.minHeight) return null;
-  if (parts.some((p, i) => sizes[i]!.width / (spanWidth(p.k) / 300) < (theirs ? PHOTO.minPpi * 0.6 : PHOTO.minPpi))) return null;
+  if (parts.some((p, i) => sizes[i]!.width / (spanWidth(p.k) / 300) < (theirs && neverSharp(sizes[i]!.width) ? PHOTO.minPpi * 0.6 : PHOTO.minPpi))) return null;
   return {
     elements: parts.map((p, i) => ({ id: `${story.id}-photo${i}`, kind: "image" as const, articleId: story.id,
                                      x: r1(p.x), y: r1(y), width: r1(spanWidth(p.k)), height: r1(h), url: urls[i], fit: "cover" as const })),
@@ -367,10 +370,10 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     if (k && photo) {
       const pw = spanWidth(k);
       const ph = pw * photo.height / photo.width; // natural shape: nothing cropped
-      // (a customer's photo prints even small or a little soft: it's what he paid for -- the newsroom warns of a small one)
+      // (a customer's photo prints even small or a little soft when no width is sharp: it's what he paid for -- the newsroom warns of a small one)
       const theirs = wordForWord(story);
       if (ph < PHOTO.minHeight && !theirs) continue; // a postage stamp
-      if (photo.width / (pw / 300) < (theirs ? PHOTO.minPpi * 0.6 : leastPpi(k))) continue; // would print soft
+      if (photo.width / (pw / 300) < (theirs && !sharp ? PHOTO.minPpi * 0.6 : leastPpi(k))) continue; // would print soft
       const px = w - pw;
       const img: ImageElement = { id: `${aid}-photo`, kind: "image", articleId: aid, x: r1(px), y: r1(cursor),
                                   width: r1(pw), height: r1(ph), url: story.photo!, fit: "cover" };

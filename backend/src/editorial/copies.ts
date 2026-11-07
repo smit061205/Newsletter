@@ -92,7 +92,8 @@ export interface Batch {
  * copies, each with one of the customer's titles and photos; 27 Oct: any
  * number of articles, each with any number of titles, sub-headings, texts and
  * photos). The copies go through them in turn (articleFor). */
-export interface Article { titles: string[]; decks: string[]; bodies: string[]; photos: string[] }
+/** `must`: printed in every copy whatever room it takes (ticked "always print"); else while there's room (7 Nov) */
+export interface Article { titles: string[]; decks: string[]; bodies: string[]; photos: string[]; must?: boolean }
 
 /** The n-th (from 1) of every mix of one from each list, in turn: each list
  * steps on with every copy; a mix already used gives way to the next unused
@@ -138,7 +139,8 @@ function articleStory(a: Article, i: number, n: number, date: string): Story {
   const from = photo ? a.photos.indexOf(photo) : 0;
   const photos = Array.from({ length: photoCount(a.photos.length, n) }, (_, k) => a.photos[(from + k) % a.photos.length]);
   return { id: `z-fixed-${i + 1}`, releaseId: null, date, kicker: "", headline: title.trim(), deck: deck.trim(), bodies: { long: body, medium: body, short: body },
-           priority: 2, page: null, photo, photos, caption: "", source: "fixed:copy", model: "as-is", needsReview: false };
+           // (one not ticked: before the day's news, but giving way when the pages run out)
+           priority: a.must ? 2 : 1, page: null, photo, photos, caption: "", source: a.must ? "fixed:copy" : "given:copy", model: "as-is", needsReview: false };
 }
 /** The day's stories that are the same news as one of the customer's articles (2 Nov): each copy
  * prints his article in their place, never the news twice. The AI reads them side by side (once a
@@ -207,11 +209,17 @@ const TRIES = 4;
  * next column's text, over the second's line 4 px short of its box). 0 is clean. */
 function badness(r: Awaited<ReturnType<typeof buildIssue>>["report"]): number {
   const failed = r.gates.filter((g) => !g.pass && LAYOUT_GATES.includes(g.gate.split(" ")[0])).length;
-  if (!failed) return 0;
-  const how = r.warnings.reduce((a, w) => a + (w.kind === "white-space" ? 5 : w.kind === "line-fit" && !/past/.test(w.detail) ? 1 : 10), 0);
-  // (a customer's article missing is worse than any gap: the try that prints them all is kept)
+  if (!failed && !r.leftOut.some((x) => x.story.startsWith("z-fixed-"))) return 0;
+  // (white space by how much is empty, not how many stretches: 7 Nov, a front page half empty was kept
+  // over a try with a strip 120pt deep, both 8 stretches)
+  const how = r.warnings.reduce((a, w) => a + (w.kind === "white-space" ? 0 : w.kind === "line-fit" && !/past/.test(w.detail) ? 1 : 10), 0)
+    + r.whiteSpace.reduce((a, g) => a + g.height / 20, 0);
+  // (a customer's article ticked "always print" missing is worse than anything; one not ticked
+  // prints while there's room, a page left with white space for it isn't: among clean tries, the one
+  // that prints the most of them is kept)
   const missing = r.gates.find((g) => g.gate.startsWith("S16") && !g.pass)?.detail.split(", ").length ?? 0;
-  return failed * 1000 + how + missing * 1_000_000;
+  const given = r.leftOut.filter((x) => x.story.startsWith("z-fixed-")).length - missing;
+  return failed * 1000 + how + missing * 1_000_000 + given * 100;
 }
 
 let running: Batch | null = null;
@@ -816,7 +824,7 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
                    ...(opts.articles?.length ? { articles: opts.articles } : {}), ...(same.ids.length ? { drop: same.ids } : {}),
                    ...(opts.pages === 8 ? { eight: { printed: day.pageOf.map(([id]) => id) } } : {}) };
     for (const [i, a] of (opts.articles ?? []).entries()) {
-      say(`fixed article ${i + 1} in every copy: ${a.titles.length} title(s), ${a.decks.length} sub-heading(s), ${a.bodies.length} text(s), ${a.photos.length} photo(s)${a.photos.length > 1 ? `, 1 to ${Math.min(3, a.photos.length)} to a copy` : ""}, in turn`);
+      say(`article ${i + 1}${a.must ? ", always printed" : ", printed while there's room"}: ${a.titles.length} title(s), ${a.decks.length} sub-heading(s), ${a.bodies.length} text(s), ${a.photos.length} photo(s)${a.photos.length > 1 ? `, 1 to ${Math.min(3, a.photos.length)} to a copy` : ""}, in turn`);
     }
     const tasks: Task[] = Array.from({ length: opts.count }, (_, i) => ({
       lang, label: `copy ${i + 1}`, spec: base, seen: day.seen,

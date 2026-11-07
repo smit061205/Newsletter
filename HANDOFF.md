@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.92** (7 Nov). Work happens on branch
+conversations. **Latest release: v1.1.92** (7 Nov; v1.1.93 is ready on the branch, not released: see "Unfinished" below). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -84,6 +84,45 @@ number after "અંક" / "Issue No." counted on from the date the PDF was writ
 The new text keeps its place; what follows on the line stays where it was (TJ adjustments). A design's
 fonts are subsets holding only its own letters: a date they can't draw is written in the app's Gopika
 (Gujarati fonts) or a standard font. Tried on 3 of the father's 33 designs (2 Nov) and Aman Ki Awaz.
+
+**Unfinished, 7 Nov (pick up here):** the last session ran out of usage mid-task. On branch
+`feat/third-engine`, committed but **not merged or released**:
+1. The "always print" tick (above). CI was READY (all four layout tests) and the newsroom built.
+2. Two fixes made after that CI run, from the father's 5 copies of 6 Nov (15 articles, all 15
+   printed in every copy, but):
+   - Copy 1's front page came out half empty (two stories, the bottom 678pt of all 8 columns blank):
+     of its 4 tries, the kept one was picked by *how many* empty stretches (8 = 8), not how much is
+     empty; a try with only a 120pt strip lost. Now `badness` in `editorial/copies.ts` adds each
+     white stretch's height / 20 instead of 5 a stretch.
+   - Copy 5 printed a customer's photo (article 13) across 5 columns at 111 ppi though it is sharp at
+     3: a customer's photo was allowed down to 90 ppi at any width. Now that allowance is only for a
+     photo no width prints sharp (`neverSharp` in `layout/module.ts`, both the single photo and the
+     photos side by side).
+   **Still to do:** typecheck passed; run the CI layout tests again (these change the layout), test
+   ONE copy with the father's 15 articles all ticked (they are saved in the app's
+   `out/copies/2026-11-06/copies.json`, `articles`; copy them with `"must": true` into a scratch
+   DATA_DIR made from a copy of the app's database, its `media/2026-11-06` (the `fixed-*` photos
+   too), settings.env, designs and papers; then `cli.ts copies --date 2026-11-06 --count 1 --reword
+   headline --shuffle anywhere --articles FILE`), then merge `--no-ff`, tag v1.1.93, push, read the
+   release workflow, tell the developer.
+3. Told the developer, not yet fixed: those 15 articles are about 4,840 words (a 4-page copy holds
+   about 3,500 cleanly besides the news), the cause of the many retries and white space; article 13's
+   first title is pasted twice in a row (the father's typing); copies 1, 2, 4 flag Telegram item
+   u6001168751 "numbers not in the English release: 1" (a flag saved from the evening's
+   translation, not from the copies); the headline-order check (gate 3) fails on customer articles
+   all of one importance (cosmetic). Offered, no answer yet: AI translation of a Hindi/English
+   article given for the copies; a warning in Copies when the articles are too many words for 4 pages.
+   After v1.1.93 the father's saved articles start unticked: he ticks the ones that must print.
+
+**"Always print" per article** (7 Nov, for v1.1.93, committed on the branch, not yet released; the developer: "all the copies atleast include ones i
+tick"): each article in Copies has a tick box, unticked to begin with. A ticked one is must-print
+(source `fixed:copy`, priority 2): gate S16 checks it, the rescue puts it in the place of lesser stories.
+An unticked one (`given:copy`, priority 1) is still kept word for word (`wordForWord`) and tried first,
+and the rescue gives it a page only where that page still comes out exact; otherwise it gives way
+(log: "left out: no room for it"), and the copies prefer a try that prints it (`badness`, 100 a story).
+Tried with 24 articles (5,820 words, 8 ticked) on one copy of 6 Nov's: all 24 printed, but the front
+page kept two white stretches from the engine's last-resort page; about 3,500 words of articles per
+4-page copy is what fits cleanly. Not yet seen: an unticked article actually giving way.
 
 **Every article given prints** (7 Nov, v1.1.92; the developer: "none of the articles should be
 missed"): 16 articles were given and the engine took the first 10 without a word
