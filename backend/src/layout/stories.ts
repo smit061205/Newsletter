@@ -38,7 +38,7 @@ const sameEvent = (a: Story, b: Story) => similarity(a, b) > 0.6;
 export const related = (a: Story, b: Story) => similarity(a, b) > 0.2;
 
 /** A story the editor sent (his Telegram news, a copy's fixed article: store.alwaysPrinted). */
-const sentByEditor = (s: Story) => !!s.source && (s.source.startsWith("telegram:") || s.source.startsWith("fixed:"));
+const sentByEditor = (s: Story) => !!s.source && (s.source.startsWith("telegram:") || s.source.startsWith("fixed:") || s.source.startsWith("given:"));
 
 export function dedupe(stories: Story[]): Story[] {
   const kept: Story[] = [];

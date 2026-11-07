@@ -32,6 +32,20 @@ export async function checkFacts(store: Store, story: Story, log: (s: string) =>
   if (!sources.length || !apiKey || wordForWord(story) || process.env.CK_FAKE_AI === "1") return { problems: [], cost: 0 };
   const text = `STORY:\n${story.headline}\n${story.deck}\n${story.bodies.long}`;
   const source = sources.map((r) => `RELEASE (${r.date}):\n${r.headline}\n${r.subhead}\n${r.body}`).join("\n\n");
+  return askFacts(store, story.id, source, text, apiKey, log);
+}
+
+/** A customer's article shortened (editorial/shorten.ts) read against its own words, as a story is
+ * against its release: what it names, dates or quotes that the original doesn't. */
+export async function checkShortened(store: Store, id: string, original: { title: string; body: string }, shorter: string, log: (s: string) => void):
+  Promise<{ problems: string[]; cost: number }> {
+  const apiKey = env("OPENROUTER_API_KEY");
+  if (!apiKey || process.env.CK_FAKE_AI === "1") return { problems: [], cost: 0 };
+  return askFacts(store, id, `RELEASE:\n${original.title}\n${original.body}`, `STORY:\n${original.title}\n${shorter}`, apiKey, log);
+}
+
+async function askFacts(store: Store, id: string, source: string, text: string, apiKey: string, log: (s: string) => void): Promise<{ problems: string[]; cost: number }> {
+  const story = { id };
   const key = `facts2|${story.id}|${createHash("sha256").update(text + source).digest("hex").slice(0, 24)}`;
   const saved = store.fitted(key);
   if (saved) return { problems: JSON.parse(saved.body) as string[], cost: 0 };

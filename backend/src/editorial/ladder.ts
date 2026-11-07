@@ -55,8 +55,31 @@ const MORE_IN_RELEASE = 1.25;
  * one already written (a copy, a translated paper). */
 export async function ladderOf(store: Store, story: Story, release: Release | undefined,
                                opts: { longer: boolean | "cached"; log?: (s: string) => void }): Promise<{ rungs: Rung[]; cost: number }> {
-  // a customer's article: its own words, whole -- never cut nor lengthened
-  if (wordForWord(story)) return { rungs: [{ body: story.bodies.long, words: wordCount(story.bodies.long), from: "long" }], cost: 0 };
+  // a customer's article: its own words, whole -- never cut nor lengthened by the layout; the lengths
+  // it was shortened to for the day (shorten.ts), each cut a sentence at a time down to the next (its
+  // whole text too while the day has room for it)
+  if (wordForWord(story)) {
+    const whole: Rung = { body: story.bodies.long, words: wordCount(story.bodies.long), from: "long" };
+    if (!story.cuts?.bodies.length) return { rungs: [whole], cost: 0 };
+    const bases = story.cuts.bodies.map((body): Rung => ({ body, words: wordCount(body), from: "medium" })).sort((a, b) => b.words - a.words);
+    const all: Rung[] = story.cuts.whole ? [whole] : [];
+    for (const [i, base] of bases.entries()) {
+      all.push(base);
+      const next = bases[i + 1]?.words ?? MIN_WORDS;
+      for (let body = dropLastSentence(base.body); body; body = dropLastSentence(body)) {
+        const words = wordCount(body);
+        if (words < Math.max(MIN_WORDS, next)) break;
+        all.push({ body, words, from: "cut" });
+      }
+    }
+    const out: Rung[] = [];
+    for (const r of all.sort((a, b) => b.words - a.words)) {
+      const last = out[out.length - 1];
+      if (last && last.words - r.words < Math.max(3, last.words * STEP)) continue;
+      out.push(r);
+    }
+    return { rungs: out.length ? out : [whole], cost: 0 };
+  }
   let cost = 0;
   const bases: Rung[] = [];
   // (a sentence said twice comes out here: 30 Oct, a story printed saying the same thing twice)

@@ -13,12 +13,13 @@ import { Button, Icon, Note, useApp } from "../ui/kit";
 
 /** A photo: picked here, or one the last copies used. */
 export type Pic = { file: File; preview: string; small?: boolean } | { url: string };
-export interface Art { titles: string[]; decks: string[]; bodies: string[]; pics: Pic[] }
+/** `must`: printed in every copy whatever room it takes; else it prints while there's room. Either one's text may be shortened to fit (7 Nov) */
+export interface Art { titles: string[]; decks: string[]; bodies: string[]; pics: Pic[]; must?: boolean }
 export const blankArt = (): Art => ({ titles: [""], decks: [""], bodies: [""], pics: [] });
 /** An article the last copies printed, ready to make them again. */
 export const artOf = (a: CopyArticle): Art => ({
   titles: a.titles.length ? a.titles : [""], decks: a.decks.length ? a.decks : [""],
-  bodies: a.bodies.length ? a.bodies : [""], pics: a.photos.map((url) => ({ url })),
+  bodies: a.bodies.length ? a.bodies : [""], pics: a.photos.map((url) => ({ url })), must: !!a.must,
 });
 const filled = (xs: string[]) => xs.map((x) => x.trim()).filter(Boolean);
 /** How many different ways the copies can print article `a`. */
@@ -102,6 +103,10 @@ export function Articles({ arts, onChange, disabled, count, single }: { arts: Ar
                 {a.pics.some((p) => "small" in p && p.small) && <Note tone="warn">{t("copies.extra.small")}</Note>}
               </div>
             </div>
+            {/* (the developer, 7 Nov: "all the copies at least include ones i tick") */}
+            {!single && <label className={s.switch}><input type="checkbox" checked={!!a.must} disabled={disabled} onChange={(e) => set(i, { ...a, must: e.target.checked })} />
+              <span>{t("copies.extra.must")}</span></label>}
+            {!single && <span className={s.faint}>{t(a.must ? "copies.extra.whole" : "copies.extra.shortened")}</span>}
             {list(i, "decks", "copies.extra.deck", "copies.extra.addDeck", 0)}
             {list(i, "bodies", "copies.extra.text", "copies.extra.addText", 1)}
             {!single && filled(a.titles).length > 0 && mixes > 1 && <span className={s.faint}>{count >= mixes

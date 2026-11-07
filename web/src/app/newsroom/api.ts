@@ -84,7 +84,7 @@ export interface CopiesRun { kind: "copies" | "editions"; date: string; count: n
   articles?: CopyArticle[];
   extra?: { body: string; deck?: string; titles: string[]; photos: string[] } }
 /** An article in every copy: the copies go through its titles, sub-headings, texts and photos in turn. */
-export interface CopyArticle { titles: string[]; decks: string[]; bodies: string[]; photos: string[] }
+export interface CopyArticle { titles: string[]; decks: string[]; bodies: string[]; photos: string[]; must?: boolean }
 
 /** A batch's share done (0-1), and minutes left from how fast it has gone so far (or `guess` before it knows). */
 export function batchProgress(run: CopiesRun, guess: number): { share: number; minutes: number } {

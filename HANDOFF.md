@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.92** (7 Nov). Work happens on branch
+conversations. **Latest release: v1.1.93** (7 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -84,6 +84,39 @@ number after "અંક" / "Issue No." counted on from the date the PDF was writ
 The new text keeps its place; what follows on the line stays where it was (TJ adjustments). A design's
 fonts are subsets holding only its own letters: a date they can't draw is written in the app's Gopika
 (Gujarati fonts) or a standard font. Tried on 3 of the father's 33 designs (2 Nov) and Aman Ki Awaz.
+
+**Copies' articles shortened to fit** (7 Nov, v1.1.93; the developer: "reword all the articles with ai
+once", "shorten only the unticked ones" then "even ticked ones body can be shortened", "don't touch
+titles", "not a hard limit"). Root cause of 6 Nov's white and blank front pages: each customer's article
+had one fixed length, and stories side by side must end level -- three fixed lengths never do. Now:
+- `editorial/shorten.ts`: once per day and set of articles, before any copy, each article's body (each of
+  its texts) is written by the AI at 3-4 shorter lengths round what suits the day (the day's paper's printed
+  words, less Telegram news and 30% kept for the day's news, shared over the articles; never under 100
+  words), each checked against the original (numbers, `facts.ts checkShortened`, no letter the font can't
+  print that the original hasn't: a customer's "✓"). Cached (`shorten1|`, `artcuts|date|`), so every copy
+  and a re-run reuse it. Titles, sub-headings and photos untouched and still turning per copy.
+- `ladder.ts`: an article's rungs are those lengths (and sentence cuts down to the next), its whole text too
+  on a day with room. Ticked still means printed in every copy (S16).
+- The planner tells apart too short, too tall, in between, and no design of these widths at all (it was
+  "too tall" for all of the last: the front page was emptied a story at a time). On pages with articles the
+  engine reacts to each (a story written to fit added; a lesser story swapped; a page of fixed lengths
+  given one that can change); pages without articles behave exactly as before (the day's paper).
+  A page of nothing but must-print articles moves one away rather than staying blank.
+- Test (one copy of 6 Nov, 15 articles, 4 ticked): READY, no white space, all 15 printed, 2.3 min, ~₹0.2.
+- **Open:** a copy's first try can still leave its front page unlaid when a short article is drawn as its
+  lead (a 192-word article fits a lead's width only at 4 columns); its second try is clean, costing ~80s.
+  Gate 3 (headline order) flags customer articles of one importance (cosmetic). The 6 Nov flag on
+  u6001168751 is a UN News story's translation (not Telegram: that day had none).
+
+**"Always print" per article** (7 Nov, for v1.1.93, committed on the branch, not yet released; the developer: "all the copies atleast include ones i
+tick"): each article in Copies has a tick box, unticked to begin with. A ticked one is must-print
+(source `fixed:copy`, priority 2): gate S16 checks it, the rescue puts it in the place of lesser stories.
+An unticked one (`given:copy`, priority 1) is still kept word for word (`wordForWord`) and tried first,
+and the rescue gives it a page only where that page still comes out exact; otherwise it gives way
+(log: "left out: no room for it"), and the copies prefer a try that prints it (`badness`, 100 a story).
+Tried with 24 articles (5,820 words, 8 ticked) on one copy of 6 Nov's: all 24 printed, but the front
+page kept two white stretches from the engine's last-resort page; about 3,500 words of articles per
+4-page copy is what fits cleanly. Not yet seen: an unticked article actually giving way.
 
 **Every article given prints** (7 Nov, v1.1.92; the developer: "none of the articles should be
 missed"): 16 articles were given and the engine took the first 10 without a word

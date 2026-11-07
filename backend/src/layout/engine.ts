@@ -83,6 +83,8 @@ interface Sized { story: Story; min: number; mid: number; max: number }
 /** News the editor sent the paper's Telegram bot, and a copy's fixed article:
  * always printed (26 Oct, the editor's wish): never the story held back while another can be. */
 const sent = (s: Sized) => alwaysPrinted(s.story) || !!s.story.editorsColumn;
+/** A story with one length only: a customer's article not shortened (shorten.ts). */
+const rigid = (s: Sized) => wordForWord(s.story) && !s.story.cuts?.bodies.length;
 /** the story to hold back first: not one he sent, then the least important, then one with no photo */
 const toHold = (a: Sized, b: Sized) => Number(sent(a)) - Number(sent(b)) || b.story.priority - a.story.priority || Number(!!a.story.photo) - Number(!!b.story.photo);
 /** the held story to bring back first: one he sent, then the most important, then one with a photo */
@@ -240,7 +242,7 @@ export async function layOut(args: {
   }
   // a story shorter than the paper's shortest (profile minWords) isn't printed,
   // unless the editor sent it: no items of a few lines under a big headline
-  const tooShort = args.pool.filter((s) => !alwaysPrinted(s) && Math.max(...(ladders.get(s.id) ?? []).map((r) => r.words)) < MIN_WORDS);
+  const tooShort = args.pool.filter((s) => !alwaysPrinted(s) && !wordForWord(s) && Math.max(...(ladders.get(s.id) ?? []).map((r) => r.words)) < MIN_WORDS);
   if (tooShort.length) log(`  shorter than ${MIN_WORDS} words, left out: ${tooShort.map((s) => s.id).join(", ")}`);
   args = { ...args, pool: args.pool.filter((s) => !tooShort.includes(s)) };
   const blocks = new Blocks(m, ladders);
@@ -438,6 +440,55 @@ export async function layOut(args: {
       if (d.again) continue;
       const sum = (k: number, f: "min" | "max" | "mid") => shares[k].reduce((a, s) => a + s[f], 0);
       const isShort = sum(i, "mid") < rooms[i];
+      // (a page with no customer's article goes on as it did before 7 Nov: no design at all is taken as
+      // too tall, short of the foot and past it as short -- the day's paper and its tests lay out as they did)
+      if (!shares[i].some((x) => wordForWord(x.story))) {
+        if (d.widths) { d.widths = false; d.long = 1; }
+        else if (d.short > 0 && d.long > 0) d.long = 0;
+      }
+      // (no design of its stories' widths at all, on a page they don't fill by their sizes: one more
+      // story, not one fewer -- the page's one story can't fill 8 columns, 6 Nov's front pages)
+      // (and the story added then is one written to fit, the day's news, not another customer's article of
+      // set lengths: 7 Nov's front page took article 1 back and held it back again, round after round)
+      if (d.widths && isShort && !(i === 0 && shares[0].length >= FRONT_MOST)) {
+        const news = held.filter((x) => !wordForWord(x.story) && mayGo(x, i) && (i > 0 || !x.story.editorsColumn)).sort(toBring)[0];
+        if (news) {
+          held.splice(held.indexOf(news), 1);
+          shares[i].push(news);
+          log(`  page ${i + 1}: its stories can't make a design: ${news.story.id}, written to fit, added`);
+          continue;
+        }
+      }
+      if (d.widths && isShort) d.short = 1;
+      // (nothing on the page can change its length -- a customer's articles not shortened, each its own words
+      // only: stories side by side end level, and three fixed lengths never do, 7 Nov's front page. A
+      // story that can: the day's news written to fit, or an article shortened)
+      if (d.widths && shares[i].every(rigid)) {
+        const flex = held.filter((x) => !rigid(x) && mayGo(x, i) && (i > 0 || !x.story.editorsColumn)).sort(toBring)[0];
+        if (flex) {
+          held.splice(held.indexOf(flex), 1);
+          if (i === 0 && shares[0].length >= FRONT_MOST) {
+            const out = shares[0].slice(1).sort((a, b) => a.mid - b.mid)[0];
+            shares[0] = shares[0].filter((x) => x !== out);
+            held.push(out);
+          }
+          shares[i].push(flex);
+          log(`  page ${i + 1}: nothing on it can change its length: ${flex.story.id} added`);
+          continue;
+        }
+      }
+      // (some designs short of the foot, some past it, none on it: a lesser story for another of
+      // another length, the rest kept -- neither more nor fewer would help)
+      if (d.short > 0 && d.long > 0) {
+        const out = shares[i].slice(1).filter((x) => !sent(x)).sort(toHold)[0];
+        const other = out && held.filter((x) => !sent(x) && mayGo(x, i) && (i > 0 || !x.story.editorsColumn) && Math.abs(x.mid - out.mid) > out.mid * 0.1).sort(toBring)[0];
+        if (out && other) {
+          held.splice(held.indexOf(other), 1, out);
+          shares[i] = shares[i].map((x) => (x === out ? other : x));
+          log(`  page ${i + 1}: no design comes out on the foot: ${other.story.id} in the place of ${out.story.id}`);
+        }
+        continue;
+      }
       // no design fills it yet: its stories written longer give the designs more
       // heights to come out at (a page isn't filled by anything but stories)
       if ((round === 1 || round === 3) && !shortBy.has(i) && args.longer && !args.modular) await lengthen(i, shares[i].map((s) => s.story), 60 + 20 * round);
@@ -544,6 +595,14 @@ export async function layOut(args: {
         const other = [...held].sort(toBring).find((s) => (i > 0 || !s.story.editorsColumn) && mayGo(s, i)), out = shares[i].findLast((s) => !sent(s));
         if (other && out) { held.splice(held.indexOf(other), 1, out); shares[i] = shares[i].map((s) => (s === out ? other : s)); }
       }
+      // (a page of nothing but what must print, too much for it: its smallest goes to another page's
+      // lesser stories' place below, and this one is laid out -- 6 Nov's copy 2 left its front page blank)
+      if (attempt >= 3 && shares[i].length > PAGE_FEWEST && shares[i].every((s) => sent(s))) {
+        const s = shares[i].slice(1).sort((a, b) => a.mid - b.mid)[0];
+        shares[i] = shares[i].filter((x) => x !== s);
+        held.push(s);
+        log(`  page ${n}: all of it must print and it won't fit: ${s.story.id} moved to another page`);
+      }
       fill.held = held.map((s) => s.story);
       const got = await solvePage(n, shares[i].map((s) => s.story), args.bands[i], pageAds(n), blocks, m, !!args.modular, seeded(args.seed * 37 + n + attempt * 7919),
                                   args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), true, false, undefined, Infinity, !!args.mend);
@@ -555,13 +614,16 @@ export async function layOut(args: {
   // articles, held back from a crowded page like any story): in the place of lesser stories, a
   // customer's article first, then the editor's news; the page laid out again, its nearest design
   // taken if none is exact (a gap is reported; a missing article is worse)
-  const stranded = [...held, ...shares.flatMap((p, i) => (pages[i] ? [] : p))].filter((x) => alwaysPrinted(x.story) && !x.story.editorsColumn)
-    .sort((a, b) => Number(wordForWord(b.story)) - Number(wordForWord(a.story)));
+  // (then a customer's article not ticked "always print", in the place of the day's news only: it
+  // gives way when the pages are his and the customer's, 7 Nov)
+  const must = (x: Sized) => alwaysPrinted(x.story) && !x.story.editorsColumn;
+  const stranded = [...held, ...shares.flatMap((p, i) => (pages[i] ? [] : p))].filter((x) => must(x) || wordForWord(x.story))
+    .sort((a, b) => Number(must(b)) - Number(must(a)) || Number(wordForWord(b.story)) - Number(wordForWord(a.story)));
   for (const s of stranded) {
     let home = false;
     const order = new Map(sized.map((x, k) => [x.story.id, k]));
     // (the pages with the most lesser stories first, the front page last)
-    const lesserOf = (i: number) => shares[i].slice(1).filter((x) => !sent(x)).sort(toHold);
+    const lesserOf = (i: number) => shares[i].slice(1).filter((x) => !sent(x) && (must(s) || !wordForWord(x.story))).sort(toHold);
     const tries = shares.map((_, i) => i).filter((i) => pages[i] && mayGo(s, i) && lesserOf(i).length)
       .sort((a, b) => Number(a === 0) - Number(b === 0) || lesserOf(b).length - lesserOf(a).length);
     for (const i of tries) {
@@ -569,8 +631,9 @@ export async function layOut(args: {
         const outs = lesserOf(i).slice(0, drop);
         const list = [...shares[i].filter((x) => !outs.includes(x)), s].sort((a, b) => (order.get(a.story.id) ?? 0) - (order.get(b.story.id) ?? 0));
         fill.held = held.filter((x) => x !== s).map((x) => x.story);
+        // (one not ticked only on a page that comes out exact: no white space for it)
         const got = await solvePage(i + 1, list.map((x) => x.story), args.bands[i], pageAds(i + 1), blocks, m, !!args.modular, seeded(args.seed * 41 + i + drop * 7919),
-                                    args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), true, false, undefined, Infinity, !!args.mend);
+                                    args.avoid, log, LAST, fill, FILL_MAX * spanOf(2), must(s), false, undefined, Infinity, !!args.mend);
         if (!got.page) continue;
         pages[i] = got.page;
         shares[i] = list;
@@ -578,12 +641,12 @@ export async function layOut(args: {
         for (const k of shares.keys()) if (k !== i && shares[k].includes(s)) shares[k] = shares[k].filter((x) => x !== s);
         held.push(...outs);
         for (const x of [...held]) if (x !== s && !outs.includes(x) && !fill.held.includes(x.story)) held.splice(held.indexOf(x), 1);
-        log(`  page ${i + 1}: ${s.story.id} must print: in the place of ${outs.map((x) => x.story.id).join(", ")}`);
+        log(`  page ${i + 1}: ${s.story.id} ${must(s) ? "must print" : "printed"}: in the place of ${outs.map((x) => x.story.id).join(", ")}`);
         home = true;
       }
       if (home) break;
     }
-    if (!home) log(`  ${s.story.id} must print, but no page could take it`);
+    if (!home) log(`  ${s.story.id} ${must(s) ? "must print, but no page could take it" : "left out: no room for it"}`);
   }
   for (const p of pages) {
     for (const x of p?.placed ?? []) if (x.module.story.factCheck) factChecks.push({ story: x.module.story.id, detail: x.module.story.factCheck });
@@ -623,7 +686,9 @@ type WriteTo = (needs: SlotNeed[]) => Promise<boolean>;
 type Grow = (placed: PlacedModule[], gaps: Extract<Block, { kind: "fill" }>[]) => Promise<boolean>;
 
 /** Why a page found no design: how many designs came out too short for it, and too tall. */
-interface Diagnosis { short: number; long: number; /** a page laid out, but badly: only other designs are wanted */ again?: boolean }
+interface Diagnosis { short: number; long: number; /** a page laid out, but badly: only other designs are wanted */ again?: boolean;
+  /** the planner: no design of these stories' widths fills the page's width at all (neither short nor tall) */
+  widths?: boolean }
 
 /** A page as it can be set: its stories' settings at each width, and what the designs and
  * the planner are given. The same for choosing a page's stories (share below) and laying it out. */
@@ -814,6 +879,16 @@ async function share(sized: Sized[], rooms: number[], open: number[], perPage: (
     let used = 0;
     if (column && i > 0) { pages[i].push(column); used += column.mid; column = undefined; }
     while (left.length && used < rooms[i] && pages[i].length < (i === 0 ? FRONT_MOST : insideMost)) { const s = left.shift()!; pages[i].push(s); used += s.mid; }
+    // (and one story that can change its length, never a page of fixed ones only: they can't end level)
+    const flex = pages[i].every(rigid) ? left.find((s) => !rigid(s) && (i > 0 || !s.story.editorsColumn)) : undefined;
+    if (flex) {
+      left = left.filter((s) => s !== flex);
+      if (pages[i].length >= (i === 0 ? FRONT_MOST : insideMost)) {
+        const out = pages[i].filter((s) => s !== lead).sort((a, b) => a.mid - b.mid)[0];
+        if (out) { pages[i] = pages[i].filter((s) => s !== out); left.unshift(out); }
+      }
+      pages[i].push(flex);
+    }
   }
   // his news held while a lesser story has a place: it takes that place, or one more on a
   // page (2 Nov's copies 14 and 29 each left one of his out for the day's lead and the rest)
@@ -879,6 +954,7 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   const planning = modular && !ads.some((a) => a.place);
   const kept = ads.flatMap((a, i) => (a.pinned !== false ? [i] : []));
   let plannedShort = 0;
+  let plannedHow: { under?: boolean; over?: boolean } = {};
   for (const arranged of planning ? [ads] : adLayouts(ads, band)) {
     const boxes: DesignAd[] = arranged.map((a, index) => {
       const c0 = Math.round((a.x - GRID.left) / GRID.pitch);
@@ -901,7 +977,7 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
         planned = plan(ds, options, boxes, GRID.columns, height, rng, 600);
       }
     }
-    if (planned && !planned.fits) plannedShort = planned.short;
+    if (planned && !planned.fits) { plannedShort = planned.short; plannedHow = { under: planned.under, over: planned.over }; }
     const gaps = shortBy > 0 || last || round >= GAPS_FROM;
     const placedRight = planned?.fits ? planned.trees.filter(inPlace) : [];
     const trees = placedRight.length ? placedRight : planned?.fits && !kept.length ? planned.trees : planned && !planned.gaveUp && !gaps && !kept.length ? []
@@ -938,10 +1014,20 @@ async function solvePage(n: number, stories: Story[], band: Band, ads: Ad[], blo
   }
   if (!candidates.length) {
     // (a design that can't be made any height at all says neither)
-    const diagnosis = { short: near.filter((x) => x.above < 0 && x.below >= 0).length, long: near.filter((x) => x.below < 0 && x.above >= 0).length };
+    const diagnosis: Diagnosis = { short: near.filter((x) => x.above < 0 && x.below >= 0).length, long: near.filter((x) => x.below < 0 && x.above >= 0).length };
     // (the planner knows for certain: nothing fits under the foot, or the page falls short of it)
-    if (planning && !near.length && plannedShort > 0) { if (plannedShort < Math.floor(height / PT)) diagnosis.short = 1; else diagnosis.long = 1; }
-    log(`  page ${n}: none of ${tried} designs fills it exactly (${diagnosis.short} too short, ${diagnosis.long} too tall; ${secs(t0)}s)`);
+    // (short of the foot, past it, both -- other designs then, not other stories -- or no design of these
+    // widths at all, which isn't too tall: 6 Nov's copies held a front page's stories back one by one)
+    if (planning && !near.length && plannedShort > 0) {
+      const { under, over } = plannedHow;
+      if (under === undefined || over === undefined) { if (plannedShort < Math.floor(height / PT)) diagnosis.short = 1; else diagnosis.long = 1; }
+      else if (under && over) { diagnosis.short = 1; diagnosis.long = 1; }
+      else if (under) diagnosis.short = 1;
+      else if (over) diagnosis.long = 1;
+      else diagnosis.widths = true;
+    }
+    log(`  page ${n}: none of ${tried} designs fills it exactly (${diagnosis.widths ? "no design of these widths" : `${diagnosis.short} too short, ${diagnosis.long} too tall`}; ${secs(t0)}s)`);
+    if (diagnosis.widths) log(`  page ${n}: its stories' widths: ${stories.map((s, k) => `${s.id} ${ds[k]?.widths.filter((c) => options(k, c).length).join("/") || "none"}`).join(", ")}${ads.length ? `; ads ${ads.map((a) => colsOf(a)).join("/")} columns` : ""}`);
     if (!last) return { page: null, diagnosis };
     // the last round: the design that comes nearest, set out from the top --
     // the space left at its foot is reported (gate 2), not handed to the old engine

@@ -56,5 +56,14 @@ export function settable(text: string): boolean {
   return !encoder || encoder.encode(text).unknown.every((u) => /^[\x00-\x7F -⁯]+$/.test(u));
 }
 
+/** Of `text`'s letters the paper's own fonts can't print, those `original` hasn't got: a customer's
+ * article shortened (shorten.ts) may keep its own "✓" -- it prints as the original does -- not add one. */
+export function lettersNotIn(text: string, original: string): string[] {
+  if (settable(text)) return [];
+  const unknown = (t: string) => (encoder ? encoder.encode(t).unknown.filter((u) => !/^[\x00-\x7F -⁯]+$/.test(u)) : []);
+  const had = new Set(unknown(original).flatMap((u) => [...u]));
+  return [...new Set(unknown(text).flatMap((u) => [...u]).filter((c) => !had.has(c)))];
+}
+
 /** Word count. */
 export const wordCount = (t: string) => t.split(/\s+/).filter(Boolean).length;
