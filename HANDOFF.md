@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.94** (7 Nov). Work happens on branch
+conversations. **Latest release: v1.1.95** (7 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -108,9 +108,14 @@ had one fixed length, and stories side by side must end level -- three fixed len
   headlines); a page that sends back a story it was given doesn't take it again; numbers: a name's Roman
   numeral ("Tara Polaris I" written ૧) is known, and a translation's saved number flag is checked again at
   the gates. Test copy: READY, no gaps, 1.0 min.
-- **Open:** on 6 Nov's copy the first try still leaves page 4 unlaid (it is "between": one story more is too
-  tall, one less too short, then no design fits its ads and its stories are held back one by one); the
-  second try is clean, costing ~30s. Next: on an article page, don't hold back stories when its copy fits its room.
+- **v1.1.95:** a shortened length that says a sentence twice has that sentence taken out rather than being
+  thrown away (6 Nov's 873-word article got no shorter length; now 15 of 15 do).
+- **Open:** on 6 Nov's copy the first try still leaves page 4 unlaid. Measured (7 Nov): its stories fit by area
+  (37-63 thousand against 47 thousand of room), yet none of the ~700 designs drawn can be made any height
+  (every one "neither too short nor too tall"), so it is read as "no design of these widths", a narrow story
+  is added and its stories are held back one by one. The second try (stories shared again) is clean (~30s).
+  Not a lack of room: the designs drawn for it can't come out level; look at how designs() is drawn for a
+  page with one very tall story before changing the hold-back rules.
 
 **"Always print" per article** (7 Nov, for v1.1.93, committed on the branch, not yet released; the developer: "all the copies atleast include ones i
 tick"): each article in Copies has a tick box, unticked to begin with. A ticked one is must-print

@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import type { Store } from "../store.ts";
 import type { Article } from "./copies.ts";
 import { checkShortened } from "./facts.ts";
-import { lettersNotIn, repeats, wordCount } from "./quality.ts";
+import { lettersNotIn, repeats, withoutRepeats, wordCount } from "./quality.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
 import { MIN_WORDS } from "./ladder.ts";
 
@@ -132,7 +132,8 @@ async function lengths(store: Store, id: string, title: string, body: string, ta
   const tidy = (v: string) => v.split(/\n\s*\n/).map((p) => p.trim().replace(/[ \t]+/g, " ")).filter(Boolean).join("\n\n");
   const out: string[] = [];
   for (const raw of versions ?? []) {
-    const v = tidy(raw ?? "");
+    // (a sentence said twice taken out, not the whole length lost: 6 Nov's 873-word article kept none)
+    const v = tidy(repeats(tidy(raw ?? "")) ? withoutRepeats(tidy(raw ?? "")) : raw ?? "");
     const w = wordCount(v);
     // shorter, not a scrap; printable (letters the original has itself print as it does); no number the original hasn't
     const why = w < MIN_WORDS ? "too short" : w > has * 0.95 ? "not shorter" : lettersNotIn(v, body).length ? `letters the font can't print: ${lettersNotIn(v, body).join(" ")}`
