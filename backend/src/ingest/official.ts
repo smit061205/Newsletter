@@ -280,7 +280,7 @@ export function dropTwinsOfPib(store: Store, date: string, log: (s: string) => v
   const all = store.releases(date);
   const pib = all.filter((r) => r.source === "pib" && (!r.lang || r.lang === "gu"));
   let n = 0;
-  for (const r of all.filter((x) => (x.source === "cmo" || x.source === "air") && x.lang !== "en")) {
+  for (const r of all.filter((x) => (x.source === "cmo" || x.source === "air" || x.source === "site") && x.lang !== "en")) {
     const twin = sameNewsIn(r, pib);
     if (!twin) continue;
     store.deleteRelease(r.id);
