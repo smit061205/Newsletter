@@ -96,13 +96,17 @@ export interface Story {
   translatedFrom?: string;
   /** the 8-page paper's section page it's for (profile sections), the day's paper's stories have none */
   section?: string;
+  /** a customer's article for the copies: its body shortened for the day, longest first
+   * (editorial/shorten.ts), and whether its own whole body may print too; its title never changes */
+  cuts?: { bodies: string[]; whole: boolean };
 }
 
 /** Always printed: news the editor sent the paper's Telegram bot, and a copy's
  * fixed article (a customer's, editorial/copies.ts). */
 export const alwaysPrinted = (s: Pick<Story, "source">) => !!s.source && (s.source.startsWith("telegram:") || s.source.startsWith("fixed:"));
-/** Printed word for word: a copy's fixed article is never reworded, cut or left without its photo
- * (one not ticked "always print", "given:", prints while there's room: 7 Nov). */
+/** Printed as the customer gave it: a copy's article is never reworded or left without its photo,
+ * its title and sub-heading never changed; its body may print shortened to fit (Story.cuts, 7 Nov).
+ * A ticked one ("fixed:") prints in every copy; one not ticked ("given:") while there's room. */
 export const wordForWord = (s: Pick<Story, "source">) => !!s.source && (s.source.startsWith("fixed:") || s.source.startsWith("given:"));
 
 export type StepName = "fetch" | "rewrite" | "topup" | "fill" | "build" | "sections";

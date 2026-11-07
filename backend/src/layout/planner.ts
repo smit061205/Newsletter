@@ -36,13 +36,17 @@ export interface Plan {
   trees: Tree[];
   /** the table was given up on: nothing is known */
   gaveUp: boolean;
+  /** (a page that doesn't fit) some design comes out short of the foot, some past it: neither, no
+   * design can be made of these widths at all (the page's one story can't fill 8 columns -- not too
+   * tall: 6 Nov's copies emptied front pages a story at a time, told so); unset when unknown */
+  under?: boolean; over?: boolean;
 }
 
 interface Block { ad?: number; lead?: boolean; widths: number[]; heights: (cols: number) => bigint; least: number }
 
 /** The designs of a page: `want` different ones, each filling `height` exactly. */
 export function plan(stories: DesignStory[], options: (story: number, cols: number) => Option[], ads: DesignAd[], cols: number,
-                     height: number, rng: () => number, want = 300): Plan {
+                     height: number, rng: () => number, want = 300, probe = false): Plan {
   const H = Math.floor(height / PT);
   const limit = (1n << BigInt(H + 1)) - 1n;
   const gap = Math.round(GAP.betweenStories / PT);
@@ -159,7 +163,15 @@ export function plan(stories: DesignStory[], options: (story: number, cols: numb
   const target = 1n << BigInt(H);
   if (!(whole & target)) {
     const reachable = bitsOf(whole);
-    return { fits: false, short: reachable.length ? H - reachable[reachable.length - 1] : H, trees: [], gaveUp: false };
+    const short = reachable.length ? H - reachable[reachable.length - 1] : H;
+    if (probe) return { fits: false, short, trees: [], gaveUp: false };
+    // what's past the foot isn't in the table (it stops there): the page worked out again twice as
+    // tall says whether any design runs over it, so a page too short, too tall, in between, or
+    // impossible at these widths are told apart
+    const tall = plan(stories, options, ads, cols, height * 2, rng, 0, true);
+    if (tall.gaveUp) return { fits: false, short, trees: [], gaveUp: false };
+    const highest = 2 * H - tall.short;
+    return { fits: false, short, trees: [], gaveUp: false, under: reachable.length > 0, over: tall.short < 2 * H && highest > H };
   }
 
   // the designs, read back from the table: at each cut, any way that keeps the height reachable
