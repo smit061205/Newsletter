@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.93** (7 Nov). Work happens on branch
+conversations. **Latest release: v1.1.94** (7 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -103,10 +103,14 @@ had one fixed length, and stories side by side must end level -- three fixed len
   given one that can change); pages without articles behave exactly as before (the day's paper).
   A page of nothing but must-print articles moves one away rather than staying blank.
 - Test (one copy of 6 Nov, 15 articles, 4 ticked): READY, no white space, all 15 printed, 2.3 min, ~₹0.2.
-- **Open:** a copy's first try can still leave its front page unlaid when a short article is drawn as its
-  lead (a 192-word article fits a lead's width only at 4 columns); its second try is clean, costing ~80s.
-  Gate 3 (headline order) flags customer articles of one importance (cosmetic). The 6 Nov flag on
-  u6001168751 is a UN News story's translation (not Telegram: that day had none).
+- **v1.1.94 (7 Nov) fixed:** a copy's lead is a story with a photo and 250 words or more (a short article
+  drawn first left the front page unlaid); gate 3 no longer compares customer articles (they keep their own
+  headlines); a page that sends back a story it was given doesn't take it again; numbers: a name's Roman
+  numeral ("Tara Polaris I" written ૧) is known, and a translation's saved number flag is checked again at
+  the gates. Test copy: READY, no gaps, 1.0 min.
+- **Open:** on 6 Nov's copy the first try still leaves page 4 unlaid (it is "between": one story more is too
+  tall, one less too short, then no design fits its ads and its stories are held back one by one); the
+  second try is clean, costing ~30s. Next: on an article page, don't hold back stories when its copy fits its room.
 
 **"Always print" per article** (7 Nov, for v1.1.93, committed on the branch, not yet released; the developer: "all the copies atleast include ones i
 tick"): each article in Copies has a tick box, unticked to begin with. A ticked one is must-print

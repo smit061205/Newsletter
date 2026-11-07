@@ -515,6 +515,20 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
         rewordCost = got.cost;
         pool = shuffled([...got.pool, ...extras]) as typeof pool;
       }
+      // the copy's front page led, as the day's is, by a story long enough for a lead and with a photo,
+      // the first in its shuffled order that is (7 Nov: a 192-word article drawn first could lead only
+      // 4 columns wide, and the copy's first try left its front page unlaid). A customer's article counts
+      // at the longest it may print (shorten.ts)
+      const longest = (x: Story) => wordCount(x.cuts && !x.cuts.whole ? x.cuts.bodies[0] ?? x.bodies.long : x.bodies.long);
+      const leads = (x: Story) => !!x.photo && longest(x) >= LEAD_WORDS;
+      if (pool[0] && !(c.shuffle === "keepLead" && pool[0].id === c.lead) && !leads(pool[0])) {
+        const k = pool.findIndex(leads);
+        if (k > 0) {
+          const [x] = pool.splice(k, 1);
+          log(`  the lead: ${x.id} (${pool[0].id} is too short for one, or has no photo)`);
+          pool.unshift(x);
+        }
+      }
     }
     // the 8-page paper: the day's last page laid out again as an inside page, with its own stories, and each
     // section page with its section's; the day's other pages kept as they are
@@ -683,11 +697,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const dayReleases = new Map([...store.releases(date), ...(opts.sections ? store.releases(sectionsDay(date)) : [])].map((r) => [storyIdOf(r), r]));
   const recheck = (s: Story) => {
     const r = dayReleases.get(s.id);
-    if (!s.factCheck?.startsWith("numbers") || s.translatedFrom || !r) return s.factCheck;
+    // (a translation too: "Tara Polaris I" written ૧ was flagged, 7 Nov)
+    if (!s.factCheck?.startsWith("numbers") || !r) return s.factCheck;
     // (a story written from several reports is checked against them all: 4 Nov, "14.2" in its second report was flagged)
     const all = s.mergedFrom?.length ? s.mergedFrom.map((id) => store.release(id)).filter((x): x is NonNullable<typeof x> => !!x) : [r];
     const n = numbersNotIn(`${s.headline} ${s.deck} ${s.bodies.long}`, all.map((x) => `${x.headline} ${x.subhead} ${x.body}`).join("\n"), r.date);
-    return n.length ? `numbers not in the release: ${n.join(", ")}` : undefined;
+    return n.length ? (s.translatedFrom ? `numbers not in the ${s.translatedFrom === "en" ? "English" : "Hindi"} release: ${n.join(", ")}` : `numbers not in the release: ${n.join(", ")}`) : undefined;
   };
   // (the layout passes on each story's saved flag: those are the ones checked again)
   const byId = new Map(result.placed.map((p) => [p.story.id, p.story]));

@@ -225,6 +225,12 @@ export function numbersNotIn(out: string, source: string, date?: string): string
     const units = /million/.test(unit) ? v * 1e6 : /billion/.test(unit) ? v * 1e9 : /crore|કરોડ|करोड/.test(unit) ? v * 1e7 : v * 1e5;
     for (const per of [1e5, 1e6, 1e7, 1e9]) known.add(asNumber(units / per));
   }
+  // a name's Roman numeral, "Tara Polaris I", "Chandrayaan-II": its figure in a translation (7 Nov: ૧ flagged)
+  const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+  for (const m of source.matchAll(/\b[A-Z][\p{L}]+[ -](X|IX|IV|V?I{0,3})\b( [a-z])?/gu)) {
+    const k = m[1] === "I" && m[2] ? -1 : ROMAN.indexOf(m[1]); // "As I said": the word, not a numeral
+    if (k >= 0) known.add(String(k + 1));
+  }
   // "આઠ હજાર 224", "બે હજાર 356": thousands in words, the rest in figures (All India Radio's way) = 8224, 2356
   for (const m of latin.matchAll(/([\p{L}\p{M}]+)\s+(हज़ार|हजार|હજાર)\s+(\d{1,3})(?!\d)/gu)) {
     const k = NUMBER_WORDS.findIndex((ws) => ws.includes(m[1].toLowerCase()));
