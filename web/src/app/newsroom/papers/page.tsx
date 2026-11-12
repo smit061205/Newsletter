@@ -5,12 +5,11 @@
 // engine drafts its profile (page, grid, type, language, the header bands),
 // check it, add its fonts and header images, save, and make a test issue.
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { batchProgress, call, media, type CopiesRun, type Edition, type Settings } from "../api";
+import { call, media } from "../api";
 import { TopBar, useStatus } from "../Shell";
 import s from "../newsroom.module.css";
-import { BatchTime } from "../ui/BatchTime";
 import { ck } from "../ui/desktop";
-import { num, rupees, shortDate } from "../ui/format";
+import { num, shortDate } from "../ui/format";
 import { Badge, Button, Icon, Note, useApp } from "../ui/kit";
 import type { StringKey } from "../ui/strings";
 

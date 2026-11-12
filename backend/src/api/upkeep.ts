@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { DATA_DIR, ROOT } from "../config.ts";
-import { collecting, currentJob } from "../pipeline.ts";
+import { collecting, currentJob, stopJob } from "../pipeline.ts";
 import { profile } from "../profile.ts";
 import type { Store } from "../store.ts";
 import { indiaNow } from "./http.ts";
@@ -31,7 +31,15 @@ export function everyEvening(store: Store, job: (day: string) => Promise<unknown
       if (store.setting("noKeyLogged", "") !== day) { store.putSetting("noKeyLogged", day); log(`evening run for ${day} skipped: no OpenRouter key yet (Settings)`); }
       return;
     }
+    // an earlier day's run still going (9 Nov's waited for PIB all night): stopped, so tonight's
+    // paper is made -- the next look, in half a minute, starts it. The day's own, started by hand, stands
+    const going = currentJob();
+    if (going && going.date !== day) {
+      if (stopJob()) log(`the run for ${going.date} is still going at ${runAt}: stopped, so ${day}'s paper is made`);
+      return;
+    }
     store.putSetting("lastScheduledRun", day);
+    if (going) return log(`evening run for ${day}: already being made`);
     log(`evening run for ${day}`);
     job(day).catch((e) => log(`evening run failed: ${e instanceof Error ? e.message : e}`));
   }, 30_000);

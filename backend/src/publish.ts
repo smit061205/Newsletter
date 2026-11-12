@@ -40,8 +40,9 @@ export interface PublishedIssue {
  * keeps every published day. */
 async function toJpegs(pngs: string[], outs: string[], quality: number) {
   const browser = await acquireBrowser();
-  const context = await browser.newContext();
+  let context: Awaited<ReturnType<typeof browser.newContext>> | undefined;
   try {
+    context = await browser.newContext();
     const page = await context.newPage();
     for (const [i, file] of pngs.entries()) {
       const b64 = (await readFile(file)).toString("base64");
@@ -51,7 +52,7 @@ async function toJpegs(pngs: string[], outs: string[], quality: number) {
       await writeFile(outs[i], await page.screenshot({ type: "jpeg", quality, clip: { x: 0, y: 0, ...size } }));
     }
   } finally {
-    await context.close().catch(() => {});
+    await context?.close().catch(() => {});
     releaseBrowser();
   }
 }

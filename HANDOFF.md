@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.96** (7 Nov). Work happens on branch
+conversations. **Latest release: v1.1.97** (13 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
@@ -114,6 +114,18 @@ had one fixed length, and stories side by side must end level -- three fixed len
   stories (`/api/paper` in the website repo) taken after the official sources, duplicates left out, printed
   as written; Aavtikal's articles fill a thin day before AI features (`ingest/site.ts`). 7 Nov: 80 listed,
   72 taken on a scratch copy (5 duplicates, 3 with letters the fonts can't print), 0 government photos.
+- **v1.1.97:** the bugs from the 11 Nov audit (logs of 8-11 Nov, the whole app tested on a scratch copy):
+  a fact check the AI didn't answer no longer passes (gate 6b, the stories named on the Review screen;
+  unread ones read again, stopping at the first that fails again); at most 15 stories weighed per page and
+  30 from the website (11 Nov's 123 stories took 25 minutes to lay out); PIB not answering has a clock
+  limit (9 Nov hung 21 hours): after it the paper is made from the other sources, or "No internet" on
+  the Today screen; the evening timer stops a run left over from an earlier day; the lead is chosen
+  among stories whose photo can print sharp (S13 looped five builds); a story the fonts would print with
+  letters missing (3 or more) is left out; the browser closing mid-step retries that step once; the Mac
+  updater's leftovers (2.4 GB) cleared; progress never goes back; the engine logs rotate past 5 MB;
+  24-hour times in Gujarati. **Not fixed:** the engine answers slowly while it lays out (up to 33 s; layout
+  in a worker thread would cure it); why the browser closed mid-step isn't proven (low memory suspected);
+  28 lint style warnings (set-state-in-effect), not crashes.
 - **Open:** on 6 Nov's copy the first try still leaves page 4 unlaid. Measured (7 Nov): its stories fit by area
   (37-63 thousand against 47 thousand of room), yet none of the ~700 designs drawn can be made any height
   (every one "neither too short nor too tall"), so it is read as "no design of these widths", a narrow story

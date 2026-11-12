@@ -23,14 +23,15 @@ import { fitCalls, isSpeechText, numbersNotIn, speechTwin, writeDeck } from "./e
 import type { FillerCount } from "./layout/fit.ts";
 import { layOut, type EnginePage, type EngineResult } from "./layout/engine.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
-import { removed } from "./layout/text.ts";
+import { lettersLost, removed } from "./layout/text.ts";
 import { applyTextEdits, dedupe, droppedBy, inPaperLanguage, oneReportOfEach, referenceAds, standInsMovable } from "./layout/stories.ts";
 import { arrangeAds } from "./layout/ads.ts";
 import { findGaps } from "./layout/occupancy.ts";
 import { styleChecks } from "./layout/style.ts";
 import { buildFingerprint } from "./fingerprint.ts";
 import { acquireBrowser, releaseBrowser } from "./browser.ts";
-import { spanWidth } from "./layout/module.ts";
+import { neverSharp, spanWidth } from "./layout/module.ts";
+import { imageSize } from "./ingest/pib.ts";
 import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typography.ts";
 import { profile } from "./profile.ts";
 import { wordCount } from "./editorial/quality.ts";
@@ -82,6 +83,21 @@ const SHORT_WORDS = 200;
 const SAME_STORY = 0.4;
 /** The fewest words of a story set as the editor's column. */
 const COLUMN_WORDS = 200;
+/** The stories whose photo can print sharp at some width (a photo whose size can't be read: yes). */
+async function sharpPhotos(pool: Story[]): Promise<Set<string>> {
+  const ok = await Promise.all(pool.map(async (s) => {
+    if (!s.photo) return false;
+    try {
+      const size = imageSize(new Uint8Array(await readFile(assetFile(new URL(s.photo, "http://x").pathname))));
+      return !size || !neverSharp(size.width);
+    } catch { return true; }
+  }));
+  return new Set(pool.filter((_, i) => ok[i]).map((s) => s.id));
+}
+/** Letters a story may lose to the fonts (a stray sign) before it's left out (a word in another script). */
+const LOST_MOST = 3;
+/** Stories weighed for each page at most, the likeliest first (a page prints 5 to 10). */
+const POOL_PER_PAGE = 15;
 /** Most important first; of equal rank, one with a photo first (28 Oct: the
  * editor's own pages put a photo with nearly every story), then the longest. */
 const byRank = (a: Story, b: Story) => a.priority - b.priority || Number(!a.photo) - Number(!b.photo) || b.bodies.long.length - a.bodies.long.length;
@@ -408,9 +424,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       }
     }
     // the front page's lead has a photo (the editor, 30 Oct), an important story
-    // first, else any long enough for a lead -- the editor's own lead stands
-    if (pool[0] && !rankedByEditor.has(pool[0].id) && !pool[0].photo) {
-      const lead = (s: Story) => !!s.photo && wordCount(s.bodies.long) >= LEAD_WORDS;
+    // first, else any long enough for a lead -- the editor's own lead stands. A photo too
+    // small to print sharp at any width is none (10 Nov: a 300-pixel one made the lead, and
+    // five layouts in a row left it out)
+    const sharp = await sharpPhotos(pool);
+    if (pool[0] && !rankedByEditor.has(pool[0].id) && !sharp.has(pool[0].id)) {
+      const lead = (s: Story) => sharp.has(s.id) && wordCount(s.bodies.long) >= LEAD_WORDS;
       const near = pool.findIndex((s) => lead(s) && s.priority <= Math.max(2, pool[0].priority));
       const k = near > 0 ? near : pool.findIndex(lead);
       if (k > 0) {
@@ -520,7 +539,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       // 4 columns wide, and the copy's first try left its front page unlaid). A customer's article counts
       // at the longest it may print (shorten.ts)
       const longest = (x: Story) => wordCount(x.cuts && !x.cuts.whole ? x.cuts.bodies[0] ?? x.bodies.long : x.bodies.long);
-      const leads = (x: Story) => !!x.photo && longest(x) >= LEAD_WORDS;
+      const sharp = await sharpPhotos(pool);
+      const leads = (x: Story) => sharp.has(x.id) && longest(x) >= LEAD_WORDS;
       if (pool[0] && !(c.shuffle === "keepLead" && pool[0].id === c.lead) && !leads(pool[0])) {
         const k = pool.findIndex(leads);
         if (k > 0) {
@@ -552,6 +572,23 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       columnPicks = last.filter((x) => x.editorsColumn).map((x) => x.id);
       log(`the ${total}-page paper: pages 1-${n - 1} as the day's, page ${n} laid out again as an inside page; ` +
           sectionList.map((x, k) => `page ${n + 1 + k} ${x.id}: ${own.filter((o) => o.section === x.id).length} stories`).join(", "));
+    }
+    // a story with letters the paper's fonts have nothing for (Armenian and Malayalam names in 11 Nov's)
+    // is left out, not printed with them cut from its words; one that must print keeps its place
+    const unprintable = pool.filter((x, i) => i > 0 && !alwaysPrinted(x) && !rankedByEditor.has(x.id) && lettersLost(`${x.headline} ${x.deck} ${x.bodies.long}`) >= LOST_MOST);
+    if (unprintable.length) {
+      log(`  letters the paper's fonts can't print, left out: ${unprintable.map((x) => x.id).join(", ")}`);
+      pool = pool.filter((x) => !unprintable.includes(x));
+    }
+    // only the likeliest stories measured and weighed: 11 Nov's 123 (the paper's website a source)
+    // took 26 minutes to share out over 4 pages that print about 30. The most important ones, and
+    // every one that must print, leave plenty to choose from; the rest are left out for room
+    const spares: Story[] = [];
+    if (!opts.sections && pool.length > total * POOL_PER_PAGE) {
+      const mustPrint = (x: Story, i: number) => i === 0 || alwaysPrinted(x) || rankedByEditor.has(x.id) || columnPicks.includes(x.id);
+      let room = total * POOL_PER_PAGE - pool.filter(mustPrint).length;
+      pool = pool.filter((x, i) => mustPrint(x, i) || room-- > 0 || !spares.push(x));
+      log(`  the ${pool.length} likeliest stories weighed for the pages; ${spares.length} more left out for room`);
     }
     log(`planning ${date} (issue ${issueNumber}): ${pool.length} stories, ${ads.length} ads, ${total} pages`);
     let spent = 0;
@@ -611,7 +648,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
           `${p.module.photoMode === 1 ? ", wide photo" : p.module.photoMode === 2 ? `, ${p.module.elements.filter((e) => e.kind === "image").length} photos` : ""}${p.module.photoDropped ? ", no photo" : ""})`).join(" ")}`);
     }
     timing.fitting = Date.now() - t1;
-    result = { pages: pagesOut, placed, gaps, leftOut: [...pool, ...sameNews, ...staleNews], plans: finalPlans, spent: spent + rewordCost, factChecks };
+    result = { pages: pagesOut, placed, gaps, leftOut: [...pool, ...spares, ...unprintable, ...sameNews, ...staleNews], plans: finalPlans, spent: spent + rewordCost, factChecks };
   } finally {
     await m.close();
   }
@@ -708,7 +745,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const byId = new Map(result.placed.map((p) => [p.story.id, p.story]));
   const seenFact = new Set<string>();
   // (the new engine lengthens stories unattended: their names, dates and quotes are read too)
-  const read = modular && !opts.copy ? await checkPlaced(store, result.placed.map((p) => p.story), log) : { found: [], cost: 0 };
+  const read = modular && !opts.copy ? await checkPlaced(store, result.placed.map((p) => p.story), log) : { found: [], unread: [] as string[], cost: 0 };
   result.spent += read.cost;
   const allFacts = [...result.factChecks, ...result.placed.flatMap((p) => (p.story.factCheck ? [{ story: p.story.id, detail: p.story.factCheck }] : [])), ...read.found]
     .map((f) => { const s = byId.get(f.story); return s && f.detail === s.factCheck ? { ...f, detail: recheck(s) } : f; })
@@ -778,6 +815,10 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       pass: !result.placed.some((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth),
       detail: result.placed.filter((p) => p.cols > MAX_STORY_COLS && !p.story.fullWidth).map((p) => `p${p.page} ${p.story.id} (${p.cols} columns)`).join(", ") || "ok" },
     { gate: modular ? "6 fact checks: every number, name, place, date and quote in the release" : "6 fact checks: every number in the release", pass: allFacts.length === 0, detail: allFacts.map((f) => `${f.story}: ${f.detail}`).join("; ") || "ok" },
+    // (a check the AI couldn't make is not a check passed: 11 Nov. Not mended -- writing again
+    // needs the same AI -- the editor reads them; only stories printed in the paper)
+    ...(modular && !opts.copy ? [{ gate: "6b names, places, dates and quotes read by the AI", pass: read.unread.length === 0,
+      detail: read.unread.length ? `not read (the AI didn't answer): ${read.unread.join(", ")}` : "ok" }] : []),
     ...style.gates,
     { gate: "7 same inputs, same issue", pass: same !== false,
       detail: !previous ? "first build"

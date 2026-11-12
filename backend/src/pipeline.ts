@@ -60,6 +60,12 @@ export function stopJob(): boolean {
 }
 const STOPPED = "stopped by the editor";
 const checkStop = () => { if (stopping) throw new Error(STOPPED); };
+/** The computer itself has no connection (not one site down): Node's fetch says "fetch failed"
+ * with the network's own code beneath, or every try timed out. */
+const offline = (e: unknown) => /fetch failed|ENOTFOUND|EAI_AGAIN|ENETUNREACH|ECONNREFUSED|ECONNRESET|aborted due to timeout/i
+  .test(`${e instanceof Error ? `${e.message} ${(e.cause as Error | undefined)?.message ?? ""}` : e}`);
+const browserGone = (e: unknown) => /Target page, context or browser has been closed|Browser has been closed|browser has disconnected|Target closed/i
+  .test(e instanceof Error ? e.message : String(e));
 /** Wait, unless the run is stopped meanwhile. */
 async function waitOrStop(ms: number) {
   for (let t = 0; t < ms; t += 1000) { checkStop(); await new Promise((ok) => setTimeout(ok, Math.min(1000, ms - t))); }
@@ -216,6 +222,9 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           .catch((e: unknown) => { if (stopping) throw e; say(`the paper's website couldn't be read (${e instanceof Error ? e.message : e})`); });
       };
       let r: Awaited<ReturnType<typeof ingestPib>> | null = null;
+      // (by the clock, not by tries: 9 Nov's computer had no internet and slept between them, and
+      // the run waited 21 hours, holding up the next evening's paper)
+      const giveUpAt = Date.now() + RETRIES * RETRY_EVERY_MS;
       for (let attempt = 0; !r; attempt++) {
         try {
           r = await timed("PIB", () => ingestPib(store, date, feed, { log: say, progress }));
@@ -232,7 +241,12 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
             if (store.releases(date).length) { say(`PIB won't show ${date}'s list: the paper is made from the other sources' news`); return; }
             throw new Error(`PIB won't show ${date}'s list, and no news was saved that day`);
           }
-          if (attempt >= RETRIES) throw e;
+          if (attempt >= RETRIES || Date.now() >= giveUpAt) {
+            // (the others' news, when they have any, rather than no paper)
+            await official();
+            if (store.releases(date).length) { say(`PIB didn't answer for ${RETRIES * RETRY_EVERY_MS / 3_600_000} hours: the paper is made from the other sources' news`); return; }
+            throw new Error(offline(e) ? "no internet: none of the news sites answered" : `PIB isn't answering, and no other news came in (${e instanceof Error ? e.message : e})`);
+          }
           const at = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }).format(Date.now() + RETRY_EVERY_MS);
           say(`PIB isn't answering (${e instanceof Error ? e.message : e}): trying again at ${at}`);
           progress({ done: 0, total: 0, label: "waiting", item: at });
@@ -409,7 +423,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         return say("the 8-page paper is made with the day's paper: press Make it again for both");
       }
       const base = built;
-      try {
+      for (let tries = 0; ; tries++) try {
         const { ingestSections } = await import("./ingest/sections.ts");
         await timed("the 8-page paper's news", () => sectionsRead?.date === date ? sectionsRead.run : ingestSections(store, date, say));
         sectionsRead = null;
@@ -443,9 +457,13 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         await writeFile(json, JSON.stringify(r.issue));
         store.putSetting(`eightPages|${date}`, { version: base.version, pdf: outName(pdfPath), json: outName(json), ready: r.report.ready, pages: r.report.pages, cost });
         say(`the 8-page paper: ${r.report.ready ? "READY" : "NOT READY"}${r.report.ready ? "" : ` (${r.report.gates.filter((g) => !g.pass).map((g) => g.gate).join("; ")})`}`);
+        break;
       } catch (e) {
         if (stopping) throw e;
+        // (the drawing browser gone: once more, as any step, pipeline's runPipeline)
+        if (!tries && browserGone(e)) { say(`the drawing browser closed (${e instanceof Error ? e.message.split("\n")[0] : e}): the 8-page paper once more`); continue; }
         say(`the 8-page paper couldn't be made (${e instanceof Error ? e.message : e}): the day's paper is ready all the same`);
+        break;
       }
       return;
     }
@@ -494,7 +512,15 @@ export async function runPipeline(store: Store, date: string, opts: { by: Job["b
           const t = Date.now();
           try { return await job(); } finally { part(name, (Date.now() - t) / 1000); }
         };
-        await step(store, date, s.name, say, progress, timed, part, job.by);
+        // (the drawing browser gone mid-step -- the computer short of memory closes it: 6 Nov's evening
+        // run and 10 Nov's 8-page paper stopped so -- the step once more, on a new one)
+        for (let tries = 0; ; tries++) {
+          try { await step(store, date, s.name, say, progress, timed, part, job.by); break; }
+          catch (e) {
+            if (stopping || tries > 0 || !browserGone(e)) throw e;
+            say(`the drawing browser closed (${e instanceof Error ? e.message.split("\n")[0] : e}): this step once more`);
+          }
+        }
         // (the AI's money run out shows on Today: 30 Oct, the screen only said to press "Make it again")
         const { aiMoney } = await import("./editorial/rewrite.ts");
         if (aiMoney()) store.putSetting("aiOutOfMoney", aiMoney() === "out");

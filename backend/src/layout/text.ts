@@ -53,7 +53,7 @@ export const removed = new Set<string>();
  * "૧૧૧.૭૫°" came from a system font), and taken out it would change the number's sense. */
 /** Gujarati's vowel signs and their vowels, written alone. */
 const FULL_VOWEL: Record<string, string> = { "ા": "આ", "િ": "ઇ", "ી": "ઈ", "ુ": "ઉ", "ૂ": "ઊ", "ૃ": "ઋ", "ે": "એ", "ૈ": "ઐ", "ો": "ઓ", "ૌ": "ઔ" };
-function printableGujarati(text: string): string {
+function printableGujarati(text: string, lost?: { n: number }): string {
   const CANDRA: Record<string, string> = { "ૅ": "ે", "ૉ": "ો", "ઍ": "એ", "ઑ": "ઓ" };
   const out = devanagariToGujarati(text)
     .replace(/\s*°\s*C\b/g, " ડિગ્રી સેલ્સિયસ").replace(/\s*°\s*F\b/g, " ડિગ્રી ફેરનહીટ").replace(/\s*°/g, " ડિગ્રી")
@@ -66,9 +66,17 @@ function printableGujarati(text: string): string {
     // Gujarati papers print the word without it
     .replace(/([\u0A95-\u0AB9])\u0ACD(?=[^\u0A80-\u0AFF\u200C\u200D]|$)/g, "$1");
   return out.replace(/[^\u0A80-\u0AFF\x09\x0A\x0D\x20-\x7E\u00A0-\u00FF\u2000-\u206F\u20B9\u0964\u0965\u200C\u200D]/gu, (c) => {
-    removed.add(c);
+    if (lost) lost.n++; else removed.add(c);
     return "";
   });
+}
+
+/** How many of `text`'s letters printing would take out (none to print them with), not reported:
+ * a story losing a word's worth is left out (build.ts), never printed with words cut short. */
+export function lettersLost(text: string): number {
+  const lost = { n: 0 };
+  printableGujarati(text, lost);
+  return lost.n;
 }
 
 export function normalizeText(text: string): string {

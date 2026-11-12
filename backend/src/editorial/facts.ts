@@ -24,12 +24,14 @@ const SCHEMA = {
       kind: { type: "string", enum: ["name", "place", "date", "quote"] }, says: { type: "string" }, why: { type: "string" } } } } } },
 };
 
-/** What the story says that its releases don't: empty when it's right, or when the AI can't be reached (the log says so). */
-export async function checkFacts(store: Store, story: Story, log: (s: string) => void): Promise<{ problems: string[]; cost: number }> {
+/** What the story says that its releases don't: empty when it's right. `unread` when the AI couldn't be
+ * reached: nothing was checked (11 Nov: 19 stories went to print "checked" while the AI didn't answer). */
+export async function checkFacts(store: Store, story: Story, log: (s: string) => void): Promise<Facts> {
   const ids = story.mergedFrom?.length ? story.mergedFrom : story.releaseId ? [story.releaseId] : [];
   const sources = ids.map((id) => store.release(id)).filter((r) => !!r);
   const apiKey = env("OPENROUTER_API_KEY");
-  if (!sources.length || !apiKey || wordForWord(story) || process.env.CK_FAKE_AI === "1") return { problems: [], cost: 0 };
+  // (a release printed as it was published says only what the release does: nothing to read)
+  if (!sources.length || !apiKey || wordForWord(story) || story.model === "as-is" || process.env.CK_FAKE_AI === "1") return { problems: [], cost: 0 };
   const text = `STORY:\n${story.headline}\n${story.deck}\n${story.bodies.long}`;
   const source = sources.map((r) => `RELEASE (${r.date}):\n${r.headline}\n${r.subhead}\n${r.body}`).join("\n\n");
   return askFacts(store, story.id, source, text, apiKey, log);
@@ -38,13 +40,15 @@ export async function checkFacts(store: Store, story: Story, log: (s: string) =>
 /** A customer's article shortened (editorial/shorten.ts) read against its own words, as a story is
  * against its release: what it names, dates or quotes that the original doesn't. */
 export async function checkShortened(store: Store, id: string, original: { title: string; body: string }, shorter: string, log: (s: string) => void):
-  Promise<{ problems: string[]; cost: number }> {
+  Promise<Facts> {
   const apiKey = env("OPENROUTER_API_KEY");
   if (!apiKey || process.env.CK_FAKE_AI === "1") return { problems: [], cost: 0 };
   return askFacts(store, id, `RELEASE:\n${original.title}\n${original.body}`, `STORY:\n${original.title}\n${shorter}`, apiKey, log);
 }
 
-async function askFacts(store: Store, id: string, source: string, text: string, apiKey: string, log: (s: string) => void): Promise<{ problems: string[]; cost: number }> {
+export interface Facts { problems: string[]; cost: number; unread?: true }
+
+async function askFacts(store: Store, id: string, source: string, text: string, apiKey: string, log: (s: string) => void): Promise<Facts> {
   const story = { id };
   const key = `facts2|${story.id}|${createHash("sha256").update(text + source).digest("hex").slice(0, 24)}`;
   const saved = store.fitted(key);
@@ -59,7 +63,7 @@ async function askFacts(store: Store, id: string, source: string, text: string, 
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: `${source}\n\n${text}` }],
       }),
     }, 60, true);
-    if (!res.ok) { log(`  ${story.id}: names and dates not checked (OpenRouter ${res.status})`); return { problems: [], cost: 0 }; }
+    if (!res.ok) { log(`  ${story.id}: names and dates not checked (OpenRouter ${res.status})`); return { problems: [], cost: 0, unread: true }; }
     const data = (await res.json()) as { choices: { message: { content: string } }[]; usage?: { cost?: number } };
     const got = JSON.parse(data.choices[0].message.content) as { problems: { kind: string; says: string; why: string }[] };
     // (a quotation is only what the story prints in quotation marks)
@@ -70,7 +74,7 @@ async function askFacts(store: Store, id: string, source: string, text: string, 
     return { problems, cost: data.usage?.cost ?? 0 };
   } catch (e) {
     log(`  ${story.id}: names and dates not checked (${e instanceof Error ? e.message : e})`);
-    return { problems: [], cost: 0 };
+    return { problems: [], cost: 0, unread: true };
   }
 }
 
@@ -80,8 +84,18 @@ export const toRefit = new Set<string>();
 
 /** The paper's placed stories checked. A failing one is flagged for writing again:
  * the story itself, or the fitted version that was printed. */
-export async function checkPlaced(store: Store, placed: Story[], log: (s: string) => void): Promise<{ found: { story: string; detail: string }[]; cost: number }> {
+export async function checkPlaced(store: Store, placed: Story[], log: (s: string) => void):
+  Promise<{ found: { story: string; detail: string }[]; unread: string[]; cost: number }> {
   const results = await Promise.all(placed.map(async (s) => ({ s, ...(await checkFacts(store, s, log)) })));
+  // those the AI didn't answer for: read again one at a time (it is often busy for a few minutes, not gone);
+  // still unread, they're said to be (gate 6b), never passed as checked
+  const unreadFirst = results.filter((r) => r.unread);
+  if (unreadFirst.length) log(`  ${unreadFirst.length} story(ies) not read by the AI: reading them again`);
+  // (the first still unanswered stops it: 19 stories one minute each, 11 Nov, would hold the paper up)
+  for (const r of unreadFirst) {
+    Object.assign(r, { unread: undefined }, await checkFacts(store, r.s, log));
+    if (r.unread) break;
+  }
   const found: { story: string; detail: string }[] = [];
   for (const { s, problems } of results) {
     if (!problems.length) continue;
@@ -95,5 +109,5 @@ export async function checkPlaced(store: Store, placed: Story[], log: (s: string
     store.putFitted(`avoid|${s.id}`, { body: problems.join("; "), model: DEFAULT_MODEL });
     if (first) toRefit.add(s.id); // (once: a second failure stays for the editor)
   }
-  return { found, cost: results.reduce((a, r) => a + r.cost, 0) };
+  return { found, unread: results.filter((r) => r.unread).map((r) => r.s.id), cost: results.reduce((a, r) => a + r.cost, 0) };
 }

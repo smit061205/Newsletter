@@ -71,7 +71,7 @@ export const spanWidth = (cols: number) => cols * GRID.column + (cols - 1) * GRI
 export const leastPpi = (k: number) => (k <= PHOTO.minCols ? PHOTO.minPpi * 2 / 3 : PHOTO.minPpi);
 /** A photo too small to print sharp at any width, even the narrowest: only then may a customer's
  * print a little soft (7 Nov: one that was sharp at 3 columns ran across 5 at 111 ppi). */
-const neverSharp = (px: number) => px / (spanWidth(PHOTO.minCols) / 300) < leastPpi(PHOTO.minCols);
+export const neverSharp = (px: number) => px / (spanWidth(PHOTO.minCols) / 300) < leastPpi(PHOTO.minCols);
 
 /** Move a module's elements to (dx, dy). */
 export function place(elements: Element[], dx: number, dy: number): Element[] {
