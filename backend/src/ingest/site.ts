@@ -28,6 +28,9 @@ const UA = "CapitalKranti-news-ingest/1.0";
 const ID_BASE = 7_000_000_000;
 export const OFFICE = "કેપિટલ ક્રાંતિ";
 const AAVTIKAL = "આવતીકાલ";
+/** The website's stories taken a day at most, its most important first: 11 Nov's 74 (with the rest,
+ * 123 stories for 4 pages) made the layout take 26 minutes, and the pages print about 30 in all. */
+const MOST = 30;
 const TIER: Record<string, string> = { gujarat: "પ્રાદેશિક", india: "રાષ્ટ્રીય", world: "આંતરરાષ્ટ્રીય" };
 
 interface SiteStory { id: string; tier: string; headline: string; deck: string; body: string; caption: string;
@@ -69,7 +72,9 @@ export async function ingestSite(store: Store, date: string, opts: { log?: (s: s
   // (the other sources' Gujarati news of the day and the day before: theirs is the record)
   const taken = [...store.releases(dayBefore(date)), ...store.releases(date)].filter((r) => !r.lang || r.lang === "gu");
   let n = 0;
+  let had = taken.filter((r) => r.source === "site" && r.date === date && r.ministry !== AAVTIKAL).length;
   for (const s of got.stories) {
+    if (had >= MOST) break;
     const id = idOf(s.id);
     if (store.hasRelease(id)) continue;
     const body = paragraphs(s.body).join("\n\n");
@@ -87,6 +92,7 @@ export async function ingestSite(store: Store, date: string, opts: { log?: (s: s
     store.putRelease(release);
     taken.push(release);
     n++;
+    had++;
     log(`  website: ${s.headline.slice(0, 70)} (${photo ? "1 photo" : "0 photos"})`);
   }
   return { listed: got.stories.length, taken: n };

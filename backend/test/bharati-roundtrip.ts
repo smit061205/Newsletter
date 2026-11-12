@@ -6,6 +6,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { BharatiEncoder } from "../src/fonts/bharati.ts";
 
 const [spansFile, todayFile, outFile] = process.argv.slice(2);
+if (!outFile) {
+  console.error("usage: bharati-roundtrip.ts spans.json today.json out.json (a helper for scripts/replica/bharati_check.py)");
+  process.exit(2);
+}
 const enc = new BharatiEncoder();
 const spans: [string, string][] = JSON.parse(readFileSync(spansFile, "utf8"));
 const today: string = JSON.parse(readFileSync(todayFile, "utf8"));

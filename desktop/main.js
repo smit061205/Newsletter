@@ -53,7 +53,10 @@ async function answers(url) {
   try { const r = await fetch(url, { signal: AbortSignal.timeout(2500) }); return r.status < 500; } catch { return false; }
 }
 function startChild(name, args, opts) {
-  const out = fs.openSync(path.join(LOGS, `${name}.log`), "a");
+  // (one log grows by every run: 2.2 MB by 10 Nov. Past 5 MB the last one is kept aside and a new one begun)
+  const file = path.join(LOGS, `${name}.log`);
+  try { if (fs.statSync(file).size > 5 * 1024 * 1024) fs.renameSync(file, path.join(LOGS, `${name}.old.log`)); } catch {}
+  const out = fs.openSync(file, "a");
   // Electron's own Node runs both: nothing else to install
   const child = spawn(process.execPath, args, {
     cwd: opts.cwd, stdio: ["ignore", out, out], windowsHide: true,
@@ -197,10 +200,14 @@ function progressOf(job) {
   let p = 0;
   for (const st of job.steps) {
     if (st.status === "done" || st.status === "skipped") p += WEIGHT[st.name];
-    else if (st.status === "running") p += WEIGHT[st.name] * (st.progress?.total ? Math.min(0.97, st.progress.done / st.progress.total) : 0.05);
+    // (the stories' lengths before the pages, which count from half way; never back: as the newsroom shows it)
+    else if (st.status === "running") p += WEIGHT[st.name] * (st.progress?.total ? Math.min(0.97, st.progress.done / st.progress.total * (st.progress.label === "lengths" ? 0.45 : 1)) : 0.05);
   }
-  return Math.min(99, Math.round(p * 100));
+  const pct = Math.min(99, Math.round(p * 100));
+  if (shownFor !== job.startedAt) { shownFor = job.startedAt; shownMost = 0; }
+  return (shownMost = Math.max(shownMost, pct));
 }
+let shownFor = "", shownMost = 0;
 async function poll() {
   try {
     const r = await fetch(`http://127.0.0.1:${ENGINE}/api/status`, { signal: AbortSignal.timeout(4000) });
@@ -405,11 +412,20 @@ async function latestRelease() {
   return { v: tag.replace(/^v/, ""), zipUrl: zip ? `https://github.com${zip}` : null };
 }
 
+/** Downloads of earlier updates, left in the temporary folder (10 Nov: 18 of them, 2.4 GB, and an
+ * update that failed for want of space): cleared before a new one is fetched. */
+function clearOldUpdates() {
+  for (const f of fs.readdirSync(os.tmpdir()).filter((x) => x.startsWith("ck-update-"))) {
+    try { fs.rmSync(path.join(os.tmpdir(), f), { recursive: true, force: true }); } catch {}
+  }
+}
+
 /** Look for a newer release. `from`: "start" (quiet unless one is ready), "menu" (says the outcome), "newsroom" (the newsroom shows it). */
 async function checkForUpdates(from = "start") {
   if (update.state === "checking" || update.state === "downloading") return update;
   if (update.state === "ready") { if (from === "menu") offerUpdate(); return update; }
   setUpdate({ state: "checking", error: "", quiet: from === "newsroom" });
+  let tmp = "";
   try {
     if (isWin && app.isPackaged) {
       const r = await windowsUpdater().checkForUpdates();
@@ -430,7 +446,8 @@ async function checkForUpdates(from = "start") {
     if (!isMac || !asset || !app.isPackaged) { setUpdate({ state: "none", latest: v, building: true }); return update; }
     // macOS without notarisation: download the new app, check it, swap it in on restart
     setUpdate({ state: "downloading", latest: v, percent: 0 });
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ck-update-"));
+    clearOldUpdates();
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ck-update-"));
     const zip = path.join(tmp, asset.name);
     await download(asset.browser_download_url, zip, (percent) => setUpdate({ percent }));
     execFileSync("ditto", ["-x", "-k", zip, tmp]);
@@ -447,6 +464,7 @@ async function checkForUpdates(from = "start") {
     if (from !== "newsroom") offerUpdate();
   } catch (e) {
     log(`update check: ${e.message}`);
+    if (tmp) try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
     setUpdate({ state: "error", error: e.message });
   }
   return update;
@@ -635,6 +653,8 @@ if (!app.requestSingleInstanceLock()) {
     setInterval(poll, 10_000);
     poll();
     if (moved && Notification.isSupported()) new Notification({ title: "Capital Kranti", body: moved }).show();
+    // (none can be waiting to be put in yet: this start is after any restart that would)
+    if (isMac) clearOldUpdates();
     setTimeout(() => checkForUpdates("start"), 15_000);
     setInterval(() => checkForUpdates("start"), 24 * 3600_000);
   });

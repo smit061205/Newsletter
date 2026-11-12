@@ -122,13 +122,13 @@ function Sources({ releases, open, setOpen, busy, translate }: { releases: Relea
               {list.map((r) => (
                 <div key={r.id}>
                   <button className={s.listItem} onClick={() => setOpen(open === r.id ? null : r.id)} aria-expanded={open === r.id}>
-                    <span className={s.listTitle} lang={r.lang}>{r.headline}</span>
-                    <span className={s.listMeta} lang={r.lang}>{r.ministry}</span>
+                    <span className={s.listTitle} lang={r.lang} translate="no">{r.headline}</span>
+                    <span className={s.listMeta} lang={r.lang} translate="no">{r.ministry}</span>
                     <span className={s.listBadges}>{r.inPaper && <Badge tone="good">{t("sources.inPaper")}</Badge>}</span>
                   </button>
                   {open === r.id && (
                     <div className={s.expand}>
-                      <p className={s.original} lang={r.lang}>{r.body}</p>
+                      <p className={s.original} lang={r.lang} translate="no">{r.body}</p>
                       <div className={s.row}>
                         {/^https?:/.test(r.url) && <a className={s.btn} href={r.url} target="_blank" rel="noreferrer">{Icon.external()}{t("sources.open")}</a>}
                         {r.lang === "hi" && !r.translated && (

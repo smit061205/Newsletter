@@ -70,6 +70,9 @@ export function problems(lang: Lang, gates: Gate[], headlineOf: (id: string) => 
         const m = part.match(/^(\S+): .*?: (.+)$/);
         if (m) out.push({ kind: "numbers", story: m[1], text: tr(lang, "issue.numbers", { headline: headlineOf(m[1]) ?? m[1], nums: num(lang, m[2]) }) });
       }
+    } else if (k === "6b") {
+      const ids = g.detail.replace(/^[^:]*: /, "").split(", ").filter(Boolean);
+      out.push({ kind: "other", text: tr(lang, "issue.unread", { n: num(lang, ids.length) }) });
     } else if (k === "2") {
       // each page badly empty said plainly, with how much of it is blank; else a little space
       const pages = [...new Set(whiteSpace.filter((w) => w.height >= BADLY_EMPTY).map((w) => w.page))].sort((a, b) => a - b);

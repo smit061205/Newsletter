@@ -45,7 +45,7 @@ export function BackupCard({ busy }: { busy: boolean }) {
     } catch (e) { setError((e as Error).message); }
     setWorking(""); setAsking(false);
   };
-  const when = (iso: string) => num(lang, new Date(iso).toLocaleString(lang === "gu" ? "gu-IN" : "en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }));
+  const when = (iso: string) => num(lang, new Date(iso).toLocaleString(lang === "gu" ? "gu-IN" : "en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }));
   const chosen = pick || b?.list[0]?.name || "";
 
   return (

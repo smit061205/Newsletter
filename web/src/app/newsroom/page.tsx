@@ -27,10 +27,19 @@ function percent(job: Job): number {
     if (st.status === "done" || st.status === "skipped") p += w;
     else if (st.status === "running") {
       const pr = st.progress;
-      p += w * (pr && pr.total ? Math.min(0.97, pr.done / pr.total) : 0.05);
+      // (the stories' lengths come before the pages, which count from half way: 87% then 69%, 10 Nov)
+      const part = pr && pr.total ? pr.done / pr.total * (pr.label === "lengths" ? 0.45 : 1) : 0.05;
+      p += w * Math.min(0.97, part);
     }
   }
   return Math.min(99, p * 100);
+}
+/** The most a run has shown: a page laid out again starts its count over, the number never goes back. */
+const shown = new Map<string, number>();
+function percentShown(job: Job): number {
+  const pct = Math.max(percent(job), shown.get(job.startedAt) ?? 0);
+  shown.set(job.startedAt, pct);
+  return pct;
 }
 /** Minutes left, from how long the last finished run's steps took. */
 function minutesLeft(job: Job, previous: Job | undefined): number | null {
@@ -116,6 +125,8 @@ function PaperToday() {
   const badlyEmpty = todo.some((p) => p.bad);
   // the latest run stopped: say where, and offer to carry on from there
   const failed = !running && job?.status === "failed" ? job.steps.find((x) => x.status === "failed") : undefined;
+  // (9 Nov: no internet, and the screen only said to try again)
+  const offline = !!failed?.error?.startsWith("no internet");
 
   const run = async (from?: StepName) => {
     setError("");
@@ -188,7 +199,8 @@ function PaperToday() {
               <Button big onClick={restart}>{t("today.restart")}</Button>
             </Hero>
           ) : failed ? (
-            <Hero tone="bad" icon={Icon.alert()} title={t("today.failed.title")} body={t("today.failed.body", { step: t(`step.${failed.name}` as StringKey) })}>
+            <Hero tone="bad" icon={Icon.alert()} title={t(offline ? "today.offline.title" : "today.failed.title")}
+                  body={offline ? t("today.offline.body") : t("today.failed.body", { step: t(`step.${failed.name}` as StringKey) })}>
               <Button kind="primary" big icon={Icon.refresh()} onClick={() => run(failed.name)}>{t("today.retry")}</Button>
               <Button big onClick={restart}>{t("today.restart")}</Button>
             </Hero>
@@ -344,7 +356,7 @@ function TimeMeter({ job }: { job: Job }) {
  * percentage, what it's doing, and the headlines as they're written. */
 function Making({ job, previous, ticker }: { job: Job; previous?: Job; ticker: string[] }) {
   const { t, lang } = useApp();
-  const pct = percent(job);
+  const pct = percentShown(job);
   const left = minutesLeft(job, previous);
   const cur = job.steps.find((x) => x.status === "running");
   const pr = cur?.progress;
