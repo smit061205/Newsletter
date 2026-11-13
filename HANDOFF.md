@@ -13,8 +13,20 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.97** (13 Nov). Work happens on branch
+conversations. **Latest release: v1.1.98** (13 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
+
+**Copies no longer wait on the day's ranking** (13 Nov, v1.1.98; the developer: "it gets stuck
+here", a copy at 0% for minutes after "wording ready"): the AI's editorial plan (`editorial/plan.ts`,
+ranks and "same event" for every story) had timed out at 150 s almost every evening since the
+website's stories came in (10 Nov: 100-odd stories, 11,000 tokens of answer), so the paper went
+unranked, and each copy asked again (the day's list had changed with three news items in since the
+paper) and waited the same 150 s with nothing on screen. Now the plan asks for little thinking and
+reasons of five words (109 stories: 38 s, 7,000 tokens; measured 64 s and 43 s before) with 240 s
+to answer; a copy takes the day's paper's own plan from its report (`dayOf`, `CopyOpts.plan`) and,
+when the paper had none, ranks as it did without asking. A worker's progress is sent on every 5%
+too (a hundred rewordings found ready inside half a second showed as 0%). One copy of 13 Nov's:
+1.4 min, its wording done at 6 s (was 3.2 min, 156 s).
 
 **The developer (the user) wants:** answers first in plain English, short; little testing time on
 their side; every finished improvement merged, tagged and released without asking (tell them the version

@@ -31,6 +31,7 @@ import os from "node:os";
 import path from "node:path";
 import { DB_FILE, ENV_FILE, MEDIA_DIR, OUT_DIR, outName, PAPERS_HOME, ROOT } from "../config.ts";
 import { buildIssue, type CopyOpts } from "../build.ts";
+import type { PlanEntry } from "./plan.ts";
 import { checkFacts } from "./facts.ts";
 import { browserServer, closeBrowser } from "../browser.ts";
 import { profile } from "../profile.ts";
@@ -381,6 +382,8 @@ interface SetSpec {
   pageOf: [string, number][]; lead?: string;
   /** placements already used (the day's paper, earlier copies): none may repeat */
   seen: string[];
+  /** the day's paper's editorial plan (build.ts CopyOpts.plan) */
+  plan?: PlanEntry[];
   /** copies of the 8-page paper (4 Nov): each copy's pages, then the section pages, the day's
    * paper's printed stories being the ones the section pages' choice was made beside */
   eight?: { printed: string[] };
@@ -447,7 +450,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
         noReview: true,
         progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0),
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
-        copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, reword, pdfPath: item.pdf,
+        copy: { rng: seeded(item.seed * 7919 + attempt * 104729 + 17), shuffle: spec.shuffle, pageOf, lead: spec.lead, plan: spec.plan, reword, pdfPath: item.pdf,
                 ...(item.images ? { images: `${item.images}-${attempt}` } : {}),
                 translate: spec.translate, ...(!spec.translate ? { store: own } : {}),
                 ...(spec.articles?.length ? { extras: spec.articles.map((a, i) => articleStory(a, i, n, spec.date, store)) } : {}),
@@ -659,10 +662,11 @@ export async function copiesIn(store: Store, specFile: string) {
       store.db.prepare("delete from edits where issue_date = ?").run(d);
       for (const e of spec.edits) store.addEdit(e);
     }
-    let last = 0;
+    let last = 0, sent = 0;
     await layOutHere(store, spec, (l) => console.log(`[copies] ${l}`), (f) => console.log(`@@file ${JSON.stringify(f)}`),
-      // at most twice a second
-      (share, what) => { if (Date.now() - last > 500) { last = Date.now(); console.log(`@@progress ${JSON.stringify({ share, what })}`); } });
+      // at most twice a second, or on a step of 5% (13 Nov: a hundred rewordings found ready at once
+      // showed as 0% until the layout began)
+      (share, what) => { if (Date.now() - last > 500 || share - sent >= 0.05) { last = Date.now(); sent = share; console.log(`@@progress ${JSON.stringify({ share, what })}`); } });
   } catch (e) {
     console.log(`@@error ${e instanceof Error ? e.message : e}`);
     process.exitCode = 1;
@@ -676,8 +680,9 @@ export async function copiesIn(store: Store, specFile: string) {
 function dayOf(store: Store, date: string) {
   const got = store.latestIssue(date);
   if (!got) throw new Error(`no paper made for ${date} yet: make the day's paper first`);
-  const report = got.report as { placed?: { page: number; story: string; cols: number; rank: number }[] };
+  const report = got.report as { placed?: { page: number; story: string; cols: number; rank: number }[]; plan?: PlanEntry[] };
   return {
+    plan: report.plan ?? [],
     pageOf: (report.placed ?? []).map((p) => [p.story, p.page] as [string, number]),
     lead: report.placed?.find((p) => p.page === 1 && p.rank === 1)?.story,
     seen: [(report.placed ?? []).map((p) => `${p.story}:${p.page}:${p.cols}`).sort().join(",")],
@@ -832,7 +837,7 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
       batch.cost += cut.cost;
       timeMark("shortening", (Date.now() - t) / 1000);
     }
-    const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead,
+    const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead, plan: day.plan,
                    ...(opts.articles?.length ? { articles: opts.articles } : {}), ...(same.ids.length ? { drop: same.ids } : {}),
                    ...(opts.pages === 8 ? { eight: { printed: day.pageOf.map(([id]) => id) } } : {}) };
     for (const [i, a] of (opts.articles ?? []).entries()) {
@@ -898,7 +903,7 @@ export async function makeEditions(store: Store, date: string, editions: Edition
     }
     const tasks: Task[] = list.map((e): Task => ({
       lang: e.lang, label: e.name, seen: day.seen,
-      spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: day.pageOf, lead: day.lead,
+      spec: { date, reword: "headlineDeck", shuffle: "keepLead", translate: e.lang !== profile.language.lang, pageOf: day.pageOf, lead: day.lead, plan: day.plan,
               ads: sisterStore(store, e.id).ads(date), ...sisterStore(store, e.id).layoutEdits(date),
               ...(own.get(e.id)?.articles.length ? { articles: own.get(e.id)!.articles } : {}),
               ...(own.get(e.id)?.drop.length ? { drop: own.get(e.id)!.drop } : {}) },
