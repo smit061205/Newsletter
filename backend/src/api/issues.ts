@@ -94,6 +94,19 @@ export async function issuesRoutes(c: Ctx) {
         return send(res, 200, { frame: await frameInfo(sister.id, date) });
       }
     }
+    if (!sister && parts[3] === "title") {
+      // the date and issue number on the paper's title, changed after it's made (export/retitle.ts)
+      const { retitle, setTitle, titleOf } = await import("../export/retitle.ts");
+      if (req.method === "GET") return send(res, 200, titleOf(store, date));
+      if (req.method === "POST") {
+        if (currentJob()?.date === date || copiesNow?.()?.date === date) return send(res, 409, { error: "the paper is being made: change the title once it's done" });
+        const body = (await readJson(req)) as { date?: string; issue?: number };
+        const wrong = setTitle(store, date, body);
+        if (wrong) return send(res, 400, { error: wrong });
+        await retitle(store, date, log);
+        return send(res, 200, titleOf(store, date));
+      }
+    }
     if (req.method === "POST" && parts[3] === "build") return startJob(res, date, "build");
     if (req.method === "POST" && parts[3] === "approve") {
       const got = store.latestIssue(date);

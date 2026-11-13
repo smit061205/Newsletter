@@ -184,9 +184,17 @@ const seedOf = (date: string) => Number(date.replace(/-/g, "")) % 2 ** 30;
 /** Where a day's page images go (served by the API for the website). */
 export const pageImageDir = (date: string) => path.join(OUT_DIR, "pages", profile.id, date);
 
-/** Issue numbers count every day from the profile's reference issue. */
-export function issueNumberFor(date: string): number {
-  const { referenceDate, referenceNumber } = profile.issue;
+/** A number the editor set for the date the paper carries: the days after count on from it. */
+export interface IssueFrom { printed: string; number: number }
+/** The date a day's paper carries on its title: the next day's, or the one the editor set for it. */
+export const titleDateOf = (store: Store, date: string) => store.setting<string | null>(`titleDate|${date}`, null) ?? printedDate(date);
+
+/** Issue numbers count every day from the profile's reference issue, or from the latest
+ * number the editor set by hand on or before the date (the title's "date and અંક", 13 Nov:
+ * a day without a paper doesn't take a number, and every day after came out one too high). */
+export function issueNumberFor(date: string, store?: Store): number {
+  const set = (store?.setting<IssueFrom[]>("issueFrom", []) ?? []).filter((x) => x.printed <= printedDate(date)).sort((a, b) => a.printed.localeCompare(b.printed)).at(-1);
+  const { referenceDate, referenceNumber } = set ? { referenceDate: set.printed, referenceNumber: set.number } : profile.issue;
   // (the number of the date it carries: the next day's, for a paper made the evening before)
   const days = Math.round((Date.parse(`${printedDate(date)}T00:00:00Z`) - Date.parse(`${referenceDate}T00:00:00Z`)) / 86_400_000);
   return referenceNumber + days;
@@ -234,7 +242,7 @@ export async function fillContext(store: Store, date: string): Promise<{
   const m = await Measurer.open(FONTS, FACES);
   try {
     const chrome: Awaited<ReturnType<typeof chromeFor>>[] = [];
-    for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumberFor(date), m));
+    for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumberFor(date, store), m, { printed: titleDateOf(store, date) }));
     ads = chrome.flatMap((c, i) => arrangeAds(ads.filter((a) => a.page === i + 1), { top: c.bodyTop, bottom: c.bodyBottom }));
     const room = chrome.reduce((sum, c, i) => {
       const band = (c.bodyBottom - c.bodyTop) * spanWidth(GRID.columns);
@@ -290,7 +298,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const total = opts.pages ?? (opts.sections ? opts.sections.base.length + sectionList.length : profile.issue.pages);
   // (the 8-page paper's own pages: their section's title across the top)
   const titleOf = (n: number) => (opts.sections && n > opts.sections.base.length ? sectionList[n - opts.sections.base.length - 1]?.title : undefined);
-  const issueNumber = opts.issueNumber ?? issueNumberFor(date);
+  const issueNumber = opts.issueNumber ?? issueNumberFor(date, store);
 
   const m = await Measurer.open(FONTS, FACES);
   let planCost = 0;
@@ -305,7 +313,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
                  plans: PagePlan[]; spent: number; factChecks: { story: string; detail: string }[] };
   const chrome: Awaited<ReturnType<typeof chromeFor>>[] = [];
   try {
-    for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m, { blank: !!opts.copy || !!opts.sections?.blank, ...(titleOf(i + 1) ? { title: titleOf(i + 1) } : {}) }));
+    for (let i = 0; i < total; i++) chrome.push(await chromeFor(i + 1, total, date, issueNumber, m, { printed: titleDateOf(store, date), blank: !!opts.copy || !!opts.sections?.blank, ...(titleOf(i + 1) ? { title: titleOf(i + 1) } : {}) }));
     // the ads the layout may place go to the foot of their page (layout/ads.ts)
     {
       const booked = ads;

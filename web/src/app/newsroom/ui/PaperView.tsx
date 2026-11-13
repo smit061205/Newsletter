@@ -50,7 +50,9 @@ export function PaperView({ problems: showProblems = false, onChanged, eight = f
     call<StoryRow[]>(`/api/stories?date=${date}`).then(setStories).catch(() => {});
   }, [date, has, eight]);
   useEffect(() => { setN(1); setInfo(null); setIssue(null); }, [date, eight]);
-  const picture = (k: number) => media(eight ? `/api/issues/${date}/pages8/${k}.png?v=${version}` : `/api/pages/${date}/${k}.png?v=${version}`);
+  // (the title's date and number changed since: the same version, new pictures)
+  const v = `${version}${(info?.report as { titledAt?: string } | undefined)?.titledAt ?? ""}`;
+  const picture = (k: number) => media(eight ? `/api/issues/${date}/pages8/${k}.png?v=${v}` : `/api/pages/${date}/${k}.png?v=${v}`);
   useEffect(() => { load(); }, [load, version]);
   useEffect(() => setImgFailed(false), [n, version]);
 
