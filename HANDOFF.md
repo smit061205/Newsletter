@@ -13,8 +13,13 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.98** (13 Nov). Work happens on branch
+conversations. **Latest release: v1.1.99** (13 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
+
+**Copies print the editor's column again** (13 Nov, v1.1.99; the developer: "the copy removed tantri
+sthanethi"): from 2 Nov copies picked none (`build.ts`, `columnTitle && !opts.copy`), the column being no
+must; now they pick as the day's paper does (Gujarat's first, no photo, longest), at an inside page's
+edge; one where none fits still passes S11. Tried on one copy of 13 Nov's: page 4's top corner, 1.0 min.
 
 **Copies no longer wait on the day's ranking** (13 Nov, v1.1.98; the developer: "it gets stuck
 here", a copy at 0% for minutes after "wording ready"): the AI's editorial plan (`editorial/plan.ts`,
