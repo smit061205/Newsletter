@@ -13,8 +13,18 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.99** (13 Nov). Work happens on branch
+conversations. **Latest release: v1.1.100** (13 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
+
+**The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
+me the power to change date and aank no in the title after the paper is built"): Tonight's paper →
+"તારીખ અને અંક" (`ui/TitleDialog.tsx`, the newsroom's own calendar). Kept per day (`titleDate|<date>`;
+the number in `issueFrom`, the days after counting on from it: a day without a paper takes no number,
+`build.ts issueNumberFor`), used by every build after, and the day's saved paper and 8-page paper
+dressed with them in place (`export/retitle.ts`: the title's `p<n>-date`/`p<n>-issue` fields set
+again, the PDFs and page pictures printed again; same version, `report.titledAt`), in seconds, no
+layout. Not while that day's paper or copies are being made. Copies' designs and sister papers'
+frames still date themselves from the day (`printedDate`), not from this.
 
 **Copies print the editor's column again** (13 Nov, v1.1.99; the developer: "the copy removed tantri
 sthanethi"): from 2 Nov copies picked none (`build.ts`, `columnTitle && !opts.copy`), the column being no

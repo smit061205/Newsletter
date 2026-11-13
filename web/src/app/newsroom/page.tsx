@@ -13,6 +13,7 @@ import { Badge, Button, Icon, Note, Ring, Skeleton, useApp } from "./ui/kit";
 import { PaperView } from "./ui/PaperView";
 import { SisterToday } from "./ui/SisterToday";
 import { StoryPanel } from "./ui/StoryPanel";
+import { TitleDialog } from "./ui/TitleDialog";
 import type { StringKey } from "./ui/strings";
 
 const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build", "sections"];
@@ -139,6 +140,9 @@ function PaperToday() {
   const [stopping, setStopping] = useState(false);
   // "start again from the beginning" while a run goes: stop it, then run from the first step
   const [restarting, setRestarting] = useState(false);
+  // the title's date and number changed after the paper is made (ui/TitleDialog): the pages shown again
+  const [retitling, setRetitling] = useState(false);
+  const [titled, setTitled] = useState(0);
   useEffect(() => {
     if (running) return;
     setStopping(false);
@@ -254,6 +258,7 @@ function PaperToday() {
             {report && fourMade && <Button kind="quiet" icon={Icon.print()} onClick={openPdf}>{t("today.print")}</Button>}
             {report && !running && issue!.eight && <Button kind="quiet" icon={Icon.print()} onClick={openPdf8}>{t("today.print8")}</Button>}
             {report && !running && issue!.eightEditable && <Button kind="quiet" icon={Icon.download()} onClick={openCorel8}>{t("corel.pdf8")}</Button>}
+            {report && !running && !otherRunning && <Button kind="quiet" icon={Icon.calendar()} onClick={() => setRetitling(true)}>{t("title.open")}</Button>}
             {report && !running && <Button kind="quiet" icon={Icon.refresh()} onClick={() => run()} disabled={!!otherRunning}>{t("today.again")}</Button>}
           </span>
         </div>
@@ -266,7 +271,8 @@ function PaperToday() {
         )}
       </section>
 
-      {hasIssue && !running && <PaperView onChanged={loadIssue} />}
+      {hasIssue && !running && <PaperView key={titled} onChanged={loadIssue} />}
+      {retitling && <TitleDialog onClose={() => setRetitling(false)} onDone={() => { loadIssue(); setTitled((k) => k + 1); }} />}
       {editing && <StoryPanel story={editing} onClose={() => setEditing(null)} onChanged={() => { toast(t("toast.rebuilding")); refresh(); }} />}
     </div>
   );

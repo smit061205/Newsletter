@@ -104,13 +104,13 @@ export function bandOf(n: number, total: number): { top: number; bottom: number;
  * `blank`: the same room kept, left empty -- a copy whose masthead, page
  * headers and footer are put in by hand afterwards (editorial/copies.ts). */
 export async function chromeFor(n: number, total: number, issueDate: string, issueNumber: number, m?: Measurer,
-                                opts: { blank?: boolean; title?: string } = {}): Promise<ChromeResult> {
+                                opts: { blank?: boolean; title?: string; printed?: string } = {}): Promise<ChromeResult> {
   const roleName = n === 1 ? "first" : n === total ? "last" : "inner";
   const role = template.roles[roleName];
   const els: Element[] = opts.blank ? [] : [{ id: `p${n}-chrome`, kind: "image", ...role.art, fit: "fill" }];
   const f = opts.blank ? {} as Role["fields"] : role.fields;
   if (f.issue) els.push(await field(f.issue, `p${n}-issue`, profile.language.issueLine.replace("{issue}", localDigits(issueNumber)), m));
-  if (f.date) els.push(await field(f.date, `p${n}-date`, dateLine(printedDate(issueDate)), m));
+  if (f.date) els.push(await field(f.date, `p${n}-date`, dateLine(opts.printed ?? printedDate(issueDate)), m));
   if (f.folio) els.push(await field(f.folio, `p${n}-folio`, localDigits(n), m));
   // a one-page paper has no "last page" header; give its last page the footer anyway
   const footer = role.footer ?? (n === total ? template.roles.last.footer : undefined);

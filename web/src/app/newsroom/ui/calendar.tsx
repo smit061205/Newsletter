@@ -63,7 +63,7 @@ export function Calendar({ value, min, max, onPick, onClose, left }:
 }
 
 /** A date chosen on the calendar: "ગુરુવાર, 6 નવેમ્બર 2026", opening it. */
-export function DateField({ label, value, min, onPick }: { label: string; value: string; min?: string; onPick: (d: string) => void }) {
+export function DateField({ label, value, min, max, onPick }: { label: string; value: string; min?: string; max?: string; onPick: (d: string) => void }) {
   const { lang } = useApp();
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
@@ -74,7 +74,7 @@ export function DateField({ label, value, min, onPick }: { label: string; value:
               onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="dialog">
         <span style={{ width: 18, height: 18, flex: "none", display: "inline-flex" }}>{Icon.calendar()}</span>{longDate(lang, value, true)}
       </button>
-      {open && <Calendar value={value} min={min} onPick={onPick} onClose={close} left />}
+      {open && <Calendar value={value} min={min} max={max} onPick={onPick} onClose={close} left />}
     </div>
   );
 }
