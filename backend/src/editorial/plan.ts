@@ -29,7 +29,7 @@ const SCHEMA = {
           properties: {
             id: { type: "string" },
             rank: { type: "integer", minimum: 1, maximum: 5, description: "1 = the day's lead (one or two), 2 front-page stories, 3 main inside stories, 4 standard, 5 brief" },
-            reason: { type: "string", description: "Why, in a few words (English)" },
+            reason: { type: "string", description: "Why, in at most five English words" },
             event: { type: "string", description: "The one happening it reports, in a few English words; stories on the same happening, or on one visit by one person, carry exactly the same words" },
             outdated: { type: "boolean", description: "true when the story will read old by the time the paper is read" },
           },
@@ -63,7 +63,9 @@ export async function planDay(store: Store, date: string, stories: Story[], opts
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", "x-title": "Capital Kranti backend" },
     body: JSON.stringify({
-      model, temperature: 0, usage: { include: true },
+      // (little thinking, short reasons: 109 stories took 11,000 tokens and over the 150 seconds most
+      // evenings from 10 Nov, when the website's stories came in, and the paper went unranked; 13 Nov)
+      model, temperature: 0, usage: { include: true }, reasoning: { effort: "low" },
       response_format: { type: "json_schema", json_schema: SCHEMA },
       messages: [
         { role: "system", content: `You are the news editor of "${profile.name.split(" (")[0]}", a Gujarati daily in Gandhinagar, Gujarat. ` +
@@ -83,7 +85,7 @@ export async function planDay(store: Store, date: string, stories: Story[], opts
           `  ${s.headline}\n  ${s.deck}\n  ${s.bodies.long.slice(0, 220).replace(/\s+/g, " ")}`).join("\n") },
       ],
     }),
-  }, 150);
+  }, 240);
   if (!res.ok) {
     opts.log?.(`  editorial plan failed (OpenRouter ${res.status}): stories keep their own ranks`);
     return null;

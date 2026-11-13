@@ -12,7 +12,7 @@ import { assetFile, OUT_DIR, outName, PLOT_ORIGIN } from "./config.ts";
 import { chromeFor, printedDate } from "./chrome/chrome.ts";
 import { Measurer } from "./layout/measure.ts";
 
-import { planDay } from "./editorial/plan.ts";
+import { planDay, type PlanEntry } from "./editorial/plan.ts";
 import { newsOverlap } from "./editorial/translate.ts";
 import { preflight } from "./export/preflight.ts";
 import { cmapCoverage } from "./fonts/cmap.ts";
@@ -112,6 +112,10 @@ export interface CopyOpts {
   pageOf: Map<string, number>;
   /** the day's lead story (for "keepLead": the front page's in every copy) */
   lead?: string;
+  /** the day's paper's editorial plan: the copy ranks as it did, without asking again
+   * (13 Nov: a copy waited two and a half minutes for the AI to rank 109 stories anew, three news
+   * items in since the evening paper having changed the day's list, and got no answer) */
+  plan?: PlanEntry[];
   /** the stories as this copy words them */
   reword: (pool: Story[]) => Promise<{ pool: Story[]; cost: number }>;
   /** where this copy's PDF goes */
@@ -348,7 +352,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       .sort(byRank);
     // the editorial plan ranks the day's stories (an editor's own rank wins)
     const rankedByEditor = new Set(edits.filter((e) => typeof e.change.priority === "number").map((e) => e.storyId));
-    const planned = await planDay(store, date, pool, { log });
+    // (a copy ranks as the day's paper did, its plan given; none when the day's had none: not asked again)
+    const planned = opts.copy?.plan ? (opts.copy.plan.length ? { plan: opts.copy.plan, cost: 0 } : null) : await planDay(store, date, pool, { log });
     // the sub-headings the AI wrote meanwhile, on the stories laid out
     await decksRun;
     const deckOf = new Map(stories.map((s) => [s.id, s.deck]));
