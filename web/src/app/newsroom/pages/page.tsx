@@ -10,6 +10,7 @@ import s from "../newsroom.module.css";
 import { num } from "../ui/format";
 import { Button, Empty, Icon, Note, useApp } from "../ui/kit";
 import { PaperView } from "../ui/PaperView";
+import { TitleDialog } from "../ui/TitleDialog";
 
 export default function Paper() {
   const { t, lang, date, toast, pdf } = useApp();
@@ -26,6 +27,9 @@ export default function Paper() {
   // the day's paper, or its 8-page paper (once the evening has made it)
   const [pages, setPages] = useState<4 | 8>(4);
   const eight = pages === 8 && !!info?.eight;
+  // the title's date and number changed after the paper is made (ui/TitleDialog): the pages shown again
+  const [retitling, setRetitling] = useState(false);
+  const [titled, setTitled] = useState(0);
 
   const rebuild = async () => {
     setError("");
@@ -49,6 +53,7 @@ export default function Paper() {
         {info?.eight && <div className={s.segmented} role="radiogroup" aria-label={t("copies.pages")}>
           {([4, 8] as const).map((k) => <button key={k} type="button" aria-pressed={pages === k} onClick={() => setPages(k)}>{t("copies.pages.n", { n: num(lang, k) })}</button>)}
         </div>}
+        <Button kind="quiet" icon={Icon.calendar()} onClick={() => setRetitling(true)} disabled={running || !info}>{t("title.open")}</Button>
         <Button kind="quiet" icon={Icon.refresh()} onClick={rebuild} disabled={running}>{running ? t("paper.rebuilding") : t("paper.rebuild")}</Button>
         <Button icon={Icon.print()} disabled={!info} onClick={() => info && pdf({ url: media(`/api/issues/${date}/${eight ? "pdf8" : "pdf"}`),
           title: pdfTitle(), fileName: fileName("") })}>{t("today.print")}</Button>
@@ -56,7 +61,9 @@ export default function Paper() {
           title: t("corel.title", { what: pdfTitle() }), fileName: fileName(" - CorelDRAW") })}>{t("corel.pdf")}</Button>}
       </TopBar>
       {error && <Note tone="bad">{error}</Note>}
-      <PaperView problems eight={eight} />
+      <PaperView key={titled} problems eight={eight} />
+      {retitling && <TitleDialog onClose={() => setRetitling(false)} onDone={() => {
+        call<IssueInfo>(`/api/issues/${date}`).then(setInfo).catch(() => {}); refresh(); setTitled((k) => k + 1); }} />}
     </div>
   );
 }

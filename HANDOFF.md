@@ -13,11 +13,12 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.100** (13 Nov). Work happens on branch
+conversations. **Latest release: v1.1.101** (14 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
-me the power to change date and aank no in the title after the paper is built"): Tonight's paper →
+me the power to change date and aank no in the title after the paper is built"): Tonight's paper and
+Paper (v1.1.101: "where is the button", looked for there) →
 "તારીખ અને અંક" (`ui/TitleDialog.tsx`, the newsroom's own calendar). Kept per day (`titleDate|<date>`;
 the number in `issueFrom`, the days after counting on from it: a day without a paper takes no number,
 `build.ts issueNumberFor`), used by every build after, and the day's saved paper and 8-page paper
