@@ -136,8 +136,9 @@ export class Blocks {
           const cost = WEIGHT[Math.min(rank, 5) - 1] * (top - r.words) / Math.max(1, top)
             + (mod.photoDropped ? 1 + WEIGHT[Math.min(rank, 5) - 1] : 0) + (mode ? 0.1 : 0) + (r.from === "longer" ? 0.15 : 0) + loose * 2
             + (spansFor(rank).includes(cols) ? 0 : cols === 1 ? 1 : 0.3) + k * 0.4
-            // (a customer's article prints the photos its copy was given: a width that shows fewer costs)
-            + (wordForWord(story) ? 0.5 * Math.max(0, (story.photos?.length ?? 0) - mod.elements.filter((e) => e.kind === "image").length) : 0)
+            // (a customer's article prints the photos its copy was given: a width that shows fewer costs as
+            // much as a photo left out -- at 0.5 the planner set it narrow beside one photo in 5 of 8 copies, 14 Nov)
+            + (wordForWord(story) ? 1.5 * Math.max(0, (story.photos?.length ?? 0) - mod.elements.filter((e) => e.kind === "image").length) : 0)
             // (columns ending a line apart: a width where it can end level wins)
             + (LEVEL && mod.short ? 2 : 0);
           out.push({ module: mod, rung: i, height: mod.height, stretch: stretchOf(mod), cost });
