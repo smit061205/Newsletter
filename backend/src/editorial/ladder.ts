@@ -101,6 +101,15 @@ export async function ladderOf(store: Store, story: Story, release: Release | un
       }
     }
   }
+  // (a copy: every length the AI has written for it to fit a space, the day's paper's and the copies
+  // before it -- it asks the AI only for one none of them has; editorial/copies.ts says whose it may use)
+  if (opts.longer === "cached") {
+    const tail = profile.language.lang === "gu" ? "" : `\\|${profile.language.lang}`;
+    const mine = new RegExp(`^(?:copy\\d+\\|)?${story.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\|\\d+${tail}$`);
+    for (const { key, value } of store.fittedOf(story.id)) {
+      if (mine.test(key) && value.body && !value.factCheck && !repeats(value.body)) bases.push({ body: value.body, words: wordCount(value.body), from: "longer" });
+    }
+  }
   bases.push(...own);
   bases.sort((a, b) => b.words - a.words);
 

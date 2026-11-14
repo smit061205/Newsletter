@@ -230,6 +230,17 @@ export class Store {
     const row = this.db.prepare("select json from fitted where key = ?").get(key) as { json: string } | undefined;
     return row ? JSON.parse(row.json) : null;
   }
+  /** Every version kept under a key with `story|` in it: the day's paper's and every copy's (a
+   * copy's lengths, editorial/ladder.ts). */
+  fittedOf(story: string): { key: string; value: { body: string; model: string; factCheck?: string } }[] {
+    return (this.db.prepare("select key, json from fitted where instr(key, ?) > 0").all(`${story}|`) as { key: string; json: string }[])
+      .map((r) => ({ key: r.key, value: JSON.parse(r.json) }));
+  }
+  /** A version kept under `key` by any copy (copy<n>|key). */
+  fittedInCopies(key: string): { body: string; model: string; factCheck?: string } | null {
+    const row = this.db.prepare("select json from fitted where key like 'copy%' and substr(key, instr(key, '|') + 1) = ? limit 1").get(key) as { json: string } | undefined;
+    return row ? JSON.parse(row.json) : null;
+  }
   putFitted(key: string, value: { body: string; model: string; factCheck?: string }) {
     this.db.prepare("insert or replace into fitted (key, json) values (?, ?)").run(key, JSON.stringify(value));
   }

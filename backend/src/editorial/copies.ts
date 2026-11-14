@@ -436,10 +436,15 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
       say(`@@cost ${JSON.stringify({ cost: got.cost, stories: got.pool.length })}`);
       continue;
     }
-    // a reworded body is fitted to its space on its own (not with the day's fits); one
-    // keeping the day's words starts from the day's fits, and what's written for it stays its own
+    // a reworded body is fitted to its space on its own (not with the day's fits); one keeping the
+    // day's words has every length the day's paper and the copies before it had written, and what's
+    // written for it is kept as its own (14 Nov: each copy asked the AI again for lengths another had,
+    // 3 to 8 a copy, about 10 s each, and 8 copies took 12 minutes). A fact check of the same words
+    // (facts2|story|their hash) counts for every copy.
     const own = Object.create(store) as Store;
-    own.fitted = (k: string) => store.fitted(`copy${n}|${k}`) ?? (spec.reword === "all" ? null : store.fitted(k));
+    const shared = (k: string) => spec.reword !== "all" || k.startsWith("facts2|");
+    own.fitted = (k: string) => store.fitted(`copy${n}|${k}`) ?? (shared(k) ? store.fitted(k) ?? store.fittedInCopies(k) : null);
+    own.fittedOf = (id: string) => store.fittedOf(id).filter((r) => r.key.startsWith(`copy${n}|`) || spec.reword !== "all");
     own.putFitted = (k: string, v: Parameters<Store["putFitted"]>[1]) => store.putFitted(`copy${n}|${k}`, v);
     own.forgetFitted = (id: string) => store.forgetFitted(`copy${n}|${id}`);
     let made: { built: Awaited<ReturnType<typeof buildIssue>>; sig: string; layout: string; fails: number; attempt: number } | null = null;
