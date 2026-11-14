@@ -48,6 +48,8 @@ export class SisterStore extends Store {
   deleteRelease(id: number) { this.main.deleteRelease(id); }
   story(id: string) { return this.main.story(id); }
   fitted(key: string) { return this.main.fitted(key); }
+  fittedOf(story: string) { return this.main.fittedOf(story); }
+  fittedInCopies(key: string) { return this.main.fittedInCopies(key); }
   putFitted(key: string, value: Parameters<Store["putFitted"]>[1]) { this.main.putFitted(key, value); }
   forgetFitted(story: string) { this.main.forgetFitted(story); }
   newJob(date: string, job: Parameters<Store["newJob"]>[1]) { return this.main.newJob(date, job); }

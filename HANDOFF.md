@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.102** (14 Nov). Work happens on branch
+conversations. **Latest release: v1.1.103** (14 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
@@ -33,6 +33,17 @@ card has "તારીખ અને અંક" (`copies/CopiesTitleDialog.tsx`):
 `dates`) and a number per design (`issueFrom` on the design, counting on for the days after; a number
 given again drops the later ones). Applied as a copy is opened or saved (`export/designs.ts dated()`,
 `redate(pdf, date, { issue })`), nothing made again; `/api/designs/title`.
+
+**Copies reuse the lengths already written** (14 Nov, v1.1.103; the developer: "previously, we did 30
+copies in 11 minutes"): each copy kept the AI's lengths written to fit its slots under its own name
+(`copy<n>|story|words`), so the next copy asked again for nearly the same length (3 to 8 a copy,
+about 10 s each, a fact check after each: copy 3's planning 59 s against 6 Nov's 17 s, report
+`timing.fits`). A copy keeping the day's words now starts with every length the day's paper and the
+copies before it had (`editorial/ladder.ts`, "cached"; `store.fittedOf`), and a fact check of the
+same words counts for every copy (`facts2|`, `store.fittedInCopies`); a copy rewording the whole text
+keeps its own only. One copy on 14 Nov's saved work: 25 lengths to ask for before, 6 after. Not yet
+done: every copy still breaks the same bodies into lines again (about 12 s of a copy's 27, ~1,700
+requests; the line cache lives only in one process).
 
 **An email written "name[at]site[dot]gov[dot]in" breaks across lines** (14 Nov, v1.1.102): it was
 one unbreakable word that ran 130 px past its column in 6 of 8 copies, each copy laid out again for it
