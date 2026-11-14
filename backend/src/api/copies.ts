@@ -106,6 +106,17 @@ export async function copiesRoutes(c: Ctx) {
     const dayOk = (x: unknown): x is string => typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x);
     try {
       if (req.method === "GET" && !parts[2]) return send(res, 200, await d.designsOf());
+      // the date and issue numbers (અંક) on the day's copies' designs, changed by the editor (14 Nov)
+      if (parts[2] === "title") {
+        const date = new URL(req.url ?? "", "http://x").searchParams.get("date");
+        if (req.method === "GET") return dayOk(date) ? send(res, 200, await d.titlesOf(date)) : send(res, 400, { error: "which day" });
+        if (req.method === "POST") {
+          const body = (await readJson(req)) as { date?: string; printed?: string; issues?: Record<string, number> };
+          if (!dayOk(body.date)) return send(res, 400, { error: "which day" });
+          const why = await d.setTitles(body.date, { date: body.printed, issues: body.issues });
+          return why ? send(res, 400, { error: why }) : send(res, 200, await d.titlesOf(body.date));
+        }
+      }
       if (req.method === "DELETE" && parts[2]) return send(res, 200, await d.dropDesign(parts[2] === "all" ? null : parts[2]));
       if (req.method === "POST" && !parts[2]) {
         const body = (await readJson(req)) as { name?: string; base64?: string };

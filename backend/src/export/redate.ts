@@ -293,8 +293,10 @@ function holdersOf(doc: PDFDocument, page: PDFPage): Holder[] {
 }
 
 /** `pdf` with its dates changed to `date` (the day the paper carries, ISO) and its issue numbers
- * counted on from the date it was written for; how many it changed, and that date. */
-export async function redate(pdf: Uint8Array, date: string): Promise<{ pdf: Uint8Array; changed: number; written: string | null }> {
+ * counted on from the date it was written for, or `issue` when given (the editor's, Copies' "date and
+ * અંક", 14 Nov); how many it changed, that date, and the issue number it now carries (null: none). */
+export async function redate(pdf: Uint8Array, date: string, opts: { issue?: number } = {}):
+  Promise<{ pdf: Uint8Array; changed: number; written: string | null; issue: number | null }> {
   const doc = await PDFDocument.load(pdf, { ignoreEncryption: true });
   const target = Date.parse(`${date}T00:00:00Z`);
   const holders = doc.getPages().flatMap((p) => holdersOf(doc, p));
@@ -316,6 +318,9 @@ export async function redate(pdf: Uint8Array, date: string): Promise<{ pdf: Uint
   // the date it's written for: its first
   const first = found.flat(2).find((f) => f.kind === "date");
   const days = first ? Math.round((target - first.date) / DAY_MS) : 0;
+  // the issue number it carries now: the editor's, else its first counted on
+  const firstIssue = holders.flatMap((h, hi) => blocks[hi].flatMap((b, bi) => found[hi][bi].filter((f) => f.kind === "issue").map((f) => textOf(h, b).slice(f.start, f.end))))[0];
+  const issue = opts.issue ?? (firstIssue ? Math.max(1, +firstIssue + days) : null);
 
   // fonts of the app's own to write in where a design's can't (each once)
   const embedded = new Map<string, { ref: PDFRef; width(u: number): number; encode(s: string): number[] | null }>();
@@ -407,8 +412,9 @@ export async function redate(pdf: Uint8Array, date: string): Promise<{ pdf: Uint
       block.reduce((at, p) => (starts.push(at), at + p.codes.length), 0);
       const where = (k: number) => { let i = 0; while (i + 1 < block.length && starts[i + 1] <= k) i++; return [i, k - starts[i]] as const; };
       for (const f of fs) {
-        const fresh = f.make(target, days);
-        if (fresh === text.slice(f.start, f.end) || (f.kind === "issue" && !first)) continue;
+        const was = text.slice(f.start, f.end);
+        const fresh = f.kind === "issue" && opts.issue !== undefined ? String(opts.issue).padStart(was.length, "0") : f.make(target, days);
+        if (fresh === was || (f.kind === "issue" && !first && opts.issue === undefined)) continue;
         const [i, a] = where(f.start), [j, b] = where(f.end - 1);
         if (block.slice(i, j + 1).some((p) => !fontIn(h, p.font) || fontIn(h, p.font)!.cid)) continue;
         spans[i].push({ from: a, to: i === j ? b + 1 : block[i].codes.length, text: fresh });
@@ -466,5 +472,5 @@ export async function redate(pdf: Uint8Array, date: string): Promise<{ pdf: Uint
     for (const e of edits.sort((x, y) => y.at - x.at)) content = content.slice(0, e.at) + e.text + content.slice(e.at + e.len);
     h.put(content);
   });
-  return { pdf: changed ? await doc.save() : pdf, changed, written: first ? new Date(first.date).toISOString().slice(0, 10) : null };
+  return { pdf: changed ? await doc.save() : pdf, changed, written: first ? new Date(first.date).toISOString().slice(0, 10) : null, issue: firstIssue ? issue : null };
 }

@@ -27,11 +27,15 @@ export interface Design {
   /** the file it came from */
   name: string;
   pages: number;
+  /** the issue numbers (અંક) the editor gave it, each counting on for the days after (14 Nov) */
+  issueFrom?: { printed: string; number: number }[];
 }
 export interface Designs {
   designs: Design[];
   /** copy number -> design id */
   copies: Record<string, string>;
+  /** the date a day's copies carry, where the editor changed it (day -> printed date, ISO; 14 Nov) */
+  dates?: Record<string, string>;
 }
 
 export async function designsOf(): Promise<Designs> {
@@ -87,19 +91,72 @@ export async function designFor(n: number): Promise<Design | null> {
   return d.designs.find((x) => x.id === d.copies[String(n)] && existsSync(fileOf(x.id))) ?? null;
 }
 
+const DAY_MS = 86_400_000;
+/** The date `date`'s copies carry: the editor's, else the day's own. */
+export const copiesDate = (d: Designs, date: string) => d.dates?.[date] ?? printedDate(date);
+/** The issue number the editor gave `design` for `printed`, counted on from the latest given on or before it. */
+function issueGiven(design: Design, printed: string): number | undefined {
+  const from = (design.issueFrom ?? []).filter((x) => x.printed <= printed).sort((a, b) => a.printed.localeCompare(b.printed)).at(-1);
+  return from ? Math.max(1, from.number + Math.round((Date.parse(printed) - Date.parse(from.printed)) / DAY_MS)) : undefined;
+}
+
 // (each design dated once a day: one design may go with many copies)
-const datedCache = new Map<string, Promise<Uint8Array>>();
+type Dated = { pdf: Uint8Array; issue: number | null };
+const datedCache = new Map<string, Promise<Dated>>();
 /** `design` dated for `date`'s copies: its dates, weekdays and issue number changed to the day they
- * carry (export/redate.ts; the developer, 6 Nov: designs made once keep an old date). */
-async function dated(design: Design, date: string): Promise<Uint8Array> {
-  const key = `${design.id}|${date}|${(await stat(fileOf(design.id))).mtimeMs}`;
+ * carry (export/redate.ts; the developer, 6 Nov: designs made once keep an old date), or to the date and
+ * number the editor gave them (14 Nov: "give the same aank no changing feature and date changing feature
+ * in copies"); `auto`: as it would be without the editor's. */
+async function dated(design: Design, date: string, auto = false): Promise<Dated> {
+  const printed = auto ? printedDate(date) : copiesDate(await designsOf(), date);
+  const issue = auto ? undefined : issueGiven(design, printed);
+  const key = `${design.id}|${printed}|${issue ?? ""}|${(await stat(fileOf(design.id))).mtimeMs}`;
   let got = datedCache.get(key);
   if (!got) {
     if (datedCache.size > 100) datedCache.clear();
-    got = readFile(fileOf(design.id)).then(async (b) => (await redate(new Uint8Array(b), printedDate(date))).pdf).catch(async () => new Uint8Array(await readFile(fileOf(design.id))));
+    got = readFile(fileOf(design.id)).then(async (b) => { const r = await redate(new Uint8Array(b), printed, { issue }); return { pdf: r.pdf, issue: r.issue }; })
+      .catch(async () => ({ pdf: new Uint8Array(await readFile(fileOf(design.id))), issue: null }));
     datedCache.set(key, got);
   }
   return got;
+}
+
+/** What `date`'s copies carry on their designs' titles, and what they would without the editor's say:
+ * the date, and each design's issue number (null: none found on it), with the copies it goes with. */
+export async function titlesOf(date: string) {
+  const d = await designsOf();
+  const designs = [];
+  for (const x of d.designs.filter((x) => existsSync(fileOf(x.id)))) {
+    const copies = Object.entries(d.copies).filter(([, id]) => id === x.id).map(([n]) => Number(n)).sort((a, b) => a - b);
+    designs.push({ id: x.id, name: x.name, copies, issue: (await dated(x, date)).issue, auto: (await dated(x, date, true)).issue });
+  }
+  return { date: copiesDate(d, date), auto: printedDate(date), designs };
+}
+
+/** The editor's date for `date`'s copies (that day alone) and issue numbers for designs (that day and
+ * those after it) kept; why not, or null. */
+export async function setTitles(date: string, want: { date?: string; issues?: Record<string, number> }): Promise<string | null> {
+  const d = await designsOf();
+  if (want.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(want.date)) return "not a date";
+  for (const [id, n] of Object.entries(want.issues ?? {})) {
+    if (!d.designs.some((x) => x.id === id)) return "no such design";
+    if (!(Number.isInteger(n) && n > 0)) return "not an issue number";
+  }
+  if (want.date !== undefined) {
+    d.dates = Object.fromEntries(Object.entries(d.dates ?? {}).filter(([day]) => day !== date));
+    if (want.date !== printedDate(date)) d.dates[date] = want.date;
+  }
+  // (the date saved first: a design's number now is read on it)
+  await save(d);
+  const printed = copiesDate(d, date);
+  for (const [id, n] of Object.entries(want.issues ?? {})) {
+    const x = d.designs.find((y) => y.id === id)!;
+    if (n === (await dated(x, date)).issue && !(x.issueFrom ?? []).some((e) => e.printed > printed)) continue;
+    // (the days after count on from it: a number given for a later day before goes)
+    x.issueFrom = [...(x.issueFrom ?? []).filter((e) => e.printed < printed), { printed, number: n }];
+  }
+  await save(d);
+  return null;
 }
 
 /** `pdf` (a copy, print or CorelDRAW) with `design`'s pages laid over its own,
@@ -110,7 +167,7 @@ async function dated(design: Design, date: string): Promise<Uint8Array> {
  * white page hid the design). */
 export async function withDesign(pdf: Uint8Array, design: Design, date?: string): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdf, { ignoreEncryption: true });
-  const src = await PDFDocument.load(date ? await dated(design, date) : await readFile(fileOf(design.id)), { ignoreEncryption: true });
+  const src = await PDFDocument.load(date ? (await dated(design, date)).pdf : await readFile(fileOf(design.id)), { ignoreEncryption: true });
   const have = src.getPageCount(), count = doc.getPageCount();
   for (const [i, page] of doc.getPages().entries()) {
     // page for page; a 4-page design on the 8-page paper (4 Nov): its last page (the footer) on the last,
