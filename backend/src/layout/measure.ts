@@ -362,10 +362,12 @@ export class Measurer {
       // email or web address after its "@" and dots too (26 Oct: an address
       // alone on a line ran 7 mm past its column): its parts glued, no space between
       // (a part still too long for a column -- a web address's code,
-      // "Url9dlIwCinQVSf8lwPB9w/", 26 Oct's copies -- breaks every 8 letters)
+      // "Url9dlIwCinQVSf8lwPB9w/", 26 Oct's copies -- breaks every 8 letters); one written
+      // "secretary[at]dpbi[dot]gov[dot]in" before its "[" too (14 Nov: it ran 130 px past its
+      // column in 6 of 8 copies, each made again for it)
       paras: r.paras.map((p) => p.split(/\s+/).filter(Boolean).flatMap((tok) =>
-        (tok.length > 14 && /^[\w.@\-+:/%?=&#~]+$/.test(tok) && /[A-Za-z]{2}/.test(tok) && /[@./]/.test(tok)
-          ? tok.split(/(?<=[@/])(?=[^/])|(?<=\.)(?=\w)/).flatMap((w) => (w.length > 12 ? w.match(/.{1,8}/g)! : [w]))
+        (tok.length > 14 && /^[\w.@\-+:/%?=&#~[\]]+$/.test(tok) && /[A-Za-z]{2}/.test(tok) && /[@./[]/.test(tok)
+          ? tok.split(/(?<=[@/])(?=[^/])|(?<=\.)(?=\w)|(?<=\w)(?=\[)/).flatMap((w) => (w.length > 12 ? w.match(/.{1,8}/g)! : [w]))
           : tok.length > 10 && tok.includes("/") ? tok.split(/(?<=\/)(?=[^/])/) : dashParts(tok)).map((w, k) => ({
           word: w, glue: k > 0, runs: this.shape(w, r.font).map((x) => ({ text: x.text, font: x.font ?? null, family: family(x.font ?? r.font) })),
         })))),

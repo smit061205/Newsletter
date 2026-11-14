@@ -9,6 +9,7 @@ import { call, type CopiesRun, type PaperDesigns } from "../api";
 import s from "../newsroom.module.css";
 import { num } from "../ui/format";
 import { Button, Icon, Note, useApp } from "../ui/kit";
+import { CopiesTitleDialog } from "./CopiesTitleDialog";
 
 const toBase64 = (f: File) => new Promise<string>((ok, bad) => {
   const r = new FileReader();
@@ -35,6 +36,7 @@ export function Designs({ designs, onChange, run, date, nameOf }:
   const [busy, setBusy] = useState("");
   const [saved, setSaved] = useState<{ folder: string; n: number; without: number[] } | null>(null);
   const [old, setOld] = useState<Old[]>([]);
+  const [retitling, setRetitling] = useState(false);
   const byId = new Map(designs.designs.map((d) => [d.id, d]));
   const pagesOf = (n: number) => run?.files.find((f) => f.n === n)?.pages ?? run?.files[0]?.pages ?? 4;
   // a row for every copy made, every design and every copy given one
@@ -82,7 +84,10 @@ export function Designs({ designs, onChange, run, date, nameOf }:
 
   return (
     <section className={s.card}>
-      <div className={s.cardHead}><h2 className={s.cardTitle}>{t("design.title")}</h2></div>
+      <div className={s.cardHead}>
+        <h2 className={s.cardTitle}>{t("design.title")}</h2>
+        {Object.keys(designs.copies).length > 0 && <Button kind="quiet" icon={Icon.calendar()} onClick={() => setRetitling(true)}>{t("title.open")}</Button>}
+      </div>
       <p className={s.muted} style={{ margin: 0 }}>{t("design.body")}</p>
       <label className={s.drop}>
         {Icon.download()}<div>{busy && busy !== t("design.saveAll") && !old.length ? busy : t("design.drop")}</div>
@@ -150,6 +155,7 @@ export function Designs({ designs, onChange, run, date, nameOf }:
       {saved && saved.without.length > 0 && <Note tone="warn">{t("design.without", { list: saved.without.map((n) => num(lang, n)).join(", ") })}</Note>}
       {saved && <span><Button icon={Icon.external()} onClick={reveal}>{t("design.openFolder")}</Button></span>}
       {error && <Note tone="bad">{error}</Note>}
+      {retitling && <CopiesTitleDialog date={date} onClose={() => setRetitling(false)} />}
     </section>
   );
 }

@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.101** (14 Nov). Work happens on branch
+conversations. **Latest release: v1.1.102** (14 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
@@ -24,8 +24,20 @@ the number in `issueFrom`, the days after counting on from it: a day without a p
 `build.ts issueNumberFor`), used by every build after, and the day's saved paper and 8-page paper
 dressed with them in place (`export/retitle.ts`: the title's `p<n>-date`/`p<n>-issue` fields set
 again, the PDFs and page pictures printed again; same version, `report.titledAt`), in seconds, no
-layout. Not while that day's paper or copies are being made. Copies' designs and sister papers'
-frames still date themselves from the day (`printedDate`), not from this.
+layout. Not while that day's paper or copies are being made. Sister papers' frames still date
+themselves from the day (`printedDate`), not from this.
+
+**Copies' date and અંક** (14 Nov, v1.1.102; the developer: "give the same aank no changing feature and
+date changing feature in copies"): the copies' titles are the other papers' designs, so Copies' designs
+card has "તારીખ અને અંક" (`copies/CopiesTitleDialog.tsx`): one date for the day's copies (pool.json
+`dates`) and a number per design (`issueFrom` on the design, counting on for the days after; a number
+given again drops the later ones). Applied as a copy is opened or saved (`export/designs.ts dated()`,
+`redate(pdf, date, { issue })`), nothing made again; `/api/designs/title`.
+
+**An email written "name[at]site[dot]gov[dot]in" breaks across lines** (14 Nov, v1.1.102): it was
+one unbreakable word that ran 130 px past its column in 6 of 8 copies, each copy laid out again for it
+(up to 3 times: 14 Nov's 8 copies took 12:42). `layout/measure.ts breakLinesRaw` now breaks such an
+address before "[" as well as after "@", "/" and dots.
 
 **Copies print the editor's column again** (13 Nov, v1.1.99; the developer: "the copy removed tantri
 sthanethi"): from 2 Nov copies picked none (`build.ts`, `columnTitle && !opts.copy`), the column being no
