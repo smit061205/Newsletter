@@ -72,6 +72,8 @@ export interface SectionsOpts {
  * masthead, page headers and footer left empty for the paper's own. */
 /** The fewest words a front-page lead has (a lead's headline over less is top-heavy). */
 const LEAD_WORDS = 250;
+/** The day's best stories for the editor's column a copy takes its turn of (14 Nov). */
+const COLUMN_TURNS = 4;
 /** How many of the day's stories, most important first, are checked before the layout (a paper prints 20 to 30). */
 const FACTS_AHEAD = 30;
 /** A translated paper's stories put into its language this many at a time, until its pages have enough. */
@@ -120,6 +122,8 @@ export interface CopyOpts {
   reword: (pool: Story[]) => Promise<{ pool: Story[]; cost: number }>;
   /** where this copy's PDF goes */
   pdfPath: string;
+  /** the copy's number: whose turn it is to lead, and to be the editor's column, and on which page (14 Nov) */
+  number?: number;
   /** a folder for its pages as pictures too (a sister paper's, for the newsroom: sister.ts) */
   images?: string;
   /** the store the gap closer caches its length fits in (a reworded body has its own) */
@@ -460,7 +464,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (copies too, the day's own pick: from 2 Nov they had none, the column being no must; 13 Nov, the
     // developer: "the copy removed tantri sthanethi")
     if (columnTitle) {
-      const fit = pool.slice(1).filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && wordCount(s.bodies.long) >= COLUMN_WORDS);
+      const fit = pool.filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && wordCount(s.bodies.long) >= COLUMN_WORDS);
       const prefers = profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null;
       const local = (s: Story) => Number(!!prefers?.test(`${s.headline} ${s.bodies.long.slice(0, 300)}`));
       columnPicks = fit.sort((a, b) => local(b) - local(a) || Number(!!a.translatedFrom) - Number(!!b.translatedFrom) || Number(!!a.photo) - Number(!!b.photo)
@@ -556,7 +560,14 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       const longest = (x: Story) => wordCount(x.cuts && !x.cuts.whole ? x.cuts.bodies[0] ?? x.bodies.long : x.bodies.long);
       const sharp = await sharpPhotos(pool);
       const leads = (x: Story) => sharp.has(x.id) && longest(x) >= LEAD_WORDS;
-      if (pool[0] && !(c.shuffle === "keepLead" && pool[0].id === c.lead) && !leads(pool[0])) {
+      // (any story anywhere: each copy led by its turn of the stories that can lead, most important first --
+      // 14 Nov, the developer: "the lead story should also change"; all 8 copies had the day's)
+      const can = c.shuffle === "anywhere" && c.number ? pool.filter(leads).sort(byRank) : [];
+      if (can.length > 1) {
+        const x = can[(c.number! - 1) % can.length];
+        pool = [x, ...pool.filter((s) => s !== x)];
+        log(`  the lead: ${x.id} (copy ${c.number}'s turn of ${can.length} that can lead)`);
+      } else if (pool[0] && !(c.shuffle === "keepLead" && pool[0].id === c.lead) && !leads(pool[0])) {
         const k = pool.findIndex(leads);
         if (k > 0) {
           const [x] = pool.splice(k, 1);
@@ -564,6 +575,16 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
           pool.unshift(x);
         }
       }
+    }
+    // the editor's column never the front page's lead; a copy's its turn of the day's best few, on its
+    // turn of pages 2, 3 and 4 (14 Nov: 7 of 8 copies had the same story in it, all on page 4)
+    columnPicks = columnPicks.filter((id) => id !== pool[0]?.id);
+    let columnPage: number | undefined;
+    if (opts.copy?.number && opts.copy.shuffle !== "samePage" && columnPicks.length) {
+      const k = opts.copy.number - 1;
+      const few = Math.min(COLUMN_TURNS, columnPicks.length);
+      columnPicks = [...columnPicks.slice(k % few, few), ...columnPicks.slice(0, k % few), ...columnPicks.slice(few)];
+      if (total >= 4) columnPage = 2 + (Math.floor(k / few) + k) % 3;
     }
     // the 8-page paper: the day's last page laid out again as an inside page, with its own stories, and each
     // section page with its section's; the day's other pages kept as they are
@@ -627,7 +648,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (a translated paper's stories too are written to their slots, in its language from their
     // releases' facts and read against them: whole translations left its columns uneven, 5 Nov)
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, toFit: modular && !!opts.copy, ...(longerBy ? { longerBy } : {}), columnPicks,
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, toFit: modular && !!opts.copy, ...(longerBy ? { longerBy } : {}), columnPicks, ...(columnPage ? { columnPage } : {}),
       // (a page repaired alone is planned exactly: it has already failed by trial)
       modular, ...(keep ? { keep } : {}), ...(noItems ? { noItems } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,

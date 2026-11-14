@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.103** (14 Nov). Work happens on branch
+conversations. **Latest release: v1.1.104** (14 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
@@ -33,6 +33,19 @@ card has "તારીખ અને અંક" (`copies/CopiesTitleDialog.tsx`):
 `dates`) and a number per design (`issueFrom` on the design, counting on for the days after; a number
 given again drops the later ones). Applied as a copy is opened or saved (`export/designs.ts dated()`,
 `redate(pdf, date, { issue })`), nothing made again; `/api/designs/title`.
+
+**The editor's news on any page; each copy its own lead, column and photos** (14 Nov, v1.1.104; the
+developer: "their stories on the 1st page stayed on 1st page in all copies and tantri's lakh is also the
+same", "the lead story should also change", "the day's paper should also print editor's news anywhere
+and not in page 1 mandetory"). `layout/engine.ts share()`: the "always printed" stories (Telegram, a
+copy's articles) were tried all on the front page first; now each page takes its fair share (the last
+what's left). `build.ts`: a copy ("anywhere") is led by its turn (`CopyOpts.number`) of the stories that
+can lead (sharp photo, 250+ words), most important first; its column is its turn of the day's best 4
+picks (`COLUMN_TURNS`), on its turn of pages 2-4 (`columnPage`, honoured by `share()` where it can);
+the column is never the lead. `layout/blocks.ts`: an article's photo it can't show costs 1.5 (was 0.5).
+Tested on a scratch copy of 14 Nov with fake AI: 4 copies with 4 leads, articles over all pages, the
+column on pages 2/3/4/2; article 3 printed 2/3/1/2 photos as its turns (article 5 still 1 in 3 copies);
+the day's paper: Telegram 2 on page 1, one on each other page, READY.
 
 **Copies reuse the lengths already written** (14 Nov, v1.1.103; the developer: "previously, we did 30
 copies in 11 minutes"): each copy kept the AI's lengths written to fit its slots under its own name
