@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.104** (14 Nov). Work happens on branch
+conversations. **Latest release: v1.1.105** (16 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
@@ -33,6 +33,23 @@ card has "તારીખ અને અંક" (`copies/CopiesTitleDialog.tsx`):
 `dates`) and a number per design (`issueFrom` on the design, counting on for the days after; a number
 given again drops the later ones). Applied as a copy is opened or saved (`export/designs.ts dated()`,
 `redate(pdf, date, { issue })`), nothing made again; `/api/designs/title`.
+
+**Each copy's editor's column its own website article; articles on their turn of pages; short
+articles' photos kept small** (16 Nov, v1.1.105; the developer: "for every copy, fetch unique article from
+our website for tantri sthanethi ... unique for every copy and ... shouldn't be present in that copy
+before", "the images ... too much expanded or big while article's text itself is small", "article's
+position still repeated"). Copies (not translated) fetch the website's day once (`ingest/site.ts
+columnArticles`: not taken by the day's paper, 200+ words, not the same news as the day's or the
+customer's articles, Gujarat's first) and give copy n its own (+ a spare in case its headline won't set),
+stored only in the worker; `build.ts CopyOpts.column` puts it first in the column picks and the engine
+drops it if it isn't the column (`columnOnly`). Fewer website articles than copies: the rest take their
+turn of the day's stories as before. Articles and Telegram news: article k in copy n gets page
+(k+n-1) mod pages (`mustPage`, engine `share()` takes that page's first; an unticked one comes forward on
+its page and waits on the others). Photos: `layout/module.ts theirShare` (a customer's article under 160
+words: photos at most half of it, else 60%), the narrowest width when nothing fits, a cost by how far
+over (`blocks.ts`), and no width where they can only be big while another width shows them right
+(`Blocks.fair`). Scratch test of 14 Nov's 8 copies: 8 different columns, every article on pages 1-4 in
+turn, 2-column photos, all gates passed, 2.4 min.
 
 **The editor's news on any page; each copy its own lead, column and photos** (14 Nov, v1.1.104; the
 developer: "their stories on the 1st page stayed on 1st page in all copies and tantri's lakh is also the

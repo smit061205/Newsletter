@@ -124,6 +124,12 @@ const RIBBON_HEIGHT = 32 * PT;
 const COLUMN_INSET = 7 * PT;
 /** The fewest lines a column under a side photo holds, if it holds any. */
 const UNDER_PHOTO = 4;
+/** A customer's article this short (words) is a short one: its photos take less of it. */
+const SHORT_ARTICLE = 160;
+/** How much of a customer's article its photos may take, where a smaller setting shows them: a short
+ * one's under half (the developer, 15 Nov: 95-word articles printed three photos across 6 columns, or
+ * one 4 columns wide, "too much expanded or big while article's text itself is small"). */
+export const theirShare = (story: Story, words: number) => (!wordForWord(story) ? Infinity : words < SHORT_ARTICLE ? 0.5 : 0.6);
 
 async function sizeOf(url: string, m: Measurer) {
   if (!imageSizes.has(url)) imageSizes.set(url, await m.imageSize(url));
@@ -132,14 +138,15 @@ async function sizeOf(url: string, m: Measurer) {
 
 /** Two photos side by side across the story (a customer's article: up to three, 3 Nov), cut to
  * one common height (each loses at most PHOTO.maxCrop), sharing the story's width. */
-async function photoPair(story: Story, cols: number, y: number, m: Measurer): Promise<{ elements: Element[]; bottom: number } | null> {
+async function photoRows(story: Story, cols: number, y: number, m: Measurer): Promise<{ elements: Element[]; bottom: number }[]> {
   const theirs = wordForWord(story);
   // (each photo at least PHOTO.minCols wide: as many as the width takes; three that won't go together, two)
+  const out: { elements: Element[]; bottom: number }[] = [];
   for (let n = Math.min(theirs ? 3 : 2, Math.floor(cols / PHOTO.minCols)); n >= 2; n--) {
     const row = await photoRow(story, (story.photos ?? []).slice(0, n), cols, y, m, theirs);
-    if (row) return row;
+    if (row) out.push(row);
   }
-  return null;
+  return out;
 }
 
 async function photoRow(story: Story, urls: string[], cols: number, y: number, m: Measurer, theirs: boolean): Promise<{ elements: Element[]; bottom: number } | null> {
@@ -339,8 +346,15 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   // (the photos side by side check their own shapes)
   if (photoMode === 1 && (!photo || photo.width / photo.height < 1.25)) return none();
 
+  const words = story.bodies[variant].split(/\s+/).filter(Boolean).length;
   if (photoMode === 2) {
-    const pair = await photoPair(story, cols, cursor, m);
+    // (the most photos whose row takes no more of the story than it may: a short article two, not three)
+    let pair: { elements: Element[]; bottom: number } | undefined;
+    for (const row of await photoRows(story, cols, cursor, m)) {
+      const area = row.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0);
+      const { bottom } = level(Array.from({ length: cols }, () => row.bottom));
+      if (area <= Math.min(wordForWord(story) ? 0.8 : maxShare, theirShare(story, words)) * w * Math.max(bottom, row.bottom)) { pair = row; break; }
+    }
     if (!pair) return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize };
     const tops = Array.from({ length: cols }, () => pair.bottom);
     const { lines: body, bottom, caps, short } = level(tops);
@@ -363,7 +377,12 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   }
 
   let best: { elements: Element[]; height: number; k: number; lines: number; short: number } | null = null;
-  for (const k of spans) {
+  // (a customer's photo: first only where it takes no more of his article than it may; at none, as before)
+  const most = theirShare(story, words);
+  for (const strict of photo && Number.isFinite(most) ? [true, false] : [false]) {
+  // (none small enough: the narrowest that works -- 15 Nov, a 95-word article's tall photo three columns wide)
+  for (const k of strict || !Number.isFinite(most) ? spans : [...spans].sort((x, y) => (x || 99) - (y || 99))) {
+    if (strict && !k) continue;
     const out: Element[] = [];
     let photoFoot = cursor; // the foot of the photo (and its caption)
     let photoBottom = cursor; // where the columns under it start
@@ -408,6 +427,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     const height = Math.max(bottom, k ? photoFoot : cursor);
     // (a customer's article always shows its photo, however short its text)
     if (k && photo && !wordForWord(story) && spanWidth(k) * (spanWidth(k) * photo.height / photo.width) > maxShare * w * height) continue;
+    if (strict && k && photo && spanWidth(k) * (photoFoot - cursor) > most * w * height) continue;
     // the text beside a photo must reach (about) its foot: a photo taller
     // than its story's text leaves a hole beside it -- try a smaller one
     if (k && k < cols && photoFoot - bottom > 1.5 * pitch) continue;
@@ -424,6 +444,8 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     });
     best = { elements: out, height, k, lines: body.length, short };
     break; // spans are in order of preference
+  }
+  if (best) break;
   }
   if (!best) {
     // a wide layout that the photo rules don't allow: not an option
