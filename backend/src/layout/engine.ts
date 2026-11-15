@@ -175,6 +175,11 @@ export async function layOut(args: {
   columnPicks?: string[];
   /** the page the editor's column goes on, where it can (a copy's own, 14 Nov) */
   columnPage?: number;
+  /** stories in the pool for the editor's column alone (a copy's own, from the paper's website,
+   * build.ts): one not made the column isn't printed */
+  columnOnly?: string[];
+  /** the page (from 1) each story that must print takes its turn on, where it can: a copy's (build.ts, 15 Nov) */
+  mustPage?: Map<string, number>;
   /** a translated paper: each story's words in its language for each of the day's paper's
    * (its release's facts go further in Urdu's longer wording: capped at the release's word
    * count, its stories were written short of their slots, 5 Nov) */
@@ -264,6 +269,7 @@ export async function layOut(args: {
     args = { ...args, pool: args.pool.map((x) => (x === s ? column : x)) };
     break;
   }
+  if (args.columnOnly?.length) args = { ...args, pool: args.pool.filter((x) => x.editorsColumn || !args.columnOnly!.includes(x.id)) };
   const sizeOf = async (s: Story, lead: boolean): Promise<Sized | null> => {
     const range = await blocks.range(s, await blocks.settable(s, rankOf(s, lead)));
     if (!range.length) return null;
@@ -303,7 +309,8 @@ export async function layOut(args: {
   // that keeps its stories on their pages shares nothing out)
   const sharing = (insideMost: number) =>
     share(sized, rooms, open, (i) => pageAds(i + 1), (i, list) => pageFits(i + 1, list.map((s) => s.story), args.bands[i], pageAds(i + 1), blocks, factsOf, log), rng, log, insideMost,
-          args.columnPage === undefined ? undefined : args.columnPage - 1);
+          args.columnPage === undefined ? undefined : args.columnPage - 1,
+          args.mustPage && new Map([...args.mustPage].map(([id, p]) => [id, p - 1])));
   let chosen = args.modular && !args.fixedPage ? await sharing(PAGE_MOST) : null;
   // every news the editor sent prints, however much (2 Nov): with some of it left over, the
   // inside pages take more stories, each written shorter (never under the paper's least words)
@@ -831,7 +838,9 @@ const PAGE_CROWDED = 10;
 async function share(sized: Sized[], rooms: number[], open: number[], perPage: (i: number) => Ad[], fits: (i: number, list: Sized[]) => Promise<boolean>,
                      rng: () => number, log: (s: string) => void, insideMost = PAGE_MOST,
                      /** the page (index) the editor's column goes on, where it can: a copy's own (else the first inside page that takes it) */
-                     columnPage?: number): Promise<{ pages: Sized[][]; held: Sized[]; unsure: number[] }> {
+                     columnPage?: number,
+                     /** the page (index) each story that must print takes its turn on, where it can (a copy's) */
+                     mustPage?: Map<string, number>): Promise<{ pages: Sized[][]; held: Sized[]; unsure: number[] }> {
   // (a little chance among stories of about the same weight: a repair is another arrangement)
   const lead = sized[0];
   let left = sized.slice(1).map((s, i) => ({ s, at: i + rng() * 3 })).sort((a, b) => a.at - b.at).map((x) => x.s).sort((a, b) => Number(sent(b)) - Number(sent(a)));
@@ -858,13 +867,18 @@ async function share(sized: Sized[], rooms: number[], open: number[], perPage: (
     // Never all of it on the front page first (14 Nov, the developer: "the day's paper should also
     // print editor's news anywhere and not in page 1 mandatory"; a copy's articles had page 1 in all
     // 8 copies). 7 Nov's copies: ten articles and five Telegram items first on one page, and no choice worked
-    const must = left.filter((s) => sent(s) && s !== lead);
+    // (a copy's: those whose turn this page is first -- 15 Nov, the same articles on the same pages in most of 8 copies)
+    const turn = (s: Sized) => Number(mustPage?.get(s.story.id) === i);
+    const must = left.filter((s) => sent(s) && s !== lead).sort((a, b) => turn(b) - turn(a));
     const fair = Math.ceil(must.length / (order.length - j));
-    const shares = (j < order.length - 1 ? [fair, fair - 1, fair - 2] : [must.length]).filter((q, x, all) => q >= 0 && all.indexOf(q) === x);
+    const mine = must.filter((s) => turn(s)).length;
+    const shares = (j < order.length - 1 ? [Math.max(fair, mine), fair, fair - 1, fair - 2] : [must.length]).filter((q, x, all) => q >= 0 && all.indexOf(q) === x);
     let chosen: Sized[] | null = null;
     for (const q of shares) {
       const now = must.slice(0, q);
-      const line = [...(left[0] === lead ? [lead] : []), ...now, ...left.filter((s) => s !== lead && !now.includes(s) && !sent(s)),
+      // (a customer's article not ticked comes forward on its turn's page and waits on the others)
+      const lean = (s: Sized) => (mustPage?.has(s.story.id) ? (mustPage.get(s.story.id) === i ? 1 : -1) : 0);
+      const line = [...(left[0] === lead ? [lead] : []), ...now, ...left.filter((s) => s !== lead && !now.includes(s) && !sent(s)).sort((a, b) => lean(b) - lean(a)),
                     ...left.filter((s) => s !== lead && !now.includes(s) && sent(s))];
       for (const k of counts) {
         // the most important k; then, a story at a time from the end, the next ones in their place

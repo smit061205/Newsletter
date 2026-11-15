@@ -36,7 +36,7 @@ import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typograp
 import { profile } from "./profile.ts";
 import { wordCount } from "./editorial/quality.ts";
 import { paperArticleStories } from "./editorial/articles.ts";
-import { alwaysPrinted, sectionsDay, storyIdOf, type Progress, type Store, type Story } from "./store.ts";
+import { alwaysPrinted, sectionsDay, storyIdOf, wordForWord, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
   /** the page review left to run after the paper is saved (reviewLater): the paper is ready a minute sooner */
@@ -84,7 +84,7 @@ const SHORT_WORDS = 200;
  * news (30 Oct's day: the same news 0.49 and over, different news 0.28 at most). */
 const SAME_STORY = 0.4;
 /** The fewest words of a story set as the editor's column. */
-const COLUMN_WORDS = 200;
+export const COLUMN_WORDS = 200;
 /** The stories whose photo can print sharp at some width (a photo whose size can't be read: yes). */
 async function sharpPhotos(pool: Story[]): Promise<Set<string>> {
   const ok = await Promise.all(pool.map(async (s) => {
@@ -134,6 +134,10 @@ export interface CopyOpts {
   extras?: Story[];
   /** the day's stories that are the same news as one of those articles: left out, the article in their place */
   drop?: string[];
+  /** this copy's own articles for its editor's column, from the paper's website and not in the day's paper
+   * (editorial/copies.ts, 15 Nov): the first that can be set is its column, the others aren't printed;
+   * with none that can, its turn of the day's picks */
+  column?: Story[];
 }
 
 /** His Telegram news sent on an earlier day than the paper's own (IST): outdated, not printed
@@ -586,6 +590,25 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       columnPicks = [...columnPicks.slice(k % few, few), ...columnPicks.slice(0, k % few), ...columnPicks.slice(few)];
       if (total >= 4) columnPage = 2 + (Math.floor(k / few) + k) % 3;
     }
+    // a copy's articles (and the editor's news) each on its turn of the pages: article k in copy n on page
+    // (k + n - 1) mod the pages, where that page can take it (the developer, 15 Nov: "those article's position
+    // still repeated in few copies" -- the shuffle leant on importance, and the same ones came first)
+    let mustPage: Map<string, number> | undefined;
+    if (opts.copy?.number && opts.copy.shuffle !== "samePage" && total > 1) {
+      const n = opts.copy.number;
+      const musts = pool.slice(1).filter((s) => alwaysPrinted(s) || wordForWord(s)).sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
+      mustPage = new Map(musts.map((s, k) => [s.id, 1 + (k + n - 1) % total]));
+      if (musts.length) log(`  the articles' pages, copy ${n}'s turn: ${musts.map((s) => `${s.id} p${mustPage!.get(s.id)}`).join(", ")}`);
+    }
+    // a copy's own article for it, from the paper's website: no other copy's, and no story of this copy's
+    // (the developer, 15 Nov: over 8 copies 3 of the day's stories took turns in it, each printed as an
+    // ordinary story in the other copies)
+    const columnOnly = columnTitle ? (opts.copy?.column ?? []).filter((x) => !pool.some((s) => s.id === x.id)) : [];
+    if (columnOnly.length) {
+      pool = [...pool, ...columnOnly.map((x) => ({ ...x, photo: null, photos: [] }))];
+      columnPicks = [...columnOnly.map((x) => x.id), ...columnPicks];
+      if (opts.copy?.number && total >= 4) columnPage = 2 + (opts.copy.number - 1) % 3;
+    }
     // the 8-page paper: the day's last page laid out again as an inside page, with its own stories, and each
     // section page with its section's; the day's other pages kept as they are
     let fixedPage: Map<string, number> | undefined;
@@ -648,7 +671,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (a translated paper's stories too are written to their slots, in its language from their
     // releases' facts and read against them: whole translations left its columns uneven, 5 Nov)
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, toFit: modular && !!opts.copy, ...(longerBy ? { longerBy } : {}), columnPicks, ...(columnPage ? { columnPage } : {}),
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, toFit: modular && !!opts.copy, ...(longerBy ? { longerBy } : {}), columnPicks, ...(columnPage ? { columnPage } : {}), ...(columnOnly.length ? { columnOnly: columnOnly.map((x) => x.id) } : {}), ...(mustPage ? { mustPage } : {}),
       // (a page repaired alone is planned exactly: it has already failed by trial)
       modular, ...(keep ? { keep } : {}), ...(noItems ? { noItems } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,

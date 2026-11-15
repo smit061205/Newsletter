@@ -18,7 +18,7 @@ import path from "node:path";
 import { MEDIA_DIR } from "../config.ts";
 import { settable } from "../editorial/quality.ts";
 import { asIs, paragraphs } from "../editorial/rewrite.ts";
-import { sameNewsIn } from "../editorial/translate.ts";
+import { newsOverlap, sameNewsIn } from "../editorial/translate.ts";
 import { storyIdOf, type Release, type Store } from "../store.ts";
 import { imageSize } from "./pib.ts";
 
@@ -96,6 +96,38 @@ export async function ingestSite(store: Store, date: string, opts: { log?: (s: s
     log(`  website: ${s.headline.slice(0, 70)} (${photo ? "1 photo" : "0 photos"})`);
   }
   return { listed: got.stories.length, taken: n };
+}
+
+/** The website's articles of `date` that the day's paper didn't take, for the copies' editor's columns:
+ * one for each copy, its own (the developer, 15 Nov: "for every copy, fetch unique article from our
+ * website for tantri sthanethi. it should be unique for every copy and that article shouldn't be
+ * present in that copy before" -- 3 stories of the day's took turns over 8 copies, each an ordinary
+ * story in the others). Up to `count`, each `minWords` long or more, none the same news as the day's
+ * own, as a text in `avoid` (a customer's articles) or as another of them; Gujarat's first (as the
+ * column prefers), then as the website ranks them. Nothing is stored: they're no part of the day's
+ * paper. No photo (the column has none). */
+export async function columnArticles(store: Store, date: string, count: number,
+                                     opts: { minWords: number; avoid?: Pick<Release, "headline" | "body">[]; prefers?: RegExp | null }): Promise<Release[]> {
+  if (count <= 0) return [];
+  const got = await day(date);
+  const taken = [...store.releases(dayBefore(date)), ...store.releases(date)].filter((r) => !r.lang || r.lang === "gu");
+  const fit: { release: Release; local: number }[] = [];
+  for (const s of got.stories) {
+    const id = idOf(s.id);
+    if (store.hasRelease(id)) continue;
+    const body = paragraphs(s.body).join("\n\n");
+    if (!s.headline.trim() || body.split(/\s+/).filter(Boolean).length < opts.minWords) continue;
+    if (!settable(`${s.headline} ${s.deck} ${body}`)) continue;
+    const text = { headline: s.headline, body };
+    if (sameNewsIn(text, [...taken, ...fit.map((x) => x.release)]) || opts.avoid?.some((a) => newsOverlap(text, a) >= 0.4)) continue;
+    fit.push({
+      release: { id, date, url: `${SITE}/story/${s.id}`, office: OFFICE, headline: s.headline, subhead: s.deck, body,
+                 photos: [], fetchedAt: new Date().toISOString(), source: "site", lang: "gu", ministry: TIER[s.tier] ?? TIER.india },
+      local: Number(s.tier === "gujarat" || !!opts.prefers?.test(`${s.headline} ${body.slice(0, 300)}`)),
+    });
+  }
+  // (a stable sort: the website's order kept among Gujarat's and among the rest)
+  return fit.sort((a, b) => b.local - a.local).slice(0, count).map((x) => x.release);
 }
 
 /** Up to `count` of Aavtikal's articles never printed before, into the day's paper as they are

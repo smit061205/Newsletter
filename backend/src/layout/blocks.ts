@@ -13,7 +13,7 @@
 import { atRung, type Rung } from "../editorial/ladder.ts";
 import { wordForWord, type Story } from "../store.ts";
 import type { Measurer } from "./measure.ts";
-import { buildModule, type Module, type PhotoMode } from "./module.ts";
+import { buildModule, theirShare, type Module, type PhotoMode } from "./module.ts";
 import { headlineHeavy, spansFor } from "./pack.ts";
 import { STORY_P90_EM, storyLooseness } from "./style.ts";
 import { BODY, GRID, HEADLINE, MAX_STORY_COLS, PT } from "./typography.ts";
@@ -28,6 +28,8 @@ export interface Option {
   stretch: number;
   /** how much the desk dislikes it: copy cut, photo lost, loose lines */
   cost: number;
+  /** a customer's photos taking more of his short article than they may (module.ts theirShare) */
+  big?: boolean;
 }
 
 /** Most extra space under the headline, and under the sub-heading (fit.ts SPREAD). */
@@ -96,10 +98,25 @@ export class Blocks {
 
   /** Every acceptable setting of `story` at `cols` columns, shortest first. */
   options(story: Story, rank: number, cols: number): Promise<Option[]> {
+    return wordForWord(story) ? this.fair(story, rank, cols) : this.built(story, rank, cols);
+  }
+
+  private built(story: Story, rank: number, cols: number): Promise<Option[]> {
     // (by its wording too: a copy's headline that won't set is tried again as the paper's own)
     const key = `${story.id}|${rank}|${cols}|${story.headline}|${story.deck}`;
     if (!this.tables.has(key)) this.tables.set(key, this.build(story, rank, cols));
     return this.tables.get(key)!;
+  }
+
+  /** A customer's article: no width where its photos can only be big for its text, while another
+   * width shows them at a size it carries (15 Nov: a 95-word article set 5 columns wide under a tall photo). */
+  private async fair(story: Story, rank: number, cols: number): Promise<Option[]> {
+    const got = await this.built(story, rank, cols);
+    if (!got.length || got.some((o) => !o.big)) return got;
+    for (const c of this.widths(story, rank)) {
+      if (c !== cols && (await this.built(story, rank, c)).some((o) => !o.big && !o.module.photoDropped)) return [];
+    }
+    return got;
   }
 
   private async build(story: Story, rank: number, cols: number): Promise<Option[]> {
@@ -141,7 +158,11 @@ export class Blocks {
             + (wordForWord(story) ? 1.5 * Math.max(0, (story.photos?.length ?? 0) - mod.elements.filter((e) => e.kind === "image").length) : 0)
             // (columns ending a line apart: a width where it can end level wins)
             + (LEVEL && mod.short ? 2 : 0);
-          out.push({ module: mod, rung: i, height: mod.height, stretch: stretchOf(mod), cost });
+          // (a customer's photos taking more of a short article than they may: only where nothing smaller shows them)
+          const over = wordForWord(story) ? mod.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0) / (mod.width * mod.height) - theirShare(story, r.words) : 0;
+          const big = over > 0;
+          // (the more over, the worse: the planner takes the smallest it can)
+          out.push({ module: mod, rung: i, height: mod.height, stretch: stretchOf(mod), cost: cost + (big ? 2 + 10 * over : 0), ...(big ? { big } : {}) });
           break;
         }
       }
@@ -151,6 +172,8 @@ export class Blocks {
     // (and its columns end level where any of its settings at this width do: Urdu's joined letters take
     // no spacing, so its uneven settings were many, 5 Nov; a width with none level keeps them for the planner)
     if (LEVEL && out.some((o) => !o.module.short)) out.splice(0, out.length, ...out.filter((o) => !o.module.short));
+    // (a customer's article: its photos at a size its text carries, where any setting at this width has them so)
+    if (wordForWord(story) && out.some((o) => !o.big && !o.module.photoDropped)) out.splice(0, out.length, ...out.filter((o) => !o.big));
     const shown = out.filter((o) => !o.module.photoDropped);
     // (a customer's article given its copy's few photos prints them side by side where the width takes them, 3 Nov)
     const row = wordForWord(story) ? shown.filter((o) => o.module.photoMode === 2) : [];
