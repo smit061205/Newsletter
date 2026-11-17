@@ -129,7 +129,7 @@ export const cleanHead = (h: string) => h.replace(/^[\s*]+|[\s*]+$/g, "").replac
 
 export function asIs(r: Release): Story {
   // a dateline-led first paragraph ("આણંદ, બુધવાર :: ...") is how the paper starts a story too
-  const body = paragraphs(r.body).join("\n\n");
+  const body = printable(r).join("\n\n");
   return {
     id: storyIdOf(r), releaseId: r.id, date: r.date,
     kicker: "", headline: cleanHead(r.headline), deck: cleanHead(r.subhead),
@@ -307,6 +307,38 @@ export function groupSimilar(releases: Release[]): Release[][] {
   }
   return groups;
 }
+const plain = (s: string) => s.replace(/[\s"'“”‘’.:।-]+/g, " ").trim().toLowerCase();
+/** A release's paragraphs as printed without the AI: not its own title again at the top (a speech's text
+ * starts with it), and a run of short lines ending in commas -- a speech's greetings ("મહામહિમ,",
+ * "અન્ય મહામહિમગણ,", "નમસ્કાર.") -- one paragraph, not a column of one-word lines each set in (17 Nov) */
+function printable(r: Release): string[] {
+  // (and no "[link]" a web page's link left in its words)
+  // (and no bullet marks: a release's "- " list lines printed as dashes, 17 Nov)
+  const ps = paragraphs(r.body.replace(/\s*\[link\]/gi, "")).map((p) => p.replace(/^\s*[-–—•*●▪]+\s*/, "")).filter(Boolean);
+  if (ps.length > 1 && plain(ps[0]) === plain(r.headline)) ps.shift();
+  const out: string[] = [];
+  for (const p of ps) {
+    const last = out[out.length - 1];
+    if (last !== undefined && /,$/.test(last) && last.split(/\s+/).length <= SHORT_LINE) out[out.length - 1] = `${last} ${p}`;
+    else out.push(p);
+  }
+  return out;
+}
+/** Words in a line short enough to run on with the next, when it ends with a comma. */
+const SHORT_LINE = 6;
+/** A group printed as published, with no AI to write it up as one (17 Nov: the key out of money; "A / B / C"
+ * was printed as one headline over all three). An occasion's report and its speech's text: one story under
+ * the report's headline, the texts one after another, never their headlines among them. Releases on one
+ * occasion that are each their own (three meetings with three leaders): each its own story, under its own
+ * headline -- one headline can't name them all without the AI */
+function asIsGroup(group: Release[]): Story[] {
+  if (group.length === 1 || !group.some((r) => isSpeechText(r))) return group.map((r) => asIs(r));
+  const order = [...group.filter((r) => !isSpeechText(r)), ...group.filter((r) => isSpeechText(r))];
+  const first = order[0];
+  return [{ ...asIs({ ...first, id: group[0].id, source: group[0].source,
+                       body: order.map((r) => printable(r).join("\n\n")).join("\n\n"), photos: [...new Set(order.flatMap((r) => r.photos))] }),
+            mergedFrom: group.map((r) => r.id) }];
+}
 /** A group as one release for the writer: every member's headline and text. */
 function merged(group: Release[]): Release {
   if (group.length === 1) return group[0];
@@ -394,33 +426,33 @@ export async function rewriteDay(store: Store, date: string, opts: { log: (s: st
     const ids = group.map((m) => m.id);
     const withIds = (s: Story): Story => (group.length > 1 ? { ...s, mergedFrom: ids } : s);
     // (the paper's website's news is written and checked there: printed as it is, no AI between, 7 Nov)
-    if (!key || r.source === "site") return withIds(asIs(r));
+    if (!key || r.source === "site") return asIsGroup(group);
     // already rewritten by a model, from the same releases: keep it (a rebuild shouldn't pay twice)
     const have = store.story(storyIdOf(r));
-    if (have && have.model !== "as-is" && !opts.force && String(have.mergedFrom ?? [r.id]) === String(group.length > 1 ? ids : [r.id])) return have;
+    if (have && have.model !== "as-is" && !opts.force && String(have.mergedFrom ?? [r.id]) === String(group.length > 1 ? ids : [r.id])) return [have];
     const model = group.some((m) => leads.has(m.id)) ? lead : workhorse;
     try {
       const got = await rewriteOne(r, model, key, group.length);
       got.story = withIds(got.story);
       spent += got.cost;
       if (got.story.factCheck) opts.log(`  ${r.id}: ${got.story.factCheck} -- check before printing`);
-      return got.story;
+      return [got.story];
     } catch (e) {
       failed++;
       opts.log(`  ${r.id}: rewrite failed (${e instanceof Error ? e.message : e}); using it as published`);
-      return withIds(asIs(r));
+      return asIsGroup(group);
     }
   };
   let written = 0;
   opts.progress?.({ done: 0, total: groups.length, label: "writing" });
   // all of them at once, stored in the day's order (it settles ties in the layout)
-  const stories = await Promise.all(groups.map(async (g) => {
-    const story = await one(g);
-    opts.progress?.({ done: ++written, total: groups.length, label: "writing", item: story.headline });
-    return story;
-  }));
+  const stories = (await Promise.all(groups.map(async (g) => {
+    const got = await one(g);
+    opts.progress?.({ done: ++written, total: groups.length, label: "writing", item: got[0]?.headline });
+    return got;
+  }))).flat();
   for (const story of stories) store.putStory(story);
-  opts.log(`rewrite ${date}: ${groups.length} stories from ${releases.length} releases` +
+  opts.log(`rewrite ${date}: ${stories.length} stories from ${releases.length} releases` +
            (key ? ` (${workhorse}; leads ${lead}), $${spent.toFixed(3)}${failed ? `, ${failed} kept as published` : ""}` : " (as published)"));
 }
 

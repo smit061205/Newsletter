@@ -68,7 +68,7 @@ export const HEADLINE = {
 };
 
 export const KICKER = { font: t.kicker.font, ratio: t.kicker.ratio, min: t.kicker.min * PT, leading: t.kicker.leading, none: !!t.kicker.none };
-export const DECK = { font: t.deck.font, ratio: t.deck.ratio, min: t.deck.min * PT, leading: t.deck.leading };
+export const DECK = { font: t.deck.font, ratio: t.deck.ratio, min: t.deck.min * PT, max: (t.deck.max ?? Infinity) * PT, leading: t.deck.leading };
 export const CAPTION = { font: t.caption.font, size: t.caption.size * PT, pitch: t.caption.pitch * PT };
 
 /** What a print desk accepts for a photo (see the profile's `photo`). */

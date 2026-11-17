@@ -290,6 +290,7 @@
       "font": "gopika-bold",
       "ratio": 0.6,
       "min": 15.6,
+      "max": 26,
       "leading": 1.15
     },
     "caption": {

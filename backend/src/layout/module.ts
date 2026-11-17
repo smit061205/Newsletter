@@ -124,6 +124,8 @@ const RIBBON_HEIGHT = 32 * PT;
 const COLUMN_INSET = 7 * PT;
 /** The fewest lines a column under a side photo holds, if it holds any. */
 const UNDER_PHOTO = 4;
+/** The most of a photo cut off to bring the columns under it onto the lines' grid. */
+const SNAP_CROP = 0.015;
 /** A customer's article this short (words) is a short one: its photos take less of it. */
 const SHORT_ARTICLE = 160;
 /** How much of a customer's article its photos may take, where a smaller setting shows them: a short
@@ -264,13 +266,14 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   const deck = story.editorsColumn ? "" : text.deck.trim(); // (the editor's column has none, as the paper prints it)
   if (deck) {
     // the sub-heading: clearly smaller than the headline, clearly larger than the body
-    const ds = Math.min(Math.max(DECK.min, (headSize || hd) * DECK.ratio), (headSize || hd) / 1.3);
+    const ds = Math.min(Math.max(DECK.min, (headSize || hd) * DECK.ratio), (headSize || hd) / 1.3, Math.max(DECK.min, DECK.max));
     // every line across the full width, a little larger or smaller to do it
     // (28 Oct: a one-line sub-heading ending short left a gap the editor
     // asked to fill), still clearly under the headline; else as a short
     // paragraph, its last line free
     // (never much over the profile's share of the headline: 31 Oct's at 78% couldn't be told from their headlines)
-    const full = await setDisplay(m, deck, { font: DECK.font, max: Math.max(DECK.min, Math.min((headSize || hd) / 1.25, ds * 1.05)), min: DECK.min,
+    // (and never over the paper's largest sub-heading: a short one only fills part of the width then, 17 Nov)
+    const full = await setDisplay(m, deck, { font: DECK.font, max: Math.max(DECK.min, Math.min((headSize || hd) / 1.25, ds * 1.05, DECK.max)), min: DECK.min,
                                              maxLines: cols <= 2 ? 3 : 2, leading: DECK.leading, align: "fit" }, `${aid}-d`, aid, 0, cursor, w);
     if (full) displayFill = Math.min(displayFill, full.fill);
     const got = full ?? await display(deck, "d", { font: DECK.font, max: Math.max(ds, DECK.min), min: DECK.min, maxLines: 2, leading: DECK.leading,
@@ -413,7 +416,9 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
       const raw = photoFoot + (caption ? GAP.afterCaption : GAP.afterPhoto) - cursor;
       const down = Math.floor(raw / pitch + 0.001) * pitch;
       const cut = raw - down;
-      if (cut > 0.01 && down > 0 && ph - cut >= Math.max(PHOTO.minHeight, ph * (1 - PHOTO.maxCrop))) {
+      // (only a sliver: 17 Nov, 5% off a round emblem cut its rim -- a picture's edges are often its words or
+      // its frame; the columns under it start a line lower instead)
+      if (cut > 0.01 && down > 0 && ph - cut >= Math.max(PHOTO.minHeight, ph * (1 - Math.min(PHOTO.maxCrop, SNAP_CROP)))) {
         img.height = r1(ph - cut);
         captionEls = captionEls.map((e) => ({ ...e, y: r1(e.y - cut) }));
         photoFoot -= cut;
