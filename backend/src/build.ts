@@ -19,7 +19,7 @@ import { cmapCoverage } from "./fonts/cmap.ts";
 import { reviewPages } from "./editorial/review.ts";
 import { checkPlaced } from "./editorial/facts.ts";
 import { repairFacts } from "./editorial/repair.ts";
-import { fitCalls, isSpeechText, numbersNotIn, speechTwin, writeDeck } from "./editorial/rewrite.ts";
+import { fitCalls, isSpeechText, numbersNotIn, paragraphs, speechTwin, writeDeck } from "./editorial/rewrite.ts";
 import type { FillerCount } from "./layout/fit.ts";
 import { layOut, type EnginePage, type EngineResult } from "./layout/engine.ts";
 import { headlineHeavy, outranks, Packer, tombstoned, type PagePlan } from "./layout/pack.ts";
@@ -72,6 +72,14 @@ export interface SectionsOpts {
  * masthead, page headers and footer left empty for the paper's own. */
 /** The fewest words a front-page lead has (a lead's headline over less is top-heavy). */
 const LEAD_WORDS = 250;
+/** The fewest words of a customer's article leading a copy: it prints as given, never written longer
+ * (the developer, 17 Nov: on 14 Nov only 4 stories could lead 8 copies; his 213- and 227-word articles
+ * with large photos may) */
+const ARTICLE_LEAD_WORDS = 200;
+/** A story's release this much longer than its text, at the least, to write it longer for a lead (editorial/ladder.ts's) */
+const MORE_IN_RELEASE = 1.25;
+/** The fewest words of a story written longer to lead a copy (a brief isn't stretched into a lead). */
+const MIN_WORDS_FOR_LEAD = 150;
 /** The day's best stories for the editor's column a copy takes its turn of (14 Nov). */
 const COLUMN_TURNS = 4;
 /** How many of the day's stories, most important first, are checked before the layout (a paper prints 20 to 30). */
@@ -509,6 +517,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     let rewordCost = 0;
     let originals: Map<string, Story> | undefined;
     let longerBy: Map<string, number> | undefined;
+    let leadLonger = false;
     if (opts.copy) {
       const c = opts.copy;
       // (the day's report of a customer's news gives way to his own article: never printed twice, 2 Nov)
@@ -563,20 +572,28 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       // at the longest it may print (shorten.ts)
       const longest = (x: Story) => wordCount(x.cuts && !x.cuts.whole ? x.cuts.bodies[0] ?? x.bodies.long : x.bodies.long);
       const sharp = await sharpPhotos(pool);
-      const leads = (x: Story) => sharp.has(x.id) && longest(x) >= LEAD_WORDS;
+      // (or one with a sharp photo whose release has the facts for a lead's length: written longer for
+      // it, as the day's paper's lead is -- 17 Nov, the developer: more stories that can lead; and a
+      // customer's article from ARTICLE_LEAD_WORDS)
+      const facts = (x: Story) => { const r = releases.get(x.id); return r ? wordCount(paragraphs(r.body).join(" ")) : 0; };
+      const grows = (x: Story) => !c.translate && !wordForWord(x) && longest(x) < LEAD_WORDS && longest(x) >= MIN_WORDS_FOR_LEAD
+        && facts(x) >= Math.max(LEAD_WORDS, longest(x) * MORE_IN_RELEASE);
+      const leads = (x: Story) => sharp.has(x.id) && (longest(x) >= (wordForWord(x) ? ARTICLE_LEAD_WORDS : LEAD_WORDS) || grows(x));
       // (any story anywhere: each copy led by its turn of the stories that can lead, most important first --
       // 14 Nov, the developer: "the lead story should also change"; all 8 copies had the day's)
       const can = c.shuffle === "anywhere" && c.number ? pool.filter(leads).sort(byRank) : [];
       if (can.length > 1) {
         const x = can[(c.number! - 1) % can.length];
         pool = [x, ...pool.filter((s) => s !== x)];
-        log(`  the lead: ${x.id} (copy ${c.number}'s turn of ${can.length} that can lead)`);
+        log(`  the lead: ${x.id} (copy ${c.number}'s turn of ${can.length} that can lead${grows(x) ? `; written longer from its release` : ""})`);
+        leadLonger = grows(x);
       } else if (pool[0] && !(c.shuffle === "keepLead" && pool[0].id === c.lead) && !leads(pool[0])) {
         const k = pool.findIndex(leads);
         if (k > 0) {
           const [x] = pool.splice(k, 1);
           log(`  the lead: ${x.id} (${pool[0].id} is too short for one, or has no photo)`);
           pool.unshift(x);
+          leadLonger = grows(x);
         }
       }
     }
@@ -671,7 +688,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (a translated paper's stories too are written to their slots, in its language from their
     // releases' facts and read against them: whole translations left its columns uneven, 5 Nov)
     const v2: EngineResult = await layOut({
-      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, toFit: modular && !!opts.copy, ...(longerBy ? { longerBy } : {}), columnPicks, ...(columnPage ? { columnPage } : {}), ...(columnOnly.length ? { columnOnly: columnOnly.map((x) => x.id) } : {}), ...(mustPage ? { mustPage } : {}),
+      pool, bands, ads, m, store: opts.copy?.store ?? store, releases, ...(originals && !opts.copy?.translate ? { originals } : {}), longer: !opts.copy, ...(leadLonger ? { leadLonger } : {}), toFit: modular && !!opts.copy, ...(longerBy ? { longerBy } : {}), columnPicks, ...(columnPage ? { columnPage } : {}), ...(columnOnly.length ? { columnOnly: columnOnly.map((x) => x.id) } : {}), ...(mustPage ? { mustPage } : {}),
       // (a page repaired alone is planned exactly: it has already failed by trial)
       modular, ...(keep ? { keep } : {}), ...(noItems ? { noItems } : {}),
       seed: opts.copy ? 1 + Math.floor(opts.copy.rng() * 2 ** 30) : (seedOf(date) + (opts.seedShift ?? 0) * 7919) % 2 ** 30,

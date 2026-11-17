@@ -164,6 +164,8 @@ export async function layOut(args: {
   noItems?: Set<number>;
   /** ask the AI for longer versions (the day's paper; a copy uses what's cached) */
   longer: boolean;
+  /** a copy led by a story shorter than a lead whose release says more: it alone written longer (build.ts, 17 Nov) */
+  leadLonger?: boolean;
   /** a copy's stories written to the spaces its pages need (the new engine; not a translation) */
   toFit?: boolean;
   /** the day (a written brief's cache key) and the fillers the paper has used (one message, one house ad) */
@@ -220,7 +222,7 @@ export async function layOut(args: {
   await lengths(args.pool, args.longer ? false : "cached");
   // the front page's lead written longer where its release has more: it carries
   // the page, and at its bare 250 words its photo left a stray line under it (30 Oct)
-  if (args.longer && args.pool[0] && !args.keep?.has(1)) {
+  if ((args.longer || args.leadLonger) && args.pool[0] && !args.keep?.has(1)) {
     await lengths([args.pool[0]], true);
     // (every length of its words read before it goes on the page, as a story written to a slot's
     // are: 31 Oct's printed length had a wrong title the longest didn't. Written once more if

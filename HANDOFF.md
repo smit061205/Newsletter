@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.105** (16 Nov). Work happens on branch
+conversations. **Latest release: v1.1.106** (17 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
@@ -33,6 +33,13 @@ card has "તારીખ અને અંક" (`copies/CopiesTitleDialog.tsx`):
 `dates`) and a number per design (`issueFrom` on the design, counting on for the days after; a number
 given again drops the later ones). Applied as a copy is opened or saved (`export/designs.ts dated()`,
 `redate(pdf, date, { issue })`), nothing made again; `/api/designs/title`.
+
+**More stories can lead a copy** (17 Nov, v1.1.106; the developer: 8 copies of 14 Nov had only 4 leads,
+each twice -- the only stories with a sharp photo and 250+ words). A copy's lead may also be a
+customer's article with a photo from 200 words (`build.ts ARTICLE_LEAD_WORDS`: it prints as given, never
+lengthened) or a story with a sharp photo, 150-249 words, whose release has 250+ words and 1.25 times its
+text: that copy's engine writes the lead longer from the release (`layOut leadLonger`, the day's paper's
+lead-lengthening, its lengths fact-checked). Scratch test of 14 Nov: 7 different leads in 8 copies.
 
 **Each copy's editor's column its own website article; articles on their turn of pages; short
 articles' photos kept small** (16 Nov, v1.1.105; the developer: "for every copy, fetch unique article from
