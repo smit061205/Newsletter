@@ -136,7 +136,8 @@ export const ProfileSchema = z.object({
     kicker: TextStyleSchema.extend({ ratio: z.number().positive(), min: pt.positive(), leading: z.number().positive(),
       /** no kicker printed over any headline (28 Oct: the editor's paper has none) */
       none: z.boolean().optional() }),
-    deck: TextStyleSchema.extend({ ratio: z.number().positive(), min: pt.positive(), leading: z.number().positive() }),
+    /** `max`: the largest a sub-heading is set, whatever its headline (17 Nov: a short one under a 51pt headline came out at 31pt) */
+    deck: TextStyleSchema.extend({ ratio: z.number().positive(), min: pt.positive(), max: pt.positive().optional(), leading: z.number().positive() }),
     caption: TextStyleSchema.extend({ size: pt.positive(), pitch: pt.positive() }),
   }),
   spacing: z.object({
