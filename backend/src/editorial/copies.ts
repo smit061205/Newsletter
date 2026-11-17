@@ -206,8 +206,9 @@ export const editionFile = (date: string, id: string) => path.join(editionsDir(d
 /** The checks a different arrangement can fix: an overflow, empty space, a
  * full-width story. (A headline that won't fill its width or a heavy one
  * came back in every arrangement on 23 Oct: retrying them only tripled the time; a lead without its photo gets another go,
- * and so does a copy missing a news the editor sent, 3 Nov.) */
-const LAYOUT_GATES = ["1", "2", "W", "S13", "S14", "S16"];
+ * and so does a copy missing a news the editor sent, 3 Nov; and one with a lesser headline bigger than a more
+ * important one's, 17 Nov: 1 copy in 8 or so, another arrangement mends it.) */
+const LAYOUT_GATES = ["1", "2", "W", "S13", "S14", "S16", "3 headline sizes"];
 /** Articles fetched for the copies' editor's columns beyond one a copy: for one whose headline no two columns take. */
 const COLUMN_SPARES = 3;
 /** Tries per copy when a layout check fails (a copy placed like another is always tried again). */
@@ -217,7 +218,7 @@ const TRIES = 4;
  * hair short (26 Oct: two tries that each failed once kept the first, a line over the
  * next column's text, over the second's line 4 px short of its box). 0 is clean. */
 function badness(r: Awaited<ReturnType<typeof buildIssue>>["report"]): number {
-  const failed = r.gates.filter((g) => !g.pass && LAYOUT_GATES.includes(g.gate.split(" ")[0])).length;
+  const failed = r.gates.filter((g) => !g.pass && LAYOUT_GATES.some((x) => g.gate === x || g.gate.startsWith(`${x} `))).length;
   if (!failed && !r.leftOut.some((x) => x.story.startsWith("z-fixed-"))) return 0;
   // (white space by how much is empty, not how many stretches: 7 Nov, a front page half empty was kept
   // over a try with a strip 120pt deep, both 8 stretches)

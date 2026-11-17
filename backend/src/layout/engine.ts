@@ -759,6 +759,23 @@ async function pageModel(n: number, stories: Story[], band: Band, ads: Ad[], blo
     // let in and the lead came out at 61%)
     if (all.length && !low.length) stories = [{ ...stories[0], fullWidth: false }, ...stories.slice(1)];
   }
+  // ... and with a headline no smaller than the page's others: a short headline fills the whole width
+  // in one line at a size another story beats at its usual width (17 Nov: the lead's 42pt under a
+  // lesser story's 48pt, gate 3 "headline sizes follow importance"). Then its usual width, where the
+  // same headline sets bigger
+  if (n === 1 && LEAD_FULL_WIDTH && stories[0].fullWidth) {
+    const loudest = Math.max(0, ...(table.get(`0|${GRID.columns}`) ?? []).map((o) => o.module.headSize));
+    const louder = stories.slice(1).find((s, k) => {
+      if (ranks[k + 1] <= ranks[0]) return false;
+      const ws = blocks.widths(s, ranks[k + 1], oneColumn).filter((c) => (table.get(`${k + 1}|${c}`) ?? []).length);
+      const usual = table.get(`${k + 1}|${ws[Math.floor(ws.length / 2)]}`) ?? [];
+      return usual.length > 0 && Math.min(...usual.map((o) => o.module.headSize)) > loudest + 0.5 * PT;
+    });
+    if (loudest && louder) {
+      log(`  page 1: the lead's headline across the page would be smaller than ${louder.id}'s: its usual width`);
+      stories = [{ ...stories[0], fullWidth: false }, ...stories.slice(1)];
+    }
+  }
   const options = (i: number, cols: number) => table.get(`${i}|${cols}`) ?? [];
   const ds: DesignStory[] = stories.map((s, i) => {
     let widths = blocks.widths(s, ranks[i], oneColumn).filter((c) => options(i, c).length);

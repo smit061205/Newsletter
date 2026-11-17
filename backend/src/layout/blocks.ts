@@ -163,7 +163,11 @@ export class Blocks {
           const big = over > 0;
           // (the more over, the worse: the planner takes the smallest it can)
           out.push({ module: mod, rung: i, height: mod.height, stretch: stretchOf(mod), cost: cost + (big ? 2 + 10 * over : 0), ...(big ? { big } : {}) });
-          break;
+          // (a customer's article, its title as given, has its smaller headlines too: one under a short page
+          // lead had only its full 52pt over the lead's 37pt, and the page broke the headlines' order --
+          // 17 Nov, the developer: "fix the headline sizes follow importance issue too". The usual stories
+          // keep one: their own size changes with their wording)
+          if (!wordForWord(story)) break;
         }
       }
     }
