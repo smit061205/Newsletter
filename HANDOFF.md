@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.106** (17 Nov). Work happens on branch
+conversations. **Latest release: v1.1.107** (17 Nov). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
@@ -33,6 +33,14 @@ card has "તારીખ અને અંક" (`copies/CopiesTitleDialog.tsx`):
 `dates`) and a number per design (`issueFrom` on the design, counting on for the days after; a number
 given again drops the later ones). Applied as a copy is opened or saved (`export/designs.ts dated()`,
 `redate(pdf, date, { issue })`), nothing made again; `/api/designs/title`.
+
+**Headline sizes follow importance** (17 Nov, v1.1.107; the developer: "fix the headline sizes follow
+importance issue too"; gate 3 failed in about 1 copy of 8). Two causes: a customer's article had only its
+full-size headline (a story gets one size, the biggest that fills; `blocks.ts` now gives a word-for-word
+article its 85% and 72% sizes too, costed a little), and a full-width front lead's short headline filled
+8 columns in one line at a size a lesser story beat at its usual width (`engine.ts pageModel`: then the
+lead takes its usual width). A copy still failing it is laid out again (`copies.ts LAYOUT_GATES`, matched
+by the gate's full name now). Scratch test of 14 Nov: all 8 copies clean, no retries.
 
 **More stories can lead a copy** (17 Nov, v1.1.106; the developer: 8 copies of 14 Nov had only 4 leads,
 each twice -- the only stories with a sharp photo and 250+ words). A copy's lead may also be a
