@@ -68,11 +68,16 @@ export async function savePaperArticles(date: string, articles: Article[], siste
 }
 
 /** The day's own articles as the paper prints them: each a story of its own, kept whole. */
+/** Text pasted from WhatsApp, as it should print: no "*" of its bold (or "_" "~" of its other marks),
+ * no line of dots between its parts (18 Nov: "*રોટે. શશીન મેવાડા*" printed with its stars). */
+export const unmarked = (t: string) => t.replace(/[*~]/g, "").replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s).,:;!?])/gu, "$1$2")
+  .split("\n").filter((l) => !/^[\s.…_\-–—=]+$/.test(l) || !l.trim()).join("\n");
+
 export function paperArticleStories(date: string): Story[] {
   return paperArticles(date).map((a, i) => {
-    const body = (a.bodies[0] ?? "").split(/\n+/).map((p) => p.trim()).filter(Boolean).join("\n\n");
+    const body = unmarked(a.bodies[0] ?? "").split(/\n+/).map((p) => p.trim()).filter(Boolean).join("\n\n");
     const photo = a.photos[0] ?? null;
-    return { id: `z-paper-${i + 1}`, releaseId: null, date, kicker: "", headline: (a.titles[0] ?? "").trim(), deck: (a.decks[0] ?? "").trim(),
+    return { id: `z-paper-${i + 1}`, releaseId: null, date, kicker: "", headline: unmarked(a.titles[0] ?? "").trim(), deck: unmarked(a.decks[0] ?? "").trim(),
              bodies: { long: body, medium: body, short: body }, priority: 2, page: null, photo, photos: photo ? [photo] : [], caption: "",
              source: "fixed:paper", model: "as-is", needsReview: false };
   });

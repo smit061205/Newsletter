@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.109** (18 Nov: the editor's Telegram news prints with its photo -- his short items get a customer article's photo share, a width without the photo is no option where another shows it, and a wide photo of his several before a tall one). Work happens on branch
+conversations. **Latest release: v1.1.110** (18 Nov: the editor's Telegram news prints with its photo; a story that is the same news as one of the editor's own articles is left out, his article printing; WhatsApp's * marks and dot lines removed from his articles and Telegram news; a word-for-word title is set where its lines fill). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give

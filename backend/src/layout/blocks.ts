@@ -168,7 +168,10 @@ export class Blocks {
             // much as a photo left out -- at 0.5 the planner set it narrow beside one photo in 5 of 8 copies, 14 Nov)
             + (wordForWord(story) ? 1.5 * Math.max(0, (story.photos?.length ?? 0) - mod.elements.filter((e) => e.kind === "image").length) : 0)
             // (columns ending a line apart: a width where it can end level wins)
-            + (LEVEL && mod.short ? 2 : 0);
+            + (LEVEL && mod.short ? 2 : 0)
+            // (a customer's or the editor's own title, word for word, where it fills its lines: its last line
+            // ended far short of the edge, 18 Nov -- "title line's end left too much space")
+            + (wordForWord(story) ? 6 * Math.max(0, 0.97 - mod.displayFill) : 0);
           // (a customer's photos taking more of a short article than they may: only where nothing smaller shows them)
           const over = Number.isFinite(theirShare(story, r.words)) ? mod.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0) / (mod.width * mod.height) - theirShare(story, r.words) : 0;
           const big = over > 0;

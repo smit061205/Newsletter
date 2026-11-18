@@ -311,6 +311,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const timing = { start: Date.now(), preparing: 0, planning: 0, fitting: 0, print: 0, review: 0 };
   let fitsBefore = fitCalls();
   let stories = store.stories(date);
+  /** the day's stories left out as the same news as one of the editor's own articles */
+  const sameAsOwn = new Set<string>();
   if (!stories.length && store.releases(date).length) {
     const { rewriteDay } = await import("./editorial/rewrite.ts");
     await rewriteDay(store, date, { log });
@@ -506,7 +508,16 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     if (!opts.copy) {
       const own = paperArticleStories(date);
       if (own.length) log(`  the editor's own article(s), word for word: ${own.map((s) => s.id).join(", ")}`);
-      pool = [...pool, ...own.map((s) => ({ ...s, photos: s.photos ?? [] }))];
+      // (a story that is the same news as one of his own articles: his prints, not it -- 18 Nov, he typed
+      // his seven Telegram news in as his own articles and each printed twice)
+      const sources = new Map(store.releases(date).map((r) => [storyIdOf(r), r]));
+      const asText = (s: Story) => ({ headline: s.headline, body: s.bodies.long });
+      for (const s of pool) {
+        const r = sources.get(s.id);
+        if (own.some((o) => newsOverlap(asText(s), asText(o)) >= SAME_STORY || (!!r && newsOverlap(r, asText(o)) >= SAME_STORY))) sameAsOwn.add(s.id);
+      }
+      if (sameAsOwn.size) log(`  the same news as the editor's own article, left out: ${[...sameAsOwn].join(", ")}`);
+      pool = [...pool.filter((s) => !sameAsOwn.has(s.id)), ...own.map((s) => ({ ...s, photos: s.photos ?? [] }))];
     }
     let checkedAhead = 0;
     // what the likely stories say checked before the layout, not after: a wrong one written
@@ -882,7 +893,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const written = new Set(store.stories(date).map((s) => s.id));
   const old = outdatedTelegram(store, date);
   const unsent = store.releases(date).filter((r) => r.source === "telegram").map((r) => storyIdOf(r))
-    .filter((id) => !leftOutByHim.has(id) && !old.has(id) && !opts.copy?.drop?.includes(id) && !printedIds.has(id));
+    .filter((id) => !leftOutByHim.has(id) && !old.has(id) && !opts.copy?.drop?.includes(id) && !printedIds.has(id) && !sameAsOwn.has(id));
   // (one not written as a story at all: named, not laid out again and again -- no arrangement prints it)
   const unwritten = unsent.filter((id) => !written.has(id));
   const gates = [
