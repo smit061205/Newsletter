@@ -11,7 +11,7 @@
 // a little more space under the headline and the sub-heading (2.5pt each, as
 // the gap closer did), and the body's line pitch up to 2% looser.
 import { atRung, type Rung } from "../editorial/ladder.ts";
-import { wordForWord, type Story } from "../store.ts";
+import { alwaysPrinted, wordForWord, type Story } from "../store.ts";
 import type { Measurer } from "./measure.ts";
 import { buildModule, theirShare, type Module, type PhotoMode } from "./module.ts";
 import { headlineHeavy, spansFor } from "./pack.ts";
@@ -98,7 +98,18 @@ export class Blocks {
 
   /** Every acceptable setting of `story` at `cols` columns, shortest first. */
   options(story: Story, rank: number, cols: number): Promise<Option[]> {
-    return wordForWord(story) ? this.fair(story, rank, cols) : this.built(story, rank, cols);
+    return wordForWord(story) ? this.fair(story, rank, cols) : alwaysPrinted(story) && story.photo ? this.withPhoto(story, rank, cols) : this.built(story, rank, cols);
+  }
+
+  /** The editor's Telegram news with its photos: no width that leaves the photo out while another
+   * width shows it (18 Nov: all four of his news printed without the photos he sent). */
+  private async withPhoto(story: Story, rank: number, cols: number): Promise<Option[]> {
+    const got = await this.built(story, rank, cols);
+    if (!got.length || got.some((o) => !o.module.photoDropped)) return got;
+    for (const c of this.widths(story, rank)) {
+      if (c !== cols && (await this.built(story, rank, c)).some((o) => !o.module.photoDropped)) return [];
+    }
+    return got;
   }
 
   private built(story: Story, rank: number, cols: number): Promise<Option[]> {
@@ -159,7 +170,7 @@ export class Blocks {
             // (columns ending a line apart: a width where it can end level wins)
             + (LEVEL && mod.short ? 2 : 0);
           // (a customer's photos taking more of a short article than they may: only where nothing smaller shows them)
-          const over = wordForWord(story) ? mod.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0) / (mod.width * mod.height) - theirShare(story, r.words) : 0;
+          const over = Number.isFinite(theirShare(story, r.words)) ? mod.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0) / (mod.width * mod.height) - theirShare(story, r.words) : 0;
           const big = over > 0;
           // (the more over, the worse: the planner takes the smallest it can)
           out.push({ module: mod, rung: i, height: mod.height, stretch: stretchOf(mod), cost: cost + (big ? 2 + 10 * over : 0), ...(big ? { big } : {}) });
@@ -177,11 +188,11 @@ export class Blocks {
     // no spacing, so its uneven settings were many, 5 Nov; a width with none level keeps them for the planner)
     if (LEVEL && out.some((o) => !o.module.short)) out.splice(0, out.length, ...out.filter((o) => !o.module.short));
     // (a customer's article: its photos at a size its text carries, where any setting at this width has them so)
-    if (wordForWord(story) && out.some((o) => !o.big && !o.module.photoDropped)) out.splice(0, out.length, ...out.filter((o) => !o.big));
+    if ((wordForWord(story) || alwaysPrinted(story)) && out.some((o) => !o.big && !o.module.photoDropped)) out.splice(0, out.length, ...out.filter((o) => !o.big));
     const shown = out.filter((o) => !o.module.photoDropped);
     // (a customer's article given its copy's few photos prints them side by side where the width takes them, 3 Nov)
     const row = wordForWord(story) ? shown.filter((o) => o.module.photoMode === 2) : [];
-    return (row.length ? row : story.photo && (wordForWord(story) || shown.length >= 2) ? shown : out).sort((a, b) => a.height - b.height);
+    return (row.length ? row : story.photo && (wordForWord(story) || shown.length >= 2 || (alwaysPrinted(story) && shown.length)) ? shown : out).sort((a, b) => a.height - b.height);
   }
 
   /** The heights a story can take at its widths (px), for planning a page: [shortest, longest]. */

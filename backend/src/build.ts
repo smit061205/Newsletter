@@ -148,6 +148,23 @@ export interface CopyOpts {
   column?: Story[];
 }
 
+/** The editor's Telegram news: a wide photo of the several he sent, where its first is tall (18 Nov: a tall
+ * photo took a 116-word item over across 3 columns while four wide ones of the same news waited). */
+async function widePhotos(store: Store, date: string, stories: Story[]): Promise<Story[]> {
+  const releases = new Map(store.releases(date).filter((r) => r.source === "telegram").map((r) => [storyIdOf(r), r]));
+  const tall = async (url: string) => {
+    const b = await readFile(assetFile(url)).catch(() => null);
+    const size = b && imageSize(new Uint8Array(b));
+    return !size || size.height > size.width;
+  };
+  return Promise.all(stories.map(async (s) => {
+    const r = releases.get(s.id);
+    if (!r || !s.photo || r.photos.length < 2 || !(await tall(s.photo))) return s;
+    for (const p of r.photos) if (p !== s.photo && !(await tall(p))) return { ...s, photo: p };
+    return s;
+  }));
+}
+
 /** His Telegram news sent on an earlier day than the paper's own (IST): outdated, not printed
  * (2 Nov, the editor: the day before's messages printed a day late). Their story ids. */
 function outdatedTelegram(store: Store, date: string): Set<string> {
@@ -300,6 +317,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     stories = store.stories(date);
   }
   if (!stories.length) throw new Error(`no stories for ${date}: ingest and rewrite the day first`);
+  stories = await widePhotos(store, date, stories);
   // the sample ads, as the editor keeps them (the Ads screen): all off, or some
   const samples = sampleAdsOf(store);
   let ads = standInsMovable(store.ads(date)).filter((a) => !samples.isSample(a.id) || samples.use(a.id));
