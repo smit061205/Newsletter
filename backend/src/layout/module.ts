@@ -17,7 +17,7 @@ import { setDisplay, type DisplaySpec } from "./display.ts";
 import { normalizeStory } from "./text.ts";
 import { profile } from "../profile.ts";
 import { INK, BODY, CAPTION, DECK, GAP, GRID, HEADLINE, KICKER, PHOTO, PT } from "./typography.ts";
-import { wordForWord, type Story } from "../store.ts";
+import { alwaysPrinted, wordForWord, type Story } from "../store.ts";
 
 export type Variant = "long" | "medium" | "short";
 
@@ -131,7 +131,9 @@ const SHORT_ARTICLE = 160;
 /** How much of a customer's article its photos may take, where a smaller setting shows them: a short
  * one's under half (the developer, 15 Nov: 95-word articles printed three photos across 6 columns, or
  * one 4 columns wide, "too much expanded or big while article's text itself is small"). */
-export const theirShare = (story: Story, words: number) => (!wordForWord(story) ? Infinity : words < SHORT_ARTICLE ? 0.5 : 0.6);
+// (the editor's Telegram news too: his short items' photos failed the usual share at every width, and all
+// four printed without them, 18 Nov)
+export const theirShare = (story: Story, words: number) => (!wordForWord(story) && !alwaysPrinted(story) ? Infinity : words < SHORT_ARTICLE ? 0.5 : 0.6);
 
 async function sizeOf(url: string, m: Measurer) {
   if (!imageSizes.has(url)) imageSizes.set(url, await m.imageSize(url));
@@ -431,7 +433,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     const { lines: body, bottom, caps, short } = level(tops);
     const height = Math.max(bottom, k ? photoFoot : cursor);
     // (a customer's article always shows its photo, however short its text)
-    if (k && photo && !wordForWord(story) && spanWidth(k) * (spanWidth(k) * photo.height / photo.width) > maxShare * w * height) continue;
+    if (k && photo && !Number.isFinite(most) && spanWidth(k) * (spanWidth(k) * photo.height / photo.width) > maxShare * w * height) continue;
     if (strict && k && photo && spanWidth(k) * (photoFoot - cursor) > most * w * height) continue;
     // the text beside a photo must reach (about) its foot: a photo taller
     // than its story's text leaves a hole beside it -- try a smaller one
