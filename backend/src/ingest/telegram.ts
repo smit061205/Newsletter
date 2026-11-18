@@ -24,6 +24,7 @@ import path from "node:path";
 import { MEDIA_DIR } from "../config.ts";
 import { env, openRouter } from "../editorial/rewrite.ts";
 import { profile } from "../profile.ts";
+import { unmarked } from "../editorial/articles.ts";
 import type { InboxItem, Release, Store } from "../store.ts";
 
 /** Telegram's numbers are added to this for the releases' ids (apart from every other source's). */
@@ -339,7 +340,7 @@ export async function ingestTelegram(store: Store, date: string, opts: { log?: (
   let n = 0;
   for (const a of articles(all)) {
     const photos = all.filter((x) => x.kind === "photo" && x.pairedTo !== undefined && a.ids.includes(x.pairedTo)).map((x) => x.photo!);
-    const lines = a.text.split("\n").map((l) => l.trim()).filter(Boolean);
+    const lines = unmarked(a.text).split("\n").map((l) => l.trim()).filter(Boolean);
     const release: Release = {
       id: ID_BASE + a.ids[0], date, url: `telegram:${a.ids[0]}`, office: OFFICE,
       // (his first line as the headline when it's short; the AI writes the paper's own)
