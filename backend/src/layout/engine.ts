@@ -18,7 +18,7 @@ import { checkFacts } from "../editorial/facts.ts";
 import { wordCount } from "../editorial/quality.ts";
 import { paragraphs } from "../editorial/rewrite.ts";
 import { alwaysPrinted, wordForWord, type Ad, type Release, type Store, type Story } from "../store.ts";
-import { Blocks, type Option } from "./blocks.ts";
+import { Blocks, DECK_FILL, type Option } from "./blocks.ts";
 import { spanWidth } from "./module.ts";
 import { designs, type DesignAd, type DesignStory } from "./designs.ts";
 import { FILL_MAX, FILL_MIN, realise, Solver, spanOf, type Block, type Tree } from "./guillotine.ts";
@@ -758,6 +758,18 @@ async function pageModel(n: number, stories: Story[], band: Band, ads: Ad[], blo
     // (none that low: its usual width. 31 Oct's shortest was 41%, so every height was
     // let in and the lead came out at 61%)
     if (all.length && !low.length) stories = [{ ...stories[0], fullWidth: false }, ...stories.slice(1)];
+  }
+  // ... and with its sub-heading across that width: a short one ends far from the edge (20 Nov, the
+  // lead across the page with its one-line sub-heading two thirds of the way -- "the subtitle is too
+  // short and leaves blank space"). Then its usual width, where the same sub-heading fills its line
+  if (n === 1 && LEAD_FULL_WIDTH && stories[0].fullWidth) {
+    const all = table.get(`0|${GRID.columns}`) ?? [];
+    const full = all.filter((o) => (o.module.deckFill ?? 1) >= DECK_FILL);
+    if (full.length && full.length < all.length) table.set(`0|${GRID.columns}`, full);
+    if (all.length && !full.length) {
+      log(`  page 1: the lead's sub-heading would end short across the page: its usual width`);
+      stories = [{ ...stories[0], fullWidth: false }, ...stories.slice(1)];
+    }
   }
   // ... and with a headline no smaller than the page's others: a short headline fills the whole width
   // in one line at a size another story beats at its usual width (17 Nov: the lead's 42pt under a

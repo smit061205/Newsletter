@@ -51,6 +51,9 @@ export interface Module {
   displayFill: number;
   /** the sub-heading's size (0 without one) */
   deckSize: number;
+  /** how far across its width the sub-heading's last line reaches (1: to the edge, or none):
+   * a short sub-heading set as it is ends short, a blank stretch under the headline (20 Nov) */
+  deckFill?: number;
   /** lines its text columns end short of its foot, in all (0: level; a column under a photo
    * holding none aside) -- a short column is white space in the story (5 Nov) */
   short?: number;
@@ -198,6 +201,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   const hd = HEADLINE.sizeFor(rank, cols);
   let headSize = 0;
   let deckSize = 0;
+  let deckFill = 1;
   let displayFill = 1;
   // a block set to fit, else (text too long for the rank's lines) the old
   // way: lines at their natural width, sized down to fit
@@ -282,6 +286,9 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
                                                    align: "fit", lastFree: true }, 3, undefined, DECK.min);
     els.push(...got.elements);
     deckSize = got.size;
+    // (set as a short paragraph: its last line ends where its words do -- the planner
+    // takes a width where it reaches the edge, blocks.ts)
+    if (!full) deckFill = got.fillAll ?? got.fill;
     cursor = got.bottom + GAP.afterDeck;
   }
 
@@ -347,7 +354,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   // landscape picture: a tall one spread across the story would take it over
   const maxShare = photoMode ? Math.min(0.65, PHOTO.maxShare + 0.2) : PHOTO.maxShare;
   const none = (): Module => ({ story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [],
-                                photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill, deckSize });
+                                photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill, deckSize, deckFill });
   // (the photos side by side check their own shapes)
   if (photoMode === 1 && (!photo || photo.width / photo.height < 1.25)) return none();
 
@@ -360,7 +367,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
       const { bottom } = level(Array.from({ length: cols }, () => row.bottom));
       if (area <= Math.min(wordForWord(story) ? 0.8 : maxShare, theirShare(story, words)) * w * Math.max(bottom, row.bottom)) { pair = row; break; }
     }
-    if (!pair) return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize };
+    if (!pair) return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize, deckFill };
     const tops = Array.from({ length: cols }, () => pair.bottom);
     const { lines: body, bottom, caps, short } = level(tops);
     const out: Element[] = [...pair.elements];
@@ -375,10 +382,10 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     const height = Math.max(bottom, pair.bottom);
     // (a customer's photos are what he paid for: they may take more of his article, 3 Nov)
     if (pair.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0) > (wordForWord(story) ? 0.8 : maxShare) * w * height) {
-      return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize };
+      return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight: 0, bodyLines: 0, pitch, headSize: 0, displayFill, deckSize, deckFill };
     }
     return { story, rank, cols, variant, photoMode, width: w, height, elements: [...els, ...out], photoDropped: false,
-             headlineHeight, bodyLines: body.length, pitch, headSize, displayFill, deckSize, short };
+             headlineHeight, bodyLines: body.length, pitch, headSize, displayFill, deckSize, deckFill, short };
   }
 
   let best: { elements: Element[]; height: number; k: number; lines: number; short: number } | null = null;
@@ -456,7 +463,7 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
   }
   if (!best) {
     // a wide layout that the photo rules don't allow: not an option
-    return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill, deckSize };
+    return { story, rank, cols, variant, photoMode, width: w, height: Infinity, elements: [], photoDropped: false, headlineHeight, bodyLines: lines.length, pitch, headSize, displayFill, deckSize, deckFill };
   }
 
   // the editor's column: a black bar with rounded ends across its frame, the title white and italic
@@ -475,6 +482,6 @@ async function build(story: Story, rank: number, cols: number, variant: Variant,
     story, rank, cols, variant, photoMode, width: w + 2 * inset, height: best.height + inset,
     elements: [...banner, ...[...els, ...best.elements].map(inside)],
     photoDropped: !!photo && best.k === 0,
-    headlineHeight, bodyLines: best.lines, pitch, headSize, displayFill, deckSize, short: best.short,
+    headlineHeight, bodyLines: best.lines, pitch, headSize, displayFill, deckSize, deckFill, short: best.short,
   };
 }

@@ -54,6 +54,8 @@ const WEIGHT = [3, 2, 1.5, 1, 0.7];
 
 /** The most lines a headline down one column runs to. */
 export const ONE_COLUMN_HEAD_LINES = 6;
+/** A sub-heading's last line reaching this share of its width is full (layout/module.ts deckFill). */
+export const DECK_FILL = 0.95;
 
 export class Blocks {
   private tables = new Map<string, Promise<Option[]>>();
@@ -171,7 +173,10 @@ export class Blocks {
             + (LEVEL && mod.short ? 2 : 0)
             // (a customer's or the editor's own title, word for word, where it fills its lines: its last line
             // ended far short of the edge, 18 Nov -- "title line's end left too much space")
-            + (wordForWord(story) ? 6 * Math.max(0, 0.97 - mod.displayFill) : 0);
+            + (wordForWord(story) ? 6 * Math.max(0, 0.97 - mod.displayFill) : 0)
+            // (a sub-heading too short for the width: a blank stretch after it -- 20 Nov's lead across
+            // the page, its one-line sub-heading two thirds of the way; a width it fills wins)
+            + 4 * Math.max(0, DECK_FILL - (mod.deckFill ?? 1));
           // (a customer's photos taking more of a short article than they may: only where nothing smaller shows them)
           const over = Number.isFinite(theirShare(story, r.words)) ? mod.elements.reduce((a, e) => a + (e.kind === "image" ? e.width * e.height : 0), 0) / (mod.width * mod.height) - theirShare(story, r.words) : 0;
           const big = over > 0;
