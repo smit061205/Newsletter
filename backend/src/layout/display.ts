@@ -47,6 +47,8 @@ export interface DisplayBlock {
   lines: number;
   /** the least full line, as a share of the width (1 = flush both sides) */
   fill: number;
+  /** the same, a free last line (`lastFree`) counted too: how far short of the edge it ends */
+  fillAll?: number;
 }
 
 /** (glue: the second part of a word broken after a dash -- no space before it) */
@@ -199,6 +201,7 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
   const clear = 0.06 * size;
   let baseline = y + ink[0].ascent;
   let fillMin = 1;
+  let fillAll = 1;
   const elements = lines.map((l, k) => {
     if (k) baseline += Math.max(pitch, ink[k - 1].descent + clear + ink[k].ascent);
     const top = topFor(baseline, ink[k].fontAscent, ink[k].fontDescent, pitch);
@@ -215,6 +218,7 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
     }
     if (spec.lastFree && l.line.end && l.natural <= room) {
       // the last line of a paragraph-like block: at its natural width
+      fillAll = Math.min(fillAll, l.natural / room);
       return { ...base, x: r1(x), width: r1(w), align: "left" as const };
     }
     const f = fitLine(l.natural, l.letters, l.spaces, size, room);
@@ -226,5 +230,5 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
       ...(f.wordSpacing > 0.005 ? { wordSpacing: Math.round(f.wordSpacing * 1000) / 1000 } : {}),
     };
   });
-  return { elements, bottom: baseline + ink[ink.length - 1].descent, size, lines: lines.length, fill: fillMin };
+  return { elements, bottom: baseline + ink[ink.length - 1].descent, size, lines: lines.length, fill: fillMin, fillAll: Math.min(fillMin, fillAll) };
 }
