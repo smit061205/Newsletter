@@ -47,6 +47,10 @@ export async function takeArticles(date: string, given: GivenArticle[], prefix: 
       return `article ${k + 1}: at most 12 titles, 12 texts and 12 photos`;
     }
     if (!titles.length || !bodies.length) return `article ${k + 1} needs its text and at least one title`;
+    // a word whose letters were lost on the way (22 Nov: "ક્રાઇમ બ્રાંચ" pasted as "િાઇમ બ્ાાંચ", from
+    // a press note): it can't print, and only he knows what it said -- he's asked to type it again
+    const broken = [...titles, ...(a.decks ?? []), ...bodies].map(brokenWord).find(Boolean);
+    if (broken) return `લેખ ${k + 1}: "${broken}" શબ્દના અક્ષર તૂટેલા છે (કોઈ અક્ષર ખૂટે છે). કૃપા કરીને આ શબ્દ ફરીથી લખો.`;
     const dir = path.join(MEDIA_DIR, date);
     await mkdir(dir, { recursive: true });
     const photos: string[] = [];
@@ -59,6 +63,19 @@ export async function takeArticles(date: string, given: GivenArticle[], prefix: 
     articles.push({ titles, decks: (a.decks ?? []).map(line).filter(Boolean).slice(0, 12), bodies, photos, ...(a.must ? { must: true } : {}) });
   }
   return articles;
+}
+
+/** The first word of `text` with a Gujarati or Devanagari vowel sign or virama that follows no letter
+ * it can go on (a sign at a word's start, two vowel signs in a row, a vowel sign after a virama):
+ * a word whose letters were lost in copying. */
+export function brokenWord(text: string): string | null {
+  // (the sign's letter: a consonant or nukta; a vowel sign may also follow a virama only through a consonant)
+  const ORPHAN = /(?<![ક-હ઼ૹक-ह़क़-य़])[ા-્ૢૣा-्ॢॣ]/u;
+  for (const word of text.split(/\s+/)) {
+    const w = word.replace(/[‌‍]/g, "");
+    if (ORPHAN.test(w)) return word.replace(/^[^઀-૿ऀ-ॿ\w]+|[^઀-૿ऀ-ॿ\w]+$/g, "");
+  }
+  return null;
 }
 
 /** The day's own articles saved (an empty list takes them out of the paper). */

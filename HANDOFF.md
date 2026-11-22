@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.113** (22 Nov: a copy's design whose page headers are drawn lower than the copy's room for them -- Gandhinagar Galax's, 8 mm lower -- has them lifted to end 2 mm above the stories, measured from the design's own drawing (export/reach.ts); before, the stories covered their lower half). Work happens on branch
+conversations. **Latest release: v1.1.114** (22 Nov: the CorelDRAW PDF keeps its text editable and its English in the English font when a line in the old Gopika font has a letter it can't write -- one broken headline had turned the whole paper into letter shapes, its English drawn in the Gujarati font; the letter-shapes route draws each run in its own font; an article with a broken word ("િાઇમ બ્ાાંચ") isn't saved, the editor asked in Gujarati to type that word again). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give

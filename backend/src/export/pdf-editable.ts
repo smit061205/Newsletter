@@ -186,10 +186,14 @@ function rgb(c: string | undefined): [number, number, number] {
 const op = (name: PDFOperatorNames, ...args: (number | PDFName | PDFHexString)[]) =>
   PDFOperator.of(name, args.map((a) => (typeof a === "number" ? PDFNumber.of(Math.round(a * 1000) / 1000) : a)));
 
-/** Can every text of this issue be written as simple-font text? (Not a Unicode script that needs shaping.) */
+/** Can every text of this issue be written as simple-font text? (Not a Unicode script that needs shaping.)
+ * A line in a legacy font (its `plainText` beside its glyph codes) is simple-font text whatever is left
+ * in it: a letter its encoding can't write is left out of that line alone (22 Nov: one headline's
+ * broken "િાઇમ બ્ાાંચ", pasted so, turned the whole paper into letter shapes, its English in the
+ * Gujarati font). */
 export function editableText(issue: IssueRender): boolean {
   for (const p of issue.pages) for (const e of p.elements) {
-    if (e.kind !== "text") continue;
+    if (e.kind !== "text" || e.plainText !== undefined) continue;
     const all = typeof e.text === "string" ? e.text : e.text.map((r) => r.text).join("");
     if (/[ऀ-෿؀-ۿ]/.test(all)) return false;
   }
