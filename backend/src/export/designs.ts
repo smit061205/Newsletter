@@ -40,6 +40,15 @@ export interface Designs {
   copies: Record<string, string>;
   /** the date a day's copies carry, where the editor changed it (day -> printed date, ISO; 14 Nov) */
   dates?: Record<string, string>;
+  /** each copy's own date and issue number, where the editor gave one (copy number -> its own; 22 Nov:
+   * "give me the option to change each and every copies date and aank no") */
+  copyTitles?: Record<string, CopyTitle>;
+}
+interface CopyTitle {
+  /** day -> the date this copy carries (ISO) */
+  dates?: Record<string, string>;
+  /** its issue numbers, each counting on for the days after */
+  issueFrom?: { printed: string; number: number }[];
 }
 
 export async function designsOf(): Promise<Designs> {
@@ -96,24 +105,27 @@ export async function designFor(n: number): Promise<Design | null> {
 }
 
 const DAY_MS = 86_400_000;
-/** The date `date`'s copies carry: the editor's, else the day's own. */
-export const copiesDate = (d: Designs, date: string) => d.dates?.[date] ?? printedDate(date);
-/** The issue number the editor gave `design` for `printed`, counted on from the latest given on or before it. */
-function issueGiven(design: Design, printed: string): number | undefined {
-  const from = (design.issueFrom ?? []).filter((x) => x.printed <= printed).sort((a, b) => a.printed.localeCompare(b.printed)).at(-1);
-  return from ? Math.max(1, from.number + Math.round((Date.parse(printed) - Date.parse(from.printed)) / DAY_MS)) : undefined;
+/** The date `date`'s copies carry (copy `n`'s, given one): the editor's for that copy, else for the day's copies, else the day's own. */
+export const copiesDate = (d: Designs, date: string, n?: number) => (n ? d.copyTitles?.[String(n)]?.dates?.[date] : undefined) ?? d.dates?.[date] ?? printedDate(date);
+/** The issue number given in `from` for `printed`, counted on from the latest given on or before it. */
+function issueGiven(from: { printed: string; number: number }[] | undefined, printed: string): number | undefined {
+  const at = (from ?? []).filter((x) => x.printed <= printed).sort((a, b) => a.printed.localeCompare(b.printed)).at(-1);
+  return at ? Math.max(1, at.number + Math.round((Date.parse(printed) - Date.parse(at.printed)) / DAY_MS)) : undefined;
 }
 
-// (each design dated once a day: one design may go with many copies)
+// (each design dated once for each date and number: one design may go with many copies)
 type Dated = { pdf: Uint8Array; issue: number | null };
 const datedCache = new Map<string, Promise<Dated>>();
-/** `design` dated for `date`'s copies: its dates, weekdays and issue number changed to the day they
- * carry (export/redate.ts; the developer, 6 Nov: designs made once keep an old date), or to the date and
- * number the editor gave them (14 Nov: "give the same aank no changing feature and date changing feature
- * in copies"); `auto`: as it would be without the editor's. */
-async function dated(design: Design, date: string, auto = false): Promise<Dated> {
-  const printed = auto ? printedDate(date) : copiesDate(await designsOf(), date);
-  const issue = auto ? undefined : issueGiven(design, printed);
+/** `design` dated for `date`'s copies (copy `copy`'s): its dates, weekdays and issue number changed to the
+ * day they carry (export/redate.ts; the developer, 6 Nov: designs made once keep an old date), or to the
+ * date and number the editor gave that copy, else the design (14 Nov: "give the same aank no changing
+ * feature and date changing feature in copies"; 22 Nov: each copy its own); `auto`: as it would be
+ * without the editor's. */
+async function dated(design: Design, date: string, opts: { copy?: number; auto?: boolean } = {}): Promise<Dated> {
+  const d = await designsOf();
+  const { copy, auto } = opts;
+  const printed = auto ? printedDate(date) : copiesDate(d, date, copy);
+  const issue = auto ? undefined : issueGiven(copy ? d.copyTitles?.[String(copy)]?.issueFrom : undefined, printed) ?? issueGiven(design.issueFrom, printed);
   const key = `${design.id}|${printed}|${issue ?? ""}|${(await stat(fileOf(design.id))).mtimeMs}`;
   let got = datedCache.get(key);
   if (!got) {
@@ -126,25 +138,33 @@ async function dated(design: Design, date: string, auto = false): Promise<Dated>
 }
 
 /** What `date`'s copies carry on their designs' titles, and what they would without the editor's say:
- * the date, and each design's issue number (null: none found on it), with the copies it goes with. */
+ * each copy with a design, its date and issue number (null: none found on its design). */
 export async function titlesOf(date: string) {
   const d = await designsOf();
-  const designs = [];
-  for (const x of d.designs.filter((x) => existsSync(fileOf(x.id)))) {
-    const copies = Object.entries(d.copies).filter(([, id]) => id === x.id).map(([n]) => Number(n)).sort((a, b) => a - b);
-    designs.push({ id: x.id, name: x.name, copies, issue: (await dated(x, date)).issue, auto: (await dated(x, date, true)).issue });
+  const copies = [];
+  for (const [key, id] of Object.entries(d.copies).sort((a, b) => Number(a[0]) - Number(b[0]))) {
+    const x = d.designs.find((y) => y.id === id);
+    if (!x || !existsSync(fileOf(x.id))) continue;
+    const n = Number(key);
+    copies.push({ n, design: x.id, name: x.name, date: copiesDate(d, date, n), issue: (await dated(x, date, { copy: n })).issue, auto: (await dated(x, date, { auto: true })).issue });
   }
-  return { date: copiesDate(d, date), auto: printedDate(date), designs };
+  return { auto: printedDate(date), copies };
 }
 
-/** The editor's date for `date`'s copies (that day alone) and issue numbers for designs (that day and
- * those after it) kept; why not, or null. */
-export async function setTitles(date: string, want: { date?: string; issues?: Record<string, number> }): Promise<string | null> {
+/** The editor's date for `date`'s copies (that day alone) and issue numbers (that day and those after
+ * it) kept: for the day's copies or a design (14 Nov), or for each copy (22 Nov); why not, or null. */
+export async function setTitles(date: string, want: { date?: string; issues?: Record<string, number>; copies?: Record<string, { printed?: string; issue?: number }> }): Promise<string | null> {
   const d = await designsOf();
-  if (want.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(want.date)) return "not a date";
+  const isDate = (x: string) => /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(Date.parse(x));
+  if (want.date !== undefined && !isDate(want.date)) return "not a date";
   for (const [id, n] of Object.entries(want.issues ?? {})) {
     if (!d.designs.some((x) => x.id === id)) return "no such design";
     if (!(Number.isInteger(n) && n > 0)) return "not an issue number";
+  }
+  for (const [n, c] of Object.entries(want.copies ?? {})) {
+    if (!d.copies[n]) return `copy ${n} has no design`;
+    if (c.printed !== undefined && !isDate(c.printed)) return "not a date";
+    if (c.issue !== undefined && !(Number.isInteger(c.issue) && c.issue > 0)) return "not an issue number";
   }
   if (want.date !== undefined) {
     d.dates = Object.fromEntries(Object.entries(d.dates ?? {}).filter(([day]) => day !== date));
@@ -160,6 +180,26 @@ export async function setTitles(date: string, want: { date?: string; issues?: Re
     x.issueFrom = [...(x.issueFrom ?? []).filter((e) => e.printed < printed), { printed, number: n }];
   }
   await save(d);
+  // each copy's own: its date first (its number is read on it), kept only where it differs from the day's copies'
+  const titles = (d.copyTitles ??= {});
+  for (const [n, c] of Object.entries(want.copies ?? {})) {
+    const t = (titles[n] ??= {});
+    if (c.printed !== undefined) {
+      t.dates = Object.fromEntries(Object.entries(t.dates ?? {}).filter(([day]) => day !== date));
+      if (c.printed !== copiesDate(d, date)) t.dates[date] = c.printed;
+    }
+  }
+  await save(d);
+  for (const [n, c] of Object.entries(want.copies ?? {})) {
+    if (c.issue === undefined) continue;
+    const x = d.designs.find((y) => y.id === d.copies[n]);
+    if (!x) continue;
+    const t = titles[n];
+    const at = copiesDate(d, date, Number(n));
+    if (c.issue === (await dated(x, date, { copy: Number(n) })).issue && !(t.issueFrom ?? []).some((e) => e.printed > at)) continue;
+    t.issueFrom = [...(t.issueFrom ?? []).filter((e) => e.printed < at), { printed: at, number: c.issue }];
+  }
+  await save(d);
   return null;
 }
 
@@ -169,9 +209,9 @@ export async function setTitles(date: string, want: { date?: string; issues?: Re
  * (27 Oct: a paper's PageMaker design carried a white box that, laid over the
  * copy, blanked the foot of page 3's first columns; laid under, the print PDF's
  * white page hid the design). */
-export async function withDesign(pdf: Uint8Array, design: Design, date?: string): Promise<Uint8Array> {
+export async function withDesign(pdf: Uint8Array, design: Design, date?: string, copy?: number): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdf, { ignoreEncryption: true });
-  const src = await PDFDocument.load(date ? (await dated(design, date)).pdf : await readFile(fileOf(design.id)), { ignoreEncryption: true });
+  const src = await PDFDocument.load(date ? (await dated(design, date, { copy })).pdf : await readFile(fileOf(design.id)), { ignoreEncryption: true });
   const have = src.getPageCount(), count = doc.getPageCount();
   for (const [i, page] of doc.getPages().entries()) {
     // page for page; a 4-page design on the 8-page paper (4 Nov): its last page (the footer) on the last,
@@ -220,6 +260,6 @@ export async function stampFile(date: string, n: number, name: string, pdf: Uint
   const dir = outFolder(date);
   await mkdir(dir, { recursive: true });
   const out = path.join(dir, path.basename(name).replace(/\.pdf$/i, "") + ".pdf");
-  await writeFile(out, await withDesign(pdf, design, date));
+  await writeFile(out, await withDesign(pdf, design, date, n));
   return out;
 }
