@@ -16,7 +16,11 @@ import { clip, endPath, PDFDocument, popGraphicsState, pushGraphicsState, rectan
 import { bandOf } from "../chrome/chrome.ts";
 import { DATA_DIR, ROOT } from "../config.ts";
 import { printedDate } from "../profile.ts";
+import { reachBelow } from "./reach.ts";
 import { redate } from "./redate.ts";
+
+/** A millimetre, in a PDF's points. */
+const MM = 72 / 25.4;
 
 export const DESIGNS_DIR = DATA_DIR ? path.join(DATA_DIR, "designs") : path.join(ROOT, "backend", "data", "designs");
 const LIST = path.join(DESIGNS_DIR, "pool.json");
@@ -181,12 +185,21 @@ export async function withDesign(pdf: Uint8Array, design: Design, date?: string)
     // the room outside the stories: the band above them and the band below
     const band = bandOf(i + 1, doc.getPageCount());
     const k = H / band.page.height;
-    page.pushOperators(pushGraphicsState(), rectangle(0, H - band.top * k, W, band.top * k), rectangle(0, 0, W, H - band.bottom * k), clip(), endPath());
-    if (Math.abs(art.width / art.height - W / H) < 0.03) page.drawPage(art, { x: 0, y: 0, width: W, height: H });
-    else {
-      const s = Math.min(W / art.width, H / art.height);
-      page.drawPage(art, { x: (W - art.width * s) / 2, y: H - art.height * s, width: art.width * s, height: art.height * s });
-    }
+    const full = Math.abs(art.width / art.height - W / H) < 0.03;
+    const s = full ? H / art.height : Math.min(W / art.width, H / art.height);
+    const place = full ? { x: 0, y: 0, width: W, height: H } : { x: (W - art.width * s) / 2, y: H - art.height * s, width: art.width * s, height: art.height * s };
+    // a header drawn lower than the copy's room for it (22 Nov: Gandhinagar Galax's, 8 mm lower than
+    // the other papers', its lower half under the stories) is lifted to end just above them, as far as
+    // the page's top allows; the foot of the page stays where it was drawn
+    const room = (band.top * k) / s;
+    const reach = reachBelow(from, room);
+    // (ending 2 mm above them, as the other papers' do)
+    const lift = reach && reach.bottom > room + MM ? Math.max(0, Math.min(reach.bottom - room + 2 * MM, reach.top - 3 * MM)) * s : 0;
+    page.pushOperators(pushGraphicsState(), rectangle(0, H - band.top * k, W, band.top * k), clip(), endPath());
+    page.drawPage(art, { ...place, y: place.y + lift });
+    page.pushOperators(popGraphicsState());
+    page.pushOperators(pushGraphicsState(), rectangle(0, 0, W, H - band.bottom * k), clip(), endPath());
+    page.drawPage(art, place);
     page.pushOperators(popGraphicsState());
   }
   return doc.save();
