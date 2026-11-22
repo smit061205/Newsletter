@@ -386,6 +386,8 @@ interface SetSpec {
   drop?: string[];
   /** each story's page and the lead in the day's paper */
   pageOf: [string, number][]; lead?: string;
+  /** the story the day's paper printed as its editor's column: never a copy's */
+  column?: string;
   /** placements already used (the day's paper, earlier copies): none may repeat */
   seen: string[];
   /** the day's paper's editorial plan (build.ts CopyOpts.plan) */
@@ -460,7 +462,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
     let spent = 0;
     for (let attempt = 0; attempt < 4; attempt++) {
       const built = await buildIssue(store, spec.date, {
-        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:|  translated)/.test(l)) say(`  ${l.trim()}`); },
+        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:|  translated|  the editor's column)/.test(l)) say(`  ${l.trim()}`); },
         noReview: true,
         progress: (p) => progress(0.15 + 0.85 * (p.total ? p.done / p.total : 0),
           `${attempt ? `again ${attempt + 1}: ` : ""}${p.label === "checking" ? "checking" : `${p.label} ${p.item ?? ""}`.trim()}`),
@@ -468,7 +470,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
                 ...(item.images ? { images: `${item.images}-${attempt}` } : {}),
                 translate: spec.translate, ...(!spec.translate ? { store: own } : {}),
                 ...(spec.articles?.length ? { extras: spec.articles.map((a, i) => articleStory(a, i, n, spec.date, store)) } : {}),
-                ...(spec.drop?.length ? { drop: spec.drop } : {}), ...(column.length ? { column } : {}) },
+                ...(spec.drop?.length ? { drop: spec.drop } : {}), ...(column.length ? { column } : {}), ...(spec.column ? { notColumn: [spec.column] } : {}) },
       });
       spent += built.report.cost;
       const sig = built.report.placed.map((p) => `${p.story}:${p.page}:${p.cols}`).sort().join(",");
@@ -502,7 +504,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
       const mine = new Set(made.built.report.placed.map((p) => p.story));
       progress(0.95, "the 8 pages");
       const eight = await buildIssue(store, spec.date, {
-        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:|  translated)/.test(l)) say(`  ${l.trim()}`); },
+        log: (l) => { if (/^(built|  FAIL|  page \d+:|  warning|  layout:|  translated|  the editor's column)/.test(l)) say(`  ${l.trim()}`); },
         noReview: true, seedShift: item.seed,
         sections: { base: made.built.pages, stories: w.stories.filter((s) => !mine.has(s.id)), pdfPath: item.pdf, blank: true },
       });
@@ -699,6 +701,8 @@ function dayOf(store: Store, date: string) {
     plan: report.plan ?? [],
     pageOf: (report.placed ?? []).map((p) => [p.story, p.page] as [string, number]),
     lead: report.placed?.find((p) => p.page === 1 && p.rank === 1)?.story,
+    // (its framed column: the story whose title ribbon it has, layout/module.ts)
+    column: got.issue.pages.flatMap((p) => p.elements).find((e) => e.id.endsWith("-k-ribbon"))?.articleId,
     seen: [(report.placed ?? []).map((p) => `${p.story}:${p.page}:${p.cols}`).sort().join(",")],
   };
 }
@@ -852,6 +856,7 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
       timeMark("shortening", (Date.now() - t) / 1000);
     }
     const base = { date, reword: opts.reword, shuffle: opts.shuffle, translate, pageOf: day.pageOf, lead: day.lead, plan: day.plan,
+                   ...(day.column ? { column: day.column } : {}),
                    ...(opts.articles?.length ? { articles: opts.articles } : {}), ...(same.ids.length ? { drop: same.ids } : {}),
                    ...(opts.pages === 8 ? { eight: { printed: day.pageOf.map(([id]) => id) } } : {}) };
     for (const [i, a] of (opts.articles ?? []).entries()) {
@@ -877,8 +882,8 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
     const tasks: Task[] = Array.from({ length: opts.count }, (_, i) => ({
       lang, label: `copy ${i + 1}`, spec: base, seen: day.seen,
       item: { n: i + 1, pdf: copyFile(date, i + 1), seed: i + 1 + (translate ? 1000 * LANGS.indexOf(lang) : 0),
-              // (its own, then a spare: the spares turn, so two copies seldom fall back on the same one)
-              ...(columns[i] ? { column: [columns[i], ...(spare.length ? [spare[i % spare.length]] : [])] } : {}) },
+              // (its own, then the spares, from its turn of them: two copies seldom fall back on the same one)
+              ...(columns[i] ? { column: [columns[i], ...spare.slice(i % Math.max(1, spare.length)), ...spare.slice(0, i % Math.max(1, spare.length))] } : {}) },
     }));
     const finished = tracker(batch, tasks.length);
     await layOutUnique(store, tasks, day.seen, say, (t, f) => {

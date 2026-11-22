@@ -146,6 +146,9 @@ export interface CopyOpts {
    * (editorial/copies.ts, 15 Nov): the first that can be set is its column, the others aren't printed;
    * with none that can, its turn of the day's picks */
   column?: Story[];
+  /** stories never this copy's editor's column: the day's paper's own (22 Nov: copy 1 printed the day's
+   * column again, its own website article not set and the day's first pick next in line) */
+  notColumn?: string[];
 }
 
 /** The editor's Telegram news: a wide photo of the several he sent, where its first is tall (18 Nov: a tall
@@ -628,7 +631,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     }
     // the editor's column never the front page's lead; a copy's its turn of the day's best few, on its
     // turn of pages 2, 3 and 4 (14 Nov: 7 of 8 copies had the same story in it, all on page 4)
-    columnPicks = columnPicks.filter((id) => id !== pool[0]?.id);
+    columnPicks = columnPicks.filter((id) => id !== pool[0]?.id && !opts.copy?.notColumn?.includes(id));
     let columnPage: number | undefined;
     if (opts.copy?.number && opts.copy.shuffle !== "samePage" && columnPicks.length) {
       const k = opts.copy.number - 1;
