@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.114** (22 Nov: the CorelDRAW PDF keeps its text editable and its English in the English font when a line in the old Gopika font has a letter it can't write -- one broken headline had turned the whole paper into letter shapes, its English drawn in the Gujarati font; the letter-shapes route draws each run in its own font; an article with a broken word ("િાઇમ બ્ાાંચ") isn't saved, the editor asked in Gujarati to type that word again). Work happens on branch
+conversations. **Latest release: v1.1.115** (22 Nov: each copy its own date and issue number (અંક) on its design's title, the days after counting on from it -- the copies' title dialog lists every copy; the day-wide date and per-design numbers of 14 Nov still apply where a copy has none of its own). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give

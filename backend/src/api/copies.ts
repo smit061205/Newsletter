@@ -111,9 +111,9 @@ export async function copiesRoutes(c: Ctx) {
         const date = new URL(req.url ?? "", "http://x").searchParams.get("date");
         if (req.method === "GET") return dayOk(date) ? send(res, 200, await d.titlesOf(date)) : send(res, 400, { error: "which day" });
         if (req.method === "POST") {
-          const body = (await readJson(req)) as { date?: string; printed?: string; issues?: Record<string, number> };
+          const body = (await readJson(req)) as { date?: string; printed?: string; issues?: Record<string, number>; copies?: Record<string, { printed?: string; issue?: number }> };
           if (!dayOk(body.date)) return send(res, 400, { error: "which day" });
-          const why = await d.setTitles(body.date, { date: body.printed, issues: body.issues });
+          const why = await d.setTitles(body.date, { date: body.printed, issues: body.issues, copies: body.copies });
           return why ? send(res, 400, { error: why }) : send(res, 200, await d.titlesOf(body.date));
         }
       }
@@ -186,5 +186,5 @@ export async function sendEditable(res: ServerResponse, issue: import("@ck/share
 async function onDesign(pdf: Uint8Array, n: number, date: string): Promise<Uint8Array> {
   const { designFor, withDesign } = await import("../export/designs.ts");
   const design = Number.isInteger(n) && n > 0 ? await designFor(n) : null;
-  return design ? withDesign(pdf, design, date) : pdf;
+  return design ? withDesign(pdf, design, date, n) : pdf;
 }
