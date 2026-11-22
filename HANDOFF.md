@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.111** (20 Nov: a sub-heading that ends short of its width counts against that width, so the layout picks one it fills; the front lead runs across the page only where its sub-heading fills that line, else at its usual width). Work happens on branch
+conversations. **Latest release: v1.1.112** (22 Nov: Telegram photos matched to their news one by one, not ten at a time as an album; a photo whose news never came -- shared from WhatsApp, an article written under a photo doesn't come along -- gets the bot's reply asking for its text, and joins it when it comes). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give

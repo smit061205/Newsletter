@@ -37,8 +37,10 @@ const PARTS = 3 * 60;
 /** A message this long may have been cut by Telegram: the next one is its rest, unless it
  * starts as news of its own (2 Nov: complete messages of 3,700 letters took the next news in) */
 const SPLIT = 4000;
-/** A photo is placed once it has waited this long (seconds): its article may come after it. */
+/** A photo is placed by its time, or asked about, once it has waited this long (seconds): its article may come after it. */
 const SETTLE = NEAR;
+/** A photo is looked at once he has sent nothing for this long (seconds): what he shared at once has all come. */
+const QUIET = 2 * 60;
 /** Articles a photo may go with: the last day's. */
 const RECENT = 24 * 3600;
 /** The office the paper credits his news to. */
@@ -55,6 +57,7 @@ const SAY = {
   joined: (h: string) => `ફોટો “${h}” સાથે જોડ્યો ✓`,
   welcome: "નમસ્તે! હવે તમે અહીં સમાચાર અને ફોટા મોકલી શકો છો. દરેક સમાચાર આગામી છાપામાં જશે.",
   noArticle: "આ ફોટો માટે કોઈ સમાચાર મળ્યા નહીં. સમાચાર મોકલશો તો ફોટો તેની સાથે જોડાશે.",
+  missing: "આ ફોટાના સમાચાર હજી મળ્યા નથી. કૃપા કરીને સમાચારનું લખાણ અલગથી મોકલો; ફોટો તેની સાથે જોડાઈ જશે.",
 };
 
 const token = () => env("TELEGRAM_BOT_TOKEN");
@@ -69,7 +72,7 @@ const api = async <T>(method: string, body: Record<string, unknown> = {}, second
 
 /** The first line of an article (its headline as he wrote it), short. */
 const titleOf = (t: string) => {
-  const line = t.split("\n").map((l) => l.trim()).find(Boolean) ?? "";
+  const line = unmarked(t).split("\n").map((l) => l.trim()).find(Boolean) ?? "";
   return line.length > 60 ? `${line.slice(0, 57)}…` : line;
 };
 /** A message that is only a link (or links): nothing to print. */
@@ -189,7 +192,7 @@ async function answer(store: Store, q: NonNullable<TgUpdate["callback_query"]>, 
   await api("answerCallbackQuery", { callback_query_id: q.id }).catch(() => {});
   if (!telegramState(store).chats.some((c) => c.id === q.message?.chat.id)) return;
   const [what, photoId, to] = (q.data ?? "").split(":");
-  const photos = albumOf(store, Number(photoId));
+  const photos = batchOf(store, Number(photoId));
   if (!photos.length || photos[0].usedOn) return;
   if (what === "c") return ask(store, photos, log);
   const pick = Number(to);
@@ -200,24 +203,30 @@ async function answer(store: Store, q: NonNullable<TgUpdate["callback_query"]>, 
                                  ...(art ? { reply_markup: { inline_keyboard: [[{ text: SAY.change, callback_data: `c:${photoId}` }]] } } : {}) }).catch(() => {});
 }
 
-/** The newsroom attaches a waiting photo (and its album) to an article (0: to none). False if either is gone. */
+/** The newsroom attaches a waiting photo to an article (0: to none). False if either is gone.
+ * (the photo alone: an album may hold photos of several articles) */
 export async function attach(store: Store, photo: number, to: number): Promise<boolean> {
-  const photos = albumOf(store, photo);
+  const p = store.inbox().find((x) => x.id === photo && x.kind === "photo");
   const art = articles(store.inbox(true)).find((a) => a.ids.includes(to));
-  if (!photos.length || photos[0].usedOn || (to !== 0 && !art)) return false;
-  for (const p of photos) store.putInbox({ ...p, pairedTo: to, asked: undefined });
-  if (art) await api("sendMessage", { chat_id: photos[0].chat, text: SAY.joined(titleOf(art.text)) }).catch(() => {});
+  if (!p || p.usedOn || (to !== 0 && !art)) return false;
+  store.putInbox({ ...p, pairedTo: to, asked: undefined });
+  if (art) await api("sendMessage", { chat_id: p.chat, text: SAY.joined(titleOf(art.text)), ...onPhoto(p) }).catch(() => {});
   return true;
 }
 
 /** A message about a photo sent as a reply to it, so he sees which photo it means (2 Nov). */
 const onPhoto = (p: InboxItem) => (p.msg ? { reply_parameters: { message_id: p.msg, allow_sending_without_reply: true } } : {});
 
-/** A photo and the others of its album. */
-const albumOf = (store: Store, id: number) => {
+/** A photo and those of its album the bot spoke of with it: joined to the same article, or
+ * asked about in the same question. (Not the whole album: shared from WhatsApp, the photos of
+ * several articles come as one album, 10 to an album -- 22 Nov's ten went with one article.) */
+const batchOf = (store: Store, id: number) => {
   const all = store.inbox();
   const p = all.find((x) => x.id === id && x.kind === "photo");
-  return !p ? [] : p.album ? all.filter((x) => x.album === p.album) : [p];
+  if (!p) return [];
+  if (!p.album) return [p];
+  return all.filter((x) => x.kind === "photo" && x.album === p.album &&
+    (p.pairedTo !== undefined ? x.pairedTo === p.pairedTo : x.pairedTo === undefined && x.asked === p.asked));
 };
 
 /** The bot asks which article a photo (album) goes with: his recent ones as buttons. */
@@ -239,62 +248,91 @@ async function ask(store: Store, photos: InboxItem[], _log: (s: string) => void)
   for (const x of photos) store.putInbox({ ...x, asked: sent.message_id });
 }
 
-/** Photos that have waited long enough: placed by time, else by the AI, else asked about. */
+type Article = ReturnType<typeof articles>[number];
+
+/** Photos he has finished sending: each looked at by the AI on its own (an album may hold
+ * the photos of several articles), joined to the article it surely shows; one whose article
+ * surely hasn't come, he's told at once (shared from WhatsApp, a photo goes and the article
+ * written under it doesn't: 22 Nov); the rest, once settled, placed by time or asked about. */
 export async function placePhotos(store: Store, log: (s: string) => void, now = Date.now() / 1000) {
+  const final = now === Number.POSITIVE_INFINITY;
   const all = store.inbox();
   const arts = articles(all);
   // (a photo told it had no article to go with looks again once articles have come: 1 Nov)
   const hasArticle = (x: InboxItem) => arts.some((a) => a.chat === x.chat && Math.abs(a.at - x.at) <= RECENT && !all.find((y) => y.id === a.ids[0])?.usedOn);
-  const waiting = all.filter((x) => x.kind === "photo" && x.pairedTo === undefined && (!x.asked || (x.asked === -1 && hasArticle(x))) && !x.usedOn && now - x.at >= SETTLE);
-  const done = new Set<string>();
-  const jobs: InboxItem[] = [];
-  for (const p of waiting) {
-    const key = p.album ?? String(p.id);
-    if (!done.has(key)) { done.add(key); jobs.push(p); }
-  }
+  // (he's still sending: a photo's article may be on its way)
+  const quiet = (chat: number) => final || !all.some((x) => x.chat === chat && now - x.at < QUIET);
+  const jobs = all.filter((x) => x.kind === "photo" && x.pairedTo === undefined && (!x.asked || (x.asked === -1 && hasArticle(x))) && !x.usedOn && quiet(x.chat));
+  const joined: { p: InboxItem; to: Article }[] = [];
   // several looked at together (26 Oct: 17 forwarded at once took two minutes one by one)
   const next = async (): Promise<void> => {
     const p = jobs.shift();
     if (!p) return;
-    const group = p.album ? all.filter((x) => x.album === p.album) : [p];
     // (one photo that can't be placed now -- the internet gone -- doesn't hold up the others: it's tried again next time)
-    try { await placeOne(store, p, group, arts, all, log, now === Number.POSITIVE_INFINITY); } catch (e) { log(`Telegram: a photo not placed yet (${e instanceof Error ? e.message : e})`); }
+    try {
+      const to = await placeOne(store, p, arts, all, log, now);
+      if (to) joined.push({ p, to });
+    } catch (e) { log(`Telegram: a photo not placed yet (${e instanceof Error ? e.message : e})`); }
     return next();
   };
   await Promise.all(Array.from({ length: 6 }, next));
+  // one word to him for the photos of an album joined to one article (its "change" changes them all)
+  const said = new Set<string>();
+  for (const { p, to } of joined.sort((a, b) => a.p.id - b.p.id)) {
+    const key = `${p.album ?? p.id}|${to.ids[0]}`;
+    if (said.has(key)) continue;
+    said.add(key);
+    await api("sendMessage", { chat_id: p.chat, text: SAY.joined(titleOf(to.text)), ...onPhoto(p),
+                               reply_markup: { inline_keyboard: [[{ text: SAY.change, callback_data: `c:${p.id}` }]] } }).catch(() => {});
+  }
 }
 
-async function placeOne(store: Store, p: InboxItem, group: InboxItem[], arts: ReturnType<typeof articles>, all: InboxItem[], log: (s: string) => void,
-                        final: boolean) {
+/** One photo: the article it's joined to (he's told by the caller), or null (left waiting, or asked about). */
+async function placeOne(store: Store, p: InboxItem, arts: Article[], all: InboxItem[], log: (s: string) => void, now: number): Promise<Article | null> {
+  const final = now === Number.POSITIVE_INFINITY;
+  const settled = final || now - p.at >= SETTLE;
   const mine = arts.filter((a) => a.chat === p.chat && !all.find((x) => x.id === a.ids[0])?.usedOn);
   const near = mine.filter((a) => Math.abs(a.at - p.at) <= NEAR);
   const recent = mine.filter((a) => Math.abs(a.at - p.at) <= RECENT);
-  // (the AI has already looked at it against these, and none was it: it waits for his next article)
-  if (!final && recent.length && p.notOf && recent.every((a) => p.notOf!.includes(a.ids[0]))) return;
-  let pick: (typeof recent)[number] | null = near.length === 1 ? near[0] : null;
-  // the AI looks too (when there's one): the time can mislead -- a photo sent
+  if (!recent.length) {
+    if (settled) await ask(store, [p], log);
+    return null;
+  }
+  const ids = recent.map((a) => a.ids[0]);
+  const covers = (xs?: number[]) => !!xs && ids.every((i) => xs.includes(i));
+  // (the AI has looked at it against these already: none was it, it waits for his next
+  // article; or it wasn't sure, it waits to settle)
+  if (!final && covers(p.notOf)) return null;
+  if (!settled && covers(p.unsure)) return null;
+  // the AI looks (when there's one): the time can mislead -- a photo sent
   // between two articles, or before its own (26 Oct)
-  const seen = recent.length ? await byLooking(p, group, recent, log) : null;
+  const seen = covers(p.notOf) ? "none" : covers(p.unsure) ? null : await byLooking(p, recent, log);
   if (seen === "none") {
-    // surely none of his articles so far: its own may be on the way -- it waits for
-    // his next one (and at paper time, he's asked)
-    if (!final) { for (const x of group) store.putInbox({ ...x, notOf: recent.map((a) => a.ids[0]) }); return; }
-    return ask(store, group, log);
+    // (at paper time: asked, unless he was told its news hadn't come -- then it waits for that news)
+    if (final) { if (!p.told) await ask(store, [p], log); return null; }
+    // surely none of his articles so far: he's told once, and it waits for his next one
+    store.putInbox({ ...p, notOf: ids, told: true });
+    if (!p.told) await api("sendMessage", { chat_id: p.chat, text: SAY.missing, ...onPhoto(p) }).catch(() => {});
+    return null;
   }
-  if (seen && pick && seen !== pick) {
+  const byTime = near.length === 1 ? near[0] : null;
+  if (seen && byTime && seen !== byTime) {
     log(`Telegram: a photo's time and what's in it point to different articles: he's asked`);
-    return ask(store, group, log);
+    await ask(store, [p], log);
+    return null;
   }
-  pick = seen ?? pick;
+  const pick = seen ?? (settled ? byTime : null);
   if (pick) {
-    for (const x of group) store.putInbox({ ...x, pairedTo: pick.ids[0] });
-    await api("sendMessage", { chat_id: p.chat, text: SAY.joined(titleOf(pick.text)), ...onPhoto(p),
-                               reply_markup: { inline_keyboard: [[{ text: SAY.change, callback_data: `c:${p.id}` }]] } }).catch(() => {});
-  } else await ask(store, group, log);
+    store.putInbox({ ...p, pairedTo: pick.ids[0], unsure: undefined });
+    return pick;
+  }
+  if (!settled) { store.putInbox({ ...p, unsure: ids }); return null; }
+  await ask(store, [p], log);
+  return null;
 }
 
 /** The AI looks at a photo and his recent articles: the one it's surely of, or none. */
-async function byLooking(p: InboxItem, group: InboxItem[], recent: ReturnType<typeof articles>, log: (s: string) => void) {
+async function byLooking(p: InboxItem, recent: Article[], log: (s: string) => void) {
   const key = env("OPENROUTER_API_KEY");
   if (!key) return null;
   const model = env("OPENROUTER_VISION_MODEL") ?? profile.editorial.leadModel;
@@ -312,7 +350,7 @@ async function byLooking(p: InboxItem, group: InboxItem[], recent: ReturnType<ty
                       sure: { type: "boolean", description: "true only if you are certain: the photo clearly belongs to that article (writing on a banner, the place, the people named), or, with 0, clearly to none of them" } },
       } } },
       messages: [{ role: "user", content: [
-        { type: "text", text: `A newspaper reporter sent this photo${group.length > 1 ? ` (one of ${group.length})` : ""}${p.text ? ` with the note "${p.text}"` : ""}. ` +
+        { type: "text", text: `A newspaper reporter sent this photo${p.text ? ` with the note "${p.text}"` : ""}. ` +
           `Which of these articles is it for? Read any writing in the photo.\n\n${list}` },
         { type: "image_url", image_url: { url: `data:image/jpeg;base64,${img.toString("base64")}` } },
       ] }],

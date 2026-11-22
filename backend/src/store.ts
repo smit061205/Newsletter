@@ -61,6 +61,10 @@ export interface InboxItem {
   pairedTo?: number;
   /** a photo: the articles the AI looked at it against and found it wasn't (it waits for his next) */
   notOf?: number[];
+  /** a photo: the articles the AI looked at it against without being sure (it waits to settle) */
+  unsure?: number[];
+  /** a photo: he was told its news hasn't come (once) */
+  told?: boolean;
   /** a photo: the bot's question about it, waiting for his answer (its message id) */
   asked?: number;
   /** the paper it went into (its day), once it has */
