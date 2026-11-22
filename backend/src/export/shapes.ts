@@ -82,8 +82,17 @@ function outline(s: Shaper, g: number, h: number): string {
 export function drawShapes(page: PDFPage, e: TextElement, hb: Hb, fonts: Map<string, Shaper>, k: number, H: number, rgb: (c?: string) => [number, number, number]) {
   const s = fonts.get(e.font);
   if (!s) return;
-  const runs = typeof e.text === "string" ? [{ text: e.text }] : e.text;
-  const lines = runs.map((r) => r.text).join("").split("\n");
+  const runs: { text: string; font?: string }[] = typeof e.text === "string" ? [{ text: e.text }] : e.text;
+  // each line's pieces in their own fonts (22 Nov: an English word's run drawn in the Gujarati font
+  // came out as Gujarati-looking marks)
+  const pieces: { text: string; s: Shaper }[][] = [[]];
+  for (const r of runs) {
+    r.text.split("\n").forEach((part, i) => {
+      if (i > 0) pieces.push([]);
+      if (part) pieces[pieces.length - 1].push({ text: part, s: (r.font && fonts.get(r.font)) || s });
+    });
+  }
+  const lines = pieces.map((l) => l.map((x) => x.text).join(""));
   const rtl = e.direction === "rtl" || (e.direction !== "ltr" && RTL.test(lines.join("")));
   const h = e.hScale ?? 1;
   const unit = e.size / s.upm; // contract px per font unit
@@ -93,17 +102,19 @@ export function drawShapes(page: PDFPage, e: TextElement, hb: Hb, fonts: Map<str
   const color = pdfColor(...rgb(e.color));
   lines.forEach((text, i) => {
     if (!text.trim()) return;
-    const glyphs = shapeLine(hb, s, text, rtl, e.lang);
+    // (a right-to-left line's pieces laid right to left)
+    const parts = rtl ? [...pieces[i]].reverse() : pieces[i];
+    const glyphs = parts.flatMap((p) => shapeLine(hb, p.s, p.text, rtl, e.lang).map((g) => ({ ...g, s: p.s, unit: e.size / p.s.upm })));
     const last = i === lines.length - 1;
     const indent = i === 0 ? e.indent ?? 0 : 0;
     const ls = e.letterSpacing ?? 0;
     let ws = e.wordSpacing ?? 0;
     const spaces = glyphs.filter((x) => x.space).length;
-    const natural = glyphs.reduce((a, x) => a + x.ax * unit + ls + (x.space ? ws : 0), 0);
+    const natural = glyphs.reduce((a, x) => a + x.ax * x.unit + ls + (x.space ? ws : 0), 0);
     // (a stretched line ends exactly at its box's edges, as Chromium set it)
     const stretch = justify && (e.nowrap || !last || e.align === "justify-all");
     if (stretch && spaces) ws += ((e.width - indent) / h - natural) / spaces;
-    const width = glyphs.reduce((a, x) => a + x.ax * unit + ls + (x.space ? ws : 0), 0) * h;
+    const width = glyphs.reduce((a, x) => a + x.ax * x.unit + ls + (x.space ? ws : 0), 0) * h;
     const x0 = e.align === "center" ? e.x + (e.width - width) / 2
       : e.align === "right" || (rtl && e.align !== "left" && !stretch) ? e.x + e.width - indent - width
       : rtl ? e.x : e.x + indent;
@@ -111,13 +122,13 @@ export function drawShapes(page: PDFPage, e: TextElement, hb: Hb, fonts: Map<str
     let pen = x0;
     for (const x of glyphs) {
       if (x.g && !x.space) {
-        page.drawSvgPath(outline(s, x.g, h), {
-          x: (pen + x.dx * unit * h) * k, y: y + x.dy * unit * k, scale: unit * k, color,
+        page.drawSvgPath(outline(x.s, x.g, h), {
+          x: (pen + x.dx * x.unit * h) * k, y: y + x.dy * x.unit * k, scale: x.unit * k, color,
           // (thickened letters, as the print PDF's shadows: an outline round each, as wide)
-          ...(e.thicken ? { borderColor: color, borderWidth: e.thicken / unit } : {}),
+          ...(e.thicken ? { borderColor: color, borderWidth: e.thicken / x.unit } : {}),
         });
       }
-      pen += (x.ax * unit + ls + (x.space ? ws : 0)) * h;
+      pen += (x.ax * x.unit + ls + (x.space ? ws : 0)) * h;
     }
   });
 }
