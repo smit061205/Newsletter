@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.116** (a copy's editor's column never the day's paper's own: copy 1 fell back on it when its own website article couldn't be set). Work happens on branch
+conversations. **Latest release: v1.1.117** (Stories has its own place in the newsroom's sidebar, after Paper). Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
