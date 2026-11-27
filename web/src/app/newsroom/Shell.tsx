@@ -21,10 +21,12 @@ export const useStatus = () => useContext(StatusContext);
 
 // six screens, around the editor's evening (5 Nov): the paper's stories and sources open
 // from Tonight's paper, its pages from Paper too (the developer, 5 Nov: "give pages its
-// separate section just like before"); adding a newspaper from Settings
+// separate section just like before"); adding a newspaper from Settings. The stories (the paper's,
+// the press releases and the editor's own articles) their own place too (the developer, 27 Nov)
 const NAV: [string, StringKey, () => React.ReactElement][] = [
   ["/newsroom", "nav.today", Icon.today],
   ["/newsroom/pages", "nav.paper", Icon.paper],
+  ["/newsroom/stories", "nav.stories", Icon.stories],
   ["/newsroom/ads", "nav.ads", Icon.ads],
   ["/newsroom/others", "nav.others", Icon.papers],
   ["/newsroom/copies", "nav.copies", Icon.copies],
