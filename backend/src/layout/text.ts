@@ -83,7 +83,9 @@ export function normalizeText(text: string): string {
   const digits = DIGITS[profile.language.digits];
   // no zero-width spaces (no font draws them); in Gujarati, a Devanagari
   // danda (। ॥, a quoted verse) ends the sentence as Gujarati prose does: "."
+  // (nor an Aavtikal figure's place, "[[fig 2]]", printed as words: 28 Nov's copies; a paragraph of it alone goes)
   let out = text.replace(/\u200b/g, "");
+  if (out.includes("[[")) out = out.replace(/\n*[ \t]*\[\[[^\]\n]*\]\][ \t]*(?=\n|$)/g, "").replace(/\[\[[^\]\n]*\]\]\s*/g, "").replace(/^\s+/, "");
   if (profile.language.lang === "gu") out = printableGujarati(out).replace(/\s*॥\s*/g, ". ").replace(/\s*।\s*/g, ". ").replace(/\. +$/, ".");
   // a translation's stray full-width stop ("。", 24 Oct: set in a system font): the paper's own
   out = out.replace(/\s*。\s*/g, ({ hi: "। ", ur: "۔ " } as Record<string, string>)[profile.language.lang] ?? ". ").replace(/ +$/, "");

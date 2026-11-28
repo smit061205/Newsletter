@@ -33,6 +33,11 @@ export interface Release {
 
 /** The story made from a release: "p<PRID>" for PIB's, "c…" the CM's office's, "a…" All India Radio's, "u…" UN News's,
  * "t…" one sent to the paper's Telegram bot, "w…" the paper's website's, "r<id>" the state's. */
+/** An Aavtikal article (the paper's website's explainers, ingest/site.ts takeAavtikal): taken on a day short of
+ * news, a few at most, inside pages, never the editor's column (28 Nov: 16 in one paper, 5 to 8 a copy). */
+export const isAavtikal = (s: { source?: string }) => /\/aavtikal\//.test(s.source ?? "");
+/** The most Aavtikal articles one paper prints. */
+export const AAVTIKAL_MOST = 3;
 export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u", telegram: "t", section: "s", site: "w" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
 
 /** Where the 8-page paper's own news (its pages after the day's) is kept: a day of its own beside

@@ -36,9 +36,9 @@ import { checkFacts } from "./facts.ts";
 import { browserServer, closeBrowser } from "../browser.ts";
 import { profile } from "../profile.ts";
 import { sisterOut, sisterStore } from "../sister.ts";
-import { sectionsDay, type Ad, type Edit, type Release, type Store, type Story } from "../store.ts";
+import { alwaysPrinted, isAavtikal, sectionsDay, wordForWord, type Ad, type Edit, type Release, type Store, type Story } from "../store.ts";
 import { asIs, DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
-import { settable } from "./quality.ts";
+import { settable, wordCount } from "./quality.ts";
 import { applyTextEdits, droppedBy, foreignLetters } from "../layout/stories.ts";
 import { newsOverlap } from "./translate.ts";
 import { paperArticles } from "./articles.ts";
@@ -378,7 +378,7 @@ interface SetSpec {
   /** `images`: a folder for its pages as pictures (a sister paper's) */
   /** `column`: the copy's own articles for its editor's column, from the paper's website (ingest/site.ts
    * columnArticles): the first is its own alone, the ones after it spares if that one can't be set */
-  items: { n: number; id?: string; name?: string; pdf: string; seed: number; images?: string; column?: Release[] }[];
+  items: { n: number; id?: string; name?: string; pdf: string; seed: number; images?: string; column?: Release[]; columnStories?: string[] }[];
   reword: Reword; shuffle: Shuffle; translate: boolean;
   /** the articles in every copy, word for word */
   articles?: Article[];
@@ -470,7 +470,7 @@ async function layOutHere(store: Store, spec: SetSpec, say: Say, onFile: OnFile,
                 ...(item.images ? { images: `${item.images}-${attempt}` } : {}),
                 translate: spec.translate, ...(!spec.translate ? { store: own } : {}),
                 ...(spec.articles?.length ? { extras: spec.articles.map((a, i) => articleStory(a, i, n, spec.date, store)) } : {}),
-                ...(spec.drop?.length ? { drop: spec.drop } : {}), ...(column.length ? { column } : {}), ...(spec.column ? { notColumn: [spec.column] } : {}) },
+                ...(spec.drop?.length ? { drop: spec.drop } : {}), ...(column.length ? { column } : {}), ...(spec.column ? { notColumn: [spec.column] } : {}), ...(item.columnStories ? { columnStories: item.columnStories } : {}) },
       });
       spent += built.report.cost;
       const sig = built.report.placed.map((p) => `${p.story}:${p.page}:${p.cols}`).sort().join(",");
@@ -862,28 +862,44 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
     for (const [i, a] of (opts.articles ?? []).entries()) {
       say(`article ${i + 1}${a.must ? ", always printed" : ", printed while there's room"}: ${a.titles.length} title(s), ${a.decks.length} sub-heading(s), ${a.bodies.length} text(s), ${a.photos.length} photo(s)${a.photos.length > 1 ? `, 1 to ${Math.min(3, a.photos.length)} to a copy` : ""}, in turn`);
     }
-    // each copy's editor's column its own article from the paper's website, one the day's paper doesn't
-    // print (15 Nov): none shared, none printed elsewhere in the copy. A copy without one (the website
-    // not answering, or fewer articles than copies) takes its turn of the day's picks, as before
+    // each copy's editor's column its own, none another copy has (15 Nov; 28 Nov: "it shouldn't get repeated
+    // for any copies upto any amount of copies"): first the paper's website's articles the day's paper doesn't
+    // print, then the day's stories it left out, then its printed ones -- never its own column, its lead, an
+    // Aavtikal explainer, an article's same news or what must print -- each copy one, the rest shared out as
+    // its spares. A copy with none left has no column (it's no must): never one another copy has
     let columns: Release[] = [];
-    if (!translate && profile.editorial.columnTitle) {
-      try {
-        columns = await columnArticles(store, date, opts.count + COLUMN_SPARES, {
-          minWords: COLUMN_WORDS, prefers: profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null,
-          avoid: (opts.articles ?? []).flatMap((a) => a.bodies.map((body) => ({ headline: a.titles[0] ?? "", body }))),
-        });
-        const own = Math.min(opts.count, columns.length);
-        say(own ? `the editor's column: ${own === opts.count ? "each copy" : `copies 1 to ${own}`} its own article from the paper's website` +
-                  (own < opts.count ? `; the other ${opts.count - own} their turn of the day's stories (the website has no more for today)` : "")
-                : "the editor's column: the website has no article the paper doesn't print: each copy its turn of the day's stories");
-      } catch (e) { say(`the editor's column: the paper's website didn't answer (${e instanceof Error ? e.message : e}): each copy its turn of the day's stories`); }
+    let columnsOf: Release[][] = [];
+    let mine: string[][] = Array.from({ length: opts.count }, () => []);
+    if (profile.editorial.columnTitle) {
+      if (!translate) {
+        try {
+          columns = await columnArticles(store, date, opts.count + COLUMN_SPARES, {
+            minWords: COLUMN_WORDS, prefers: profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null,
+            avoid: (opts.articles ?? []).flatMap((a) => a.bodies.map((body) => ({ headline: a.titles[0] ?? "", body }))),
+          });
+        } catch (e) { say(`the editor's column: the paper's website didn't answer (${e instanceof Error ? e.message : e})`); }
+      }
+      const prefers = profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null;
+      const printed = new Set(day.pageOf.map(([id]) => id));
+      const local = (x: Story) => Number(!!prefers?.test(`${x.headline} ${x.bodies.long.slice(0, 300)}`));
+      const stories = store.stories(date).filter((x) => x.id !== day.column && x.id !== day.lead && !x.id.startsWith("f-") && !isAavtikal(x)
+        && !alwaysPrinted(x) && !wordForWord(x) && !same.ids.includes(x.id) && wordCount(x.bodies.long) >= COLUMN_WORDS)
+        .sort((a, b) => Number(printed.has(a.id)) - Number(printed.has(b.id)) || local(b) - local(a) || b.bodies.long.length - a.bodies.long.length || a.id.localeCompare(b.id));
+      const all = [...columns.map((r) => ({ release: r })), ...stories.map((x) => ({ id: x.id }))];
+      const lists = Array.from({ length: opts.count }, (_, i) => all.slice(i, i + 1));
+      all.slice(opts.count).forEach((x, k) => lists[k % opts.count].push(x));
+      columnsOf = lists.map((l) => l.flatMap((x) => ("release" in x ? [x.release] : [])));
+      mine = lists.map((l) => l.flatMap((x) => ("id" in x ? [x.id] : [])));
+      const web = lists.filter((l) => l[0] && "release" in l[0]).length;
+      const none = lists.filter((l) => !l.length).length;
+      say(`the editor's column: each copy its own, none another copy's` + (web ? `; ${web} from the paper's website` : "; the website has none the paper doesn't print") +
+          (opts.count - web - none ? `; ${opts.count - web - none} of the day's stories` : "") + (none ? `; ${none} without one (not enough stories for each its own)` : ""));
     }
-    const spare = columns.slice(opts.count);
     const tasks: Task[] = Array.from({ length: opts.count }, (_, i) => ({
       lang, label: `copy ${i + 1}`, spec: base, seen: day.seen,
       item: { n: i + 1, pdf: copyFile(date, i + 1), seed: i + 1 + (translate ? 1000 * LANGS.indexOf(lang) : 0),
-              // (its own, then the spares, from its turn of them: two copies seldom fall back on the same one)
-              ...(columns[i] ? { column: [columns[i], ...spare.slice(i % Math.max(1, spare.length)), ...spare.slice(0, i % Math.max(1, spare.length))] } : {}) },
+              ...(columnsOf[i]?.length ? { column: columnsOf[i] } : {}),
+              ...(profile.editorial.columnTitle ? { columnStories: mine[i] } : {}) },
     }));
     const finished = tracker(batch, tasks.length);
     await layOutUnique(store, tasks, day.seen, say, (t, f) => {

@@ -17,7 +17,7 @@ import { grown, ladderOf, MIN_WORDS, writtenTo, type Rung } from "../editorial/l
 import { checkFacts } from "../editorial/facts.ts";
 import { wordCount } from "../editorial/quality.ts";
 import { paragraphs } from "../editorial/rewrite.ts";
-import { alwaysPrinted, wordForWord, type Ad, type Release, type Store, type Story } from "../store.ts";
+import { alwaysPrinted, isAavtikal, wordForWord, type Ad, type Release, type Store, type Story } from "../store.ts";
 import { Blocks, DECK_FILL, type Option } from "./blocks.ts";
 import { spanWidth } from "./module.ts";
 import { designs, type DesignAd, type DesignStory } from "./designs.ts";
@@ -114,7 +114,7 @@ export function assign(sized: Sized[], rooms: number[], opts: { fixedPage?: Map<
       const want = rooms.map((_, k) => share[k] - used[k] - s.mid);
       // (news fills the front pages first, a feature article the inside ones:
       // 24 Oct's short day put five features on the front page)
-      const feature = s.story.id.startsWith("f-");
+      const feature = s.story.id.startsWith("f-") || isAavtikal(s.story);
       const score = (k: number) => (k === 0 && s.story.editorsColumn ? -10 : 0) + want[k] / rooms[k] + (k === 0 && s.story.priority <= 2 ? 0.15 : 0)
         + (feature ? (k === 0 ? -0.5 : 0.05 * k) : 0.08 * (rooms.length - 1 - k))
         - (pages[k].some((o) => related(o.story, s.story)) ? 0.3 : 0) + (opts.rng ? (opts.rng() - 0.5) * 0.12 : 0);

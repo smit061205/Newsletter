@@ -15,7 +15,7 @@ import path from "node:path";
 import { buildIssue } from "./build.ts";
 import { OUT_DIR, outName } from "./config.ts";
 import type { EnginePage } from "./layout/engine.ts";
-import { sectionsDay, type Job, type JobStep, type Progress, type StepName, type Store } from "./store.ts";
+import { AAVTIKAL_MOST, isAavtikal, sectionsDay, type Job, type JobStep, type Progress, type StepName, type Store } from "./store.ts";
 
 export const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build", "sections"];
 
@@ -308,7 +308,8 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         // it didn't answer for most of an hour, and only 2 of 14 features came)
         if (round === 0 && profile.language.lang === "gu") {
           const { takeAavtikal } = await import("./ingest/site.ts");
-          const took = await takeAavtikal(store, date, need, say).catch((e: unknown) => { say(`  Aavtikal couldn't be read (${e instanceof Error ? e.message : e})`); return 0; });
+          const took = await takeAavtikal(store, date, Math.min(need, AAVTIKAL_MOST - store.stories(date).filter(isAavtikal).length), say).catch((e: unknown) => { say(`  Aavtikal couldn't be read (${e instanceof Error ? e.message : e})`); return 0; });
+          // (a few at most: each is a long explainer, and 28 Nov's 16 filled the copies with them; the rest as features)
           if (took) { say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: ${took} of Aavtikal's articles taken`); continue; }
         }
         say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: writing ${need} feature article(s)`);
@@ -319,7 +320,20 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         const costs = await Promise.all(Array.from({ length: calls }, (_, i) =>
           writeFeatures(store, date, Math.min(3, need - 3 * i), { log: say, subjects: SUBJECTS.filter((_, k) => k % calls === i) })
             .catch((e: unknown) => { say(`  features failed (${e instanceof Error ? e.message : e})`); return 0; })));
-        if (costs.some((c) => c === null)) return; // no AI key
+        if (costs.some((c) => c === null)) break; // no AI key
+      }
+      // the last resort, the AI having written too few (or none): more of Aavtikal's, past the usual few,
+      // rather than blank pages
+      if (profile.language.lang === "gu") {
+        const ctx = await fillContext(store, date);
+        const share = ctx.share();
+        await ctx.close();
+        if (share < 1) {
+          const { takeAavtikal } = await import("./ingest/site.ts");
+          const more = Math.ceil(((1.05 - share) * ctx.room) / (ctx.room / (4 * profile.issue.pages)));
+          const took = await takeAavtikal(store, date, more, say).catch(() => 0);
+          if (took) say(`the copy fills ${(share * 100).toFixed(0)}% of the pages with too few features written: ${took} more of Aavtikal's articles taken`);
+        }
       }
       return;
     }

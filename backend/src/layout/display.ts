@@ -15,11 +15,17 @@ import { r1 } from "./compose.ts";
 import { elementText, topFor, type Line, type Measurer, type Run } from "./measure.ts";
 import { INK, PT } from "./typography.ts";
 
-/** How far a display line may be squeezed or stretched. */
+/** How far a display line may be squeezed or stretched. (28 Nov: at up to 1.2, with letter spacing on top,
+ * one line of a headline at 94% beside the next at 119% read as two sizes of letter, and stretched
+ * lines as letters spaced apart: lines are now near one squeeze, the rest in word spaces) */
 const HMIN = 0.86;
-const HMAX = 1.2;
+const HMAX = 1.1;
 /** letter spacing a display line may take on top of HMAX, in em */
-const LS_MAX = 0.05;
+const LS_MAX = 0.015;
+/** how far one line's squeeze may differ from another's in the same headline */
+const SPREAD = 0.05;
+/** the most a word space may open up, in em (beyond that the line is too short for its width) */
+const WS_MAX = 0.8;
 
 export interface DisplaySpec {
   font: string;
@@ -63,7 +69,8 @@ function breaksFor(words: Measured[], space: number, size: number, w: number, n:
   const k = words.length;
   if (n > k) return null;
   const nat = (i: number, j: number) => (words.slice(i, j).reduce((a, x) => a + x.width, 0) + gaps(words, i, j) * space) * size;
-  const stretchable = (i: number, j: number) => nat(i, j) * HMAX + (words.slice(i, j).reduce((a, x) => a + x.letters, 0) + j - i - 2) * LS_MAX * size * HMAX;
+  const stretchable = (i: number, j: number) => nat(i, j) * HMAX + (words.slice(i, j).reduce((a, x) => a + x.letters, 0) + j - i - 2) * LS_MAX * size * HMAX
+    + gaps(words, i, j) * WS_MAX * size * HMAX;
   // cost[j][l]: best cost to set words[0..j) in l lines
   const INF = Number.POSITIVE_INFINITY;
   const cost = Array.from({ length: k + 1 }, () => new Array<number>(n + 1).fill(INF));
@@ -100,8 +107,8 @@ function breaksFor(words: Measured[], space: number, size: number, w: number, n:
 
 /** One display line's spacing: the squeeze or stretch, then letter spacing,
  * then (only if still short) word spacing. */
-function fitLine(natural: number, letters: number, spaces: number, size: number, w: number) {
-  const hScale = Math.max(HMIN, Math.min(HMAX, w / natural));
+function fitLine(natural: number, letters: number, spaces: number, size: number, w: number, most = HMAX) {
+  const hScale = Math.max(HMIN, Math.min(most, w / natural));
   let rest = w / hScale - natural;
   let letterSpacing = 0;
   let wordSpacing = 0;
@@ -115,6 +122,21 @@ function fitLine(natural: number, letters: number, spaces: number, size: number,
   }
   const fill = Math.min(1, (w - Math.max(0, rest) * hScale) / w);
   return { hScale, letterSpacing, wordSpacing, fill };
+}
+
+/** The squeeze every stretched line of a headline is held near: the tightest line's (a line may take at
+ * most SPREAD more, the rest of its width in its word spaces). Null where a line would then open its
+ * word spaces past WS_MAX: those breaks or that size aren't set. */
+function evenScale(lines: { natural: number; letters: number; spaces: number; free: boolean }[], size: number, w: number): number | null {
+  const fitted = lines.filter((l) => !l.free);
+  if (!fitted.length) return 1;
+  const base = Math.max(HMIN, Math.min(HMAX, ...fitted.map((l) => w / l.natural)));
+  for (const l of fitted) {
+    if (!l.spaces) continue; // (one word alone: as before)
+    const f = fitLine(l.natural, l.letters, l.spaces, size, w, Math.min(HMAX, base * (1 + SPREAD)));
+    if (f.wordSpacing > WS_MAX * size) return null;
+  }
+  return base;
 }
 
 /**
@@ -145,6 +167,15 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
   const measured = await m.words(t, spec.font, REF);
   const words: Measured[] = measured.words.map((x) => ({ word: x.word, width: x.width / REF, letters: x.letters, runs: x.runs, glue: x.glue }));
   const space = measured.space / REF;
+  // each line's natural width, letters and spaces for a set of breaks (a free last line marked)
+  const shape = (starts: number[], size: number) => starts.map((i, k) => {
+    const j = starts[k + 1] ?? words.length;
+    const ws = words.slice(i, j);
+    const natural = (ws.reduce((a, x) => a + x.width, 0) + gaps(words, i, j) * space) * size;
+    const letters = ws.some((x) => x.letters > 0) ? ws.reduce((a, x) => a + x.letters, 0) + ws.length - 2 : 0;
+    const room = KERNED.test(t) ? w * 0.995 : w;
+    return { natural, letters, spaces: gaps(words, i, j), free: !!spec.lastFree && k === starts.length - 1 && natural <= room };
+  });
 
   // the largest size (in 0.5pt steps) at which the text can be set; for
   // each line count its own largest size, then the best of those
@@ -159,8 +190,10 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
     for (let n = 1; n <= spec.maxLines; n++) {
       for (let size = spec.max; size >= spec.min - 0.01; size -= PT / 2) {
         // (a kerned script, Hindi or Urdu, prints a hair wider than it measures: a margin)
-        const starts = breaksFor(words, space, size, KERNED.test(t) ? w * 0.995 : w, n, spec.lastFree);
+        const room = KERNED.test(t) ? w * 0.995 : w;
+        const starts = breaksFor(words, space, size, room, n, spec.lastFree);
         if (!starts) continue;
+        if (evenScale(shape(starts, size), size, room) === null) continue;
         const score = size * (1 + (spec.linesBonus ?? 0) * (n - 1));
         if (score > bestScore + 0.01) {
           bestScore = score;
@@ -198,6 +231,8 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
   const room = KERNED.test(t) ? w * 0.995 : w;
   // baselines: a fixed pitch, opened only where marks would touch
   const ink = await m.ink(lines.map((l) => ({ text: l.line.text, font: spec.font, size })));
+  // (every stretched line near the same squeeze: the tightest line's, a little more at most)
+  const even = spec.align === "fit" ? evenScale(shape(starts, size), size, room) ?? HMAX : 1;
   const clear = 0.06 * size;
   let baseline = y + ink[0].ascent;
   let fillMin = 1;
@@ -217,11 +252,12 @@ async function setDisplayOnce(m: Measurer, text: string, spec: DisplaySpec, id: 
                ...(hScale < 0.9999 ? { hScale: Math.round(hScale * 10000) / 10000 } : {}) };
     }
     if (spec.lastFree && l.line.end && l.natural <= room) {
-      // the last line of a paragraph-like block: at its natural width
-      fillAll = Math.min(fillAll, l.natural / room);
-      return { ...base, x: r1(x), width: r1(w), align: "left" as const };
+      // the last line of a paragraph-like block: at its natural width, squeezed as the lines over it
+      const h = Math.min(1, even);
+      fillAll = Math.min(fillAll, (l.natural * h) / room);
+      return { ...base, x: r1(x), width: r1(w), align: "left" as const, ...(h < 0.9999 ? { hScale: Math.round(h * 10000) / 10000 } : {}) };
     }
-    const f = fitLine(l.natural, l.letters, l.spaces, size, room);
+    const f = fitLine(l.natural, l.letters, l.spaces, size, room, Math.min(HMAX, even * (1 + SPREAD)));
     fillMin = Math.min(fillMin, f.fill);
     return {
       ...base, x: r1(x), width: r1(w), align: (f.fill > 0.999 ? "justify-all" : "left") as TextElement["align"],

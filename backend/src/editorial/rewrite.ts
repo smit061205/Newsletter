@@ -84,8 +84,10 @@ export function env(name: string): string | undefined {
 
 // releases separate sections with rows of zeros, dashes or stars: not text to print
 const filler = /^[\s0૦.\-–—*_=~•]+$/;
+/** A figure's place in an Aavtikal article ("[[fig 1]]"): the paper prints none of its figures (28 Nov). */
+export const FIGURE = /\[\[[^\]\n]*\]\]/g;
 export const paragraphs = (text: string) => text.split(/\n\s*\n/)
-  .map((p) => p.replace(/[0૦]{5,}|[-–—*_=]{4,}/g, "").trim())
+  .map((p) => p.replace(FIGURE, "").replace(/[0૦]{5,}|[-–—*_=]{4,}/g, "").trim())
   .filter((p) => p && !filler.test(p));
 
 /** The first paragraphs of `body` that add up to at most `share` of it (at least one). */
