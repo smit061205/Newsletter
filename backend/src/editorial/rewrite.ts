@@ -180,6 +180,7 @@ export const SYSTEM = `${profile.language.lang === "gu" ? `તમે ગાં�
 `central government's from PIB) into a newspaper story in clear, formal newspaper ${paperLang.name}.
 Rules:
 - Use ONLY facts in the release. Never add names, numbers, dates, places or quotes that are not in it.
+- Write the news as the paper's own: never point at the text you are given or at other papers -- no "according to the release", "the report says", "this article", "media reports", "according to <a newspaper or channel>". State the facts directly, and say who said or did them (the minister said, the police said); a named body's own report (the World Bank's, a ministry's) may be named as the news.
 - Keep every number, name and date exactly as in the release, written in ${paperLang.digits} -- except inside English names and codes (ATM 2026, COVID-19).
 ${profile.language.lang !== "en" ? `- A release in English (the editor's own news): write it all in ${paperLang.name}, people's and places' names in ${paperLang.name} letters.\n` : ""}- Start body_long with the dateline the release uses (e.g. "${paperLang.dateline}"), if it has one.
 ${profile.issue.datedNextDay ? `- The paper is read the morning after the release (both days are given with it): write every time word as of that morning. ` +

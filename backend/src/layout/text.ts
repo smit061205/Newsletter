@@ -5,7 +5,7 @@
 //     numbers that belong to English ("ATM 2026", "COVID-19") stay Latin;
 //   - no doubled spaces, no space before punctuation.
 import { profile } from "../profile.ts";
-import type { Story } from "../store.ts";
+import { wordForWord, type Story } from "../store.ts";
 
 const DIGITS: Record<string, string> = { gujarati: "૦૧૨૩૪૫૬૭૮૯", "arabic-indic": "۰۱۲۳۴۵۶۷۸۹", latin: "0123456789" };
 const LATIN_WORD = /^[A-Za-z][A-Za-z.&'’-]*$/;
@@ -79,6 +79,39 @@ export function lettersLost(text: string): number {
   return lost.n;
 }
 
+/** Words that make a report a news outlet's (or the media's in general): "હિન્દુસ્તાન ટાઈમ્સના અહેવાલ
+ * મુજબ", "મીડિયા અહેવાલો અનુસાર" -- not a named body's own report ("વર્લ્ડ બેંકના અહેવાલ મુજબ" is the news). */
+const MEDIA = /મીડિયા|ન્યૂઝ|ન્યુઝ|ટાઈમ્સ|ટાઇમ્સ|એક્સપ્રેસ|હિંદુ|હિન્દુ|એજન્સી|ચેનલ|ટીવી|અખબાર|સમાચાર|રોઇટર્સ|રોયટર્સ|બીબીસી|સીએનએન|પીટીઆઈ|પીટીઆઇ|આઈએએનએસ|એએનઆઈ|બ્લૂમબર્ગ|બ્લુમબર્ગ|મિન્ટ|સંદેશ|ભાસ્કર|ગાર્ડિયન|પોસ્ટ|હેરાલ્ડ|ટ્રિબ્યુન|ક્રોનિકલ|જર્નલ|ડેક્કન|ઈકોનોમિક|ઇકોનોમિક|બિઝનેસ|સીએનબીસી|એનડીટીવી|વેબસાઇટ|પોર્ટલ|ટુડે|આજ તક|આજતક|એબીપી|અસ્મિતા|ઉજાલા|જાગરણ|દેશગુજરાત|રેડિયો|આકાશવાણી|દૂરદર્શન|ઝી |દિવ્ય|ફર્સ્ટપોસ્ટ|વાયર|\b(?:PTI|ANI|IANS|Reuters|BBC|CNN|NDTV|Aaj Tak|India Today|ABP|News|Times|Express|Hindu|Mint|Bloomberg|AIR|Standard|Today|Post|Journal|Herald|Tribune|Wire|Scroll|Print|Mirror|Chronicle|Telegraph|Guardian)\b|વિકિપીડિયા|Wikipedia|ટ્રિબ્યુન|સ્ટાન્ડર્ડ|યોર્ક|દેશ ગુજરાત|ઇન્ડિપેન્ડન્ટ|ઈન્ડિપેન્ડન્ટ|ઉજલા|Independent/;
+/** A report or article no one is named for: the text the story was written from. */
+const GENERIC = /^(?:આ|એક|એ|તે|કેટલાક|વિવિધ|સ્થાનિક|પ્રારંભિક|પ્રાથમિક|તાજા|તાજેતરના|અન્ય|બીજા|અગાઉના|વધુ|શરૂઆતી|શરૂઆતના|આધારભૂત|વિશ્વસનીય|સૂત્રોના|મળતા)$/;
+const REPORT = "(?:અહેવાલ|અહેવાલો|રિપોર્ટ|રિપોર્ટ્સ|લેખ)";
+const LEADING = new RegExp(`(^|[.!?।:,]\\s*|\\n)((?:[^\\s,.।:]+\\s+){0,7}?)${REPORT}(?:ના|ની|માં)?\\s+(?:જણાવ્યા\\s+)?(?:મુજબ|અનુસાર|પ્રમાણે)\\s*,?\\s*`, "gu");
+/** "આ અહેવાલમાં જણાવાયું છે કે ...": the rest of the sentence, said by the paper. */
+const SAYS_THAT = new RegExp(`(^|[.!?।:]\\s*|\\n)((?:[^\\s,.।:]+\\s+){0,7}?)${REPORT}(?:(?:ો)?માં\\s+જણાવ(?:ાયું|વામાં આવ્યું)\\s+(?:છે|હતું)|\\s+જણાવે\\s+છે)\\s+કે\\s*,?\\s*`, "gu");
+/** "... ઘટનામાં અહેવાલો મુજબ ૨૪ લોકોનાં મોત": reports no one is named for, in the middle of a sentence. */
+const BARE = /(^|[^\S\n]+)((?:[\p{L}\p{M}]+[^\S\n]+)?)(?:મીડિયા\s+)?અહેવાલો\s+(?:મુજબ|અનુસાર)\s*,?\s*/gu;
+const SAID_IN = new RegExp(`\\s+હોવાન(?:ું|ો)(?:\\s+પણ)?\\s+((?:[^\\s,.।]+\\s+){0,4}?)${REPORT}(?:ો)?માં\\s+(?:જણાવ(?:ાયું|વામાં આવ્યું)|ઉલ્લેખ)\\s+છે`, "gu");
+const AS_SAID = new RegExp(`\\s*,?\\s+તેમ\\s+((?:[^\\s,.।]+\\s+){0,4}?)${REPORT}(?:ો)?માં\\s+જણાવ(?:ાયું|વામાં આવ્યું)\\s+(?:છે|હતું)`, "gu");
+const fromTheSource = (words: string) => {
+  const w = words.trim().split(/\s+/).filter(Boolean);
+  return !w.length || w.every((x) => GENERIC.test(x)) || MEDIA.test(words);
+};
+
+/** A story never points at the text it was written from, or at other papers (28 Nov, the developer: "remove the
+ * writing that refers to another articles like 'according to this article', as real papers don't do that"):
+ * "X ના અહેવાલ મુજબ, ..." -> "...", "... થયો હોવાનું અહેવાલમાં જણાવાયું છે" -> "... થયો છે". A named body's own
+ * report (the World Bank's, a ministry's) is news, and stays. */
+export function withoutSourceTalk(text: string): string {
+  if (!/અહેવાલ|રિપોર્ટ|લેખ/.test(text)) return text;
+  return text
+    .replace(LEADING, (all, start: string, words: string) => (fromTheSource(words) ? start : all))
+    .replace(SAYS_THAT, (all, start: string, words: string) => (fromTheSource(words) ? start : all))
+    // (a word owning the reports, "ટીવીના અહેવાલો", is a named one: left to the rules above)
+    .replace(BARE, (all, space: string, word: string) => (/(?:ના|ની|નાં)\s*$/u.test(word) ? all : `${space}${word}`))
+    .replace(SAID_IN, (all, words: string) => (fromTheSource(words) ? " છે" : all))
+    .replace(AS_SAID, (all, words: string) => (fromTheSource(words) ? "" : all));
+}
+
 export function normalizeText(text: string): string {
   const digits = DIGITS[profile.language.digits];
   // no zero-width spaces (no font draws them); in Gujarati, a Devanagari
@@ -111,10 +144,13 @@ export function normalizeText(text: string): string {
 
 /** Every printed field of a story, normalised. */
 export function normalizeStory(s: Story): Story {
+  // (the editor's own words as he gave them; everyone else's without talk of their sources)
+  const own = wordForWord(s);
+  const t = (x: string) => normalizeText(own ? x : withoutSourceTalk(x));
   return {
     ...s,
-    kicker: normalizeText(s.kicker ?? ""), headline: normalizeText(s.headline ?? ""), deck: normalizeText(s.deck ?? ""),
+    kicker: t(s.kicker ?? ""), headline: t(s.headline ?? ""), deck: t(s.deck ?? ""),
     caption: normalizeText(s.caption ?? ""),
-    bodies: { long: normalizeText(s.bodies.long), medium: normalizeText(s.bodies.medium), short: normalizeText(s.bodies.short) },
+    bodies: { long: t(s.bodies.long), medium: t(s.bodies.medium), short: t(s.bodies.short) },
   };
 }
