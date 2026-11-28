@@ -86,8 +86,10 @@ export function env(name: string): string | undefined {
 const filler = /^[\s0૦.\-–—*_=~•]+$/;
 /** A figure's place in an Aavtikal article ("[[fig 1]]"): the paper prints none of its figures (28 Nov). */
 export const FIGURE = /\[\[[^\]\n]*\]\]/g;
+/** "According to Wikipedia," leading a sentence (Aavtikal's, 28 Nov: nine in a day): the fact stays, the phrase goes. */
+export const WIKI_SAYS = /(?:વિકિપીડિયા|Wikipedia)[^,.\n।]{0,50}?(?:મુજબ|અનુસાર)\s*,?\s*/g;
 export const paragraphs = (text: string) => text.split(/\n\s*\n/)
-  .map((p) => p.replace(FIGURE, "").replace(/[0૦]{5,}|[-–—*_=]{4,}/g, "").trim())
+  .map((p) => p.replace(FIGURE, "").replace(WIKI_SAYS, "").replace(/[0૦]{5,}|[-–—*_=]{4,}/g, "").trim())
   .filter((p) => p && !filler.test(p));
 
 /** The first paragraphs of `body` that add up to at most `share` of it (at least one). */
