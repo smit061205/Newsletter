@@ -293,7 +293,11 @@
   position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 41; width: min(460px, calc(100vw - 32px));
   background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-lg); padding: 26px; display: flex; flex-direction: column; gap: 14px;
   animation: pop 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  /* a long one (33 copies' dates, 28 Nov) scrolls inside the window, never past it */
+  max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain;
 }
+/* a dialog's buttons, kept in sight at its foot while the rest scrolls */
+.dialogFoot { position: sticky; bottom: -26px; z-index: 1; margin: 0 -26px -26px; padding: 12px 26px 26px; background: var(--surface); border-top: 1px solid var(--hairline); justify-content: flex-end; }
 @keyframes pop { from { opacity: 0; transform: translate(-50%, -48%) scale(0.98); } to { opacity: 1; transform: translate(-50%, -50%); } }
 
 .toasts { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 70; display: flex; flex-direction: column; gap: 8px; align-items: center; }

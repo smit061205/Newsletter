@@ -83,7 +83,7 @@ export function CopiesTitleDialog({ date, onClose }: { date: string; onClose: ()
       ))}
       {changed && valid && <p className={s.faint}>{t("title.after")}</p>}
       {error && <Note tone="bad">{error}</Note>}
-      <div className={s.row} style={{ justifyContent: "flex-end" }}>
+      <div className={`${s.row} ${s.dialogFoot}`}>
         <Button kind="quiet" onClick={onClose} disabled={working}>{t("edit.cancel")}</Button>
         <Button kind="primary" onClick={save} disabled={!now || !valid || working}>{working ? t("title.saving") : t("edit.save")}</Button>
       </div>

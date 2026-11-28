@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.123** (no story in the paper points at its source or other papers: "according to the report" and the like are taken out at print, and the AI is told never to write them). The website's GitHub repository was disabled on 27 Nov and its jobs are off (website repo HANDOFF); its Aavtikal fix waits on branch aavtikal-no-wikipedia there. Work happens on branch
+conversations. **Latest release: v1.1.124** (a long dialog, like the copies' dates and issue numbers for 33 copies, scrolls inside the window with its buttons kept at its foot). The website's GitHub repository was disabled on 27 Nov and its jobs are off (website repo HANDOFF); its Aavtikal fix waits on branch aavtikal-no-wikipedia there. Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
