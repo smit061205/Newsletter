@@ -397,8 +397,18 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       return !!r && !alwaysPrinted(s) && isSpeechText(r) && stories.some((o) => o.id !== s.id && !dropped.has(o.id) && !!releases.get(o.id) && speechTwin(r, releases.get(o.id)!));
     };
     if (outdated.size) log(`  Telegram news sent on an earlier day, outdated: left out: ${[...outdated].join(", ")}`);
+    // a news outlet's story its check still finds fault with: left out, there's other news (28 Nov: "31" for the
+    // report's 29 printed in 22 of 33 copies); its numbers read again by today's rules, a stale flag not held against it
+    const faulty = new Set(stories.filter((s) => {
+      if (!s.id.startsWith("n") || !s.factCheck) return false;
+      const r = releases.get(s.id);
+      if (!s.factCheck.startsWith("numbers") || !r) return true;
+      const all = s.mergedFrom?.length ? s.mergedFrom.map((id) => store.release(id)).filter((x): x is NonNullable<typeof x> => !!x) : [r];
+      return numbersNotIn(`${s.headline} ${s.deck} ${s.bodies.long}`, all.map((x) => `${x.headline} ${x.subhead} ${x.body}`).join("\n"), r.date).length > 0;
+    }).map((s) => s.id));
+    if (faulty.size) log(`  news outlets' stories with a number their reports don't have: left out: ${[...faulty].join(", ")}`);
     // (never Aavtikal's explainers: the paper prints news only, 28 Nov -- "remove aavtikaal. i want only news")
-    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && !outdated.has(s.id) && !speechDup(s) && !isAavtikal(s) && (opts.copy?.translate || inPaperLanguage(s))))
+    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && !outdated.has(s.id) && !faulty.has(s.id) && !speechDup(s) && !isAavtikal(s) && (opts.copy?.translate || inPaperLanguage(s))))
       .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
       .sort(byRank);
     // the editorial plan ranks the day's stories (an editor's own rank wins)

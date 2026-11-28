@@ -225,17 +225,27 @@ export function numbersNotIn(out: string, source: string, date?: string): string
   }
   // "377 million" is "૩૭.૭ કરોડ" in an Indian paper: millions, billions, crores and lakhs as each other
   const asNumber = (n: number) => String(Math.round(n * 1000) / 1000);
-  for (const m of latin.replace(/,/g, "").matchAll(/(\d+(?:\.\d+)?)\s*(million|billion|crore|lakh|કરોડ|લાખ|करोड़|करोड|लाख)/gi)) {
-    const v = Number(m[1]);
-    const unit = m[2].toLowerCase();
-    const units = /million/.test(unit) ? v * 1e6 : /billion/.test(unit) ? v * 1e9 : /crore|કરોડ|करोड/.test(unit) ? v * 1e7 : v * 1e5;
+  const scales = (v: number, unit: string) => {
+    const units = /million/i.test(unit) ? v * 1e6 : /billion/i.test(unit) ? v * 1e9 : /crore|કરોડ|करोड/i.test(unit) ? v * 1e7 : v * 1e5;
     for (const per of [1e5, 1e6, 1e7, 1e9]) known.add(asNumber(units / per));
+  };
+  for (const m of latin.replace(/,/g, "").matchAll(/(\d+(?:\.\d+)?)\s*(million|billion|crore|lakh|કરોડ|લાખ|करोड़|करोड|लाख)/gi)) scales(Number(m[1]), m[2]);
+  // ... and in words: "one million" is "૧૦ લાખ" (28 Nov: a PIB translation flagged for its correct "૧૦")
+  for (const m of latin.matchAll(/(?<![\p{L}\p{M}])([\p{L}\p{M}]+)\s+(million|billion|crore|lakh|કરોડ|લાખ|करोड़|करोड|लाख)/giu)) {
+    const k = /^an?$/i.test(m[1]) ? 1 : NUMBER_WORDS.findIndex((ws) => ws.includes(m[1].toLowerCase()));
+    if (k > 0) scales(k, m[2]);
   }
   // a name's Roman numeral, "Tara Polaris I", "Chandrayaan-II": its figure in a translation (7 Nov: ૧ flagged)
-  const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
-  for (const m of source.matchAll(/\b[A-Z][\p{L}]+[ -](X|IX|IV|V?I{0,3})\b( [a-z])?/gu)) {
-    const k = m[1] === "I" && m[2] ? -1 : ROMAN.indexOf(m[1]); // "As I said": the word, not a numeral
-    if (k >= 0) known.add(String(k + 1));
+  // (and past ten: "SRP Group XVI" is the story's "ગ્રુપ ૧૬", 28 Nov)
+  const roman = (r: string) => {
+    const v: Record<string, number> = { I: 1, V: 5, X: 10, L: 50 };
+    let n = 0;
+    for (let i = 0; i < r.length; i++) n += v[r[i]] < (v[r[i + 1]] ?? 0) ? -v[r[i]] : v[r[i]];
+    return n;
+  };
+  for (const m of source.matchAll(/\b[A-Z][\p{L}]+[ -]((?:XL|L?X{0,3})(?:IX|IV|V?I{0,3}))\b( [a-z])?/gu)) {
+    if (!m[1] || (m[1] === "I" && m[2])) continue; // "As I said": the word, not a numeral
+    known.add(String(roman(m[1])));
   }
   // "આઠ હજાર 224", "બે હજાર 356": thousands in words, the rest in figures (All India Radio's way) = 8224, 2356
   for (const m of latin.matchAll(/([\p{L}\p{M}]+)\s+(हज़ार|हजार|હજાર)\s+(\d{1,3})(?!\d)/gu)) {

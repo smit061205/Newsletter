@@ -25,7 +25,11 @@ export const FILE_PHOTO = "ફાઇલ ફોટો: ";
 /** What the AI is told when it writes a section story from a news outlet's report (and writes it again, editorial/repair.ts). */
 export const OWN_WORDS = (title: string, reports: number) =>
   `\nThe text below is ${reports > 1 ? `${reports} news reports of the same news` : reports === 1 ? "a news report" : "one or more news reports of the same news"}, not a press release: write the paper's own story ` +
-  `for its "${title}" page from its facts alone, in your own words -- never copy its sentences, and don't name the outlet.`;
+  `for its "${title}" page from its facts alone, in your own words -- never copy its sentences, and don't name the outlet. ` +
+  // (28 Nov: "however, the report's figures add up to 31, not 29" printed in a story, and in its sub-heading)
+  `Write it as the paper's own news, plainly: never say "the report", "according to the report" or the like, and never ` +
+  `comment on the report itself (its wording, what it leaves out, figures that don't add up). Where its figures disagree ` +
+  `with each other, leave out the ones that disagree: give the parts without the total, or the total without the parts.`;
 
 /** The most stories chosen for a section page (it prints six or seven; the rest are its reserve). */
 const MOST = 9;
