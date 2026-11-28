@@ -36,7 +36,7 @@ import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typograp
 import { profile } from "./profile.ts";
 import { wordCount } from "./editorial/quality.ts";
 import { paperArticleStories } from "./editorial/articles.ts";
-import { alwaysPrinted, sectionsDay, storyIdOf, wordForWord, type Progress, type Store, type Story } from "./store.ts";
+import { alwaysPrinted, isAavtikal, sectionsDay, storyIdOf, wordForWord, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
   /** the page review left to run after the paper is saved (reviewLater): the paper is ready a minute sooner */
@@ -149,6 +149,9 @@ export interface CopyOpts {
   /** stories never this copy's editor's column: the day's paper's own (22 Nov: copy 1 printed the day's
    * column again, its own website article not set and the day's first pick next in line) */
   notColumn?: string[];
+  /** the day's stories this copy alone may set as its editor's column, best first, after its own website
+   * articles (`column`): given, no other story is (editorial/copies.ts: no two copies the same, 28 Nov) */
+  columnStories?: string[];
 }
 
 /** The editor's Telegram news: a wide photo of the several he sent, where its first is tall (18 Nov: a tall
@@ -499,11 +502,16 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // (copies too, the day's own pick: from 2 Nov they had none, the column being no must; 13 Nov, the
     // developer: "the copy removed tantri sthanethi")
     if (columnTitle) {
-      const fit = pool.filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && wordCount(s.bodies.long) >= COLUMN_WORDS);
+      // (never an Aavtikal explainer: the column is the paper's own word on the day's news, Gujarat's first)
+      const fit = pool.filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && !isAavtikal(s) && wordCount(s.bodies.long) >= COLUMN_WORDS);
       const prefers = profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null;
       const local = (s: Story) => Number(!!prefers?.test(`${s.headline} ${s.bodies.long.slice(0, 300)}`));
       columnPicks = fit.sort((a, b) => local(b) - local(a) || Number(!!a.translatedFrom) - Number(!!b.translatedFrom) || Number(!!a.photo) - Number(!!b.photo)
                                      || b.bodies.long.length - a.bodies.long.length || a.id.localeCompare(b.id)).map((s) => s.id);
+      // a copy given its own stories for it (editorial/copies.ts, 28 Nov): those alone, none another copy has,
+      // and no turn of the day's picks after them (with 6 copies and 2 or 3 picks, they came round again)
+      const own = opts.copy?.columnStories;
+      if (own) columnPicks = own.filter((id) => fit.some((x) => x.id === id));
     }
     // feature articles print like the news: no kicker, no special title (24 Oct, the editor's wish)
     pool = pool.map((s) => (s.id.startsWith("f-") ? { ...s, kicker: "" } : s));
@@ -633,12 +641,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // turn of pages 2, 3 and 4 (14 Nov: 7 of 8 copies had the same story in it, all on page 4)
     columnPicks = columnPicks.filter((id) => id !== pool[0]?.id && !opts.copy?.notColumn?.includes(id));
     let columnPage: number | undefined;
-    if (opts.copy?.number && opts.copy.shuffle !== "samePage" && columnPicks.length) {
+    if (opts.copy?.number && opts.copy.shuffle !== "samePage" && columnPicks.length && !opts.copy.columnStories) {
       const k = opts.copy.number - 1;
       const few = Math.min(COLUMN_TURNS, columnPicks.length);
       columnPicks = [...columnPicks.slice(k % few, few), ...columnPicks.slice(0, k % few), ...columnPicks.slice(few)];
       if (total >= 4) columnPage = 2 + (Math.floor(k / few) + k) % 3;
-    }
+    } else if (opts.copy?.number && opts.copy.columnStories && total >= 4) columnPage = 2 + (opts.copy.number - 1) % 3;
     // a copy's articles (and the editor's news) each on its turn of the pages: article k in copy n on page
     // (k + n - 1) mod the pages, where that page can take it (the developer, 15 Nov: "those article's position
     // still repeated in few copies" -- the shuffle leant on importance, and the same ones came first)
