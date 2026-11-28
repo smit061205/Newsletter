@@ -47,8 +47,16 @@ export async function writeNews(store: Store, date: string, want: number, log: (
     // (the day's own date, not the outlets' day: what the story says is dated by it)
     const report: Release = { ...r, date, photos: [], ...(others.length ? { body: [r.body, ...others.map((o) => o.body)].join("\n\n") } : {}) };
     try {
-      const w = await rewriteOne(report, model, key, 1, OWN_WORDS(news.title, others.length + 1));
+      let w = await rewriteOne(report, model, key, 1, OWN_WORDS(news.title, others.length + 1));
       cost += w.cost;
+      // a number not in the reports: written once more without it, else left out -- there's other news,
+      // and a wrong figure is worse than none (28 Nov: "31" where the report said 29)
+      if (w.story.factCheck) {
+        w = await rewriteOne(report, model, key, 1, OWN_WORDS(news.title, others.length + 1) +
+          `\nIMPORTANT: a first version put in numbers that are not in the reports (${w.story.factCheck.replace(/^[^:]*:\s*/, "")}). Use only numbers the reports give.`);
+        cost += w.cost;
+        if (w.story.factCheck) { log(`  ${r.headline.slice(0, 50)}: ${w.story.factCheck}: left out`); return null; }
+      }
       // (after the official news: a story the AI ranks higher still follows theirs)
       return { ...w.story, date, priority: k < 3 ? 4 : 5, page: null, photo: null, photos: [], caption: "",
                ...(others.length ? { mergedFrom: [r.id, ...others.map((o) => o.id)] } : {}) };
