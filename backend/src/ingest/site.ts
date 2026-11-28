@@ -109,10 +109,13 @@ export async function ingestSite(store: Store, date: string, opts: { log?: (s: s
 export async function columnArticles(store: Store, date: string, count: number,
                                      opts: { minWords: number; avoid?: Pick<Release, "headline" | "body">[]; prefers?: RegExp | null }): Promise<Release[]> {
   if (count <= 0) return [];
+  // (the day's, then the day before's the paper didn't print: 28 Nov, the website's news jobs were down
+  // and it listed none for the day)
   const got = await day(date);
+  const before = await day(dayBefore(date)).catch(() => ({ stories: [] as Day["stories"] }));
   const taken = [...store.releases(dayBefore(date)), ...store.releases(date)].filter((r) => !r.lang || r.lang === "gu");
   const fit: { release: Release; local: number }[] = [];
-  for (const s of got.stories) {
+  for (const s of [...got.stories, ...before.stories]) {
     const id = idOf(s.id);
     if (store.hasRelease(id)) continue;
     const body = paragraphs(s.body).join("\n\n");
@@ -127,6 +130,30 @@ export async function columnArticles(store: Store, date: string, count: number,
     });
   }
   // (a stable sort: the website's order kept among Gujarat's and among the rest)
+  return fit.sort((a, b) => b.local - a.local).slice(0, count).map((x) => x.release);
+}
+
+/** The day's (and the day before's) official releases in Gujarati -- PIB's, the state government's -- that
+ * no story was written from, for the copies' editor's columns after the website's articles (the developer,
+ * 28 Nov: "can't you add more news sources for editor's column?"): each printed as it was published (no AI),
+ * `minWords` long or more, none the same news as a story of those days, as a text in `avoid` or as another
+ * of them; Gujarat's first (as the column prefers), the day's before the day before's. */
+export function columnReleases(store: Store, date: string, count: number,
+                               opts: { minWords: number; avoid?: Pick<Release, "headline" | "body">[]; prefers?: RegExp | null }): Release[] {
+  if (count <= 0) return [];
+  const stories = [...store.stories(dayBefore(date)), ...store.stories(date)];
+  const written = new Set(stories.map((x) => x.id));
+  const told = stories.map((x) => ({ headline: x.headline, body: x.bodies.long }) as Release);
+  const fit: { release: Release; local: number }[] = [];
+  for (const r of [...store.releases(date), ...store.releases(dayBefore(date))]) {
+    if (r.lang !== "gu" || !["pib", "cmo", "air"].includes(r.source ?? "") || written.has(storyIdOf(r))) continue;
+    const body = paragraphs(r.body).join("\n\n");
+    if (!r.headline.trim() || body.split(/\s+/).filter(Boolean).length < opts.minWords) continue;
+    if (!settable(`${r.headline} ${r.subhead} ${body}`)) continue;
+    const text = { headline: r.headline, body };
+    if (sameNewsIn(text, [...told, ...fit.map((x) => x.release)]) || opts.avoid?.some((a) => newsOverlap(text, a) >= 0.4)) continue;
+    fit.push({ release: { ...r, photos: [] }, local: Number(/ગુજરાત|ગાંધીનગર|અમદાવાદ/.test(`${r.office} ${r.ministry ?? ""} ${r.headline}`) || !!opts.prefers?.test(`${r.headline} ${body.slice(0, 300)}`)) });
+  }
   return fit.sort((a, b) => b.local - a.local).slice(0, count).map((x) => x.release);
 }
 

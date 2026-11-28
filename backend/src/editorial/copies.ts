@@ -42,7 +42,7 @@ import { settable, wordCount } from "./quality.ts";
 import { applyTextEdits, droppedBy, foreignLetters } from "../layout/stories.ts";
 import { newsOverlap } from "./translate.ts";
 import { paperArticles } from "./articles.ts";
-import { columnArticles } from "../ingest/site.ts";
+import { columnArticles, columnReleases } from "../ingest/site.ts";
 import { cutsOf, shortenArticles } from "./shorten.ts";
 
 export type Reword = "headline" | "headlineDeck" | "all";
@@ -879,21 +879,52 @@ export async function makeCopies(store: Store, date: string, opts: { count: numb
           });
         } catch (e) { say(`the editor's column: the paper's website didn't answer (${e instanceof Error ? e.message : e})`); }
       }
+      // then the official releases no story was written from (in Gujarati, printed as published)
+      const official = translate ? [] : columnReleases(store, date, opts.count + COLUMN_SPARES - columns.length, {
+        minWords: COLUMN_WORDS, prefers: profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null,
+        avoid: [...columns, ...(opts.articles ?? []).flatMap((a) => a.bodies.map((body) => ({ headline: a.titles[0] ?? "", body })))],
+      });
+      const fromWeb = columns.length;
+      columns = [...columns, ...official];
       const prefers = profile.editorial.columnPrefers ? new RegExp(profile.editorial.columnPrefers) : null;
       const printed = new Set(day.pageOf.map(([id]) => id));
       const local = (x: Story) => Number(!!prefers?.test(`${x.headline} ${x.bodies.long.slice(0, 300)}`));
       const stories = store.stories(date).filter((x) => x.id !== day.column && x.id !== day.lead && !x.id.startsWith("f-") && !isAavtikal(x)
         && !alwaysPrinted(x) && !wordForWord(x) && !same.ids.includes(x.id) && wordCount(x.bodies.long) >= COLUMN_WORDS)
         .sort((a, b) => Number(printed.has(a.id)) - Number(printed.has(b.id)) || local(b) - local(a) || b.bodies.long.length - a.bodies.long.length || a.id.localeCompare(b.id));
-      const all = [...columns.map((r) => ({ release: r })), ...stories.map((x) => ({ id: x.id }))];
+      // the day before's stories its paper didn't print, already written in Gujarati (28 Nov: 25 of 51), after
+      // the day's left out and before its printed: each as a text of its own for the copy (no AI)
+      const before = new Date(Date.parse(`${date}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+      const was = store.latestIssue(before)?.report as { placed?: { story: string }[] } | undefined;
+      const wasPrinted = new Set((was?.placed ?? []).map((p) => p.story));
+      const today = [...store.stories(date).map((x) => ({ headline: x.headline, body: x.bodies.long })), ...columns];
+      const yesterday: Release[] = [];
+      for (const x of store.stories(before).filter((x) => was && !wasPrinted.has(x.id) && !x.id.startsWith("f-") && !isAavtikal(x) && !alwaysPrinted(x)
+             && !wordForWord(x) && !x.section && wordCount(x.bodies.long) >= COLUMN_WORDS && settable(`${x.headline} ${x.bodies.long}`))
+             .sort((a, b) => local(b) - local(a) || b.bodies.long.length - a.bodies.long.length)) {
+        const text = { headline: x.headline, body: x.bodies.long };
+        if ([...today, ...yesterday].some((t) => newsOverlap(text, t) >= 0.4)) continue;
+        if ((opts.articles ?? []).some((a) => a.bodies.some((body) => newsOverlap(text, { headline: a.titles[0] ?? "", body }) >= 0.4))) continue;
+        const r = x.releaseId !== undefined ? store.releases(before).find((y) => y.id === x.releaseId) : undefined;
+        yesterday.push({ id: r?.id ?? Number(x.id.replace(/\D/g, "")), date, url: x.source ?? "", office: r?.office ?? "", headline: x.headline, subhead: x.deck ?? "",
+                         body: x.bodies.long, photos: [], fetchedAt: new Date().toISOString(), source: r?.source ?? "site", lang: "gu", ...(r?.ministry ? { ministry: r.ministry } : {}) });
+      }
+      type Pick = { release: Release; from: "web" | "official" | "yesterday" } | { id: string };
+      const all: Pick[] = [...columns.map((r, k): Pick => ({ release: r, from: k < fromWeb ? "web" : "official" })),
+        ...stories.filter((x) => !printed.has(x.id)).map((x): Pick => ({ id: x.id })),
+        ...yesterday.map((r): Pick => ({ release: r, from: "yesterday" })),
+        ...stories.filter((x) => printed.has(x.id)).map((x): Pick => ({ id: x.id }))];
       const lists = Array.from({ length: opts.count }, (_, i) => all.slice(i, i + 1));
       all.slice(opts.count).forEach((x, k) => lists[k % opts.count].push(x));
       columnsOf = lists.map((l) => l.flatMap((x) => ("release" in x ? [x.release] : [])));
       mine = lists.map((l) => l.flatMap((x) => ("id" in x ? [x.id] : [])));
-      const web = lists.filter((l) => l[0] && "release" in l[0]).length;
-      const none = lists.filter((l) => !l.length).length;
-      say(`the editor's column: each copy its own, none another copy's` + (web ? `; ${web} from the paper's website` : "; the website has none the paper doesn't print") +
-          (opts.count - web - none ? `; ${opts.count - web - none} of the day's stories` : "") + (none ? `; ${none} without one (not enough stories for each its own)` : ""));
+      const firsts = lists.map((l) => l[0]);
+      const of = (f: string) => firsts.filter((x) => x && "release" in x && x.from === f).length;
+      const days = firsts.filter((x) => x && "id" in x).length;
+      const none = firsts.filter((x) => !x).length;
+      say(`the editor's column: each copy its own, none another copy's` + (of("web") ? `; ${of("web")} from the paper's website` : "; the website has none the paper doesn't print") +
+          (of("official") ? `; ${of("official")} from official releases no story was written from` : "") + (days ? `; ${days} of the day's stories` : "") +
+          (of("yesterday") ? `; ${of("yesterday")} of yesterday's stories its paper didn't print` : "") + (none ? `; ${none} without one (not enough stories for each its own)` : ""));
     }
     const tasks: Task[] = Array.from({ length: opts.count }, (_, i) => ({
       lang, label: `copy ${i + 1}`, spec: base, seen: day.seen,
