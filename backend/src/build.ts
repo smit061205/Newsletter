@@ -36,7 +36,7 @@ import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typograp
 import { profile } from "./profile.ts";
 import { wordCount } from "./editorial/quality.ts";
 import { paperArticleStories } from "./editorial/articles.ts";
-import { alwaysPrinted, isAavtikal, sectionsDay, storyIdOf, wordForWord, type Progress, type Store, type Story } from "./store.ts";
+import { AAVTIKAL_MOST, alwaysPrinted, isAavtikal, sectionsDay, storyIdOf, wordForWord, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
   /** the page review left to run after the paper is saved (reviewLater): the paper is ready a minute sooner */
@@ -501,6 +501,12 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const columnTitle = profile.editorial.columnTitle;
     // (copies too, the day's own pick: from 2 Nov they had none, the column being no must; 13 Nov, the
     // developer: "the copy removed tantri sthanethi")
+    // a copy: at most AAVTIKAL_MOST of Aavtikal's explainers (28 Nov: the day's 16 gave each copy 2 to 6, and a
+    // copy leaves 20 stories and more out); the day's paper prints what the fill step took, which keeps to it
+    if (opts.copy) {
+      let explainers = 0;
+      pool = pool.filter((s) => !isAavtikal(s) || alwaysPrinted(s) || ++explainers <= AAVTIKAL_MOST);
+    }
     if (columnTitle) {
       // (never an Aavtikal explainer: the column is the paper's own word on the day's news, Gujarat's first)
       const fit = pool.filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && !isAavtikal(s) && wordCount(s.bodies.long) >= COLUMN_WORDS);
