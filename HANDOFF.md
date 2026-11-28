@@ -13,7 +13,7 @@ technical manual) as needed.
 ## State on 4 November 2026 (read this first)
 
 Written for the next Claude Code session, on another Claude account, which has none of the earlier
-conversations. **Latest release: v1.1.120** (each copy at most 3 Aavtikal articles). The website's GitHub repository was disabled on 27 Nov and its jobs are off (website repo HANDOFF); its Aavtikal fix waits on branch aavtikal-no-wikipedia there. Work happens on branch
+conversations. **Latest release: v1.1.121** (news only: Aavtikal removed; a short day filled from news outlets' Gujarat and India news, written in the paper's own words). The website's GitHub repository was disabled on 27 Nov and its jobs are off (website repo HANDOFF); its Aavtikal fix waits on branch aavtikal-no-wikipedia there. Work happens on branch
 `feat/third-engine`, merged to `main` with `--no-ff` after the checks, then tagged (§5, CLAUDE.md).
 
 **The title's date and અંક changed after the paper is made** (13 Nov, v1.1.100; the developer: "give
@@ -208,7 +208,7 @@ had one fixed length, and stories side by side must end level -- three fixed len
   thrown away (6 Nov's 873-word article got no shorter length; now 15 of 15 do).
 - **v1.1.96:** the paper's own website as a source, allowed on all pages (the user, 7 Nov): its published
   stories (`/api/paper` in the website repo) taken after the official sources, duplicates left out, printed
-  as written; Aavtikal's articles fill a thin day before AI features (`ingest/site.ts`). 7 Nov: 80 listed,
+  as written (`ingest/site.ts`). From 28 Nov a thin day is filled with news outlets' Gujarat and India news (profile `news`, `editorial/news.ts`), never Aavtikal. 7 Nov: 80 listed,
   72 taken on a scratch copy (5 duplicates, 3 with letters the fonts can't print), 0 government photos.
 - **v1.1.97:** the bugs from the 11 Nov audit (logs of 8-11 Nov, the whole app tested on a scratch copy):
   a fact check the AI didn't answer no longer passes (gate 6b, the stories named on the Review screen;

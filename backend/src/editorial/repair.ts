@@ -8,7 +8,8 @@ import type { Store, Story } from "../store.ts";
 import { DEFAULT_MODEL, env, numbersNotIn, rewriteOne } from "./rewrite.ts";
 import { translateOne } from "./translate.ts";
 import { checkFacts, toRefit } from "./facts.ts";
-import { FILE_PHOTO } from "./sections.ts";
+import { FILE_PHOTO, OWN_WORDS } from "./sections.ts";
+import { profile } from "../profile.ts";
 
 /** Writes the day's number-flagged stories again. Returns how many came out clean. */
 export async function repairFacts(store: Store, date: string, log: (s: string) => void, only?: Set<string>, opts: { note?: string; merged?: boolean } = {}): Promise<number> {
@@ -33,7 +34,9 @@ export async function repairFacts(store: Store, date: string, log: (s: string) =
       : `\nIMPORTANT: a first version of this story said things that are not in the release (${nums}). Use only the names, places, dates and quotations the release gives.`;
     try {
       const got = s.translatedFrom ? await translateOne(r, key, undefined, note)
-        : await rewriteOne(r, s.model && s.model !== "as-is" ? s.model : env("OPENROUTER_MODEL") ?? DEFAULT_MODEL, key, 1, `${opts.note ?? ""}${note}`);
+        : await rewriteOne(first.source === "news" ? { ...r, date: s.date, photos: [] } : r, s.model && s.model !== "as-is" ? s.model : env("OPENROUTER_MODEL") ?? DEFAULT_MODEL, key, 1,
+                           // (a news outlet's report: the paper's own words still, editorial/news.ts)
+                           `${opts.note ?? (first.source === "news" ? OWN_WORDS(profile.news?.title ?? "", others.length + 1) : "")}${note}`);
       const left = numbersNotIn(`${got.story.headline} ${got.story.deck} ${got.story.bodies.long}`, `${r.headline} ${r.subhead} ${r.body}`, r.date);
       if (left.length) { log(`  ${s.id}: written again, still with ${left.join(", ")}: left for the editor`); return; }
       const wrong = (await checkFacts(store, { ...s, headline: got.story.headline, deck: got.story.deck, bodies: got.story.bodies }, log)).problems;

@@ -43,6 +43,26 @@ const TextStyleSchema = z.object({
   pitch: pt.optional(),
 });
 
+/** A section of the paper and its news sources (profile `sections`, `news`). */
+const SectionSchema = z.object({
+  id: z.string().min(1),
+  /** the page's title, printed across its top */
+  title: z.string().min(1),
+  /** what the page is about, for the AI that chooses its news */
+  about: z.string().min(1),
+  /** PIB ministries whose releases are this page's news (a regular expression on the ministry's name) */
+  ministries: z.string().optional(),
+  feeds: z.array(z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    /** an RSS or Atom feed */
+    url: z.string().url(),
+    lang: z.enum(["gu", "hi", "en"]),
+    /** the source's photos may be printed (a government's own, NASA's): a news outlet's are its own, never */
+    photos: z.boolean().optional(),
+  })),
+});
+
 export const ProfileSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1),
@@ -66,24 +86,11 @@ export const ProfileSchema = z.object({
   /** The 8-page paper (the editor, 3 Nov): the day's pages, then a page for each of these, made every
    * evening beside the day's paper. Each takes its own news: its sources' feeds, and the day's PIB
    * releases from its ministries that the day's pages didn't print. */
-  sections: z.array(z.object({
-    id: z.string().min(1),
-    /** the page's title, printed across its top */
-    title: z.string().min(1),
-    /** what the page is about, for the AI that chooses its news */
-    about: z.string().min(1),
-    /** PIB ministries whose releases are this page's news (a regular expression on the ministry's name) */
-    ministries: z.string().optional(),
-    feeds: z.array(z.object({
-      id: z.string().min(1),
-      name: z.string().min(1),
-      /** an RSS or Atom feed */
-      url: z.string().url(),
-      lang: z.enum(["gu", "hi", "en"]),
-      /** the source's photos may be printed (a government's own, NASA's): a news outlet's are its own, never */
-      photos: z.boolean().optional(),
-    })),
-  })).optional(),
+  sections: z.array(SectionSchema).optional(),
+  /** More news for the day's pages (28 Nov: "i want only news"), the same kind of list as a section's:
+   * news outlets' Gujarat and India feeds, read where their robots rules allow it, the paper's own story
+   * written from their facts when the official news leaves the pages short. */
+  news: SectionSchema.optional(),
   page: z.object({ width: pt.positive(), height: pt.positive() }),
   grid: z.object({
     left: pt, // first column's left edge

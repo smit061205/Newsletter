@@ -15,7 +15,7 @@ import path from "node:path";
 import { buildIssue } from "./build.ts";
 import { OUT_DIR, outName } from "./config.ts";
 import type { EnginePage } from "./layout/engine.ts";
-import { AAVTIKAL_MOST, isAavtikal, sectionsDay, type Job, type JobStep, type Progress, type StepName, type Store } from "./store.ts";
+import { sectionsDay, type Job, type JobStep, type Progress, type StepName, type Store } from "./store.ts";
 
 export const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build", "sections"];
 
@@ -23,6 +23,8 @@ export const STEPS: StepName[] = ["fetch", "rewrite", "topup", "fill", "build", 
 let built: { date: string; version: number; pages: (EnginePage | null)[] } | null = null;
 /** The 8-page paper's own news, read beside the day's (begun in "fetch"). */
 let sectionsRead: { date: string; run: Promise<unknown> } | null = null;
+/** The news outlets' news being read beside the paper's other sources (fetch step), for the fill step. */
+let newsRead: { date: string; run: Promise<unknown> } | null = null;
 
 type Listener = (job: Job, line?: string) => void;
 const listeners = new Set<Listener>();
@@ -188,6 +190,11 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         const { ingestSections } = await import("./ingest/sections.ts");
         sectionsRead = { date, run: ingestSections(store, date, () => {}).catch(() => {}) };
       }
+      // (and the news outlets' news, for a day the official news leaves short: the fill step)
+      if (paper.news) {
+        const { ingestNews } = await import("./ingest/sections.ts");
+        newsRead = { date, run: ingestNews(store, date, () => {}).catch(() => {}) };
+      }
       // then the CM's office and All India Radio's Gujarati news (a Gujarati
       // paper): extra copy, so a site not answering never stops the paper
       // (read side by side with PIB: each site at its own polite pace)
@@ -295,7 +302,7 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
       const { writeFeatures } = await import("./editorial/features.ts");
       const { profile } = await import("./profile.ts");
       const WANT = 1.1;
-      for (let round = 0; round < 3; round++) {
+      for (let round = 0; round < 4; round++) {
         const ctx = await fillContext(store, date);
         const share = ctx.share();
         const features = store.stories(date).filter((s) => s.id.startsWith("f-"));
@@ -304,13 +311,18 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
         if (share >= WANT) return say(`the copy fills ${(share * 100).toFixed(0)}% of the pages${round ? "" : ": no features needed"}`);
         // how many more, from a feature's size (a first guess: an eighth of a page)
         const need = Math.ceil(((WANT - share) * ctx.room) / (each || ctx.room / (8 * profile.issue.pages)));
-        // Aavtikal's articles first, already written and checked: the AI only for what's still short (7 Nov:
-        // it didn't answer for most of an hour, and only 2 of 14 features came)
-        if (round === 0 && profile.language.lang === "gu") {
-          const { takeAavtikal } = await import("./ingest/site.ts");
-          const took = await takeAavtikal(store, date, Math.min(need, AAVTIKAL_MOST - store.stories(date).filter(isAavtikal).length), say).catch((e: unknown) => { say(`  Aavtikal couldn't be read (${e instanceof Error ? e.message : e})`); return 0; });
-          // (a few at most: each is a long explainer, and 28 Nov's 16 filled the copies with them; the rest as features)
-          if (took) { say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: ${took} of Aavtikal's articles taken`); continue; }
+        // the news outlets' Gujarat and India news first, written as the paper's own (28 Nov: "i want only
+        // news"); the AI's feature articles only when they have no more and the pages are still short
+        if (profile.news) {
+          if (newsRead?.date === date) await newsRead.run;
+          newsRead = null;
+          const { ingestNews } = await import("./ingest/sections.ts");
+          await timed("the news outlets", () => ingestNews(store, date, say)).catch((e: unknown) => { if (stopping) throw e; });
+          const { writeNews } = await import("./editorial/news.ts");
+          const got = await timed("the news outlets' stories", () => writeNews(store, date, need, say))
+            .catch((e: unknown) => { if (stopping) throw e; say(`  the news outlets' news couldn't be written (${e instanceof Error ? e.message : e})`); return { written: 0, cost: 0 }; });
+          if (got === null) break; // no AI key
+          if (got.written) { say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: ${got.written} story(ies) written from the news outlets' news`); continue; }
         }
         say(`the copy fills ${(share * 100).toFixed(0)}% of the pages: writing ${need} feature article(s)`);
         progress({ done: round, total: round + 1, label: "features", item: `${(share * 100).toFixed(0)}%` });
@@ -321,19 +333,6 @@ async function step(store: Store, date: string, name: StepName, say: (s: string)
           writeFeatures(store, date, Math.min(3, need - 3 * i), { log: say, subjects: SUBJECTS.filter((_, k) => k % calls === i) })
             .catch((e: unknown) => { say(`  features failed (${e instanceof Error ? e.message : e})`); return 0; })));
         if (costs.some((c) => c === null)) break; // no AI key
-      }
-      // the last resort, the AI having written too few (or none): more of Aavtikal's, past the usual few,
-      // rather than blank pages
-      if (profile.language.lang === "gu") {
-        const ctx = await fillContext(store, date);
-        const share = ctx.share();
-        await ctx.close();
-        if (share < 1) {
-          const { takeAavtikal } = await import("./ingest/site.ts");
-          const more = Math.ceil(((1.05 - share) * ctx.room) / (ctx.room / (4 * profile.issue.pages)));
-          const took = await takeAavtikal(store, date, more, say).catch(() => 0);
-          if (took) say(`the copy fills ${(share * 100).toFixed(0)}% of the pages with too few features written: ${took} more of Aavtikal's articles taken`);
-        }
       }
       return;
     }

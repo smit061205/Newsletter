@@ -20,7 +20,7 @@ export interface Release {
   fetchedAt: string;
   /** where it came from: the state's Information Department (the default, for older rows), PIB,
    * the Gujarat CM's office or All India Radio's Gujarati news (ingest/official.ts), the paper's own website (ingest/site.ts) */
-  source?: "gujinfo" | "pib" | "cmo" | "air" | "un" | "telegram" | "section" | "site";
+  source?: "gujinfo" | "pib" | "cmo" | "air" | "un" | "telegram" | "section" | "site" | "news";
   /** its language: Gujarati (the default), or Hindi or English, which are translated */
   lang?: "gu" | "hi" | "en";
   /** PIB: the ministry that issued it */
@@ -33,16 +33,16 @@ export interface Release {
 
 /** The story made from a release: "p<PRID>" for PIB's, "c…" the CM's office's, "a…" All India Radio's, "u…" UN News's,
  * "t…" one sent to the paper's Telegram bot, "w…" the paper's website's, "r<id>" the state's. */
-/** An Aavtikal article (the paper's website's explainers, ingest/site.ts takeAavtikal): taken on a day short of
- * news, a few at most, inside pages, never the editor's column (28 Nov: 16 in one paper, 5 to 8 a copy). */
+/** An Aavtikal article (the paper's website's explainers), once taken on a day short of news: never printed
+ * now, the paper news only (28 Nov: "remove aavtikaal. i want only news"); those already saved are left out. */
 export const isAavtikal = (s: { source?: string }) => /\/aavtikal\//.test(s.source ?? "");
-/** The most Aavtikal articles one paper prints. */
-export const AAVTIKAL_MOST = 3;
-export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u", telegram: "t", section: "s", site: "w" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
+export const storyIdOf = (r: Pick<Release, "id" | "source">) => `${({ pib: "p", cmo: "c", air: "a", un: "u", telegram: "t", section: "s", site: "w", news: "n" } as Record<string, string>)[r.source ?? ""] ?? "r"}${r.id}`;
 
 /** Where the 8-page paper's own news (its pages after the day's) is kept: a day of its own beside
  * the paper's, so nothing that makes the day's paper, its copies or its checks ever sees it (3 Nov). */
 export const sectionsDay = (date: string) => `${date}+sections`;
+/** The news outlets' items for a day's pages (profile `news`), kept apart from its own releases until one is written. */
+export const newsDay = (date: string) => `${date}+news`;
 
 /** A message sent to the paper's Telegram bot (ingest/telegram.ts): news text, or a photo for it. */
 export interface InboxItem {

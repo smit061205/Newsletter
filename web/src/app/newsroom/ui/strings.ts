@@ -333,7 +333,7 @@ const gu = {
   "settings.save": "સાચવો",
   "settings.saved": "સાચવ્યું",
   "settings.news": "સમાચાર ક્યાંથી",
-  "settings.newsBody": "સૌથી પહેલાં તમે ટેલિગ્રામ પર મોકલેલા સમાચાર. પછી PIB ની ગુજરાતી પ્રેસ રિલીઝ (ઓછી પડે ત્યારે હિન્દી અને અંગ્રેજી, અનુવાદ કરીને), મુખ્યમંત્રી કાર્યાલય, આકાશવાણી અને સંયુક્ત રાષ્ટ્રના સમાચાર, પછી કેપિટલ ક્રાંતિની પોતાની વેબસાઇટના સમાચાર (જેમ લખાયા તેમ) અને ઓછા સમાચારના દિવસે આવતીકાલના લેખ. ૮ પાનાંના છાપાના વિભાગો માટે સમાચાર વેબસાઇટ્સ (હકીકતો જ, લખાણ આપણું), અને જરૂર પડે ત્યારે વિકિપીડિયાનો ફોટો.",
+  "settings.newsBody": "સૌથી પહેલાં તમે ટેલિગ્રામ પર મોકલેલા સમાચાર. પછી PIB ની ગુજરાતી પ્રેસ રિલીઝ (ઓછી પડે ત્યારે હિન્દી અને અંગ્રેજી, અનુવાદ કરીને), મુખ્યમંત્રી કાર્યાલય, આકાશવાણી અને સંયુક્ત રાષ્ટ્રના સમાચાર, પછી કેપિટલ ક્રાંતિની પોતાની વેબસાઇટના સમાચાર (જેમ લખાયા તેમ), અને ઓછા સમાચારના દિવસે ગુજરાત અને દેશના સમાચાર વેબસાઇટ્સના સમાચાર (હકીકતો જ, લખાણ આપણું). ૮ પાનાંના છાપાના વિભાગો માટે સમાચાર વેબસાઇટ્સ (હકીકતો જ, લખાણ આપણું), અને જરૂર પડે ત્યારે વિકિપીડિયાનો ફોટો.",
 
   "common.close": "બંધ કરો",
   "common.back": "પાછા",
@@ -965,7 +965,7 @@ const en: Record<StringKey, string> = {
   "settings.save": "Save",
   "settings.saved": "Saved",
   "settings.news": "Where the news comes from",
-  "settings.newsBody": "First, the news you send on Telegram. Then PIB's Gujarati press releases (Hindi and English ones translated when they're short), the Chief Minister's Office, All India Radio and UN News; then the paper's own website (as it wrote them), and Aavtikal's articles on a day short of news. For the 8-page paper's sections, news websites (their facts only, in our own words), and a Wikipedia photo when one is needed.",
+  "settings.newsBody": "First, the news you send on Telegram. Then PIB's Gujarati press releases (Hindi and English ones translated when they're short), the Chief Minister's Office, All India Radio and UN News; then the paper's own website (as it wrote them), and on a day short of news, Gujarat's and India's news from news websites (their facts only, in our own words). For the 8-page paper's sections, news websites (their facts only, in our own words), and a Wikipedia photo when one is needed.",
 
   "common.close": "Close",
   "common.back": "Back",

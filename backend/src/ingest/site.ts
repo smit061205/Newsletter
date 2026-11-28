@@ -6,10 +6,10 @@
 //
 //   news      taken at paper time after PIB, the CM's office and All India Radio: one that is the
 //             same news as theirs or the editor's Telegram news is left out (theirs are the record)
-//   Aavtikal  only on a day short of copy, before the AI is asked for features (fill step): an
-//             article already written, once ever (7 Nov: the AI didn't answer for most of an hour)
+//   (Aavtikal's explainers are never printed: the paper is news only, 28 Nov -- "remove aavtikaal.
+//   i want only news"; a short day is filled with the news outlets' news, ingest/sections.ts ingestNews)
 //
-// Both are printed as the website wrote them (rewrite.ts asIs): no AI between them and the page.
+// Its news is printed as the website wrote it (rewrite.ts asIs): no AI between it and the page.
 // A photo only when it is the government's own (the website shows it through /official/<the
 // address in base64>); it is fetched from the government's site itself.
 import { createHash } from "node:crypto";
@@ -155,29 +155,4 @@ export function columnReleases(store: Store, date: string, count: number,
     fit.push({ release: { ...r, photos: [] }, local: Number(/ગુજરાત|ગાંધીનગર|અમદાવાદ/.test(`${r.office} ${r.ministry ?? ""} ${r.headline}`) || !!opts.prefers?.test(`${r.headline} ${body.slice(0, 300)}`)) });
   }
   return fit.sort((a, b) => b.local - a.local).slice(0, count).map((x) => x.release);
-}
-
-/** Up to `count` of Aavtikal's articles never printed before, into the day's paper as they are
- * (its sub-headings left out: the paper's stories have none), the newest first. Returns how many. */
-export async function takeAavtikal(store: Store, date: string, count: number, log: (s: string) => void = () => {}): Promise<number> {
-  const got = await day(date);
-  let n = 0;
-  for (const f of got.features) {
-    if (n >= count) break;
-    const id = idOf(`aavtikal-${f.id}`);
-    if (store.hasRelease(id)) continue;
-    const body = paragraphs(f.body).filter((p) => !p.startsWith("#")).join("\n\n");
-    if (!f.headline.trim() || !body) continue;
-    if (!settable(`${f.headline} ${f.deck} ${body}`)) continue;
-    const release: Release = {
-      id, date, url: `${SITE}/aavtikal/${f.id}`, office: OFFICE, headline: f.headline, subhead: f.deck, body,
-      photos: [], fetchedAt: new Date().toISOString(), source: "site", lang: "gu", ministry: AAVTIKAL,
-    };
-    store.putRelease(release);
-    // (in the paper's inside pages, like the features it stands in for)
-    store.putStory({ ...asIs(release), priority: 5, page: 4 });
-    n++;
-    log(`  ${storyIdOf(release)}: Aavtikal -- ${f.headline.slice(0, 70)}`);
-  }
-  return n;
 }
