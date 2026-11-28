@@ -178,6 +178,55 @@
       ]
     }
   ],
+  "news": {
+    "id": "news",
+    "title": "સમાચાર",
+    "about": "the day's news of Gujarat and India: government, the state's cities and districts, people, public life, courts, farming, the economy and events; Gujarat's own first",
+    "feeds": [
+      {
+        "id": "tv9-gujarat",
+        "name": "ટીવી9 ગુજરાતી: ગુજરાત",
+        "url": "https://tv9gujarati.com/gujarat/feed",
+        "lang": "gu"
+      },
+      {
+        "id": "sandesh-gujarat",
+        "name": "સંદેશ: ગુજરાત",
+        "url": "https://sandesh.com/rss/gujarat.xml",
+        "lang": "gu"
+      },
+      {
+        "id": "ie-ahmedabad",
+        "name": "The Indian Express: Ahmedabad",
+        "url": "https://indianexpress.com/section/cities/ahmedabad/feed/",
+        "lang": "en"
+      },
+      {
+        "id": "tv9-national",
+        "name": "ટીવી9 ગુજરાતી: દેશ",
+        "url": "https://tv9gujarati.com/national/feed",
+        "lang": "gu"
+      },
+      {
+        "id": "sandesh-india",
+        "name": "સંદેશ: દેશ",
+        "url": "https://sandesh.com/rss/india.xml",
+        "lang": "gu"
+      },
+      {
+        "id": "ie-india",
+        "name": "The Indian Express: India",
+        "url": "https://indianexpress.com/section/india/feed/",
+        "lang": "en"
+      },
+      {
+        "id": "hindu-national",
+        "name": "The Hindu: national",
+        "url": "https://www.thehindu.com/news/national/feeder/default.rss",
+        "lang": "en"
+      }
+    ]
+  },
   "page": {
     "width": 1105.5,
     "height": 1488.2

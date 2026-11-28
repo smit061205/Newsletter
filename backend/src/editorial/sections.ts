@@ -55,7 +55,7 @@ const PICK_SCHEMA = {
 export interface SectionPick { id: string; same: string[]; photo?: string; photoIs?: string }
 
 /** A candidate as the AI reads it. */
-const line = (id: string, from: string, headline: string, body: string) => `[${id}] (${from}) ${headline}\n    ${body.replace(/\s+/g, " ").slice(0, 280)}`;
+export const line = (id: string, from: string, headline: string, body: string) => `[${id}] (${from}) ${headline}\n    ${body.replace(/\s+/g, " ").slice(0, 280)}`;
 
 /** The day's section pages' stories: chosen and written. `printed`: the day's paper's story ids (not printed again). */
 export async function writeSections(store: Store, date: string, printed: Set<string>, log: (s: string) => void):
@@ -141,10 +141,11 @@ export async function writeSections(store: Store, date: string, printed: Set<str
   return { stories: out, cost };
 }
 
-/** The AI's choice of a section page's news, most important first (cached for the same candidates). */
-async function pick(store: Store, date: string, section: Section, lines: string[], ids: string[], key: string, log: (s: string) => void):
-  Promise<{ picks: SectionPick[]; cost: number } | null> {
-  const cacheKey = `sections4|${date}|${section.id}|${createHash("sha1").update(ids.join(",")).digest("hex").slice(0, 12)}`;
+/** The AI's choice of a section page's news, most important first (cached for the same candidates).
+ * `have`: the headlines of the news the paper has already (the day's pages' own, for the outlets' news: editorial/news.ts). */
+export async function pick(store: Store, date: string, section: Section, lines: string[], ids: string[], key: string, log: (s: string) => void,
+                           have: string[] = [], most = MOST): Promise<{ picks: SectionPick[]; cost: number } | null> {
+  const cacheKey = `sections4|${date}|${section.id}|${createHash("sha1").update([...ids, ...have, most].join(",")).digest("hex").slice(0, 12)}`;
   const cached = store.fitted(cacheKey);
   if (cached) return { picks: JSON.parse(cached.body), cost: 0 };
   const model = env("OPENROUTER_MODEL") ?? DEFAULT_MODEL;
@@ -159,13 +160,13 @@ async function pick(store: Store, date: string, section: Section, lines: string[
         response_format: { type: "json_schema", json_schema: PICK_SCHEMA },
         messages: [
           { role: "system", content: `You are the editor of the "${section.title}" page of a Gujarati daily from Gandhinagar, Gujarat. The page is about ${section.about}. ` +
-            `From the day's items below, choose ${MOST} for the page (fewer only if fewer are about its subject), the most important first: news that matters to readers in Gujarat, Gujarat's and Gandhinagar's own first, ` +
+            `From the day's items below, choose ${most} for the page (fewer only if fewer are about its subject), the most important first: news that matters to readers in Gujarat, Gujarat's and Gandhinagar's own first, ` +
             `then India's, then the world's. Each choice a different news event; for each, list the other items that report the same event. ` +
             `Leave out items that aren't about the page's subject, gossip, rumours, quizzes, horoscopes, lists of deals or prices to buy, and anything older than the day's news. ` +
             `The items are all from the day's own news (${date}): a match, film or season they look ahead to is still the day's news. ` +
             `For each, name the one person it is about for a file photo (a player, an actor, a businessman, a minister), only when the news is plainly about that person; ` +
             `never a company, team, film or subject: a wrong photo is worse than none.` },
-          { role: "user", content: lines.join("\n") },
+          { role: "user", content: (have.length ? `The paper has this news already: leave out every item that is the same news as one of these.\n${have.map((h) => `- ${h}`).join("\n")}\n\nThe day's items:\n` : "") + lines.join("\n") },
         ],
       }),
     });

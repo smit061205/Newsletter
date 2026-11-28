@@ -14,13 +14,15 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR } from "../config.ts";
 import { profile } from "../profile.ts";
-import { sectionsDay, type Release, type Store } from "../store.ts";
+import { newsDay, sectionsDay, type Release, type Store } from "../store.ts";
 import { decodeEntities, imageSize } from "./pib.ts";
 
 const UA = "CapitalKranti-news-ingest/1.0";
 const PAUSE_MS = 500;
 /** Release ids: above every other source's (official.ts, telegram.ts). */
 const ID_BASE = 8_000_000_000;
+/** The news outlets' items (profile `news`): ids of their own, apart from every other source's. */
+const NEWS_BASE = 9_000_000_000;
 /** The newest items read from each feed (a feed lists 30-200; a page prints six or seven). */
 const PER_FEED = 8;
 /** The fewest words an item's page must give for a story to be written from it. */
@@ -118,10 +120,10 @@ export function articleText(html: string): string[] {
 }
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
-const idOf = (url: string) => {
+const idOf = (url: string, base = ID_BASE) => {
   let h = 0;
   for (const c of url) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return ID_BASE + (h % 1_000_000_000);
+  return base + (h % 1_000_000_000);
 };
 
 /** The day's window: its own news (IST), with the evening before (a match ended late). */
@@ -132,8 +134,22 @@ export function windowOf(date: string): { from: number; to: number } {
 
 /** Every section's news for `date`: each feed's newest items in the day, read where its site allows it. */
 export async function ingestSections(store: Store, date: string, log: (s: string) => void): Promise<{ read: number; refused: string[] }> {
-  const sections = profile.sections ?? [];
-  const day = sectionsDay(date);
+  const got = await readFeeds(store, date, profile.sections ?? [], sectionsDay(date), { base: ID_BASE, source: "section" }, log);
+  log(`the 8-page paper's own news: ${got.read} new item(s)${got.refused.length ? `; refused us: ${[...new Set(got.refused)].join(", ")}` : ""}`);
+  return got;
+}
+
+/** News outlets' Gujarat and India news for the day's pages (profile `news`, 28 Nov: "i want only news"),
+ * kept under a day of its own (store.ts newsDay) until the fill step writes the paper's own story from one. */
+export async function ingestNews(store: Store, date: string, log: (s: string) => void): Promise<{ read: number; refused: string[] }> {
+  if (!profile.news) return { read: 0, refused: [] };
+  const got = await readFeeds(store, date, [profile.news], newsDay(date), { base: NEWS_BASE, source: "news" }, log);
+  log(`more news from the outlets: ${got.read} new item(s)${got.refused.length ? `; refused us: ${[...new Set(got.refused)].join(", ")}` : ""}`);
+  return got;
+}
+
+async function readFeeds(store: Store, date: string, sections: Section[], day: string, as: { base: number; source: "section" | "news" },
+                         log: (s: string) => void): Promise<{ read: number; refused: string[] }> {
   const have = new Set(store.releases(day).map((r) => r.url));
   const { from, to } = windowOf(date);
   const mediaDir = path.join(MEDIA_DIR, date);
@@ -164,13 +180,13 @@ export async function ingestSections(store: Store, date: string, log: (s: string
         const bytes = img?.ok ? new Uint8Array(await img.arrayBuffer()) : null;
         const size = bytes ? imageSize(bytes) : null;
         if (bytes && size && size.width >= 600) {
-          const name = `section-${idOf(it.link) - ID_BASE}.${bytes[0] === 0x89 ? "png" : "jpg"}`;
+          const name = `${as.source}-${idOf(it.link, as.base) - as.base}.${bytes[0] === 0x89 ? "png" : "jpg"}`;
           await writeFile(path.join(mediaDir, name), bytes);
           photos.push(`/media/${date}/${name}`);
         }
       }
-      const release: Release = { id: idOf(it.link), date: day, url: it.link, office: feed.name, headline: it.title, subhead: "",
-                                 body: paras.join("\n\n"), photos, fetchedAt: new Date().toISOString(), source: "section", lang: feed.lang, section: section.id };
+      const release: Release = { id: idOf(it.link, as.base), date: day, url: it.link, office: feed.name, headline: it.title, subhead: "",
+                                 body: paras.join("\n\n"), photos, fetchedAt: new Date().toISOString(), source: as.source, lang: feed.lang, section: section.id };
       store.putRelease(release);
       have.add(it.link);
       read++;
@@ -179,6 +195,5 @@ export async function ingestSections(store: Store, date: string, log: (s: string
   };
   // (the sources side by side; each site's requests one at a time, at its own pace)
   await Promise.all(sections.flatMap((s) => s.feeds.map((f) => one(s, f).catch((e: unknown) => log(`  ${f.name}: couldn't be read (${e instanceof Error ? e.message : e})`)))));
-  log(`the 8-page paper's own news: ${read} new item(s)${refused.length ? `; refused us: ${[...new Set(refused)].join(", ")}` : ""}`);
   return { read, refused };
 }

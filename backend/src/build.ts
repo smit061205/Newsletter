@@ -36,7 +36,7 @@ import { DPI, FACES, FONTS, GRID, MAX_STORY_COLS, PAGE } from "./layout/typograp
 import { profile } from "./profile.ts";
 import { wordCount } from "./editorial/quality.ts";
 import { paperArticleStories } from "./editorial/articles.ts";
-import { AAVTIKAL_MOST, alwaysPrinted, isAavtikal, sectionsDay, storyIdOf, wordForWord, type Progress, type Store, type Story } from "./store.ts";
+import { alwaysPrinted, isAavtikal, newsDay, sectionsDay, storyIdOf, wordForWord, type Progress, type Store, type Story } from "./store.ts";
 
 type Opts = { log: (s: string) => void; issueNumber?: number; pages?: number; noReview?: boolean;
   /** the page review left to run after the paper is saved (reviewLater): the paper is ready a minute sooner */
@@ -291,7 +291,7 @@ export async function fillContext(store: Store, date: string): Promise<{
     }, 0);
     const edits = store.edits(date);
     const dropped = droppedBy(edits);
-    const pool = dedupe(applyTextEdits(store.stories(date), edits).filter((s) => !dropped.has(s.id) && inPaperLanguage(s)))
+    const pool = dedupe(applyTextEdits(store.stories(date), edits).filter((s) => !dropped.has(s.id) && !isAavtikal(s) && inPaperLanguage(s)))
       .sort(byRank);
     const packer = new Packer(m);
     const ctx = {
@@ -367,7 +367,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     // stories not placed yet, most important first
     const edits = store.edits(date);
     const dropped = droppedBy(edits);
-    const releases = new Map([...store.releases(date), ...(opts.sections ? store.releases(sectionsDay(date)) : [])].map((r) => [storyIdOf(r), r]));
+    const releases = new Map([...store.releases(date), ...store.releases(newsDay(date)), ...(opts.sections ? store.releases(sectionsDay(date)) : [])].map((r) => [storyIdOf(r), r]));
     // a feature article (editorial/features.ts) is its own source: the gap
     // closer can lengthen it or brief it from its text, and the number check
     // against a text with no numbers keeps it free of them
@@ -397,7 +397,8 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
       return !!r && !alwaysPrinted(s) && isSpeechText(r) && stories.some((o) => o.id !== s.id && !dropped.has(o.id) && !!releases.get(o.id) && speechTwin(r, releases.get(o.id)!));
     };
     if (outdated.size) log(`  Telegram news sent on an earlier day, outdated: left out: ${[...outdated].join(", ")}`);
-    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && !outdated.has(s.id) && !speechDup(s) && (opts.copy?.translate || inPaperLanguage(s))))
+    // (never Aavtikal's explainers: the paper prints news only, 28 Nov -- "remove aavtikaal. i want only news")
+    let pool = dedupe(applyTextEdits(stories, edits).filter((s) => !dropped.has(s.id) && !outdated.has(s.id) && !speechDup(s) && !isAavtikal(s) && (opts.copy?.translate || inPaperLanguage(s))))
       .map((s) => ({ ...s, photos: s.photo ? [s.photo, ...(releases.get(s.id)?.photos ?? []).filter((u) => u !== s.photo)] : [] }))
       .sort(byRank);
     // the editorial plan ranks the day's stories (an editor's own rank wins)
@@ -501,12 +502,6 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
     const columnTitle = profile.editorial.columnTitle;
     // (copies too, the day's own pick: from 2 Nov they had none, the column being no must; 13 Nov, the
     // developer: "the copy removed tantri sthanethi")
-    // a copy: at most AAVTIKAL_MOST of Aavtikal's explainers (28 Nov: the day's 16 gave each copy 2 to 6, and a
-    // copy leaves 20 stories and more out); the day's paper prints what the fill step took, which keeps to it
-    if (opts.copy) {
-      let explainers = 0;
-      pool = pool.filter((s) => !isAavtikal(s) || alwaysPrinted(s) || ++explainers <= AAVTIKAL_MOST);
-    }
     if (columnTitle) {
       // (never an Aavtikal explainer: the column is the paper's own word on the day's news, Gujarat's first)
       const fit = pool.filter((s) => !alwaysPrinted(s) && !rankedByEditor.has(s.id) && !isAavtikal(s) && wordCount(s.bodies.long) >= COLUMN_WORDS);
@@ -853,7 +848,7 @@ export async function buildIssue(store: Store, date: string, opts: Opts): Promis
   const plotterProblems = warnings;
   // a story's numbers checked again against its release by today's rules (a
   // flag saved when it was written can be stale: "આઠ હજાર 224" read as wrong, 24 Oct)
-  const dayReleases = new Map([...store.releases(date), ...(opts.sections ? store.releases(sectionsDay(date)) : [])].map((r) => [storyIdOf(r), r]));
+  const dayReleases = new Map([...store.releases(date), ...store.releases(newsDay(date)), ...(opts.sections ? store.releases(sectionsDay(date)) : [])].map((r) => [storyIdOf(r), r]));
   const recheck = (s: Story) => {
     const r = dayReleases.get(s.id);
     // (a translation too: "Tara Polaris I" written ૧ was flagged, 7 Nov)

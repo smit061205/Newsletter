@@ -36,7 +36,7 @@ import { checkFacts } from "./facts.ts";
 import { browserServer, closeBrowser } from "../browser.ts";
 import { profile } from "../profile.ts";
 import { sisterOut, sisterStore } from "../sister.ts";
-import { alwaysPrinted, isAavtikal, sectionsDay, wordForWord, type Ad, type Edit, type Release, type Store, type Story } from "../store.ts";
+import { alwaysPrinted, isAavtikal, newsDay, sectionsDay, wordForWord, type Ad, type Edit, type Release, type Store, type Story } from "../store.ts";
 import { asIs, DEFAULT_MODEL, env, numbersNotIn, openRouter, SYSTEM } from "./rewrite.ts";
 import { settable, wordCount } from "./quality.ts";
 import { applyTextEdits, droppedBy, foreignLetters } from "../layout/stories.ts";
@@ -652,8 +652,8 @@ export async function copiesIn(store: Store, specFile: string) {
     const d = spec.date;
     store.db.exec(`attach database '${src.replace(/'/g, "''")}' as src`);
     try {
-      // (and the 8-page paper's own news, kept under a day of its own: store.ts sectionsDay)
-      for (const t of ["releases", "stories", "ads"]) for (const day of t === "ads" ? [d] : [d, sectionsDay(d)]) {
+      // (and the 8-page paper's own news and the outlets' news, kept under days of their own: store.ts sectionsDay, newsDay)
+      for (const t of ["releases", "stories", "ads"]) for (const day of t === "ads" ? [d] : [d, sectionsDay(d), newsDay(d)]) {
         store.db.prepare(`delete from ${t} where date = ?`).run(day);
         store.db.prepare(`insert or replace into ${t} select * from src.${t} where date = ?`).run(day);
       }
